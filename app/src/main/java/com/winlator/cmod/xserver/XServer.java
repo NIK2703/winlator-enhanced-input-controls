@@ -45,6 +45,7 @@ public class XServer {
     private WinHandler winHandler;
     private final EnumMap<Lockable, ReentrantLock> locks = new EnumMap<>(Lockable.class);
     private InputMode inputMode = InputMode.ABSOLUTE;
+    private boolean simulateTouchScreen = false;
 
     public XServer(ScreenInfo screenInfo) {
         Log.d("XServer", "Creating xServer " + screenInfo);
@@ -69,6 +70,10 @@ public class XServer {
 
     public void setInputMode(InputMode inputMode) {
         this.inputMode = inputMode;
+    }
+
+    public InputDeviceManager getInputDeviceManager() {
+        return inputDeviceManager;
     }
 
     public boolean isSimulateTouchScreen() { return simulateTouchScreen; }

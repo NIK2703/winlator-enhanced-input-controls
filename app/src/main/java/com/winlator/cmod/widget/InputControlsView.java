@@ -569,7 +569,6 @@ public class InputControlsView extends View {
             int pointerId = event.getPointerId(actionIndex);
             int actionMasked = event.getActionMasked();
             boolean handled = false;
-            boolean isTouchscreenMode = profile.getMouseMode() == MouseMode.TOUCHSCREEN;
 
             switch (actionMasked) {
                 case MotionEvent.ACTION_DOWN:
@@ -597,7 +596,7 @@ public class InputControlsView extends View {
                             touchpadView.setPointerButtonLeftEnabled(false);
                         }
                     }
-                    if (!handled || isTouchscreenMode) touchpadView.onTouchEvent(event);
+                    if (!handled) touchpadView.onTouchEvent(event);
                     break;
                 }
                 case MotionEvent.ACTION_MOVE: {
@@ -609,7 +608,7 @@ public class InputControlsView extends View {
                         for (ControlElement element : profile.getElements()) {
                             if (element.handleTouchMove(i, x, y)) handled = true;
                         }
-                        if (!handled || isTouchscreenMode) touchpadView.onTouchEvent(event);
+                        if (!handled) touchpadView.onTouchEvent(event);
                     }
                     break;
                 }
@@ -617,7 +616,7 @@ public class InputControlsView extends View {
                 case MotionEvent.ACTION_POINTER_UP:
                 case MotionEvent.ACTION_CANCEL:
                     for (ControlElement element : profile.getElements()) if (element.handleTouchUp(pointerId)) handled = true;
-                    if (!handled || isTouchscreenMode) touchpadView.onTouchEvent(event);
+                    if (!handled) touchpadView.onTouchEvent(event);
                     break;
             }
         }
