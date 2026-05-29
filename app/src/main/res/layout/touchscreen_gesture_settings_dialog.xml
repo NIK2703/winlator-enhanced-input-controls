@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="General"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="@color/colorPrimary" />
+
+        <View style="@style/HorizontalLine" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mouse Mode"
+            android:layout_marginTop="8dp" />
+
+        <Spinner
+            android:id="@+id/SPMouseMode"
+            style="@style/ComboBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:spinnerMode="dialog" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Input Mode"
+            android:layout_marginTop="8dp" />
+
+        <Spinner
+            android:id="@+id/SPInputMode"
+            style="@style/ComboBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:spinnerMode="dialog" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Drag Mode"
+            android:layout_marginTop="8dp" />
+
+        <Spinner
+            android:id="@+id/SPDragMode"
+            style="@style/ComboBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:spinnerMode="dialog" />
+
+        <View style="@style/HorizontalLine"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Timing"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="@color/colorPrimary" />
+
+        <View style="@style/HorizontalLine" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Long Press Timeout (ms)"
+            android:layout_marginTop="8dp" />
+
+        <com.winlator.cmod.widget.NumberPicker
+            android:id="@+id/NPLongPressTimeout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:minValue="100"
+            app:maxValue="1000"
+            app:step="50"
+            app:value="400" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Double Tap Timeout (ms)"
+            android:layout_marginTop="8dp" />
+
+        <com.winlator.cmod.widget.NumberPicker
+            android:id="@+id/NPDoubleTapTimeout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:minValue="50"
+            app:maxValue="500"
+            app:step="50"
+            app:value="200" />
+
+        <CheckBox
+            android:id="@+id/CBDeferSingleTap"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Defer single tap until double tap timeout"
+            android:layout_marginTop="8dp" />
+
+        <View style="@style/HorizontalLine"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Single Finger Gestures"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="@color/colorPrimary" />
+
+        <View style="@style/HorizontalLine" />
+
+        <LinearLayout
+            android:id="@+id/LLSingleFinger"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <View style="@style/HorizontalLine"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Two-Finger Gestures"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="@color/colorPrimary" />
+
+        <View style="@style/HorizontalLine" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Actions when a second finger is already held on screen"
+            android:textSize="12sp"
+            android:textColor="#888888"
+            android:layout_marginTop="4dp" />
+
+        <LinearLayout
+            android:id="@+id/LLTwoFinger"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+    </LinearLayout>
+</ScrollView>

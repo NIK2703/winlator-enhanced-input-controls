@@ -43,6 +43,7 @@ import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.contentdialog.TouchscreenGestureSettingsDialog;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
@@ -237,7 +238,20 @@ public class InputControlsFragment extends Fragment {
                 Intent intent = new Intent(context, ControlsEditorActivity.class);
                 intent.putExtra("profile_id", currentProfile.id);
                 startActivity(intent);
-                getActivity().overridePendingTransition(R.anim.slide_in_up, R.anim.slide_out_down);  // Custom slide animations
+                getActivity().overridePendingTransition(R.anim.slide_in_up, R.anim.slide_out_down);
+            } else {
+                AppUtils.showToast(context, R.string.no_profile_selected);
+            }
+        });
+
+        view.findViewById(R.id.BTGestureSettings).setOnClickListener((v) -> {
+            if (currentProfile != null) {
+                TouchscreenGestureSettingsDialog dialog = new TouchscreenGestureSettingsDialog(getContext(), currentProfile);
+                dialog.setOnSaveListener((savedProfile) -> {
+                    loadProfileSpinner(view.findViewById(R.id.SProfile));
+                    AppUtils.showToast(getContext(), "Gesture settings saved");
+                });
+                dialog.show();
             } else {
                 AppUtils.showToast(context, R.string.no_profile_selected);
             }

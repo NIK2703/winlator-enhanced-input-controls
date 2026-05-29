@@ -310,6 +310,7 @@
     <string name="cannot_edit_default_profile">Cannot edit default profile.</string>
     <string name="do_you_want_to_restore_default_profile">Do you want to restore default profile?</string>
     <string name="simulate_touch_screen">Simulate touch screen</string>
+    <string name="warning_simtouchscreen_overridden">simTouchScreen is overridden when the controls profile uses TOUCHSCREEN mode</string>
     <string name="install_content">Install Content</string>
     <string name="content_type">Content Type</string>
     <string name="contents">Contents</string>

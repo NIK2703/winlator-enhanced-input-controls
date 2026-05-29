@@ -48,6 +48,7 @@ import com.winlator.cmod.fexcore.FEXCorePreset;
 import com.winlator.cmod.fexcore.FEXCorePresetManager;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
+import com.winlator.cmod.inputcontrols.MouseMode;
 import com.winlator.cmod.midi.MidiManager;
 import com.winlator.cmod.widget.CPUListView;
 import com.winlator.cmod.widget.EnvVarsView;
@@ -323,6 +324,35 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         final CheckBox cbSimTouchScreen = findViewById(R.id.CBTouchscreenMode);
         String isTouchScreenMode = shortcut.getExtra("simTouchScreen");
         cbSimTouchScreen.setChecked(isTouchScreenMode.equals("1") ? true : false);
+
+        final boolean[] suppressWarning = {true};
+        sControlsProfile.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (suppressWarning[0]) return;
+                if (cbSimTouchScreen.isChecked() && position > 0) {
+                    ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
+                    if (position - 1 < profiles.size() && profiles.get(position - 1).getMouseMode() == MouseMode.TOUCHSCREEN) {
+                        Toast.makeText(fragment.getContext(), R.string.warning_simtouchscreen_overridden, Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        cbSimTouchScreen.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (suppressWarning[0]) return;
+            if (isChecked) {
+                int pos = sControlsProfile.getSelectedItemPosition();
+                if (pos > 0) {
+                    ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
+                    if (pos - 1 < profiles.size() && profiles.get(pos - 1).getMouseMode() == MouseMode.TOUCHSCREEN) {
+                        Toast.makeText(fragment.getContext(), R.string.warning_simtouchscreen_overridden, Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+        });
+        suppressWarning[0] = false;
 
         ContainerDetailFragment.createWinComponentsTabFromShortcut(this, getContentView(),
                 shortcut.getExtra("wincomponents", shortcut.container.getWinComponents()), isDarkMode);

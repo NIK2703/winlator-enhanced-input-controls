@@ -39,7 +39,6 @@
     </LinearLayout>
 
     <LinearLayout android:id="@+id/LLSubMouse" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone" android:background="#111111" android:paddingTop="8dp" android:paddingBottom="8dp">
-        <Switch android:id="@+id/SWRelativeMouse" android:layout_width="match_parent" android:layout_height="40dp" android:text="Relative Mouse" android:textColor="#CCCCCC" android:paddingStart="56dp" android:paddingEnd="16dp"/>
         <Switch android:id="@+id/SWDisableMouse" android:layout_width="match_parent" android:layout_height="40dp" android:text="Disable Mouse" android:textColor="#CCCCCC" android:paddingStart="56dp" android:paddingEnd="16dp"/>
     </LinearLayout>
 

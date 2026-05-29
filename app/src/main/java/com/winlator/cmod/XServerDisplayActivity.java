@@ -29,6 +29,9 @@ import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 
+import com.winlator.cmod.inputcontrols.InputMode;
+import com.winlator.cmod.inputcontrols.MouseMode;
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -167,7 +170,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
     PreloaderDialog preloaderDialog = null;
     private Runnable configChangedCallback = null;
     private boolean isPaused = false;
-    private boolean isRelativeMouseMovement = false;
     private boolean isMouseDisabled = false;
     private Handler handler;
     private Handler timeoutHandler = new Handler(Looper.getMainLooper());
@@ -530,32 +532,32 @@ if (enableLogs) {
         switch (event.getAction()) {
             case MotionEvent.ACTION_BUTTON_PRESS:
                 if (actionButton == MotionEvent.BUTTON_PRIMARY) {
-                    if (xServer.isRelativeMouseMovement()) xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTDOWN, 0, 0, 0);
+                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTDOWN, 0, 0, 0);
                     else xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
                 } else if (actionButton == MotionEvent.BUTTON_SECONDARY) {
-                    if (xServer.isRelativeMouseMovement()) xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTDOWN, 0, 0, 0);
+                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTDOWN, 0, 0, 0);
                     else xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
                 } else if (actionButton == MotionEvent.BUTTON_TERTIARY) {
-                    if (xServer.isRelativeMouseMovement()) xServer.getWinHandler().mouseEvent(MouseEventFlags.MIDDLEDOWN, 0, 0, 0);
+                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.MIDDLEDOWN, 0, 0, 0);
                     else xServer.injectPointerButtonPress(Pointer.Button.BUTTON_MIDDLE); 
                 }
                 break;
             case MotionEvent.ACTION_BUTTON_RELEASE:
                 if (actionButton == MotionEvent.BUTTON_PRIMARY) {
-                    if (xServer.isRelativeMouseMovement()) xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTUP, 0, 0, 0);
+                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTUP, 0, 0, 0);
                     else xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
                 } else if (actionButton == MotionEvent.BUTTON_SECONDARY) {
-                    if (xServer.isRelativeMouseMovement()) xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTUP, 0, 0, 0);
+                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTUP, 0, 0, 0);
                     else xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
                 } else if (actionButton == MotionEvent.BUTTON_TERTIARY) {
-                    if (xServer.isRelativeMouseMovement()) xServer.getWinHandler().mouseEvent(MouseEventFlags.MIDDLEUP, 0, 0, 0);
+                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.MIDDLEUP, 0, 0, 0);
                     else xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_MIDDLE); 
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
             case MotionEvent.ACTION_HOVER_MOVE:
                 float[] transformedPoint = XForm.transformPoint(xform, event.getX(), event.getY());
-                if (xServer.isRelativeMouseMovement()) {
+                if (xServer.getInputMode() == InputMode.RELATIVE) {
                     xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, (int)transformedPoint[0], (int)transformedPoint[1], 0);
                     if (xServer.getRenderer() != null) {
                         xServer.getRenderer().updateVisualCursorPosition((int) transformedPoint[0], (int) transformedPoint[1]);
@@ -565,13 +567,13 @@ if (enableLogs) {
             case MotionEvent.ACTION_SCROLL:
                 float scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
                 if (scrollY <= -1.0f) {
-                    if (xServer.isRelativeMouseMovement()) xServer.getWinHandler().mouseEvent(MouseEventFlags.WHEEL, 0, 0, (int)scrollY * 270);
+                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.WHEEL, 0, 0, (int)scrollY * 270);
                     else {
                         xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
                         xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
                     }
                 } else if (scrollY >= 1.0f) {
-                    if (xServer.isRelativeMouseMovement()) xServer.getWinHandler().mouseEvent(MouseEventFlags.WHEEL, 0, 0,(int)scrollY * 270);
+                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.WHEEL, 0, 0,(int)scrollY * 270);
                     else {
                         xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
                         xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
@@ -893,6 +895,7 @@ if (enableLogs) {
         inputControlsView = new InputControlsView(this, timeoutHandler, hideControlsRunnable);
         inputControlsView.setOverlayOpacity(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY));
         inputControlsView.setTouchpadView(touchpadView);
+        touchpadView.setInputControlsView(inputControlsView);
         inputControlsView.setXServer(xServer);
         inputControlsView.setVisibility(View.GONE);
         rootView.addView(inputControlsView);
@@ -938,12 +941,12 @@ if (enableLogs) {
 
         if (shortcut != null) {
             String controlsProfile = shortcut.getExtra("controlsProfile");
+            String simTouchScreen = shortcut.getExtra("simTouchScreen");
+            touchpadView.setSimTouchScreen(simTouchScreen.equals("1"));
             if (!controlsProfile.isEmpty()) {
                 ControlsProfile profile = inputControlsManager.getProfile(Integer.parseInt(controlsProfile));
                 if (profile != null) showInputControls(profile);
             }
-            String simTouchScreen = shortcut.getExtra("simTouchScreen");
-            touchpadView.setSimTouchScreen(simTouchScreen.equals("1"));
         }
 
         AppUtils.observeSoftKeyboardVisibility(drawerLayout, renderer::setScreenOffsetYRelativeToCursor);
@@ -1008,14 +1011,6 @@ private void setupLeftSidebar() {
             drawerLayout.closeDrawers();
         });
         
-        Switch swRelativeMouse = findViewById(R.id.SWRelativeMouse);
-        if (swRelativeMouse != null) {
-            swRelativeMouse.setOnCheckedChangeListener((cb, checked) -> {
-                isRelativeMouseMovement = checked;
-                xServer.setRelativeMouseMovement(isRelativeMouseMovement);
-            });
-        }
-
         Switch swDisableMouse = findViewById(R.id.SWDisableMouse);
         if (swDisableMouse != null) {
             swDisableMouse.setOnCheckedChangeListener((cb, checked) -> {
@@ -1513,8 +1508,16 @@ private void applySidebarSettings() {
         inputControlsView.requestFocus();
         inputControlsView.setProfile(profile);
 
+        touchpadView.setProfile(profile);
         touchpadView.setSensitivity(profile.getCursorSpeed() * globalCursorSpeed);
         touchpadView.setPointerButtonRightEnabled(false);
+        if (profile.getMouseMode() == MouseMode.TOUCHSCREEN) {
+            touchpadView.setSimTouchScreen(false);
+        }
+
+        inputControlsView.setInputMode(profile.getInputMode());
+        xServer.setInputMode(profile.getInputMode());
+        xServer.getInputDeviceManager().setInputMode(profile.getInputMode());
 
         inputControlsView.invalidate();
         winHandler.sendGamepadState();
@@ -1525,9 +1528,14 @@ private void applySidebarSettings() {
         inputControlsView.setVisibility(View.GONE);
         inputControlsView.setProfile(null);
 
+        touchpadView.clearProfile();
         touchpadView.setSensitivity(globalCursorSpeed);
         touchpadView.setPointerButtonLeftEnabled(true);
         touchpadView.setPointerButtonRightEnabled(true);
+
+        inputControlsView.setInputMode(InputMode.ABSOLUTE);
+        xServer.setInputMode(InputMode.ABSOLUTE);
+        xServer.getInputDeviceManager().setInputMode(InputMode.ABSOLUTE);
 
         inputControlsView.invalidate();
         winHandler.sendGamepadState();
