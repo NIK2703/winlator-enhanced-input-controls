@@ -215,7 +215,21 @@ public class InputControlsManager {
             int profileId = 0;
             String profileName = null;
             float cursorSpeed = Float.NaN;
-            int fieldsRead = 0;
+
+            // Buffered gesture values
+            String mouseModeStr = null;
+            String inputModeStr = null;
+            String dragModeStr = null;
+            String singleTapActionStr = null;
+            String longPressActionStr = null;
+            String doubleTapActionStr = null;
+            String singleTap2ndFingerActionStr = null;
+            String longPress2ndFingerActionStr = null;
+            String doubleTap2ndFingerActionStr = null;
+            int doubleTapTimeout = -1;
+            int longPressTimeout = -1;
+            boolean deferSingleTap = false;
+            boolean hasDeferSingleTap = false;
 
             reader.beginObject();
             while (reader.hasNext()) {
@@ -223,25 +237,59 @@ public class InputControlsManager {
 
                 if (name.equals("id")) {
                     profileId = reader.nextInt();
-                    fieldsRead++;
                 }
                 else if (name.equals("name")) {
                     profileName = reader.nextString();
-                    fieldsRead++;
                 }
                 else if (name.equals("cursorSpeed")) {
                     cursorSpeed = (float) reader.nextDouble();
-                    fieldsRead++;
+                }
+                else if (name.equals("touchscreenGestures")) {
+                    reader.beginObject();
+                    while (reader.hasNext()) {
+                        String key = reader.nextName();
+                        switch (key) {
+                            case "mouseMode": mouseModeStr = reader.nextString(); break;
+                            case "inputMode": inputModeStr = reader.nextString(); break;
+                            case "dragMode": dragModeStr = reader.nextString(); break;
+                            case "singleTapAction": singleTapActionStr = reader.nextString(); break;
+                            case "longPressAction": longPressActionStr = reader.nextString(); break;
+                            case "doubleTapAction": doubleTapActionStr = reader.nextString(); break;
+                            case "singleTap2ndFingerAction": singleTap2ndFingerActionStr = reader.nextString(); break;
+                            case "longPress2ndFingerAction": longPress2ndFingerActionStr = reader.nextString(); break;
+                            case "doubleTap2ndFingerAction": doubleTap2ndFingerActionStr = reader.nextString(); break;
+                            case "doubleTapTimeout": doubleTapTimeout = reader.nextInt(); break;
+                            case "longPressTimeout": longPressTimeout = reader.nextInt(); break;
+                            case "deferSingleTap": deferSingleTap = reader.nextBoolean(); hasDeferSingleTap = true; break;
+                            default: reader.skipValue(); break;
+                        }
+                    }
+                    reader.endObject();
                 }
                 else {
-                    if (fieldsRead == 3) break;
                     reader.skipValue();
                 }
             }
 
             ControlsProfile profile = new ControlsProfile(context, profileId);
             profile.setName(profileName);
-            profile.setCursorSpeed(cursorSpeed);
+            if (!Float.isNaN(cursorSpeed)) profile.setCursorSpeed(cursorSpeed);
+
+            // Apply buffered gesture values
+            if (mouseModeStr != null) profile.setMouseMode(ControlsProfile.parseMouseMode(mouseModeStr));
+            if (inputModeStr != null) profile.setInputMode(ControlsProfile.parseInputMode(inputModeStr));
+            if (dragModeStr != null) profile.setDragMode(ControlsProfile.parseDragMode(dragModeStr));
+            if (singleTapActionStr != null) profile.setSingleTapAction(ControlsProfile.parseBinding(singleTapActionStr, Binding.MOUSE_LEFT_BUTTON));
+            if (longPressActionStr != null) profile.setLongPressAction(ControlsProfile.parseBinding(longPressActionStr, Binding.MOUSE_LEFT_BUTTON));
+            if (doubleTapActionStr != null) profile.setDoubleTapAction(ControlsProfile.parseBinding(doubleTapActionStr, Binding.NONE));
+            if (singleTap2ndFingerActionStr != null) profile.setSingleTap2ndFingerAction(ControlsProfile.parseBinding(singleTap2ndFingerActionStr, Binding.MOUSE_RIGHT_BUTTON));
+            if (longPress2ndFingerActionStr != null) profile.setLongPress2ndFingerAction(ControlsProfile.parseBinding(longPress2ndFingerActionStr, Binding.MOUSE_RIGHT_BUTTON));
+            if (doubleTap2ndFingerActionStr != null) profile.setDoubleTap2ndFingerAction(ControlsProfile.parseBinding(doubleTap2ndFingerActionStr, Binding.NONE));
+            if (doubleTapTimeout >= 0) profile.setDoubleTapTimeout(doubleTapTimeout);
+            if (longPressTimeout >= 0) profile.setLongPressTimeout(longPressTimeout);
+            if (hasDeferSingleTap) profile.setDeferSingleTap(deferSingleTap);
+
+            profile.markGestureSettingsLoaded();
             return profile;
         }
         catch (IOException e) {

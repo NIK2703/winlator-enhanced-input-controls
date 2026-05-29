@@ -10,6 +10,7 @@ import android.graphics.Rect;
 import androidx.core.graphics.ColorUtils;
 
 import com.winlator.cmod.core.CubicBezierInterpolator;
+import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.widget.TouchpadView;
@@ -784,7 +785,7 @@ public class ControlElement {
 
                     if (cursorDx != 0 || cursorDy != 0)  {
                         XServer xServer = inputControlsView.getXServer();
-                        if (xServer.isRelativeMouseMovement())
+                        if (xServer.getInputMode() == InputMode.RELATIVE)
                             xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, cursorDx, cursorDy, 0);
                         else
                             inputControlsView.getXServer().injectPointerMoveDelta(cursorDx, cursorDy);

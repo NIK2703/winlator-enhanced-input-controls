@@ -31,6 +31,8 @@ import androidx.preference.PreferenceManager;
 import com.winlator.cmod.R;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlElement;
+import com.winlator.cmod.inputcontrols.InputMode;
+import com.winlator.cmod.inputcontrols.MouseMode;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.ExternalControllerBinding;
@@ -76,7 +78,12 @@ public class InputControlsView extends View {
 
     private ControlElement stickElement;
 
+    private InputMode inputMode = InputMode.ABSOLUTE;
     private boolean focusOnStick = false; // A flag to determine if we are focusing on the stick
+
+    public void setInputMode(InputMode mode) {
+        this.inputMode = mode;
+    }
 
     public boolean isFocusedOnStick() {
         return focusOnStick;
@@ -400,7 +407,7 @@ public class InputControlsView extends View {
                 @Override
                 public void run() {
                     if (mouseMoveOffset.x != 0 || mouseMoveOffset.y != 0) {// Only move if there's an offsete if there's an offset
-                        if (xServer.isRelativeMouseMovement())
+                        if (inputMode == InputMode.RELATIVE)
                             winHandler.mouseEvent(MouseEventFlags.MOVE, (int) (mouseMoveOffset.x * cursorSpeed * 10), (int) (mouseMoveOffset.y * cursorSpeed * 10), 0);
                         else
                             xServer.injectPointerMoveDelta(
@@ -562,6 +569,7 @@ public class InputControlsView extends View {
             int pointerId = event.getPointerId(actionIndex);
             int actionMasked = event.getActionMasked();
             boolean handled = false;
+            boolean isTouchscreenMode = profile.getMouseMode() == MouseMode.TOUCHSCREEN;
 
             switch (actionMasked) {
                 case MotionEvent.ACTION_DOWN:
@@ -580,18 +588,16 @@ public class InputControlsView extends View {
                                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                                         vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE));
                                     } else {
-                                        vibrator.vibrate(50); // Legacy method for older Android versions
+                                        vibrator.vibrate(50);
                                     }
-
                                 }
-
                             }
                         }
                         if (element.getBindingAt(0) == Binding.MOUSE_LEFT_BUTTON) {
                             touchpadView.setPointerButtonLeftEnabled(false);
                         }
                     }
-                    if (!handled) touchpadView.onTouchEvent(event);
+                    if (!handled || isTouchscreenMode) touchpadView.onTouchEvent(event);
                     break;
                 }
                 case MotionEvent.ACTION_MOVE: {
@@ -603,7 +609,7 @@ public class InputControlsView extends View {
                         for (ControlElement element : profile.getElements()) {
                             if (element.handleTouchMove(i, x, y)) handled = true;
                         }
-                        if (!handled) touchpadView.onTouchEvent(event);
+                        if (!handled || isTouchscreenMode) touchpadView.onTouchEvent(event);
                     }
                     break;
                 }
@@ -611,7 +617,7 @@ public class InputControlsView extends View {
                 case MotionEvent.ACTION_POINTER_UP:
                 case MotionEvent.ACTION_CANCEL:
                     for (ControlElement element : profile.getElements()) if (element.handleTouchUp(pointerId)) handled = true;
-                    if (!handled) touchpadView.onTouchEvent(event);
+                    if (!handled || isTouchscreenMode) touchpadView.onTouchEvent(event);
                     break;
             }
         }
@@ -752,7 +758,7 @@ public class InputControlsView extends View {
                 Pointer.Button pointerButton = binding.getPointerButton();
                 if (isActionDown) {
                     if (pointerButton != null) {
-                        if (xServer.isRelativeMouseMovement()) {
+                        if (inputMode == InputMode.RELATIVE) {
                             int wheelDelta = pointerButton == Pointer.Button.BUTTON_SCROLL_UP ? MOUSE_WHEEL_DELTA : (pointerButton == Pointer.Button.BUTTON_SCROLL_DOWN ? -MOUSE_WHEEL_DELTA : 0);
                             winHandler.mouseEvent(MouseEventFlags.getFlagFor(pointerButton, true), 0, 0, wheelDelta);
                         } else {
@@ -763,7 +769,7 @@ public class InputControlsView extends View {
                 }
                 else {
                     if (pointerButton != null) {
-                        if (xServer.isRelativeMouseMovement()) {
+                        if (inputMode == InputMode.RELATIVE) {
                             winHandler.mouseEvent(MouseEventFlags.getFlagFor(pointerButton, false), 0, 0, 0);
                         } else {
                             xServer.injectPointerButtonRelease(pointerButton);

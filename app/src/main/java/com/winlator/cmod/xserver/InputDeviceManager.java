@@ -1,5 +1,6 @@
 package com.winlator.cmod.xserver;
 
+import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.events.ButtonPress;
@@ -15,8 +16,13 @@ import com.winlator.cmod.xserver.events.PointerWindowEvent;
 
 public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyboard.OnKeyboardListener, WindowManager.OnWindowModificationListener, XResourceManager.OnResourceLifecycleListener {
     private static final byte MOUSE_WHEEL_DELTA = 120;
+    private InputMode inputMode = InputMode.ABSOLUTE;
     private Window pointWindow;
     private final XServer xServer;
+
+    public void setInputMode(InputMode mode) {
+        this.inputMode = mode;
+    }
 
     public InputDeviceManager(XServer xServer) {
         this.xServer = xServer;
@@ -126,7 +132,7 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
 
     @Override
     public void onPointerButtonPress(Pointer.Button button) {
-        if (xServer.isRelativeMouseMovement()) {
+        if (inputMode == InputMode.RELATIVE) {
             WinHandler winHandler = xServer.getWinHandler();
             int wheelDelta = button == Pointer.Button.BUTTON_SCROLL_UP ? MOUSE_WHEEL_DELTA : (button == Pointer.Button.BUTTON_SCROLL_DOWN ? -MOUSE_WHEEL_DELTA : 0);
             winHandler.mouseEvent(MouseEventFlags.getFlagFor(button, true), 0, 0, wheelDelta);
@@ -154,7 +160,7 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
 
     @Override
     public void onPointerButtonRelease(Pointer.Button button) {
-        if (xServer.isRelativeMouseMovement()) {
+        if (inputMode == InputMode.RELATIVE) {
             WinHandler winHandler = xServer.getWinHandler();
             winHandler.mouseEvent(MouseEventFlags.getFlagFor(button, false), 0, 0, 0);
         }

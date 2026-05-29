@@ -5,6 +5,7 @@ import static com.winlator.cmod.xserver.XClientRequestHandler.RESPONSE_CODE_SUCC
 import android.graphics.Rect;
 import android.util.Log;
 
+import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xconnector.XStreamLock;
@@ -20,7 +21,7 @@ public abstract class GrabRequests {
     private enum Status {SUCCESS, ALREADY_GRABBED, INVALID_TIME, NOT_VIEWABLE, FROZEN}
 
     public static void grabPointer(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {
-        if (client.xServer.isRelativeMouseMovement()) {
+        if (client.xServer.getInputMode() == InputMode.RELATIVE) {
             client.skipRequest();
             try (XStreamLock lock = outputStream.lock()) {
                 outputStream.writeByte(RESPONSE_CODE_SUCCESS);

@@ -1,6 +1,7 @@
 package com.winlator.cmod.inputcontrols;
 
 import android.content.Context;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -29,6 +30,21 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private boolean virtualGamepad = false;
     private final Context context;
     private GamepadState gamepadState;
+
+    // Touchscreen gesture settings
+    private MouseMode mouseMode = MouseMode.TOUCHPAD;
+    private InputMode inputMode = InputMode.ABSOLUTE;
+    private DragMode dragMode = DragMode.AUTO;
+    private Binding singleTapAction = Binding.MOUSE_LEFT_BUTTON;
+    private Binding longPressAction = Binding.MOUSE_LEFT_BUTTON;
+    private Binding doubleTapAction = Binding.NONE;
+    private Binding singleTap2ndFingerAction = Binding.MOUSE_RIGHT_BUTTON;
+    private Binding longPress2ndFingerAction = Binding.MOUSE_RIGHT_BUTTON;
+    private Binding doubleTap2ndFingerAction = Binding.NONE;
+    private int doubleTapTimeout = 200;
+    private int longPressTimeout = 400;
+    private boolean deferSingleTap = false;
+    private boolean gestureSettingsLoaded = false;
 
     public ControlsProfile(Context context, int id) {
         this.context = context;
@@ -108,6 +124,208 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         return Integer.compare(id, o.id);
     }
 
+    // ---- Touchscreen gesture settings ----
+
+    public MouseMode getMouseMode() {
+        ensureGestureSettingsLoaded();
+        return mouseMode;
+    }
+
+    public void setMouseMode(MouseMode mouseMode) {
+        this.mouseMode = mouseMode;
+    }
+
+    public InputMode getInputMode() {
+        ensureGestureSettingsLoaded();
+        return inputMode;
+    }
+
+    public void setInputMode(InputMode inputMode) {
+        this.inputMode = inputMode;
+    }
+
+    public DragMode getDragMode() {
+        ensureGestureSettingsLoaded();
+        return dragMode;
+    }
+
+    public void setDragMode(DragMode dragMode) {
+        this.dragMode = dragMode;
+    }
+
+    public Binding getSingleTapAction() {
+        ensureGestureSettingsLoaded();
+        return singleTapAction;
+    }
+
+    public void setSingleTapAction(Binding binding) {
+        this.singleTapAction = binding;
+    }
+
+    public Binding getLongPressAction() {
+        ensureGestureSettingsLoaded();
+        return longPressAction;
+    }
+
+    public void setLongPressAction(Binding binding) {
+        this.longPressAction = binding;
+    }
+
+    public Binding getDoubleTapAction() {
+        ensureGestureSettingsLoaded();
+        return doubleTapAction;
+    }
+
+    public void setDoubleTapAction(Binding binding) {
+        this.doubleTapAction = binding;
+    }
+
+    public Binding getSingleTap2ndFingerAction() {
+        ensureGestureSettingsLoaded();
+        return singleTap2ndFingerAction;
+    }
+
+    public void setSingleTap2ndFingerAction(Binding binding) {
+        this.singleTap2ndFingerAction = binding;
+    }
+
+    public Binding getLongPress2ndFingerAction() {
+        ensureGestureSettingsLoaded();
+        return longPress2ndFingerAction;
+    }
+
+    public void setLongPress2ndFingerAction(Binding binding) {
+        this.longPress2ndFingerAction = binding;
+    }
+
+    public Binding getDoubleTap2ndFingerAction() {
+        ensureGestureSettingsLoaded();
+        return doubleTap2ndFingerAction;
+    }
+
+    public void setDoubleTap2ndFingerAction(Binding binding) {
+        this.doubleTap2ndFingerAction = binding;
+    }
+
+    public int getDoubleTapTimeout() {
+        ensureGestureSettingsLoaded();
+        return doubleTapTimeout;
+    }
+
+    public void setDoubleTapTimeout(int timeout) {
+        this.doubleTapTimeout = clamp(timeout, 50, 500);
+    }
+
+    public int getLongPressTimeout() {
+        ensureGestureSettingsLoaded();
+        return longPressTimeout;
+    }
+
+    public void setLongPressTimeout(int timeout) {
+        this.longPressTimeout = clamp(timeout, 50, 1000);
+    }
+
+    public boolean isDeferSingleTap() {
+        ensureGestureSettingsLoaded();
+        return deferSingleTap;
+    }
+
+    public void setDeferSingleTap(boolean defer) {
+        this.deferSingleTap = defer;
+    }
+
+    private void ensureGestureSettingsLoaded() {
+        if (gestureSettingsLoaded) return;
+        File file = getProfileFile(context, id);
+        if (!file.isFile()) {
+            gestureSettingsLoaded = true;
+            return;
+        }
+        try {
+            JSONObject data = new JSONObject(FileUtils.readString(file));
+            if (data.has("touchscreenGestures")) {
+                loadGestureSettingsFromJson(data.getJSONObject("touchscreenGestures"));
+            }
+        }
+        catch (JSONException e) {
+            Log.w("ControlsProfile", "Failed to load touchscreenGestures", e);
+        }
+        gestureSettingsLoaded = true;
+    }
+
+    public void loadGestureSettingsFromJson(JSONObject gestureData) {
+        if (gestureData == null) return;
+        try {
+            if (gestureData.has("mouseMode"))
+                mouseMode = parseEnum(MouseMode.class, gestureData.getString("mouseMode"), MouseMode.TOUCHPAD);
+            if (gestureData.has("inputMode"))
+                inputMode = parseEnum(InputMode.class, gestureData.getString("inputMode"), InputMode.ABSOLUTE);
+            if (gestureData.has("dragMode"))
+                dragMode = parseEnum(DragMode.class, gestureData.getString("dragMode"), DragMode.AUTO);
+            if (gestureData.has("singleTapAction"))
+                singleTapAction = parseBinding(gestureData.getString("singleTapAction"), Binding.MOUSE_LEFT_BUTTON);
+            if (gestureData.has("longPressAction"))
+                longPressAction = parseBinding(gestureData.getString("longPressAction"), Binding.MOUSE_LEFT_BUTTON);
+            if (gestureData.has("doubleTapAction"))
+                doubleTapAction = parseBinding(gestureData.getString("doubleTapAction"), Binding.NONE);
+            if (gestureData.has("singleTap2ndFingerAction"))
+                singleTap2ndFingerAction = parseBinding(gestureData.getString("singleTap2ndFingerAction"), Binding.MOUSE_RIGHT_BUTTON);
+            if (gestureData.has("longPress2ndFingerAction"))
+                longPress2ndFingerAction = parseBinding(gestureData.getString("longPress2ndFingerAction"), Binding.MOUSE_RIGHT_BUTTON);
+            if (gestureData.has("doubleTap2ndFingerAction"))
+                doubleTap2ndFingerAction = parseBinding(gestureData.getString("doubleTap2ndFingerAction"), Binding.NONE);
+            if (gestureData.has("doubleTapTimeout"))
+                doubleTapTimeout = clamp(gestureData.getInt("doubleTapTimeout"), 50, 500);
+            if (gestureData.has("longPressTimeout"))
+                longPressTimeout = clamp(gestureData.getInt("longPressTimeout"), 50, 1000);
+            if (gestureData.has("deferSingleTap"))
+                deferSingleTap = gestureData.getBoolean("deferSingleTap");
+        }
+        catch (JSONException e) {
+            Log.w("ControlsProfile", "Failed to parse gesture field in touchscreenGestures", e);
+        }
+    }
+
+    public void markGestureSettingsLoaded() {
+        this.gestureSettingsLoaded = true;
+    }
+
+    public static MouseMode parseMouseMode(String value) {
+        return parseEnum(MouseMode.class, value, MouseMode.TOUCHPAD);
+    }
+
+    public static InputMode parseInputMode(String value) {
+        return parseEnum(InputMode.class, value, InputMode.ABSOLUTE);
+    }
+
+    public static DragMode parseDragMode(String value) {
+        return parseEnum(DragMode.class, value, DragMode.AUTO);
+    }
+
+    static <T extends Enum<T>> T parseEnum(Class<T> enumType, String value, T defaultValue) {
+        if (value == null) return defaultValue;
+        for (T constant : enumType.getEnumConstants()) {
+            if (constant.name().equalsIgnoreCase(value)) return constant;
+        }
+        return defaultValue;
+    }
+
+    public static Binding parseBinding(String value, Binding defaultValue) {
+        if (value == null) return defaultValue;
+        try {
+            return Binding.valueOf(value);
+        }
+        catch (IllegalArgumentException e) {
+            return defaultValue;
+        }
+    }
+
+    public static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    // ---- End of touchscreen gesture settings ----
+
     public boolean isElementsLoaded() {
         return elementsLoaded;
     }
@@ -141,6 +359,21 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 }
             }
             if (controllersJSONArray.length() > 0) data.put("controllers", controllersJSONArray);
+
+            JSONObject gestureData = new JSONObject();
+            gestureData.put("mouseMode", mouseMode.name());
+            gestureData.put("inputMode", inputMode.name());
+            gestureData.put("dragMode", dragMode.name());
+            gestureData.put("singleTapAction", singleTapAction.name());
+            gestureData.put("longPressAction", longPressAction.name());
+            gestureData.put("doubleTapAction", doubleTapAction.name());
+            gestureData.put("singleTap2ndFingerAction", singleTap2ndFingerAction.name());
+            gestureData.put("longPress2ndFingerAction", longPress2ndFingerAction.name());
+            gestureData.put("doubleTap2ndFingerAction", doubleTap2ndFingerAction.name());
+            gestureData.put("doubleTapTimeout", doubleTapTimeout);
+            gestureData.put("longPressTimeout", longPressTimeout);
+            gestureData.put("deferSingleTap", deferSingleTap);
+            data.put("touchscreenGestures", gestureData);
 
             FileUtils.writeString(file, data.toString());
         }
@@ -215,6 +448,12 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
         try {
             JSONObject profileJSONObject = new JSONObject(FileUtils.readString(file));
+
+            if (profileJSONObject.has("touchscreenGestures")) {
+                loadGestureSettingsFromJson(profileJSONObject.getJSONObject("touchscreenGestures"));
+            }
+            gestureSettingsLoaded = true;
+
             JSONArray elementsJSONArray = profileJSONObject.getJSONArray("elements");
             for (int i = 0; i < elementsJSONArray.length(); i++) {
                 JSONObject elementJSONObject = elementsJSONArray.getJSONObject(i);

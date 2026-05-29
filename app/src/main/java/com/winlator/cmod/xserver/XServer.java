@@ -4,6 +4,7 @@ import android.graphics.Rect;
 import android.util.Log;
 import android.util.SparseArray;
 
+import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.renderer.VulkanRenderer;
 import com.winlator.cmod.winhandler.WinHandler;
@@ -43,8 +44,7 @@ public class XServer {
     private VulkanRenderer renderer;
     private WinHandler winHandler;
     private final EnumMap<Lockable, ReentrantLock> locks = new EnumMap<>(Lockable.class);
-    private boolean relativeMouseMovement = false;
-    private boolean simulateTouchScreen = false;
+    private InputMode inputMode = InputMode.ABSOLUTE;
 
     public XServer(ScreenInfo screenInfo) {
         Log.d("XServer", "Creating xServer " + screenInfo);
@@ -63,12 +63,12 @@ public class XServer {
         setupExtensions();
     }
 
-    public boolean isRelativeMouseMovement() {
-        return relativeMouseMovement;
+    public InputMode getInputMode() {
+        return inputMode;
     }
 
-    public void setRelativeMouseMovement(boolean relativeMouseMovement) {
-        this.relativeMouseMovement = relativeMouseMovement;
+    public void setInputMode(InputMode inputMode) {
+        this.inputMode = inputMode;
     }
 
     public boolean isSimulateTouchScreen() { return simulateTouchScreen; }
