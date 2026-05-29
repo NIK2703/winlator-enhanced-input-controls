@@ -6,10 +6,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
+
+import android.view.ViewGroup;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
@@ -18,6 +19,7 @@ import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.DragMode;
 import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.inputcontrols.MouseMode;
+import com.winlator.cmod.inputcontrols.SecondFingerMode;
 import com.winlator.cmod.widget.NumberPicker;
 
 import java.util.HashMap;
@@ -51,18 +53,31 @@ public class TouchscreenGestureSettingsDialog {
         Spinner spMouseMode = view.findViewById(R.id.SPMouseMode);
         Spinner spInputMode = view.findViewById(R.id.SPInputMode);
         Spinner spDragMode = view.findViewById(R.id.SPDragMode);
+        Spinner spSecondFingerMode = view.findViewById(R.id.SPSecondFingerMode);
 
         setupEnumSpinner(spMouseMode, MouseMode.values(), profile.getMouseMode());
         setupEnumSpinner(spInputMode, InputMode.values(), profile.getInputMode());
         setupEnumSpinner(spDragMode, DragMode.values(), profile.getDragMode());
+        setupEnumSpinner(spSecondFingerMode, SecondFingerMode.values(), profile.getSecondFingerMode());
+
+        LinearLayout llTwoFingerSection = view.findViewById(R.id.LLTwoFingerSection);
+        Runnable updateTwoFingerVisibility = () -> {
+            SecondFingerMode mode = (SecondFingerMode) spSecondFingerMode.getSelectedItem();
+            llTwoFingerSection.setVisibility(mode == SecondFingerMode.SECOND_TAP_ACTIONS ? View.VISIBLE : View.GONE);
+        };
+        spSecondFingerMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) { updateTwoFingerVisibility.run(); }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        updateTwoFingerVisibility.run();
 
         NumberPicker npLongPress = view.findViewById(R.id.NPLongPressTimeout);
         NumberPicker npDoubleTap = view.findViewById(R.id.NPDoubleTapTimeout);
-        CheckBox cbDeferSingleTap = view.findViewById(R.id.CBDeferSingleTap);
+        NumberPicker npTapClickDelay = view.findViewById(R.id.NPTapClickDelay);
 
         npLongPress.setValue(profile.getLongPressTimeout());
         npDoubleTap.setValue(profile.getDoubleTapTimeout());
-        cbDeferSingleTap.setChecked(profile.isDeferSingleTap());
+        npTapClickDelay.setValue(profile.getTapClickDelay());
 
         LinearLayout llSingleFinger = view.findViewById(R.id.LLSingleFinger);
         addBindingPicker(llSingleFinger, "single", "Single Tap", profile.getSingleTapAction());
@@ -75,21 +90,22 @@ public class TouchscreenGestureSettingsDialog {
         addBindingPicker(llTwoFinger, "double_2nd", "Double Tap", profile.getDoubleTap2ndFingerAction());
 
         builder.setPositiveButton("Save", (dialog, which) -> save(
-                spMouseMode, spInputMode, spDragMode,
-                npLongPress, npDoubleTap, cbDeferSingleTap));
+                spMouseMode, spInputMode, spDragMode, spSecondFingerMode,
+                npLongPress, npDoubleTap, npTapClickDelay));
         builder.setNegativeButton("Cancel", null);
 
         builder.create().show();
     }
 
-    private void save(Spinner spMouseMode, Spinner spInputMode, Spinner spDragMode,
-                      NumberPicker npLongPress, NumberPicker npDoubleTap, CheckBox cbDeferSingleTap) {
+    private void save(Spinner spMouseMode, Spinner spInputMode, Spinner spDragMode, Spinner spSecondFingerMode,
+                      NumberPicker npLongPress, NumberPicker npDoubleTap, NumberPicker npTapClickDelay) {
         profile.setMouseMode((MouseMode) spMouseMode.getSelectedItem());
         profile.setInputMode((InputMode) spInputMode.getSelectedItem());
         profile.setDragMode((DragMode) spDragMode.getSelectedItem());
+        profile.setSecondFingerMode((SecondFingerMode) spSecondFingerMode.getSelectedItem());
         profile.setLongPressTimeout(npLongPress.getValue());
         profile.setDoubleTapTimeout(npDoubleTap.getValue());
-        profile.setDeferSingleTap(cbDeferSingleTap.isChecked());
+        profile.setTapClickDelay(npTapClickDelay.getValue());
 
         profile.setSingleTapAction(bindingValues.getOrDefault("single", Binding.NONE));
         profile.setLongPressAction(bindingValues.getOrDefault("long", Binding.NONE));
@@ -157,13 +173,11 @@ public class TouchscreenGestureSettingsDialog {
     }
 
     private <T extends Enum<T>> void setupEnumSpinner(Spinner spinner, T[] values, T current) {
-        String[] labels = new String[values.length];
         int selectedIndex = 0;
         for (int i = 0; i < values.length; i++) {
-            labels[i] = values[i].toString();
             if (values[i] == current) selectedIndex = i;
         }
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, labels));
+        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, values));
         spinner.setSelection(selectedIndex, false);
     }
 }

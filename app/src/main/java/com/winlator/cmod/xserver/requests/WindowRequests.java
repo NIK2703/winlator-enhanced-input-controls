@@ -274,7 +274,7 @@ public abstract class WindowRequests {
 
         try (XStreamLock lock = outputStream.lock()) {
             outputStream.writeByte(RESPONSE_CODE_SUCCESS);
-            outputStream.writeByte((byte)(!client.xServer.getInputMode() == InputMode.RELATIVE ? 1 : 0));
+            outputStream.writeByte((byte)(client.xServer.getInputMode() != InputMode.RELATIVE ? 1 : 0));
             outputStream.writeShort(client.getSequenceNumber());
             outputStream.writeInt(0);
             outputStream.writeInt(client.xServer.windowManager.rootWindow.id);

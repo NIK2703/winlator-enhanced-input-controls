@@ -43,7 +43,8 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private Binding doubleTap2ndFingerAction = Binding.NONE;
     private int doubleTapTimeout = 200;
     private int longPressTimeout = 400;
-    private boolean deferSingleTap = false;
+    private int tapClickDelay = 0;
+    private SecondFingerMode secondFingerMode = SecondFingerMode.SECOND_TAP_ACTIONS;
     private boolean gestureSettingsLoaded = false;
 
     public ControlsProfile(Context context, int id) {
@@ -225,13 +226,22 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.longPressTimeout = clamp(timeout, 50, 1000);
     }
 
-    public boolean isDeferSingleTap() {
+    public int getTapClickDelay() {
         ensureGestureSettingsLoaded();
-        return deferSingleTap;
+        return tapClickDelay;
     }
 
-    public void setDeferSingleTap(boolean defer) {
-        this.deferSingleTap = defer;
+    public void setTapClickDelay(int delay) {
+        this.tapClickDelay = clamp(delay, 0, 10);
+    }
+
+    public SecondFingerMode getSecondFingerMode() {
+        ensureGestureSettingsLoaded();
+        return secondFingerMode;
+    }
+
+    public void setSecondFingerMode(SecondFingerMode mode) {
+        this.secondFingerMode = mode;
     }
 
     private void ensureGestureSettingsLoaded() {
@@ -278,8 +288,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 doubleTapTimeout = clamp(gestureData.getInt("doubleTapTimeout"), 50, 500);
             if (gestureData.has("longPressTimeout"))
                 longPressTimeout = clamp(gestureData.getInt("longPressTimeout"), 50, 1000);
-            if (gestureData.has("deferSingleTap"))
-                deferSingleTap = gestureData.getBoolean("deferSingleTap");
+            if (gestureData.has("tapClickDelay"))
+                tapClickDelay = clamp(gestureData.getInt("tapClickDelay"), 0, 10);
+            if (gestureData.has("secondFingerMode"))
+                secondFingerMode = parseEnum(SecondFingerMode.class, gestureData.getString("secondFingerMode"), SecondFingerMode.SECOND_TAP_ACTIONS);
         }
         catch (JSONException e) {
             Log.w("ControlsProfile", "Failed to parse gesture field in touchscreenGestures", e);
@@ -372,7 +384,8 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             gestureData.put("doubleTap2ndFingerAction", doubleTap2ndFingerAction.name());
             gestureData.put("doubleTapTimeout", doubleTapTimeout);
             gestureData.put("longPressTimeout", longPressTimeout);
-            gestureData.put("deferSingleTap", deferSingleTap);
+            gestureData.put("tapClickDelay", tapClickDelay);
+            gestureData.put("secondFingerMode", secondFingerMode.name());
             data.put("touchscreenGestures", gestureData);
 
             FileUtils.writeString(file, data.toString());

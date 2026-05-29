@@ -249,6 +249,7 @@ public class InputControlsFragment extends Fragment {
                 TouchscreenGestureSettingsDialog dialog = new TouchscreenGestureSettingsDialog(getContext(), currentProfile);
                 dialog.setOnSaveListener((savedProfile) -> {
                     loadProfileSpinner(view.findViewById(R.id.SProfile));
+                    XServerDisplayActivity.updateGestureConfig();
                     AppUtils.showToast(getContext(), "Gesture settings saved");
                 });
                 dialog.show();

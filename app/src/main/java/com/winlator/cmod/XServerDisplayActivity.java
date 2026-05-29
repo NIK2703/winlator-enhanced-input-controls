@@ -126,6 +126,22 @@ import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 public class XServerDisplayActivity extends AppCompatActivity {
     public static String NOTIFICATION_CHANNEL_ID = "Winlator";
     public static int NOTIFICATION_ID = -1;
+    private static XServerDisplayActivity activeInstance;
+
+    public static void updateGestureConfig() {
+        XServerDisplayActivity activity = activeInstance;
+        if (activity == null) return;
+        activity.inputControlsManager.loadProfiles(true);
+        ControlsProfile profile = activity.inputControlsView != null ? activity.inputControlsView.getProfile() : null;
+        if (profile != null) {
+            ControlsProfile reloaded = activity.inputControlsManager.getProfile(profile.id);
+            if (reloaded != null) {
+                activity.touchpadView.setProfile(reloaded);
+                activity.inputControlsView.setProfile(reloaded);
+            }
+        }
+    }
+
     private XServerView xServerView;
     private InputControlsView inputControlsView;
     private TouchpadView touchpadView;
@@ -267,6 +283,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        activeInstance = this;
         AppUtils.hideSystemUI(this);
         AppUtils.keepScreenOn(this);
         android.view.WindowManager.LayoutParams params = getWindow().getAttributes();
@@ -644,6 +661,7 @@ if (enableLogs) {
     }
     @Override
     protected void onDestroy() {
+        activeInstance = null;
         if (hudDataSource != null) hudDataSource.stop();
         super.onDestroy();
     }

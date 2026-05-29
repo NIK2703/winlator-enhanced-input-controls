@@ -228,8 +228,8 @@ public class InputControlsManager {
             String doubleTap2ndFingerActionStr = null;
             int doubleTapTimeout = -1;
             int longPressTimeout = -1;
-            boolean deferSingleTap = false;
-            boolean hasDeferSingleTap = false;
+            int tapClickDelay = -1;
+            String secondFingerModeStr = null;
 
             reader.beginObject();
             while (reader.hasNext()) {
@@ -260,7 +260,8 @@ public class InputControlsManager {
                             case "doubleTap2ndFingerAction": doubleTap2ndFingerActionStr = reader.nextString(); break;
                             case "doubleTapTimeout": doubleTapTimeout = reader.nextInt(); break;
                             case "longPressTimeout": longPressTimeout = reader.nextInt(); break;
-                            case "deferSingleTap": deferSingleTap = reader.nextBoolean(); hasDeferSingleTap = true; break;
+                            case "tapClickDelay": tapClickDelay = reader.nextInt(); break;
+                            case "secondFingerMode": secondFingerModeStr = reader.nextString(); break;
                             default: reader.skipValue(); break;
                         }
                     }
@@ -287,7 +288,8 @@ public class InputControlsManager {
             if (doubleTap2ndFingerActionStr != null) profile.setDoubleTap2ndFingerAction(ControlsProfile.parseBinding(doubleTap2ndFingerActionStr, Binding.NONE));
             if (doubleTapTimeout >= 0) profile.setDoubleTapTimeout(doubleTapTimeout);
             if (longPressTimeout >= 0) profile.setLongPressTimeout(longPressTimeout);
-            if (hasDeferSingleTap) profile.setDeferSingleTap(deferSingleTap);
+            if (tapClickDelay >= 0) profile.setTapClickDelay(tapClickDelay);
+            if (secondFingerModeStr != null) profile.setSecondFingerMode(ControlsProfile.parseEnum(SecondFingerMode.class, secondFingerModeStr, SecondFingerMode.SECOND_TAP_ACTIONS));
 
             profile.markGestureSettingsLoaded();
             return profile;
