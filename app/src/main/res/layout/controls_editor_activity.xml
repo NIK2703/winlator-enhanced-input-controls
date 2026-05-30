@@ -46,6 +46,11 @@
             android:src="@drawable/icon_add"  />
 
         <ImageButton
+            android:id="@+id/BTCopyElement"
+            style="@style/ToolButton"
+            android:src="@drawable/icon_copy"  />
+
+        <ImageButton
             android:id="@+id/BTRemoveElement"
             style="@style/ToolButton"
             android:src="@drawable/icon_remove"  />
@@ -54,5 +59,6 @@
             android:id="@+id/BTElementSettings"
             style="@style/ToolButton"
             android:src="@drawable/icon_settings"  />
+
     </LinearLayout>
 </FrameLayout>

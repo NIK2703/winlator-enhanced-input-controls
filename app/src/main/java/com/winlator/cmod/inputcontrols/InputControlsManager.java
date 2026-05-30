@@ -7,6 +7,10 @@ import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Environment;
 import android.util.JsonReader;
+import android.util.JsonToken;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import androidx.preference.PreferenceManager;
 
@@ -210,6 +214,28 @@ public class InputControlsManager {
         }
     }
 
+    private static List<Binding> readBindingListOld(JsonReader reader) {
+        List<Binding> list = new ArrayList<>();
+        try {
+            if (reader.peek() == JsonToken.BEGIN_ARRAY) {
+                reader.beginArray();
+                while (reader.hasNext()) {
+                    String str = reader.nextString();
+                    Binding b = ControlsProfile.parseBinding(str, Binding.NONE);
+                    if (b != Binding.NONE) list.add(b);
+                }
+                reader.endArray();
+            } else {
+                String str = reader.nextString();
+                Binding b = ControlsProfile.parseBinding(str, Binding.NONE);
+                if (b != Binding.NONE) list.add(b);
+            }
+        } catch (IOException e) {
+            // ignore
+        }
+        return list;
+    }
+
     public static ControlsProfile loadProfile(Context context, InputStream inStream) {
         try (JsonReader reader = new JsonReader(new InputStreamReader(inStream, StandardCharsets.UTF_8))) {
             int profileId = 0;
@@ -220,18 +246,19 @@ public class InputControlsManager {
             String mouseModeStr = null;
             String inputModeStr = null;
             String dragModeStr = null;
-            String singleTapActionStr = null;
-            String longPressActionStr = null;
-            String doubleTapActionStr = null;
-            String singleTap2ndFingerActionStr = null;
-            String longPress2ndFingerActionStr = null;
-            String doubleTap2ndFingerActionStr = null;
-            String singleTapDragActionStr = null;
-            String longPressDragActionStr = null;
-            String doubleTapDragActionStr = null;
-            String singleTap2ndFingerDragActionStr = null;
-            String longPress2ndFingerDragActionStr = null;
-            String doubleTap2ndFingerDragActionStr = null;
+            List<Binding> singleTapAction = null;
+            List<Binding> longPressAction = null;
+            List<Binding> doubleTapAction = null;
+            List<Binding> singleTap2ndFingerAction = null;
+            List<Binding> longPress2ndFingerAction = null;
+            List<Binding> doubleTap2ndFingerAction = null;
+            List<Binding> singleTapDragAction = null;
+            List<Binding> longPressDragAction = null;
+            List<Binding> doubleTapDragAction = null;
+            List<Binding> singleTap2ndFingerDragAction = null;
+            List<Binding> longPress2ndFingerDragAction = null;
+            List<Binding> doubleTap2ndFingerDragAction = null;
+            int bindingDelay = -1;
             int doubleTapTimeout = -1;
             int longPressTimeout = -1;
             String secondFingerModeStr = null;
@@ -249,6 +276,9 @@ public class InputControlsManager {
                 else if (name.equals("cursorSpeed")) {
                     cursorSpeed = (float) reader.nextDouble();
                 }
+                else if (name.equals("bindingDelay")) {
+                    bindingDelay = reader.nextInt();
+                }
                 else if (name.equals("touchscreenGestures")) {
                     reader.beginObject();
                     while (reader.hasNext()) {
@@ -257,18 +287,18 @@ public class InputControlsManager {
                             case "mouseMode": mouseModeStr = reader.nextString(); break;
                             case "inputMode": inputModeStr = reader.nextString(); break;
                             case "dragMode": dragModeStr = reader.nextString(); break;
-                            case "singleTapAction": singleTapActionStr = reader.nextString(); break;
-                            case "longPressAction": longPressActionStr = reader.nextString(); break;
-                            case "doubleTapAction": doubleTapActionStr = reader.nextString(); break;
-                            case "singleTap2ndFingerAction": singleTap2ndFingerActionStr = reader.nextString(); break;
-                            case "longPress2ndFingerAction": longPress2ndFingerActionStr = reader.nextString(); break;
-                            case "doubleTap2ndFingerAction": doubleTap2ndFingerActionStr = reader.nextString(); break;
-                            case "singleTapDragAction": singleTapDragActionStr = reader.nextString(); break;
-                            case "longPressDragAction": longPressDragActionStr = reader.nextString(); break;
-                            case "doubleTapDragAction": doubleTapDragActionStr = reader.nextString(); break;
-                            case "singleTap2ndFingerDragAction": singleTap2ndFingerDragActionStr = reader.nextString(); break;
-                            case "longPress2ndFingerDragAction": longPress2ndFingerDragActionStr = reader.nextString(); break;
-                            case "doubleTap2ndFingerDragAction": doubleTap2ndFingerDragActionStr = reader.nextString(); break;
+                            case "singleTapAction": singleTapAction = readBindingListOld(reader); break;
+                            case "longPressAction": longPressAction = readBindingListOld(reader); break;
+                            case "doubleTapAction": doubleTapAction = readBindingListOld(reader); break;
+                            case "singleTap2ndFingerAction": singleTap2ndFingerAction = readBindingListOld(reader); break;
+                            case "longPress2ndFingerAction": longPress2ndFingerAction = readBindingListOld(reader); break;
+                            case "doubleTap2ndFingerAction": doubleTap2ndFingerAction = readBindingListOld(reader); break;
+                            case "singleTapDragAction": singleTapDragAction = readBindingListOld(reader); break;
+                            case "longPressDragAction": longPressDragAction = readBindingListOld(reader); break;
+                            case "doubleTapDragAction": doubleTapDragAction = readBindingListOld(reader); break;
+                            case "singleTap2ndFingerDragAction": singleTap2ndFingerDragAction = readBindingListOld(reader); break;
+                            case "longPress2ndFingerDragAction": longPress2ndFingerDragAction = readBindingListOld(reader); break;
+                            case "doubleTap2ndFingerDragAction": doubleTap2ndFingerDragAction = readBindingListOld(reader); break;
                             case "doubleTapTimeout": doubleTapTimeout = reader.nextInt(); break;
                             case "longPressTimeout": longPressTimeout = reader.nextInt(); break;
                             case "secondFingerMode": secondFingerModeStr = reader.nextString(); break;
@@ -290,21 +320,22 @@ public class InputControlsManager {
             if (mouseModeStr != null) profile.setMouseMode(ControlsProfile.parseMouseMode(mouseModeStr));
             if (inputModeStr != null) profile.setInputMode(ControlsProfile.parseInputMode(inputModeStr));
             if (dragModeStr != null) profile.setDragMode(ControlsProfile.parseDragMode(dragModeStr));
-            if (singleTapActionStr != null) profile.setSingleTapAction(ControlsProfile.parseBinding(singleTapActionStr, Binding.MOUSE_LEFT_BUTTON));
-            if (longPressActionStr != null) profile.setLongPressAction(ControlsProfile.parseBinding(longPressActionStr, Binding.MOUSE_LEFT_BUTTON));
-            if (doubleTapActionStr != null) profile.setDoubleTapAction(ControlsProfile.parseBinding(doubleTapActionStr, Binding.NONE));
-            if (singleTap2ndFingerActionStr != null) profile.setSingleTap2ndFingerAction(ControlsProfile.parseBinding(singleTap2ndFingerActionStr, Binding.MOUSE_RIGHT_BUTTON));
-            if (longPress2ndFingerActionStr != null) profile.setLongPress2ndFingerAction(ControlsProfile.parseBinding(longPress2ndFingerActionStr, Binding.MOUSE_RIGHT_BUTTON));
-            if (doubleTap2ndFingerActionStr != null) profile.setDoubleTap2ndFingerAction(ControlsProfile.parseBinding(doubleTap2ndFingerActionStr, Binding.NONE));
-            if (singleTapDragActionStr != null) profile.setSingleTapDragAction(ControlsProfile.parseBinding(singleTapDragActionStr, Binding.NONE));
-            if (longPressDragActionStr != null) profile.setLongPressDragAction(ControlsProfile.parseBinding(longPressDragActionStr, Binding.NONE));
-            if (doubleTapDragActionStr != null) profile.setDoubleTapDragAction(ControlsProfile.parseBinding(doubleTapDragActionStr, Binding.NONE));
-            if (singleTap2ndFingerDragActionStr != null) profile.setSingleTap2ndFingerDragAction(ControlsProfile.parseBinding(singleTap2ndFingerDragActionStr, Binding.NONE));
-            if (longPress2ndFingerDragActionStr != null) profile.setLongPress2ndFingerDragAction(ControlsProfile.parseBinding(longPress2ndFingerDragActionStr, Binding.NONE));
-            if (doubleTap2ndFingerDragActionStr != null) profile.setDoubleTap2ndFingerDragAction(ControlsProfile.parseBinding(doubleTap2ndFingerDragActionStr, Binding.NONE));
+            if (singleTapAction != null) profile.setSingleTapAction(singleTapAction);
+            if (longPressAction != null) profile.setLongPressAction(longPressAction);
+            if (doubleTapAction != null) profile.setDoubleTapAction(doubleTapAction);
+            if (singleTap2ndFingerAction != null) profile.setSingleTap2ndFingerAction(singleTap2ndFingerAction);
+            if (longPress2ndFingerAction != null) profile.setLongPress2ndFingerAction(longPress2ndFingerAction);
+            if (doubleTap2ndFingerAction != null) profile.setDoubleTap2ndFingerAction(doubleTap2ndFingerAction);
+            if (singleTapDragAction != null) profile.setSingleTapDragAction(singleTapDragAction);
+            if (longPressDragAction != null) profile.setLongPressDragAction(longPressDragAction);
+            if (doubleTapDragAction != null) profile.setDoubleTapDragAction(doubleTapDragAction);
+            if (singleTap2ndFingerDragAction != null) profile.setSingleTap2ndFingerDragAction(singleTap2ndFingerDragAction);
+            if (longPress2ndFingerDragAction != null) profile.setLongPress2ndFingerDragAction(longPress2ndFingerDragAction);
+            if (doubleTap2ndFingerDragAction != null) profile.setDoubleTap2ndFingerDragAction(doubleTap2ndFingerDragAction);
             if (doubleTapTimeout >= 0) profile.setDoubleTapTimeout(doubleTapTimeout);
             if (longPressTimeout >= 0) profile.setLongPressTimeout(longPressTimeout);
             if (secondFingerModeStr != null) profile.setSecondFingerMode(ControlsProfile.parseEnum(SecondFingerMode.class, secondFingerModeStr, SecondFingerMode.SECOND_TAP_ACTIONS));
+            if (bindingDelay >= 0) profile.setBindingDelay(bindingDelay);
 
             profile.markGestureSettingsLoaded();
             return profile;
