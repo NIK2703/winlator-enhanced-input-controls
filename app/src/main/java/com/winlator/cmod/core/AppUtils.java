@@ -210,10 +210,7 @@ public abstract class AppUtils {
         textView.setPadding(padding, padding, padding, padding);
         textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
         textView.setText(Html.fromHtml(text, Html.FROM_HTML_MODE_LEGACY));
-        int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
-        int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
-        textView.measure(widthMeasureSpec, heightMeasureSpec);
-        showPopupWindow(anchor, textView, 300, textView.getMeasuredHeight());
+        showPopupWindow(anchor, textView, 300, 0);
     }
 
     public static int getVersionCode(Context context) {
@@ -345,6 +342,35 @@ public abstract class AppUtils {
                 callback.run();
             }
         }, delay);
+    }
+
+    public static void performHapticFeedback(Context context) {
+        performHapticFeedback(context, 255);
+    }
+
+    public static void performHapticFeedback(Context context, int intensity) {
+        if (context == null || intensity <= 0) return;
+        android.os.Vibrator vibrator = (android.os.Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+        if (vibrator != null && vibrator.hasVibrator()) {
+            int amp = Math.max(1, Math.min(255, intensity * 255 / 100));
+            float scale = amp / 255.0f;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                vibrator.areAllPrimitivesSupported(android.os.VibrationEffect.Composition.PRIMITIVE_TICK)) {
+                vibrator.vibrate(android.os.VibrationEffect.startComposition()
+                        .addPrimitive(android.os.VibrationEffect.Composition.PRIMITIVE_TICK, scale, 0)
+                        .compose());
+            }
+            else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    vibrator.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_TICK));
+                } catch (IllegalArgumentException e) {
+                    vibrator.vibrate(android.os.VibrationEffect.createOneShot(30, amp));
+                }
+            }
+            else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(android.os.VibrationEffect.createOneShot(30, amp));
+            }
+        }
     }
 
 }

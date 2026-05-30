@@ -86,6 +86,9 @@ public class ControlElement {
     private String text = "";
     private byte iconId;
     private List<Binding> heldBindings;
+    private List<Binding> longPressBindings = new ArrayList<>();
+    private boolean longPressTriggered;
+    private android.os.Handler longPressHandler;
     private Range range;
     private byte orientation;
     private PointF currentPosition;
@@ -96,36 +99,33 @@ public class ControlElement {
     public ControlElement(InputControlsView inputControlsView) {
         this.inputControlsView = inputControlsView;
         for (int i = 0; i < 4; i++) {
-            List<Binding> seq = new ArrayList<>();
-            seq.add(Binding.NONE);
-            bindings.add(seq);
+            bindings.add(new ArrayList<Binding>());
         }
     }
 
     private void reset() {
         for (List<Binding> seq : bindings) {
             seq.clear();
-            seq.add(Binding.NONE);
         }
         scroller = null;
 
         if (type == Type.STICK) {
-            bindings.get(0).set(0, Binding.KEY_W);
-            bindings.get(1).set(0, Binding.KEY_D);
-            bindings.get(2).set(0, Binding.KEY_S);
-            bindings.get(3).set(0, Binding.KEY_A);
+            bindings.get(0).add(Binding.KEY_W);
+            bindings.get(1).add(Binding.KEY_D);
+            bindings.get(2).add(Binding.KEY_S);
+            bindings.get(3).add(Binding.KEY_A);
         }
         else if(type == Type.D_PAD){
-            bindings.get(0).set(0, Binding.GAMEPAD_DPAD_UP);
-            bindings.get(1).set(0, Binding.GAMEPAD_DPAD_RIGHT);
-            bindings.get(2).set(0, Binding.GAMEPAD_DPAD_DOWN);
-            bindings.get(3).set(0, Binding.GAMEPAD_DPAD_LEFT);
+            bindings.get(0).add(Binding.GAMEPAD_DPAD_UP);
+            bindings.get(1).add(Binding.GAMEPAD_DPAD_RIGHT);
+            bindings.get(2).add(Binding.GAMEPAD_DPAD_DOWN);
+            bindings.get(3).add(Binding.GAMEPAD_DPAD_LEFT);
         }
         else if (type == Type.TRACKPAD) {
-            bindings.get(0).set(0, Binding.GAMEPAD_RIGHT_THUMB_UP);
-            bindings.get(1).set(0, Binding.GAMEPAD_RIGHT_THUMB_RIGHT);
-            bindings.get(2).set(0, Binding.GAMEPAD_RIGHT_THUMB_DOWN);
-            bindings.get(3).set(0, Binding.GAMEPAD_RIGHT_THUMB_LEFT);
+            bindings.get(0).add(Binding.GAMEPAD_RIGHT_THUMB_UP);
+            bindings.get(1).add(Binding.GAMEPAD_RIGHT_THUMB_RIGHT);
+            bindings.get(2).add(Binding.GAMEPAD_RIGHT_THUMB_DOWN);
+            bindings.get(3).add(Binding.GAMEPAD_RIGHT_THUMB_LEFT);
         }
         else if (type == Type.RANGE_BUTTON) {
             scroller = new RangeScroller(inputControlsView, this);
@@ -246,7 +246,6 @@ public class ControlElement {
             List<Binding> seq = bindings.get(index);
             if (seqIndex >= 0 && seqIndex < seq.size()) {
                 seq.remove(seqIndex);
-                if (seq.isEmpty()) seq.add(Binding.NONE);
             }
         }
     }
@@ -258,6 +257,31 @@ public class ControlElement {
                 seq.set(seqIndex, binding);
             }
         }
+    }
+
+    public List<Binding> getLongPressBindings() {
+        return longPressBindings;
+    }
+
+    public void setLongPressBindings(List<Binding> bindings) {
+        longPressBindings.clear();
+        longPressBindings.addAll(bindings);
+    }
+
+    public void addLongPressBinding(Binding binding) {
+        longPressBindings.add(binding);
+    }
+
+    public void removeLongPressBinding(int index) {
+        if (index >= 0 && index < longPressBindings.size()) {
+            longPressBindings.remove(index);
+        }
+    }
+
+    public boolean hasLongPressBinding() {
+        if (longPressBindings == null || longPressBindings.isEmpty()) return false;
+        if (longPressBindings.size() == 1 && longPressBindings.get(0) == Binding.NONE) return false;
+        return true;
     }
 
     public float getScale() {
@@ -679,7 +703,9 @@ public class ControlElement {
             JSONArray bindingsJSONArray = new JSONArray();
             for (List<Binding> seq : bindings) {
                 JSONArray seqArray = new JSONArray();
-                for (Binding b : seq) seqArray.put(b.name());
+                for (Binding b : seq) {
+                    if (b != null && b != Binding.NONE) seqArray.put(b.name());
+                }
                 bindingsJSONArray.put(seqArray);
             }
 
@@ -690,6 +716,14 @@ public class ControlElement {
             elementJSONObject.put("toggleSwitch", toggleSwitch);
             elementJSONObject.put("text", text);
             elementJSONObject.put("iconId", iconId);
+
+            if (hasLongPressBinding()) {
+                JSONArray lpArray = new JSONArray();
+                for (Binding b : longPressBindings) {
+                    if (b != null && b != Binding.NONE) lpArray.put(b.name());
+                }
+                elementJSONObject.put("longPressBindings", lpArray);
+            }
 
             if (type == Type.RANGE_BUTTON && range != null) {
                 elementJSONObject.put("range", range.name());
@@ -765,13 +799,30 @@ public class ControlElement {
             currentPointerId = pointerId;
             if (type == Type.BUTTON) {
                 if (isKeepButtonPressedAfterMinTime()) touchTime = System.currentTimeMillis();
-                if (!toggleSwitch || !selected) {
+                if (toggleSwitch && selected) {
+                    releaseHeldBindings();
+                }
+                else if (hasLongPressBinding() && !toggleSwitch) {
+                    longPressTriggered = false;
+                    int delay = inputControlsView.getProfile() != null ? inputControlsView.getProfile().getLongPressDelay() : 0;
+                    if (delay > 0) {
+                        if (longPressHandler == null) longPressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+                        longPressHandler.postDelayed(() -> {
+                            longPressTriggered = true;
+                            ControlsProfile profile = inputControlsView.getProfile();
+                            if (profile != null && profile.getLongPressHapticEnabled()) {
+                                com.winlator.cmod.core.AppUtils.performHapticFeedback(inputControlsView.getContext(), profile.getLongPressHapticIntensity());
+                            }
+                            heldBindings = new ArrayList<>(longPressBindings);
+                            pressBindings(longPressBindings);
+                            inputControlsView.invalidate();
+                        }, delay);
+                    }
+                }
+                else {
                     List<Binding> seq = bindings.get(0);
                     heldBindings = new ArrayList<>(seq);
                     pressBindings(seq);
-                }
-                else if (toggleSwitch && selected) {
-                    releaseHeldBindings();
                 }
                 inputControlsView.invalidate();
                 return true;
@@ -953,7 +1004,20 @@ public class ControlElement {
                     if (selected) return true;
                 }
 
-                releaseHeldBindings();
+                if (longPressTriggered) {
+                    releaseHeldBindings();
+                    longPressTriggered = false;
+                }
+                else if (hasLongPressBinding()) {
+                    if (longPressHandler != null) longPressHandler.removeCallbacksAndMessages(null);
+                    List<Binding> seq = bindings.get(0);
+                    heldBindings = new ArrayList<>(seq);
+                    pressBindings(seq);
+                    releaseHeldBindings();
+                }
+                else {
+                    releaseHeldBindings();
+                }
                 inputControlsView.invalidate();
             }
             else if (type == Type.RANGE_BUTTON || type == Type.D_PAD || type == Type.STICK || type == Type.TRACKPAD) {

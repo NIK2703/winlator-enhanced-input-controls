@@ -39,6 +39,7 @@ import com.winlator.cmod.widget.NumberPicker;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -252,6 +253,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         ControlElement.Type type = element.getType();
         if (type == ControlElement.Type.BUTTON) {
             loadBindingSection(element, container, 0, R.string.binding);
+            loadLongPressBindingSection(element, container);
         }
         else if (type == ControlElement.Type.D_PAD || type == ControlElement.Type.STICK || type == ControlElement.Type.TRACKPAD) {
             loadBindingSection(element, container, 0, R.string.binding_up);
@@ -262,147 +264,36 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
     }
 
     private void loadBindingSection(final ControlElement element, LinearLayout container, final int index, int titleResId) {
-        final LinearLayout section = new LinearLayout(this);
-        section.setOrientation(LinearLayout.VERTICAL);
-        section.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText(titleResId);
-        tvTitle.setTextSize(14);
-        section.addView(tvTitle);
-
-        LinearLayout llMods = new LinearLayout(this);
-        llMods.setOrientation(LinearLayout.HORIZONTAL);
-        int buttonHeight = (int)UnitUtils.dpToPx(36);
-        int modMargin = (int)UnitUtils.dpToPx(2);
-        final Button btCtrl = new Button(this, null, 0, R.style.ButtonNeutral);
-        btCtrl.setText("Ctrl");
-        LinearLayout.LayoutParams lpCtrl = new LinearLayout.LayoutParams(0, buttonHeight, 1);
-        lpCtrl.setMargins(0, 0, modMargin, 0);
-        btCtrl.setLayoutParams(lpCtrl);
-        final Button btShift = new Button(this, null, 0, R.style.ButtonNeutral);
-        btShift.setText("Shift");
-        LinearLayout.LayoutParams lpShift = new LinearLayout.LayoutParams(0, buttonHeight, 1);
-        lpShift.setMargins(modMargin, 0, modMargin, 0);
-        btShift.setLayoutParams(lpShift);
-        final Button btAlt = new Button(this, null, 0, R.style.ButtonNeutral);
-        btAlt.setText("Alt");
-        LinearLayout.LayoutParams lpAlt = new LinearLayout.LayoutParams(0, buttonHeight, 1);
-        lpAlt.setMargins(modMargin, 0, 0, 0);
-        btAlt.setLayoutParams(lpAlt);
-        llMods.addView(btCtrl);
-        llMods.addView(btShift);
-        llMods.addView(btAlt);
-        section.addView(llMods);
-
-        final LinearLayout llItems = new LinearLayout(this);
-        llItems.setOrientation(LinearLayout.VERTICAL);
-        section.addView(llItems);
-
-        final Runnable[] populateItemsRef = new Runnable[1];
-        populateItemsRef[0] = () -> {
-            llItems.removeAllViews();
-            List<Binding> seq = element.getBindingSequence(index);
-
-            boolean ctrlOn = seq.contains(Binding.MOD_CTRL);
-            boolean shiftOn = seq.contains(Binding.MOD_SHIFT);
-            boolean altOn = seq.contains(Binding.MOD_ALT);
-            btCtrl.setBackgroundResource(ctrlOn ? R.drawable.button_positive : R.drawable.button_neutral);
-            btCtrl.setTextColor(ctrlOn ? 0xffffffff : 0xaaffffff);
-            btShift.setBackgroundResource(shiftOn ? R.drawable.button_positive : R.drawable.button_neutral);
-            btShift.setTextColor(shiftOn ? 0xffffffff : 0xaaffffff);
-            btAlt.setBackgroundResource(altOn ? R.drawable.button_positive : R.drawable.button_neutral);
-            btAlt.setTextColor(altOn ? 0xffffffff : 0xaaffffff);
-            btCtrl.setOnClickListener(null);
-            btShift.setOnClickListener(null);
-            btAlt.setOnClickListener(null);
-            btCtrl.setOnClickListener((v) -> toggleModifier(element, index, Binding.MOD_CTRL, !ctrlOn, populateItemsRef[0]));
-            btShift.setOnClickListener((v) -> toggleModifier(element, index, Binding.MOD_SHIFT, !shiftOn, populateItemsRef[0]));
-            btAlt.setOnClickListener((v) -> toggleModifier(element, index, Binding.MOD_ALT, !altOn, populateItemsRef[0]));
-
-            int displayIndex = 0;
-            for (int i = 0; i < seq.size(); i++) {
-                Binding currentBinding = seq.get(i);
-                if (currentBinding.isModifier()) continue;
-                final int seqIndex = i;
-                final int dIndex = displayIndex;
-                View row = LayoutInflater.from(this).inflate(R.layout.binding_sequence_item, llItems, false);
-                final Spinner sBindingType = row.findViewById(R.id.SBindingType);
-                final Spinner sBinding = row.findViewById(R.id.SBinding);
-
-                Runnable update = () -> {
-                    switch (sBindingType.getSelectedItemPosition()) {
-                        case 0:
-                            sBinding.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, Binding.keyboardBindingLabels()));
-                            break;
-                        case 1:
-                            sBinding.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, Binding.mouseBindingLabels()));
-                            break;
-                        case 2:
-                            sBinding.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, Binding.gamepadBindingLabels()));
-                            break;
-                    }
-                    AppUtils.setSpinnerSelectionFromValue(sBinding, currentBinding.toString());
-                };
-
-                if (currentBinding.isKeyboard()) sBindingType.setSelection(0, false);
-                else if (currentBinding.isMouse()) sBindingType.setSelection(1, false);
-                else if (currentBinding.isGamepad()) sBindingType.setSelection(2, false);
-
-                update.run();
-
-                sBindingType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                    @Override public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) {
-                        update.run();
-                    }
-                    @Override public void onNothingSelected(AdapterView<?> parent) {}
-                });
-
-                sBinding.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                    @Override public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) {
-                        Binding binding = Binding.NONE;
-                        switch (sBindingType.getSelectedItemPosition()) {
-                            case 0: binding = Binding.keyboardBindingValues()[pos]; break;
-                            case 1: binding = Binding.mouseBindingValues()[pos]; break;
-                            case 2: binding = Binding.gamepadBindingValues()[pos]; break;
-                        }
-                        if (binding != seq.get(seqIndex)) {
-                            element.setBindingAtSequenceIndex(index, seqIndex, binding);
-                            profile.save();
-                            inputControlsView.invalidate();
-                        }
-                    }
-                    @Override public void onNothingSelected(AdapterView<?> parent) {}
-                });
-
-                row.findViewById(R.id.BTRemove).setOnClickListener((v) -> {
-                    element.removeBindingFromSequence(index, seqIndex);
-                    profile.save();
-                    inputControlsView.invalidate();
-                    populateItemsRef[0].run();
-                });
-
-                llItems.addView(row);
-                displayIndex++;
-            }
-        };
-
-        populateItemsRef[0].run();
-
-        Button btAdd = new Button(this, null, 0, R.style.ButtonNeutral);
-        btAdd.setText("+ Add Binding");
-        btAdd.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, buttonHeight));
-        btAdd.setOnClickListener((v) -> {
-            element.addBindingToSequence(index, Binding.NONE);
+        List<Binding> seq = new ArrayList<>(element.getBindingSequence(index));
+        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, getString(titleResId), 0, seq, () -> {
+            element.setBindingSequence(index, seq);
             profile.save();
             inputControlsView.invalidate();
-            populateItemsRef[0].run();
         });
-        section.addView(btAdd);
-
         container.addView(section);
+    }
+
+    private void loadLongPressBindingSection(final ControlElement element, LinearLayout container) {
+        List<Binding> seq = new ArrayList<>(element.getLongPressBindings());
+        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Long Press", 0, seq, () -> {
+            element.setLongPressBindings(seq);
+            profile.save();
+            inputControlsView.invalidate();
+        });
+        container.addView(section);
+    }
+
+    private void toggleLongPressModifier(ControlElement element, Binding modBinding, boolean add, Runnable populate) {
+        List<Binding> seq = new ArrayList<>(element.getLongPressBindings());
+        if (add) {
+            seq.add(modBinding);
+        } else {
+            seq.remove(modBinding);
+        }
+        element.setLongPressBindings(seq);
+        profile.save();
+        inputControlsView.invalidate();
+        populate.run();
     }
 
     private void toggleModifier(ControlElement element, int seqIndex, Binding modBinding, boolean checked, Runnable populate) {

@@ -75,6 +75,11 @@ public class InputControlsFragment extends Fragment {
     private Spinner spMouseMode;
     private SeekBar sbBindingDelay;
     private TextView tvBindingDelay;
+    private SeekBar sbLongPressDelay;
+    private TextView tvLongPressDelay;
+    private SeekBar sbLongPressHaptic;
+    private TextView tvLongPressHaptic;
+    private CheckBox cbLongPressHaptic;
 
     private int[] keycodes;
 
@@ -161,6 +166,8 @@ public class InputControlsFragment extends Fragment {
 
         tvBindingDelay = view.findViewById(R.id.TVBindingDelay);
         sbBindingDelay = view.findViewById(R.id.SBBindingDelay);
+        view.findViewById(R.id.BTHelpBindingDelay).setOnClickListener((v) ->
+                AppUtils.showHelpBox(context, v, R.string.binding_delay_help));
         sbBindingDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -177,6 +184,68 @@ public class InputControlsFragment extends Fragment {
         if (currentProfile != null) {
             sbBindingDelay.setProgress(currentProfile.getBindingDelay());
         }
+
+        tvLongPressDelay = view.findViewById(R.id.TVLongPressDelay);
+        sbLongPressDelay = view.findViewById(R.id.SBLongPressDelay);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            sbLongPressDelay.setMin(50);
+        }
+        sbLongPressDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int stepVal = Math.round(progress / 10.0f) * 10;
+                if (fromUser && stepVal != progress) seekBar.setProgress(stepVal);
+                tvLongPressDelay.setText(stepVal + " ms");
+                if (fromUser && currentProfile != null) {
+                    currentProfile.setLongPressDelay(stepVal);
+                    currentProfile.save();
+                }
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbLongPressDelay.post(() -> {
+            int delay = currentProfile != null ? currentProfile.getLongPressDelay() : 50;
+            sbLongPressDelay.setProgress(delay);
+            tvLongPressDelay.setText(delay + " ms");
+        });
+
+        tvLongPressHaptic = view.findViewById(R.id.TVLongPressHaptic);
+        sbLongPressHaptic = view.findViewById(R.id.SBLongPressHaptic);
+        view.findViewById(R.id.BTHelpLongPressHaptic).setOnClickListener((v) ->
+                AppUtils.showHelpBox(context, v, R.string.long_press_haptic_help));
+        sbLongPressHaptic.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvLongPressHaptic.setText(progress > 0 ? progress + "%" : "Off");
+                if (fromUser && currentProfile != null) {
+                    currentProfile.setLongPressHapticIntensity(progress);
+                    currentProfile.save();
+                }
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbLongPressHaptic.post(() -> {
+            int haptic = currentProfile != null ? currentProfile.getLongPressHapticIntensity() : 50;
+            sbLongPressHaptic.setProgress(haptic);
+            tvLongPressHaptic.setText(haptic > 0 ? haptic + "%" : "Off");
+        });
+
+        cbLongPressHaptic = view.findViewById(R.id.CBLongPressHaptic);
+        cbLongPressHaptic.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (currentProfile != null) {
+                currentProfile.setLongPressHapticEnabled(isChecked);
+                currentProfile.save();
+            }
+        });
+        cbLongPressHaptic.post(() -> {
+            if (currentProfile != null) {
+                cbLongPressHaptic.setChecked(currentProfile.getLongPressHapticEnabled());
+            }
+        });
 
         spMouseMode = view.findViewById(R.id.SPMouseMode);
         setupEnumSpinner(spMouseMode, MouseMode.values(), currentProfile != null ? currentProfile.getMouseMode() : MouseMode.TOUCHPAD);
@@ -377,6 +446,13 @@ public class InputControlsFragment extends Fragment {
                     AppUtils.setSpinnerSelectionFromValue(spMouseMode, currentProfile.getMouseMode().name());
                     sbBindingDelay.setProgress(currentProfile.getBindingDelay());
                     tvBindingDelay.setText(currentProfile.getBindingDelay() + " ms");
+                    int lpDelay = currentProfile.getLongPressDelay();
+                    sbLongPressDelay.setProgress(lpDelay);
+                    tvLongPressDelay.setText(lpDelay + " ms");
+                    int haptic = currentProfile.getLongPressHapticIntensity();
+                    sbLongPressHaptic.setProgress(haptic);
+                    tvLongPressHaptic.setText(haptic > 0 ? haptic + "%" : "Off");
+                    cbLongPressHaptic.setChecked(currentProfile.getLongPressHapticEnabled());
                 }
             }
 

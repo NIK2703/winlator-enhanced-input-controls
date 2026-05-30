@@ -51,6 +51,21 @@
             app:value="150" />
 
         <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Drag Threshold (px)"
+            android:layout_marginTop="8dp" />
+
+        <com.winlator.cmod.widget.NumberPicker
+            android:id="@+id/NPDragThreshold"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:minValue="0"
+            app:maxValue="30"
+            app:step="1"
+            app:value="10" />
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Single Finger Gestures"

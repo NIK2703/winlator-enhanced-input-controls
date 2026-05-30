@@ -82,15 +82,20 @@
             android:orientation="horizontal">
 
             <TextView
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:text="Binding Delay (ms)"/>
+
+            <ImageView
+                android:id="@+id/BTHelpBindingDelay"
+                style="@style/HelpButton" />
 
             <TextView
                 android:id="@+id/TVBindingDelay"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end" />
         </LinearLayout>
 
         <SeekBar
@@ -99,6 +104,67 @@
             android:layout_height="wrap_content"
             android:max="10"
             android:progress="0" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Long Press Delay (ms)"/>
+
+            <TextView
+                android:id="@+id/TVLongPressDelay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/SBLongPressDelay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="500"
+            android:progress="50"
+            android:progressTint="@color/colorAccent" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Long Press Haptic"/>
+
+            <ImageView
+                android:id="@+id/BTHelpLongPressHaptic"
+                style="@style/HelpButton" />
+
+            <TextView
+                android:id="@+id/TVLongPressHaptic"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/SBLongPressHaptic"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="50" />
+
+        <CheckBox
+            android:id="@+id/CBLongPressHaptic"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Long Press Haptic Enabled"
+            android:checked="true" />
 
         <TextView
             android:layout_width="match_parent"
