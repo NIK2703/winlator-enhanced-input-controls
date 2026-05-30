@@ -515,7 +515,7 @@ public class TouchscreenGestureHandler {
             if (b == null || b == Binding.NONE) continue;
             if (b == Binding.MOUSE_SCROLL_UP || b == Binding.MOUSE_SCROLL_DOWN) continue;
             if (b.isMouseMove()) continue;
-            if (b.isModifier()) continue;
+            if (b.isModifier() || b.isKeyboardModifier()) continue;
 
             if (inputControlsView != null) {
                 inputControlsView.handleInputEvent(b, true, 0);
@@ -554,7 +554,7 @@ public class TouchscreenGestureHandler {
             if (b == null || b == Binding.NONE) continue;
             if (b.isMouseMove()) continue;
             if (b == Binding.MOUSE_SCROLL_UP || b == Binding.MOUSE_SCROLL_DOWN) continue;
-            if (b.isModifier()) continue;
+            if (b.isModifier() || b.isKeyboardModifier()) continue;
 
             if (inputControlsView != null) {
                 inputControlsView.handleInputEvent(b, true, 0);

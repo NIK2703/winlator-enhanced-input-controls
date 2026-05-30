@@ -728,7 +728,7 @@ public class ControlElement {
         for (int i = 0; i < size; i++) {
             Binding b = seq.get(i);
             if (b == null || b == Binding.NONE) continue;
-            if (b.isModifier()) continue;
+            if (b.isModifier() || b.isKeyboardModifier()) continue;
             if (inputControlsView != null) {
                 inputControlsView.handleInputEvent(b, true);
                 inputControlsView.handleInputEvent(b, false);
