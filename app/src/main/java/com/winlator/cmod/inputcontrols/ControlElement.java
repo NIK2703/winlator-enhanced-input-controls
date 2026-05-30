@@ -1,5 +1,6 @@
 package com.winlator.cmod.inputcontrols;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -88,6 +89,12 @@ public class ControlElement {
     private List<Binding> heldBindings;
     private List<Binding> longPressBindings = new ArrayList<>();
     private boolean longPressTriggered;
+    private List<Binding> gestureBindings = new ArrayList<>();
+    private boolean gestureTriggered;
+
+    private float gestureDownX;
+
+    private float gestureDownY;
     private boolean active;
     private android.os.Handler longPressHandler;
     private Range range;
@@ -283,6 +290,44 @@ public class ControlElement {
         if (longPressBindings == null || longPressBindings.isEmpty()) return false;
         if (longPressBindings.size() == 1 && longPressBindings.get(0) == Binding.NONE) return false;
         return true;
+    }
+
+    public List<Binding> getGestureBindings() {
+        return gestureBindings;
+    }
+
+    public void setGestureBindings(List<Binding> bindings) {
+        gestureBindings.clear();
+        gestureBindings.addAll(bindings);
+    }
+
+    public void addGestureBinding(Binding binding) {
+        gestureBindings.add(binding);
+    }
+
+    public void removeGestureBinding(int index) {
+        if (index >= 0 && index < gestureBindings.size()) {
+            gestureBindings.remove(index);
+        }
+    }
+
+    public boolean hasGestureBinding() {
+        if (gestureBindings == null || gestureBindings.isEmpty()) return false;
+        if (gestureBindings.size() == 1 && gestureBindings.get(0) == Binding.NONE) return false;
+        return true;
+    }
+
+    public void setGestureDownPosition(float x, float y) {
+        gestureDownX = x;
+        gestureDownY = y;
+    }
+
+    public boolean isGestureTriggered() {
+        return gestureTriggered;
+    }
+
+    public boolean isLongPressTriggered() {
+        return longPressTriggered;
     }
 
     public float getScale() {
@@ -525,48 +570,53 @@ public class ControlElement {
                 float offsetX = snappingSize * 2 * scale;
                 float offsetY = snappingSize * 3 * scale;
                 float start = snappingSize * scale;
-                Path path = inputControlsView.getPath();
-                path.reset();
 
-                path.moveTo(cx, cy - start);
-                path.lineTo(cx - offsetX, cy - offsetY);
-                path.lineTo(cx - offsetX, boundingBox.top);
-                path.lineTo(cx + offsetX, boundingBox.top);
-                path.lineTo(cx + offsetX, cy - offsetY);
-                path.close();
+                Path upPath = new Path();
+                upPath.moveTo(cx, cy - start);
+                upPath.lineTo(cx - offsetX, cy - offsetY);
+                upPath.lineTo(cx - offsetX, boundingBox.top);
+                upPath.lineTo(cx + offsetX, boundingBox.top);
+                upPath.lineTo(cx + offsetX, cy - offsetY);
+                upPath.close();
 
-                path.moveTo(cx - start, cy);
-                path.lineTo(cx - offsetY, cy - offsetX);
-                path.lineTo(boundingBox.left, cy - offsetX);
-                path.lineTo(boundingBox.left, cy + offsetX);
-                path.lineTo(cx - offsetY, cy + offsetX);
-                path.close();
+                Path rightPath = new Path();
+                rightPath.moveTo(cx + start, cy);
+                rightPath.lineTo(cx + offsetY, cy - offsetX);
+                rightPath.lineTo(boundingBox.right, cy - offsetX);
+                rightPath.lineTo(boundingBox.right, cy + offsetX);
+                rightPath.lineTo(cx + offsetY, cy + offsetX);
+                rightPath.close();
 
-                path.moveTo(cx, cy + start);
-                path.lineTo(cx - offsetX, cy + offsetY);
-                path.lineTo(cx - offsetX, boundingBox.bottom);
-                path.lineTo(cx + offsetX, boundingBox.bottom);
-                path.lineTo(cx + offsetX, cy + offsetY);
-                path.close();
+                Path downPath = new Path();
+                downPath.moveTo(cx, cy + start);
+                downPath.lineTo(cx - offsetX, cy + offsetY);
+                downPath.lineTo(cx - offsetX, boundingBox.bottom);
+                downPath.lineTo(cx + offsetX, boundingBox.bottom);
+                downPath.lineTo(cx + offsetX, cy + offsetY);
+                downPath.close();
 
-                path.moveTo(cx + start, cy);
-                path.lineTo(cx + offsetY, cy - offsetX);
-                path.lineTo(boundingBox.right, cy - offsetX);
-                path.lineTo(boundingBox.right, cy + offsetX);
-                path.lineTo(cx + offsetY, cy + offsetX);
-                path.close();
+                Path leftPath = new Path();
+                leftPath.moveTo(cx - start, cy);
+                leftPath.lineTo(cx - offsetY, cy - offsetX);
+                leftPath.lineTo(boundingBox.left, cy - offsetX);
+                leftPath.lineTo(boundingBox.left, cy + offsetX);
+                leftPath.lineTo(cx - offsetY, cy + offsetX);
+                leftPath.close();
 
-                canvas.drawPath(path, paint);
-                boolean anyDirActive = false;
-                for (boolean s : states) if (s) { anyDirActive = true; break; }
-                if (anyDirActive) {
-                    paint.setStyle(Paint.Style.FILL);
-                    paint.setColor(fillColor);
-                    canvas.drawPath(path, paint);
-                    paint.setStyle(Paint.Style.STROKE);
-                    paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
-                    paint.setStrokeWidth(strokeWidth);
-                }
+                canvas.drawPath(upPath, paint);
+                canvas.drawPath(rightPath, paint);
+                canvas.drawPath(downPath, paint);
+                canvas.drawPath(leftPath, paint);
+
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(fillColor);
+                if (states[0]) canvas.drawPath(upPath, paint);
+                if (states[1]) canvas.drawPath(rightPath, paint);
+                if (states[2]) canvas.drawPath(downPath, paint);
+                if (states[3]) canvas.drawPath(leftPath, paint);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
+                paint.setStrokeWidth(strokeWidth);
                 break;
             }
             case RANGE_BUTTON: {
@@ -726,6 +776,14 @@ public class ControlElement {
                 elementJSONObject.put("longPressBindings", lpArray);
             }
 
+            if (hasGestureBinding()) {
+                JSONArray gArray = new JSONArray();
+                for (Binding b : gestureBindings) {
+                    if (b != null && b != Binding.NONE) gArray.put(b.name());
+                }
+                elementJSONObject.put("gestureBindings", gArray);
+            }
+
             if (type == Type.RANGE_BUTTON && range != null) {
                 elementJSONObject.put("range", range.name());
                 if (orientation != 0) elementJSONObject.put("orientation", orientation);
@@ -802,9 +860,17 @@ public class ControlElement {
         longPressTriggered = false;
         longPressHandler.postDelayed(() -> {
             longPressTriggered = true;
-            ControlsProfile p = inputControlsView.getProfile();
-            if (p != null && p.getLongPressHapticEnabled()) {
-                com.winlator.cmod.core.AppUtils.performHapticFeedback(inputControlsView.getContext(), p.getLongPressHapticIntensity());
+            android.os.Vibrator vib = (android.os.Vibrator) inputControlsView.getContext().getSystemService(Context.VIBRATOR_SERVICE);
+            if (vib != null && vib.hasVibrator()) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    try {
+                        vib.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_HEAVY_CLICK));
+                    } catch (IllegalArgumentException e) {
+                        vib.vibrate(android.os.VibrationEffect.createOneShot(50, 255));
+                    }
+                } else {
+                    vib.vibrate(50);
+                }
             }
             heldBindings = new ArrayList<>(longPressBindings);
             pressBindings(longPressBindings);
@@ -820,18 +886,28 @@ public class ControlElement {
         inputControlsView.invalidate();
     }
 
+    public void releaseTapBindings() {
+        active = false;
+        releaseHeldBindings();
+        inputControlsView.invalidate();
+    }
+
     public void cancelLongPress() {
         if (longPressHandler != null) {
             longPressHandler.removeCallbacksAndMessages(null);
             longPressHandler = null;
         }
+        currentPointerId = -1;
         longPressTriggered = false;
+        gestureTriggered = false;
     }
 
     public boolean handleTouchDown(int pointerId, float x, float y) {
         if (currentPointerId == -1 && containsPoint(x, y)) {
             currentPointerId = pointerId;
             if (type == Type.BUTTON) {
+                gestureDownX = x;
+                gestureDownY = y;
                 if (isKeepButtonPressedAfterMinTime()) touchTime = System.currentTimeMillis();
                 if (toggleSwitch && selected) {
                     releaseHeldBindings();
@@ -844,9 +920,17 @@ public class ControlElement {
                         if (longPressHandler == null) longPressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
                         longPressHandler.postDelayed(() -> {
                             longPressTriggered = true;
-                            ControlsProfile p = inputControlsView.getProfile();
-                            if (p != null && p.getLongPressHapticEnabled()) {
-                                com.winlator.cmod.core.AppUtils.performHapticFeedback(inputControlsView.getContext(), p.getLongPressHapticIntensity());
+                            android.os.Vibrator vib = (android.os.Vibrator) inputControlsView.getContext().getSystemService(Context.VIBRATOR_SERVICE);
+                            if (vib != null && vib.hasVibrator()) {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                    try {
+                                        vib.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_HEAVY_CLICK));
+                                    } catch (IllegalArgumentException e) {
+                                        vib.vibrate(android.os.VibrationEffect.createOneShot(50, 255));
+                                    }
+                                } else {
+                                    vib.vibrate(50);
+                                }
                             }
                             heldBindings = new ArrayList<>(longPressBindings);
                             pressBindings(longPressBindings);
@@ -877,7 +961,36 @@ public class ControlElement {
     }
 
     public boolean handleTouchMove(int pointerId, float x, float y) {
-        if (pointerId == currentPointerId && (type == Type.D_PAD || type == Type.STICK || type == Type.TRACKPAD)) {
+        if (pointerId == currentPointerId) {
+            if (type == Type.BUTTON && hasGestureBinding() && !gestureTriggered) {
+                float dx = x - gestureDownX;
+                float dy = y - gestureDownY;
+                ControlsProfile p = inputControlsView.getProfile();
+                int threshold = p != null ? p.getGestureThreshold() : 20;
+                float distSq = dx * dx + dy * dy;
+                if (distSq > threshold * threshold) {
+                    gestureTriggered = true;
+                    if (longPressHandler != null) {
+                        longPressHandler.removeCallbacksAndMessages(null);
+                        longPressHandler = null;
+                    }
+                    longPressTriggered = false;
+                    android.os.Vibrator vib = (android.os.Vibrator) inputControlsView.getContext().getSystemService(Context.VIBRATOR_SERVICE);
+                    if (vib != null && vib.hasVibrator()) {
+                        vib.vibrate(android.os.VibrationEffect.createOneShot(20, 200));
+                    }
+                    heldBindings = new ArrayList<>(gestureBindings);
+                    pressBindings(gestureBindings);
+                    inputControlsView.invalidate();
+                    return true;
+                }
+            }
+            if (type == Type.BUTTON && hasLongPressBinding() && !longPressTriggered && longPressHandler != null && !containsPoint(x, y)) {
+                longPressHandler.removeCallbacksAndMessages(null);
+                longPressHandler = null;
+                longPressTriggered = false;
+            }
+            if (type == Type.D_PAD || type == Type.STICK || type == Type.TRACKPAD) {
             float deltaX, deltaY;
             Rect boundingBox = getBoundingBox();
             float radius = boundingBox.width() * 0.5f;
@@ -1020,15 +1133,15 @@ public class ControlElement {
                     }
                 }
                 inputControlsView.invalidate();
+                return true;
             }
-
-            return true;
+            }
+            if (type == Type.RANGE_BUTTON) {
+                scroller.handleTouchMove(x, y);
+                return true;
+            }
         }
-        else if (pointerId == currentPointerId && type == Type.RANGE_BUTTON) {
-            scroller.handleTouchMove(x, y);
-            return true;
-        }
-        else return false;
+        return false;
     }
 
     public boolean handleTouchUp(int pointerId) {
@@ -1047,6 +1160,10 @@ public class ControlElement {
                 if (longPressTriggered) {
                     releaseHeldBindings();
                     longPressTriggered = false;
+                }
+                else if (gestureTriggered) {
+                    releaseHeldBindings();
+                    gestureTriggered = false;
                 }
                 else if (hasLongPressBinding()) {
                     if (longPressHandler != null) longPressHandler.removeCallbacksAndMessages(null);
