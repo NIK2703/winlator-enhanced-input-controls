@@ -597,6 +597,11 @@ public class InputControlsView extends View {
             int actionMasked = event.getActionMasked();
             boolean handled = false;
 
+            if (profile.getElements().isEmpty()) {
+                touchpadView.onTouchEvent(event);
+                return true;
+            }
+
             switch (actionMasked) {
                 case MotionEvent.ACTION_DOWN:
                 case MotionEvent.ACTION_POINTER_DOWN: {
