@@ -4,8 +4,11 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.CornerPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PathEffect;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.os.SystemClock;
@@ -54,7 +57,7 @@ public class ControlElement {
         }
     }
     public enum Shape {
-        CIRCLE, RECT, ROUND_RECT, SQUARE;
+        CIRCLE, RECT;
 
         public static String[] names() {
             Shape[] shapes = values();
@@ -82,6 +85,10 @@ public class ControlElement {
     private final InputControlsView inputControlsView;
     private Type type = Type.BUTTON;
     private Shape shape = Shape.CIRCLE;
+    private float elementWidth = 8f;
+    private float elementHeight = 4f;
+    private float cornerRadius;
+    private float dpadCornerRadius;
     private List<List<Binding>> bindings = new ArrayList<>();
     private float scale = 1.0f;
     private short x;
@@ -111,6 +118,7 @@ public class ControlElement {
     private float gestureDownX;
 
     private float gestureDownY;
+    private boolean buildingCache;
     private boolean active;
     private android.os.Handler longPressHandler;
     private Range range;
@@ -197,6 +205,44 @@ public class ControlElement {
     public void setShape(Shape shape) {
         this.shape = shape;
         boundingBoxNeedsUpdate = true;
+        invalidateElementCache();
+    }
+
+    public float getElementWidth() {
+        return elementWidth;
+    }
+
+    public void setElementWidth(float elementWidth) {
+        this.elementWidth = elementWidth;
+        boundingBoxNeedsUpdate = true;
+        invalidateElementCache();
+    }
+
+    public float getElementHeight() {
+        return elementHeight;
+    }
+
+    public void setElementHeight(float elementHeight) {
+        this.elementHeight = elementHeight;
+        boundingBoxNeedsUpdate = true;
+        invalidateElementCache();
+    }
+
+    public float getCornerRadius() {
+        return cornerRadius;
+    }
+
+    public void setCornerRadius(float cornerRadius) {
+        this.cornerRadius = cornerRadius;
+        invalidateElementCache();
+    }
+
+    public float getDpadCornerRadius() {
+        return dpadCornerRadius;
+    }
+
+    public void setDpadCornerRadius(float dpadCornerRadius) {
+        this.dpadCornerRadius = dpadCornerRadius;
         invalidateElementCache();
     }
 
@@ -427,13 +473,8 @@ public class ControlElement {
             case BUTTON:
                 switch (shape) {
                     case RECT:
-                    case ROUND_RECT:
-                        halfWidth = snappingSize * 4;
-                        halfHeight = snappingSize * 2;
-                        break;
-                    case SQUARE:
-                        halfWidth = (int)(snappingSize * 2.5f);
-                        halfHeight = (int)(snappingSize * 2.5f);
+                        halfWidth = (int)((elementWidth / 2.0) * snappingSize);
+                        halfHeight = (int)((elementHeight / 2.0) * snappingSize);
                         break;
                     case CIRCLE:
                         halfWidth = snappingSize * 3;
@@ -528,10 +569,13 @@ public class ControlElement {
         cacheBaseDirty = true;
         cacheFillDirty = true;
         dpadCacheDirty = true;
-        if (!cacheKey.isEmpty()) {
-            File dir = cacheDir();
-            File[] files = dir.listFiles((d, n) -> n.startsWith(cacheKey));
-            if (files != null) for (File f : files) f.delete();
+        if (inputControlsView != null) {
+            String key = diskKey(false);
+            if (!key.isEmpty()) {
+                File dir = cacheDir();
+                File[] files = dir.listFiles((d, n) -> n.startsWith(key));
+                if (files != null) for (File f : files) f.delete();
+            }
         }
     }
 
@@ -582,13 +626,13 @@ public class ControlElement {
 
     private String visualKey(boolean isFill) {
         if (isFill) {
-            return type.ordinal() + "_" + shape.ordinal() + "_" + scale + "_fill";
+            return type.ordinal() + "_" + shape.ordinal() + "_" + elementWidth + "_" + elementHeight + "_" + cornerRadius + "_" + dpadCornerRadius + "_" + scale + "_fill";
         }
-        return type.ordinal() + "_" + shape.ordinal() + "_" + scale + "_" + getDisplayText() + "_" + iconId;
+        return type.ordinal() + "_" + shape.ordinal() + "_" + elementWidth + "_" + elementHeight + "_" + cornerRadius + "_" + dpadCornerRadius + "_" + scale + "_" + getDisplayText() + "_" + iconId;
     }
 
     private String diskKey(boolean isFill) {
-        return type.ordinal() + "_" + shape.ordinal() + "_" + scale + "_" + x + "_" + y + "_" + text + "_" + iconId
+        return type.ordinal() + "_" + shape.ordinal() + "_" + elementWidth + "_" + elementHeight + "_" + cornerRadius + "_" + dpadCornerRadius + "_" + scale + "_" + x + "_" + y + "_" + text + "_" + iconId
             + (isFill ? "_fill" : "");
     }
 
@@ -598,7 +642,22 @@ public class ControlElement {
     }
 
     private int strokePad() {
-        return Math.max(1, (int)Math.ceil(inputControlsView.getSnappingSize() * 0.2f / 2) + 1);
+        return Math.max(1, (int)Math.ceil(inputControlsView.getSnappingSize() * strokeWidthMultiplier() / 2) + 1);
+    }
+
+    private float strokeWidthMultiplier() {
+        ControlsProfile p = inputControlsView.getProfile();
+        return p != null ? p.getStrokeWidth() : 0.2f;
+    }
+
+    private int fillAlphaActive() {
+        ControlsProfile p = inputControlsView.getProfile();
+        return p != null ? p.getFillAlphaActive() : 80;
+    }
+
+    private int fillAlphaInactive() {
+        ControlsProfile p = inputControlsView.getProfile();
+        return p != null ? p.getFillAlphaInactive() : 50;
     }
 
     private Bitmap loadFromDisk(String key) {
@@ -657,7 +716,9 @@ public class ControlElement {
             currentPointerId = -1;
             active = false;
             Arrays.fill(states, false);
+            buildingCache = true;
             draw(c);
+            buildingCache = false;
             selected = savedSelected;
             currentPointerId = savedPointerId;
             active = savedActive;
@@ -696,7 +757,7 @@ public class ControlElement {
             c.translate(-box.left + pad, -box.top + pad);
             Paint paint = inputControlsView.getPaint();
             int primaryColor = inputControlsView.getPrimaryColor();
-            int fillColor = ColorUtils.setAlphaComponent(primaryColor, 80);
+            int fillColor = ColorUtils.setAlphaComponent(primaryColor, 255);
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(fillColor);
             switch (type) {
@@ -705,15 +766,12 @@ public class ControlElement {
                     float cy = box.centerY();
                     switch (shape) {
                         case CIRCLE: c.drawCircle(cx, cy, box.width() * 0.5f, paint); break;
-                        case RECT:   c.drawRect(box, paint); break;
-                        case ROUND_RECT: {
-                            float r = box.height() * 0.5f;
-                            c.drawRoundRect(box.left, box.top, box.right, box.bottom, r, r, paint);
-                            break;
-                        }
-                        case SQUARE: {
-                            float r = inputControlsView.getSnappingSize() * 0.75f * scale;
-                            c.drawRoundRect(box.left, box.top, box.right, box.bottom, r, r, paint);
+                        case RECT: {
+                            float r = cornerRadius * inputControlsView.getSnappingSize() * scale;
+                            if (r > 0)
+                                c.drawRoundRect(box.left, box.top, box.right, box.bottom, r, r, paint);
+                            else
+                                c.drawRect(box, paint);
                             break;
                         }
                     }
@@ -767,7 +825,9 @@ public class ControlElement {
         if (w <= 0 || h <= 0) return;
         Paint paint = inputControlsView.getPaint();
         int primaryColor = inputControlsView.getPrimaryColor();
-        float strokeWidth = snappingSize * 0.2f;
+        float strokeWidth = snappingSize * strokeWidthMultiplier();
+        paint.setPathEffect(null);
+        if (dpadCornerRadius > 0) paint.setPathEffect(new CornerPathEffect(dpadCornerRadius * snappingSize * scale));
         String strokeKey = diskKey(false) + "_dpad_stroke";
         String fillKey = diskKey(false) + "_dpad_fill";
         dpadPetalStroke = loadFromDisk(strokeKey);
@@ -795,11 +855,12 @@ public class ControlElement {
             Canvas c = new Canvas(dpadPetalFill);
             c.translate(-box.left + pad, -box.top + pad);
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(ColorUtils.setAlphaComponent(primaryColor, 80));
+            paint.setColor(ColorUtils.setAlphaComponent(primaryColor, 255));
             c.drawPath(buildUpPetal(box, snappingSize), paint);
             paint.setStyle(Paint.Style.STROKE);
             saveToDisk(fillKey, dpadPetalFill);
         }
+        paint.setPathEffect(null);
         dpadCacheDirty = false;
     }
 
@@ -817,41 +878,148 @@ public class ControlElement {
             float cy = box.centerY();
             Paint paint = inputControlsView.getPaint();
             int primaryColor = inputControlsView.getPrimaryColor();
-            float strokeWidth = snappingSize * 0.2f;
+            float strokeWidth = snappingSize * strokeWidthMultiplier();
             for (int i = 0; i < 4; i++) {
                 canvas.save();
                 canvas.rotate(i * 90, cx, cy);
                 canvas.drawBitmap(dpadPetalStroke, box.left - pad, box.top - pad, null);
                 canvas.restore();
             }
-            if (isEngaged()) {
-                paint.setStyle(Paint.Style.FILL);
-                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, 80));
-                for (int i = 0; i < 4; i++) {
-                    if (states[i]) {
-                        canvas.save();
-                        canvas.rotate(i * 90, cx, cy);
-                        canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, null);
-                        canvas.restore();
-                    }
-                }
-                paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(strokeWidth);
-                paint.setColor(primaryColor);
+            boolean engagedDpad = isEngaged();
+            paint.setStyle(Paint.Style.FILL);
+            for (int i = 0; i < 4; i++) {
+                canvas.save();
+                canvas.rotate(i * 90, cx, cy);
+                int alpha = engagedDpad && states[i] ? fillAlphaActive() : fillAlphaInactive();
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor) * alpha / 255));
+                canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, paint);
+                canvas.restore();
             }
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(strokeWidth);
+            paint.setColor(primaryColor);
             return;
         }
         boolean engaged = isEngaged();
-        if (engaged && type != Type.RANGE_BUTTON && type != Type.TRACKPAD) {
-            ensureFillCache();
-            if (cacheFill != null)
-                canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, null);
+        if (type != Type.TRACKPAD && type != Type.STICK) {
+            int targetAlpha = engaged ? fillAlphaActive() : fillAlphaInactive();
+            if (targetAlpha > 0) {
+                ensureFillCache();
+                if (cacheFill != null) {
+                    Paint p = inputControlsView.getPaint();
+                    int savedColor = p.getColor();
+                    Paint.Style savedStyle = p.getStyle();
+                    float savedStrokeWidth = p.getStrokeWidth();
+                    int pc = inputControlsView.getPrimaryColor();
+                    int fillAlpha = Color.alpha(pc) * targetAlpha / 255;
+                    p.setColor(ColorUtils.setAlphaComponent(pc, fillAlpha));
+                    p.setStyle(Paint.Style.FILL);
+                    canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, p);
+                    p.setStyle(savedStyle);
+                    p.setColor(savedColor);
+                    p.setStrokeWidth(savedStrokeWidth);
+                }
+            }
         }
         ensureBaseCache();
         if (cacheBase != null)
             canvas.drawBitmap(cacheBase, box.left - pad, box.top - pad, null);
-        else
+        else {
             draw(canvas);
+            return;
+        }
+        if (type == Type.STICK || type == Type.RANGE_BUTTON) {
+            int snappingSize = inputControlsView.getSnappingSize();
+            Paint paint = inputControlsView.getPaint();
+            int primaryColor = inputControlsView.getPrimaryColor();
+            paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
+            paint.setStyle(Paint.Style.STROKE);
+            float strokeWidth = snappingSize * strokeWidthMultiplier();
+            paint.setStrokeWidth(strokeWidth);
+            if (type == Type.STICK) {
+                float thumbstickX = getCurrentPosition().x;
+                float thumbstickY = getCurrentPosition().y;
+                short thumbRadius = (short) (snappingSize * 3.5f * scale);
+                int oldColor = paint.getColor();
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, engaged ? (Color.alpha(primaryColor) * fillAlphaActive() / 255) : (Color.alpha(primaryColor) * fillAlphaInactive() / 255)));
+                canvas.drawCircle(thumbstickX, thumbstickY, thumbRadius, paint);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setColor(oldColor);
+                canvas.drawCircle(thumbstickX, thumbstickY, thumbRadius + strokeWidth * 0.5f, paint);
+            } else {
+                float radius = snappingSize * 0.75f * scale;
+                float elementSize = scroller.getElementSize();
+                float minTextSize = snappingSize * 2 * scale;
+                float scrollOffset = scroller.getScrollOffset();
+                byte[] rangeIndex = scroller.getRangeIndex();
+                Range range = getRange();
+                Path path = inputControlsView.getPath();
+                path.reset();
+                if (orientation == 0) {
+                    float lineTop = box.top + strokeWidth * 0.5f;
+                    float lineBottom = box.bottom - strokeWidth * 0.5f;
+                    canvas.save();
+                    path.addRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, Path.Direction.CW);
+                    canvas.clipPath(path);
+                    float startX = box.left - scrollOffset % elementSize;
+                    for (byte i = rangeIndex[0]; i < rangeIndex[1]; i++) {
+                        int index = i % range.max;
+                        paint.setStyle(Paint.Style.STROKE);
+                        paint.setColor(primaryColor);
+                        if (startX > box.left && startX < box.right) canvas.drawLine(startX, lineTop, startX, lineBottom, paint);
+                        String text = getRangeTextForIndex(range, index);
+                        if (startX < box.right && startX + elementSize > box.left) {
+                            if (scroller.isActionDown() && scroller.getPressedIndex() == index) {
+                                paint.setStyle(Paint.Style.FILL);
+                                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor) * fillAlphaActive() / 255));
+                                float r = elementSize * 0.2f;
+                                canvas.drawRect(startX, lineTop, startX + elementSize, lineBottom, paint);
+                            }
+                            paint.setStyle(Paint.Style.FILL);
+                            paint.setColor(primaryColor);
+                            paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, elementSize - strokeWidth * 2), minTextSize));
+                            paint.setTextAlign(Paint.Align.CENTER);
+                            canvas.drawText(text, startX + elementSize * 0.5f, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
+                        }
+                        startX += elementSize;
+                    }
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setColor(primaryColor);
+                    canvas.restore();
+                } else {
+                    float lineLeft = box.left + strokeWidth * 0.5f;
+                    float lineRight = box.right - strokeWidth * 0.5f;
+                    canvas.save();
+                    path.addRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, Path.Direction.CW);
+                    canvas.clipPath(path);
+                    float startY = box.top - scrollOffset % elementSize;
+                    for (byte i = rangeIndex[0]; i < rangeIndex[1]; i++) {
+                        paint.setStyle(Paint.Style.STROKE);
+                        paint.setColor(primaryColor);
+                        if (startY > box.top && startY < box.bottom) canvas.drawLine(lineLeft, startY, lineRight, startY, paint);
+                        String text = getRangeTextForIndex(range, i);
+                        if (startY < box.bottom && startY + elementSize > box.top) {
+                            if (scroller.isActionDown() && scroller.getPressedIndex() == (i % range.max)) {
+                                paint.setStyle(Paint.Style.FILL);
+                                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor) * fillAlphaActive() / 255));
+                                float r = elementSize * 0.2f;
+                                canvas.drawRect(lineLeft, startY, lineRight, startY + elementSize, paint);
+                            }
+                            paint.setStyle(Paint.Style.FILL);
+                            paint.setColor(primaryColor);
+                            paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, box.width() - strokeWidth * 2), minTextSize));
+                            paint.setTextAlign(Paint.Align.CENTER);
+                            canvas.drawText(text, x, startY + elementSize * 0.5f - ((paint.descent() + paint.ascent()) * 0.5f), paint);
+                        }
+                        startY += elementSize;
+                    }
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setColor(primaryColor);
+                    canvas.restore();
+                }
+            }
+        }
     }
 
     public void draw(Canvas canvas) {
@@ -861,11 +1029,11 @@ public class ControlElement {
 
         paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
         paint.setStyle(Paint.Style.STROKE);
-        float strokeWidth = snappingSize * 0.2f;
+        float strokeWidth = snappingSize * strokeWidthMultiplier();
         paint.setStrokeWidth(strokeWidth);
         Rect boundingBox = getBoundingBox();
         boolean engaged = isEngaged();
-        int fillAlpha = engaged ? 80 : 0;
+        int fillAlpha = engaged ? (Color.alpha(primaryColor) * fillAlphaActive() / 255) : (Color.alpha(primaryColor) * fillAlphaInactive() / 255);
         int fillColor = ColorUtils.setAlphaComponent(primaryColor, fillAlpha);
 
         switch (type) {
@@ -873,49 +1041,13 @@ public class ControlElement {
                 float cx = boundingBox.centerX();
                 float cy = boundingBox.centerY();
 
-                if (engaged) {
-                    paint.setStyle(Paint.Style.FILL);
-                    paint.setColor(fillColor);
-                    switch (shape) {
-                        case CIRCLE:
-                            canvas.drawCircle(cx, cy, boundingBox.width() * 0.5f, paint);
-                            break;
-                        case RECT:
-                            canvas.drawRect(boundingBox, paint);
-                            break;
-                        case ROUND_RECT: {
-                            float r = boundingBox.height() * 0.5f;
-                            canvas.drawRoundRect(boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, r, r, paint);
-                            break;
-                        }
-                        case SQUARE: {
-                            float r = snappingSize * 0.75f * scale;
-                            canvas.drawRoundRect(boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, r, r, paint);
-                            break;
-                        }
-                    }
-                    paint.setStyle(Paint.Style.STROKE);
-                    paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
-                    paint.setStrokeWidth(strokeWidth);
-                }
-                switch (shape) {
-                    case CIRCLE:
-                        canvas.drawCircle(cx, cy, boundingBox.width() * 0.5f, paint);
-                        break;
-                    case RECT:
-                        canvas.drawRect(boundingBox, paint);
-                        break;
-                    case ROUND_RECT: {
-                        float radius = boundingBox.height() * 0.5f;
-                        canvas.drawRoundRect(boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, paint);
-                        break;
-                    }
-                    case SQUARE: {
-                        float radius = snappingSize * 0.75f * scale;
-                        canvas.drawRoundRect(boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, paint);
-                        break;
-                    }
-                }
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(fillColor);
+                drawButtonShape(canvas, boundingBox, snappingSize, paint);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
+                paint.setStrokeWidth(strokeWidth);
+                drawButtonShape(canvas, boundingBox, snappingSize, paint);
 
                 if (iconId > 0) {
                     drawIcon(canvas, cx, cy, boundingBox.width(), boundingBox.height(), iconId);
@@ -969,25 +1101,32 @@ public class ControlElement {
                 leftPath.lineTo(cx - offsetY, cy + offsetX);
                 leftPath.close();
 
+                paint.setPathEffect(null);
+                if (dpadCornerRadius > 0) paint.setPathEffect(new CornerPathEffect(dpadCornerRadius * snappingSize * scale));
+
                 canvas.drawPath(upPath, paint);
                 canvas.drawPath(rightPath, paint);
                 canvas.drawPath(downPath, paint);
                 canvas.drawPath(leftPath, paint);
 
                 paint.setStyle(Paint.Style.FILL);
-                paint.setColor(fillColor);
-                if (states[0]) canvas.drawPath(upPath, paint);
-                if (states[1]) canvas.drawPath(rightPath, paint);
-                if (states[2]) canvas.drawPath(downPath, paint);
-                if (states[3]) canvas.drawPath(leftPath, paint);
+                int baseAlpha = Color.alpha(primaryColor);
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[0] ? fillAlphaActive() : fillAlphaInactive()) / 255));
+                canvas.drawPath(upPath, paint);
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[1] ? fillAlphaActive() : fillAlphaInactive()) / 255));
+                canvas.drawPath(rightPath, paint);
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[2] ? fillAlphaActive() : fillAlphaInactive()) / 255));
+                canvas.drawPath(downPath, paint);
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[3] ? fillAlphaActive() : fillAlphaInactive()) / 255));
+                canvas.drawPath(leftPath, paint);
                 paint.setStyle(Paint.Style.STROKE);
                 paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
                 paint.setStrokeWidth(strokeWidth);
+                paint.setPathEffect(null);
                 break;
             }
             case RANGE_BUTTON: {
                 Range range = getRange();
-                int oldColor = paint.getColor();
                 float radius = snappingSize * 0.75f * scale;
                 float elementSize = scroller.getElementSize();
                 float minTextSize = snappingSize * 2 * scale;
@@ -1000,66 +1139,94 @@ public class ControlElement {
                     float lineTop = boundingBox.top + strokeWidth * 0.5f;
                     float lineBottom = boundingBox.bottom - strokeWidth * 0.5f;
                     float startX = boundingBox.left;
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(fillColor);
+                    canvas.drawRoundRect(startX, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, paint);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
+                    paint.setStrokeWidth(strokeWidth);
                     canvas.drawRoundRect(startX, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, paint);
 
-                    canvas.save();
-                    path.addRoundRect(startX, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, Path.Direction.CW);
-                    canvas.clipPath(path);
-                    startX -= scrollOffset % elementSize;
+                    if (!buildingCache) {
+                        canvas.save();
+                        path.addRoundRect(startX, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, Path.Direction.CW);
+                        canvas.clipPath(path);
+                        startX -= scrollOffset % elementSize;
 
-                    for (byte i = rangeIndex[0]; i < rangeIndex[1]; i++) {
-                        int index = i % range.max;
-                        paint.setStyle(Paint.Style.STROKE);
-                        paint.setColor(oldColor);
-
-                        if (startX > boundingBox.left && startX  < boundingBox.right) canvas.drawLine(startX, lineTop, startX, lineBottom, paint);
-                        String text = getRangeTextForIndex(range, index);
-
-                        if (startX < boundingBox.right && startX + elementSize > boundingBox.left) {
-                            paint.setStyle(Paint.Style.FILL);
+                        for (byte i = rangeIndex[0]; i < rangeIndex[1]; i++) {
+                            int index = i % range.max;
+                            paint.setStyle(Paint.Style.STROKE);
                             paint.setColor(primaryColor);
-                            paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, elementSize - strokeWidth * 2), minTextSize));
-                            paint.setTextAlign(Paint.Align.CENTER);
-                            canvas.drawText(text, startX + elementSize * 0.5f, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
-                        }
-                        startX += elementSize;
-                    }
 
-                    paint.setStyle(Paint.Style.STROKE);
-                    paint.setColor(oldColor);
-                    canvas.restore();
+                            if (startX > boundingBox.left && startX  < boundingBox.right) canvas.drawLine(startX, lineTop, startX, lineBottom, paint);
+                            String text = getRangeTextForIndex(range, index);
+
+                            if (startX < boundingBox.right && startX + elementSize > boundingBox.left) {
+                                if (scroller.isActionDown() && scroller.getPressedIndex() == index) {
+                                    paint.setStyle(Paint.Style.FILL);
+                                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor) * fillAlphaActive() / 255));
+                                    float r = elementSize * 0.2f;
+                                    canvas.drawRoundRect(startX, lineTop, startX + elementSize, lineBottom, r, r, paint);
+                                }
+                                paint.setStyle(Paint.Style.FILL);
+                                paint.setColor(primaryColor);
+                                paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, elementSize - strokeWidth * 2), minTextSize));
+                                paint.setTextAlign(Paint.Align.CENTER);
+                                canvas.drawText(text, startX + elementSize * 0.5f, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
+                            }
+                            startX += elementSize;
+                        }
+
+                        paint.setStyle(Paint.Style.STROKE);
+                        paint.setColor(primaryColor);
+                        canvas.restore();
+                    }
                 }
                 else {
                     float lineLeft = boundingBox.left + strokeWidth * 0.5f;
                     float lineRight = boundingBox.right - strokeWidth * 0.5f;
                     float startY = boundingBox.top;
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(fillColor);
+                    canvas.drawRoundRect(boundingBox.left, startY, boundingBox.right, boundingBox.bottom, radius, radius, paint);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
+                    paint.setStrokeWidth(strokeWidth);
                     canvas.drawRoundRect(boundingBox.left, startY, boundingBox.right, boundingBox.bottom, radius, radius, paint);
 
-                    canvas.save();
-                    path.addRoundRect(boundingBox.left, startY, boundingBox.right, boundingBox.bottom, radius, radius, Path.Direction.CW);
-                    canvas.clipPath(inputControlsView.getPath());
-                    startY -= scrollOffset % elementSize;
+                    if (!buildingCache) {
+                        canvas.save();
+                        path.addRoundRect(boundingBox.left, startY, boundingBox.right, boundingBox.bottom, radius, radius, Path.Direction.CW);
+                        canvas.clipPath(inputControlsView.getPath());
+                        startY -= scrollOffset % elementSize;
 
-                    for (byte i = rangeIndex[0]; i < rangeIndex[1]; i++) {
-                        paint.setStyle(Paint.Style.STROKE);
-                        paint.setColor(oldColor);
-
-                        if (startY > boundingBox.top && startY < boundingBox.bottom) canvas.drawLine(lineLeft, startY, lineRight, startY, paint);
-                        String text = getRangeTextForIndex(range, i);
-
-                        if (startY < boundingBox.bottom && startY + elementSize > boundingBox.top) {
-                            paint.setStyle(Paint.Style.FILL);
+                        for (byte i = rangeIndex[0]; i < rangeIndex[1]; i++) {
+                            paint.setStyle(Paint.Style.STROKE);
                             paint.setColor(primaryColor);
-                            paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, boundingBox.width() - strokeWidth * 2), minTextSize));
-                            paint.setTextAlign(Paint.Align.CENTER);
-                            canvas.drawText(text, x, startY + elementSize * 0.5f - ((paint.descent() + paint.ascent()) * 0.5f), paint);
-                        }
-                        startY += elementSize;
-                    }
 
-                    paint.setStyle(Paint.Style.STROKE);
-                    paint.setColor(oldColor);
-                    canvas.restore();
+                            if (startY > boundingBox.top && startY < boundingBox.bottom) canvas.drawLine(lineLeft, startY, lineRight, startY, paint);
+                            String text = getRangeTextForIndex(range, i);
+
+                            if (startY < boundingBox.bottom && startY + elementSize > boundingBox.top) {
+                                if (scroller.isActionDown() && scroller.getPressedIndex() == (i % range.max)) {
+                                    paint.setStyle(Paint.Style.FILL);
+                                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor) * fillAlphaActive() / 255));
+                                    float r = elementSize * 0.2f;
+                                    canvas.drawRoundRect(lineLeft, startY, lineRight, startY + elementSize, r, r, paint);
+                                }
+                                paint.setStyle(Paint.Style.FILL);
+                                paint.setColor(primaryColor);
+                                paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, boundingBox.width() - strokeWidth * 2), minTextSize));
+                                paint.setTextAlign(Paint.Align.CENTER);
+                                canvas.drawText(text, x, startY + elementSize * 0.5f - ((paint.descent() + paint.ascent()) * 0.5f), paint);
+                            }
+                            startY += elementSize;
+                        }
+
+                        paint.setStyle(Paint.Style.STROKE);
+                        paint.setColor(primaryColor);
+                        canvas.restore();
+                    }
                 }
                 break;
             }
@@ -1070,22 +1237,30 @@ public class ControlElement {
 
                 canvas.drawCircle(cx, cy, boundingBox.height() * 0.5f, paint);
 
-                float thumbstickX = getCurrentPosition().x;
-                float thumbstickY = getCurrentPosition().y;
+                if (!buildingCache) {
+                    float thumbstickX = getCurrentPosition().x;
+                    float thumbstickY = getCurrentPosition().y;
 
-                short thumbRadius = (short) (snappingSize * 3.5f * scale); // Radius of the thumbstick
-                paint.setStyle(Paint.Style.FILL);
-                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, engaged ? 120 : 50));
-                canvas.drawCircle(thumbstickX, thumbstickY, thumbRadius, paint); // Draw thumbstick
+                    short thumbRadius = (short) (snappingSize * 3.5f * scale);
+                    paint.setStyle(Paint.Style.FILL);
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, engaged ? (Color.alpha(primaryColor) * fillAlphaActive() / 255) : (Color.alpha(primaryColor) * fillAlphaInactive() / 255)));
+                    canvas.drawCircle(thumbstickX, thumbstickY, thumbRadius, paint);
 
-                paint.setStyle(Paint.Style.STROKE);
-                paint.setColor(oldColor);
-                canvas.drawCircle(thumbstickX, thumbstickY, thumbRadius + strokeWidth * 0.5f, paint);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setColor(oldColor);
+                    canvas.drawCircle(thumbstickX, thumbstickY, thumbRadius + strokeWidth * 0.5f, paint);
+                }
                 break;
             }
 
             case TRACKPAD: {
                 float radius = boundingBox.height() * 0.15f;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(fillColor);
+                canvas.drawRoundRect(boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, paint);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
+                paint.setStrokeWidth(strokeWidth);
                 canvas.drawRoundRect(boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, paint);
                 float offset = strokeWidth * 2.5f;
                 float innerStrokeWidth = strokeWidth * 2;
@@ -1098,11 +1273,29 @@ public class ControlElement {
         }
     }
 
+    private void drawButtonShape(Canvas canvas, Rect box, int snappingSize, Paint paint) {
+        float cx = box.centerX();
+        float cy = box.centerY();
+        switch (shape) {
+            case CIRCLE:
+                canvas.drawCircle(cx, cy, box.width() * 0.5f, paint);
+                break;
+            case RECT: {
+                float r = cornerRadius * snappingSize * scale;
+                if (r > 0)
+                    canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, r, r, paint);
+                else
+                    canvas.drawRect(box, paint);
+                break;
+            }
+        }
+    }
+
     private void drawIcon(Canvas canvas, float cx, float cy, float width, float height, int iconId) {
         Paint paint = inputControlsView.getPaint();
         Bitmap icon = inputControlsView.getIcon((byte)iconId);
         paint.setColorFilter(inputControlsView.getColorFilter());
-        int margin = (int)(inputControlsView.getSnappingSize() * (shape == Shape.CIRCLE || shape == Shape.SQUARE ? 2.0f : 1.0f) * scale);
+        int margin = (int)(inputControlsView.getSnappingSize() * (shape == Shape.CIRCLE ? 2.0f : 1.0f) * scale);
         int halfSize = (int)((Math.min(width, height) - margin) * 0.5f);
 
         Rect srcRect = new Rect(0, 0, icon.getWidth(), icon.getHeight());
@@ -1116,6 +1309,11 @@ public class ControlElement {
             JSONObject elementJSONObject = new JSONObject();
             elementJSONObject.put("type", type.name());
             elementJSONObject.put("shape", shape.name());
+            if (type == Type.BUTTON && shape == Shape.RECT) {
+                elementJSONObject.put("elementWidth", elementWidth);
+                elementJSONObject.put("elementHeight", elementHeight);
+                elementJSONObject.put("cornerRadius", cornerRadius);
+            }
 
             JSONArray bindingsJSONArray = new JSONArray();
             for (List<Binding> seq : bindings) {
@@ -1153,6 +1351,9 @@ public class ControlElement {
             if (type == Type.RANGE_BUTTON && range != null) {
                 elementJSONObject.put("range", range.name());
                 if (orientation != 0) elementJSONObject.put("orientation", orientation);
+            }
+            if (type == Type.D_PAD && dpadCornerRadius > 0) {
+                elementJSONObject.put("dpadCornerRadius", dpadCornerRadius);
             }
             return elementJSONObject;
         }
@@ -1313,6 +1514,7 @@ public class ControlElement {
             }
             else if (type == Type.RANGE_BUTTON) {
                 scroller.handleTouchDown(x, y);
+                inputControlsView.invalidate();
                 return true;
             }
             else {
@@ -1506,6 +1708,7 @@ public class ControlElement {
                 scroller.handleTouchMove(x, y);
                 return true;
             }
+            return true;
         }
         return false;
     }
@@ -1555,6 +1758,7 @@ public class ControlElement {
 
                 if (type == Type.RANGE_BUTTON) {
                     scroller.handleTouchUp();
+                    inputControlsView.invalidate();
                 }
                 else if (type == Type.STICK || type == Type.D_PAD) {
                     inputControlsView.invalidate();

@@ -56,6 +56,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private boolean longPressHapticEnabled = true;
     private int dragThreshold = 10;
     private int gestureThreshold = 20;
+    private float strokeWidth = 0.2f;
+    private int fillAlphaActive = 80;
+    private int fillAlphaInactive = 50;
     private TouchActivationMode touchActivationMode = TouchActivationMode.LOCK;
 
     private boolean gestureSettingsLoaded = false;
@@ -334,6 +337,33 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.gestureThreshold = clamp(gestureThreshold, 10, 50);
     }
 
+    public float getStrokeWidth() {
+        ensureGestureSettingsLoaded();
+        return strokeWidth;
+    }
+
+    public void setStrokeWidth(float strokeWidth) {
+        this.strokeWidth = strokeWidth;
+    }
+
+    public int getFillAlphaActive() {
+        ensureGestureSettingsLoaded();
+        return fillAlphaActive;
+    }
+
+    public void setFillAlphaActive(int fillAlphaActive) {
+        this.fillAlphaActive = fillAlphaActive;
+    }
+
+    public int getFillAlphaInactive() {
+        ensureGestureSettingsLoaded();
+        return fillAlphaInactive;
+    }
+
+    public void setFillAlphaInactive(int fillAlphaInactive) {
+        this.fillAlphaInactive = fillAlphaInactive;
+    }
+
     public SecondFingerMode getSecondFingerMode() {
         ensureGestureSettingsLoaded();
         return secondFingerMode;
@@ -457,6 +487,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (data.has("longPressHapticEnabled")) longPressHapticEnabled = data.getBoolean("longPressHapticEnabled");
             if (data.has("dragThreshold")) dragThreshold = clamp(data.getInt("dragThreshold"), 0, 30);
             if (data.has("gestureThreshold")) gestureThreshold = clamp(data.getInt("gestureThreshold"), 10, 50);
+            if (data.has("strokeWidth")) strokeWidth = (float)data.getDouble("strokeWidth");
+            if (data.has("fillAlphaActive")) fillAlphaActive = data.getInt("fillAlphaActive");
+            if (data.has("fillAlphaInactive")) fillAlphaInactive = data.getInt("fillAlphaInactive");
             if (data.has("touchscreenGestures")) {
                 loadGestureSettingsFromJson(data.getJSONObject("touchscreenGestures"));
             }
@@ -584,6 +617,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             data.put("longPressHapticEnabled", longPressHapticEnabled);
             if (dragThreshold != 10) data.put("dragThreshold", dragThreshold);
             if (gestureThreshold != 20) data.put("gestureThreshold", gestureThreshold);
+            if (strokeWidth != 0.2f) data.put("strokeWidth", strokeWidth);
+            data.put("fillAlphaActive", fillAlphaActive);
+            data.put("fillAlphaInactive", fillAlphaInactive);
 
             JSONArray elementsJSONArray = new JSONArray();
             if (!elementsLoaded && file.isFile()) {
@@ -707,6 +743,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (profileJSONObject.has("longPressHapticIntensity")) longPressHapticIntensity = profileJSONObject.getInt("longPressHapticIntensity");
             if (profileJSONObject.has("longPressHapticEnabled")) longPressHapticEnabled = profileJSONObject.getBoolean("longPressHapticEnabled");
             if (profileJSONObject.has("dragThreshold")) dragThreshold = clamp(profileJSONObject.getInt("dragThreshold"), 0, 30);
+            if (profileJSONObject.has("strokeWidth")) strokeWidth = (float)profileJSONObject.getDouble("strokeWidth");
+            if (profileJSONObject.has("fillAlphaActive")) fillAlphaActive = profileJSONObject.getInt("fillAlphaActive");
+            if (profileJSONObject.has("fillAlphaInactive")) fillAlphaInactive = profileJSONObject.getInt("fillAlphaInactive");
             if (profileJSONObject.has("touchscreenGestures")) {
                 loadGestureSettingsFromJson(profileJSONObject.getJSONObject("touchscreenGestures"));
             }
@@ -717,7 +756,35 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 JSONObject elementJSONObject = elementsJSONArray.getJSONObject(i);
                 ControlElement element = new ControlElement(inputControlsView);
                 element.setType(ControlElement.Type.valueOf(elementJSONObject.getString("type")));
-                element.setShape(ControlElement.Shape.valueOf(elementJSONObject.getString("shape")));
+
+                String shapeStr = elementJSONObject.getString("shape");
+                if ("RECT".equals(shapeStr) || "SQUARE".equals(shapeStr) || "ROUND_RECT".equals(shapeStr)) {
+                    element.setShape(ControlElement.Shape.RECT);
+                    switch (shapeStr) {
+                        case "SQUARE":
+                            element.setElementWidth(5f);
+                            element.setElementHeight(5f);
+                            element.setCornerRadius(0.75f);
+                            break;
+                        case "ROUND_RECT":
+                            element.setElementWidth(8f);
+                            element.setElementHeight(4f);
+                            element.setCornerRadius(2f);
+                            break;
+                        default:
+                            element.setElementWidth(8f);
+                            element.setElementHeight(4f);
+                            element.setCornerRadius(0f);
+                            break;
+                    }
+                } else {
+                    element.setShape(ControlElement.Shape.valueOf(shapeStr));
+                }
+
+                if (elementJSONObject.has("elementWidth")) element.setElementWidth((float)elementJSONObject.getDouble("elementWidth"));
+                if (elementJSONObject.has("elementHeight")) element.setElementHeight((float)elementJSONObject.getDouble("elementHeight"));
+                if (elementJSONObject.has("cornerRadius")) element.setCornerRadius((float)elementJSONObject.getDouble("cornerRadius"));
+                if (elementJSONObject.has("dpadCornerRadius")) element.setDpadCornerRadius((float)elementJSONObject.getDouble("dpadCornerRadius"));
                 element.setToggleSwitch(elementJSONObject.getBoolean("toggleSwitch"));
                 element.setX((int)(elementJSONObject.getDouble("x") * inputControlsView.getMaxWidth()));
                 element.setY((int)(elementJSONObject.getDouble("y") * inputControlsView.getMaxHeight()));

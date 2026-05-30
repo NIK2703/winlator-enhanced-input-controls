@@ -622,6 +622,7 @@ if (enableLogs) {
             try { hudDataSource.start(); } catch (Exception ignored) {}
         }
         ProcessHelper.resumeAllWineProcesses();
+        inputControlsView.setOverlayOpacity(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY));
     }
 
     @Override
