@@ -85,6 +85,7 @@ public class ControlElement {
     private boolean boundingBoxNeedsUpdate = true;
     private String text = "";
     private byte iconId;
+    private List<Binding> heldBindings;
     private Range range;
     private byte orientation;
     private PointF currentPosition;
@@ -710,7 +711,7 @@ public class ControlElement {
         return !toggleSwitch && (binding == Binding.GAMEPAD_BUTTON_L3 || binding == Binding.GAMEPAD_BUTTON_R3);
     }
 
-    private void executeSequencePressRelease(List<Binding> seq) {
+    private void pressBindings(List<Binding> seq) {
         int delay = inputControlsView.getProfile() != null ? inputControlsView.getProfile().getBindingDelay() : 0;
         int size = seq.size();
 
@@ -724,27 +725,39 @@ public class ControlElement {
             }
         }
 
-        // Execute non-modifier bindings (press + release with delay)
+        // Press non-modifier bindings with delay
         for (int i = 0; i < size; i++) {
             Binding b = seq.get(i);
             if (b == null || b == Binding.NONE) continue;
-            if (b.isModifier() || b.isKeyboardModifier()) continue;
+            if (b.isModifier()) continue;
             if (inputControlsView != null) {
                 inputControlsView.handleInputEvent(b, true);
-                inputControlsView.handleInputEvent(b, false);
             }
             if (delay > 0 && i < size - 1) SystemClock.sleep(delay);
         }
+    }
 
-        // Release modifier keys (reverse order)
-        if (inputControlsView != null) {
-            for (int i = size - 1; i >= 0; i--) {
-                Binding b = seq.get(i);
-                if (b == null || b == Binding.NONE) continue;
-                Binding kb = b.toKeyboardBinding();
-                if (kb != null) inputControlsView.handleInputEvent(kb, false);
-            }
+    private void releaseHeldBindings() {
+        if (heldBindings == null || inputControlsView == null) return;
+        int size = heldBindings.size();
+
+        // Release non-modifier bindings in reverse order
+        for (int i = size - 1; i >= 0; i--) {
+            Binding b = heldBindings.get(i);
+            if (b == null || b == Binding.NONE) continue;
+            if (b.isModifier()) continue;
+            inputControlsView.handleInputEvent(b, false);
         }
+
+        // Release modifier keys in reverse order
+        for (int i = size - 1; i >= 0; i--) {
+            Binding b = heldBindings.get(i);
+            if (b == null || b == Binding.NONE) continue;
+            Binding kb = b.toKeyboardBinding();
+            if (kb != null) inputControlsView.handleInputEvent(kb, false);
+        }
+
+        heldBindings = null;
     }
 
     public boolean handleTouchDown(int pointerId, float x, float y) {
@@ -754,7 +767,11 @@ public class ControlElement {
                 if (isKeepButtonPressedAfterMinTime()) touchTime = System.currentTimeMillis();
                 if (!toggleSwitch || !selected) {
                     List<Binding> seq = bindings.get(0);
-                    executeSequencePressRelease(seq);
+                    heldBindings = new ArrayList<>(seq);
+                    pressBindings(seq);
+                }
+                else if (toggleSwitch && selected) {
+                    releaseHeldBindings();
                 }
                 inputControlsView.invalidate();
                 return true;
@@ -933,7 +950,10 @@ public class ControlElement {
 
                 if (toggleSwitch) {
                     selected = !selected;
+                    if (selected) return true;
                 }
+
+                releaseHeldBindings();
                 inputControlsView.invalidate();
             }
             else if (type == Type.RANGE_BUTTON || type == Type.D_PAD || type == Type.STICK || type == Type.TRACKPAD) {
