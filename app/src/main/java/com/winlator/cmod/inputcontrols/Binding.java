@@ -116,21 +116,11 @@ public enum Binding {
         return this == MOD_CTRL || this == MOD_SHIFT || this == MOD_ALT;
     }
 
-    public boolean isKeyboardModifier() {
-        return this == KEY_SHIFT_L || this == KEY_SHIFT_R ||
-               this == KEY_CTRL_L || this == KEY_CTRL_R ||
-               this == KEY_ALT_L || this == KEY_ALT_R;
-    }
-
     public Binding toKeyboardBinding() {
         switch (this) {
             case MOD_CTRL: return KEY_CTRL_L;
             case MOD_SHIFT: return KEY_SHIFT_L;
             case MOD_ALT: return KEY_ALT_L;
-            case KEY_CTRL_L: case KEY_CTRL_R:
-            case KEY_SHIFT_L: case KEY_SHIFT_R:
-            case KEY_ALT_L: case KEY_ALT_R:
-                return this;
             default: return null;
         }
     }
