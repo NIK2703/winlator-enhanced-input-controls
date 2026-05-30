@@ -129,6 +129,7 @@ public class ControlElement {
     }
 
     public void setType(Type type) {
+        if (this.type == type) return;
         this.type = type;
         reset();
     }
