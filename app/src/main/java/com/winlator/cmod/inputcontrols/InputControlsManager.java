@@ -226,9 +226,14 @@ public class InputControlsManager {
             String singleTap2ndFingerActionStr = null;
             String longPress2ndFingerActionStr = null;
             String doubleTap2ndFingerActionStr = null;
+            String singleTapDragActionStr = null;
+            String longPressDragActionStr = null;
+            String doubleTapDragActionStr = null;
+            String singleTap2ndFingerDragActionStr = null;
+            String longPress2ndFingerDragActionStr = null;
+            String doubleTap2ndFingerDragActionStr = null;
             int doubleTapTimeout = -1;
             int longPressTimeout = -1;
-            int tapClickDelay = -1;
             String secondFingerModeStr = null;
 
             reader.beginObject();
@@ -258,9 +263,14 @@ public class InputControlsManager {
                             case "singleTap2ndFingerAction": singleTap2ndFingerActionStr = reader.nextString(); break;
                             case "longPress2ndFingerAction": longPress2ndFingerActionStr = reader.nextString(); break;
                             case "doubleTap2ndFingerAction": doubleTap2ndFingerActionStr = reader.nextString(); break;
+                            case "singleTapDragAction": singleTapDragActionStr = reader.nextString(); break;
+                            case "longPressDragAction": longPressDragActionStr = reader.nextString(); break;
+                            case "doubleTapDragAction": doubleTapDragActionStr = reader.nextString(); break;
+                            case "singleTap2ndFingerDragAction": singleTap2ndFingerDragActionStr = reader.nextString(); break;
+                            case "longPress2ndFingerDragAction": longPress2ndFingerDragActionStr = reader.nextString(); break;
+                            case "doubleTap2ndFingerDragAction": doubleTap2ndFingerDragActionStr = reader.nextString(); break;
                             case "doubleTapTimeout": doubleTapTimeout = reader.nextInt(); break;
                             case "longPressTimeout": longPressTimeout = reader.nextInt(); break;
-                            case "tapClickDelay": tapClickDelay = reader.nextInt(); break;
                             case "secondFingerMode": secondFingerModeStr = reader.nextString(); break;
                             default: reader.skipValue(); break;
                         }
@@ -286,9 +296,14 @@ public class InputControlsManager {
             if (singleTap2ndFingerActionStr != null) profile.setSingleTap2ndFingerAction(ControlsProfile.parseBinding(singleTap2ndFingerActionStr, Binding.MOUSE_RIGHT_BUTTON));
             if (longPress2ndFingerActionStr != null) profile.setLongPress2ndFingerAction(ControlsProfile.parseBinding(longPress2ndFingerActionStr, Binding.MOUSE_RIGHT_BUTTON));
             if (doubleTap2ndFingerActionStr != null) profile.setDoubleTap2ndFingerAction(ControlsProfile.parseBinding(doubleTap2ndFingerActionStr, Binding.NONE));
+            if (singleTapDragActionStr != null) profile.setSingleTapDragAction(ControlsProfile.parseBinding(singleTapDragActionStr, Binding.NONE));
+            if (longPressDragActionStr != null) profile.setLongPressDragAction(ControlsProfile.parseBinding(longPressDragActionStr, Binding.NONE));
+            if (doubleTapDragActionStr != null) profile.setDoubleTapDragAction(ControlsProfile.parseBinding(doubleTapDragActionStr, Binding.NONE));
+            if (singleTap2ndFingerDragActionStr != null) profile.setSingleTap2ndFingerDragAction(ControlsProfile.parseBinding(singleTap2ndFingerDragActionStr, Binding.NONE));
+            if (longPress2ndFingerDragActionStr != null) profile.setLongPress2ndFingerDragAction(ControlsProfile.parseBinding(longPress2ndFingerDragActionStr, Binding.NONE));
+            if (doubleTap2ndFingerDragActionStr != null) profile.setDoubleTap2ndFingerDragAction(ControlsProfile.parseBinding(doubleTap2ndFingerDragActionStr, Binding.NONE));
             if (doubleTapTimeout >= 0) profile.setDoubleTapTimeout(doubleTapTimeout);
             if (longPressTimeout >= 0) profile.setLongPressTimeout(longPressTimeout);
-            if (tapClickDelay >= 0) profile.setTapClickDelay(tapClickDelay);
             if (secondFingerModeStr != null) profile.setSecondFingerMode(ControlsProfile.parseEnum(SecondFingerMode.class, secondFingerModeStr, SecondFingerMode.SECOND_TAP_ACTIONS));
 
             profile.markGestureSettingsLoaded();

@@ -41,9 +41,14 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private Binding singleTap2ndFingerAction = Binding.MOUSE_RIGHT_BUTTON;
     private Binding longPress2ndFingerAction = Binding.MOUSE_RIGHT_BUTTON;
     private Binding doubleTap2ndFingerAction = Binding.NONE;
+    private Binding singleTapDragAction = Binding.NONE;
+    private Binding longPressDragAction = Binding.NONE;
+    private Binding doubleTapDragAction = Binding.NONE;
+    private Binding singleTap2ndFingerDragAction = Binding.NONE;
+    private Binding longPress2ndFingerDragAction = Binding.NONE;
+    private Binding doubleTap2ndFingerDragAction = Binding.NONE;
     private int doubleTapTimeout = 200;
     private int longPressTimeout = 400;
-    private int tapClickDelay = 0;
     private SecondFingerMode secondFingerMode = SecondFingerMode.SECOND_TAP_ACTIONS;
     private boolean gestureSettingsLoaded = false;
 
@@ -226,15 +231,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.longPressTimeout = clamp(timeout, 50, 1000);
     }
 
-    public int getTapClickDelay() {
-        ensureGestureSettingsLoaded();
-        return tapClickDelay;
-    }
-
-    public void setTapClickDelay(int delay) {
-        this.tapClickDelay = clamp(delay, 0, 10);
-    }
-
     public SecondFingerMode getSecondFingerMode() {
         ensureGestureSettingsLoaded();
         return secondFingerMode;
@@ -242,6 +238,60 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
     public void setSecondFingerMode(SecondFingerMode mode) {
         this.secondFingerMode = mode;
+    }
+
+    public Binding getSingleTapDragAction() {
+        ensureGestureSettingsLoaded();
+        return singleTapDragAction;
+    }
+
+    public void setSingleTapDragAction(Binding binding) {
+        this.singleTapDragAction = binding;
+    }
+
+    public Binding getLongPressDragAction() {
+        ensureGestureSettingsLoaded();
+        return longPressDragAction;
+    }
+
+    public void setLongPressDragAction(Binding binding) {
+        this.longPressDragAction = binding;
+    }
+
+    public Binding getDoubleTapDragAction() {
+        ensureGestureSettingsLoaded();
+        return doubleTapDragAction;
+    }
+
+    public void setDoubleTapDragAction(Binding binding) {
+        this.doubleTapDragAction = binding;
+    }
+
+    public Binding getSingleTap2ndFingerDragAction() {
+        ensureGestureSettingsLoaded();
+        return singleTap2ndFingerDragAction;
+    }
+
+    public void setSingleTap2ndFingerDragAction(Binding binding) {
+        this.singleTap2ndFingerDragAction = binding;
+    }
+
+    public Binding getLongPress2ndFingerDragAction() {
+        ensureGestureSettingsLoaded();
+        return longPress2ndFingerDragAction;
+    }
+
+    public void setLongPress2ndFingerDragAction(Binding binding) {
+        this.longPress2ndFingerDragAction = binding;
+    }
+
+    public Binding getDoubleTap2ndFingerDragAction() {
+        ensureGestureSettingsLoaded();
+        return doubleTap2ndFingerDragAction;
+    }
+
+    public void setDoubleTap2ndFingerDragAction(Binding binding) {
+        this.doubleTap2ndFingerDragAction = binding;
     }
 
     private void ensureGestureSettingsLoaded() {
@@ -284,12 +334,22 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 longPress2ndFingerAction = parseBinding(gestureData.getString("longPress2ndFingerAction"), Binding.MOUSE_RIGHT_BUTTON);
             if (gestureData.has("doubleTap2ndFingerAction"))
                 doubleTap2ndFingerAction = parseBinding(gestureData.getString("doubleTap2ndFingerAction"), Binding.NONE);
+            if (gestureData.has("singleTapDragAction"))
+                singleTapDragAction = parseBinding(gestureData.getString("singleTapDragAction"), Binding.NONE);
+            if (gestureData.has("longPressDragAction"))
+                longPressDragAction = parseBinding(gestureData.getString("longPressDragAction"), Binding.NONE);
+            if (gestureData.has("doubleTapDragAction"))
+                doubleTapDragAction = parseBinding(gestureData.getString("doubleTapDragAction"), Binding.NONE);
+            if (gestureData.has("singleTap2ndFingerDragAction"))
+                singleTap2ndFingerDragAction = parseBinding(gestureData.getString("singleTap2ndFingerDragAction"), Binding.NONE);
+            if (gestureData.has("longPress2ndFingerDragAction"))
+                longPress2ndFingerDragAction = parseBinding(gestureData.getString("longPress2ndFingerDragAction"), Binding.NONE);
+            if (gestureData.has("doubleTap2ndFingerDragAction"))
+                doubleTap2ndFingerDragAction = parseBinding(gestureData.getString("doubleTap2ndFingerDragAction"), Binding.NONE);
             if (gestureData.has("doubleTapTimeout"))
                 doubleTapTimeout = clamp(gestureData.getInt("doubleTapTimeout"), 50, 500);
             if (gestureData.has("longPressTimeout"))
                 longPressTimeout = clamp(gestureData.getInt("longPressTimeout"), 50, 1000);
-            if (gestureData.has("tapClickDelay"))
-                tapClickDelay = clamp(gestureData.getInt("tapClickDelay"), 0, 10);
             if (gestureData.has("secondFingerMode"))
                 secondFingerMode = parseEnum(SecondFingerMode.class, gestureData.getString("secondFingerMode"), SecondFingerMode.SECOND_TAP_ACTIONS);
         }
@@ -382,9 +442,14 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             gestureData.put("singleTap2ndFingerAction", singleTap2ndFingerAction.name());
             gestureData.put("longPress2ndFingerAction", longPress2ndFingerAction.name());
             gestureData.put("doubleTap2ndFingerAction", doubleTap2ndFingerAction.name());
+            gestureData.put("singleTapDragAction", singleTapDragAction.name());
+            gestureData.put("longPressDragAction", longPressDragAction.name());
+            gestureData.put("doubleTapDragAction", doubleTapDragAction.name());
+            gestureData.put("singleTap2ndFingerDragAction", singleTap2ndFingerDragAction.name());
+            gestureData.put("longPress2ndFingerDragAction", longPress2ndFingerDragAction.name());
+            gestureData.put("doubleTap2ndFingerDragAction", doubleTap2ndFingerDragAction.name());
             gestureData.put("doubleTapTimeout", doubleTapTimeout);
             gestureData.put("longPressTimeout", longPressTimeout);
-            gestureData.put("tapClickDelay", tapClickDelay);
             gestureData.put("secondFingerMode", secondFingerMode.name());
             data.put("touchscreenGestures", gestureData);
 
