@@ -41,6 +41,7 @@ public class TouchscreenGestureHandler {
     private int longPressHapticIntensity = 50;
     private boolean longPressHapticEnabled = true;
     private int dragThreshold = 10;
+    private int dragThresholdSq = 100;
     private SecondFingerMode secondFingerMode = SecondFingerMode.SECOND_TAP_ACTIONS;
     private boolean isLongTapMode;
 
@@ -57,6 +58,20 @@ public class TouchscreenGestureHandler {
     private boolean hasActiveDoubleTapDrag;
     private boolean hasActiveSingleTapDrag;
     private boolean canHoldLongPress;
+
+    // Cached firstBinding values (computed once in applyConfig, used by updateActiveBindings)
+    private Binding firstSingleTap;
+    private Binding firstLongPress;
+    private Binding firstDoubleTap;
+    private Binding firstSingleTapDrag;
+    private Binding firstLongPressDrag;
+    private Binding firstDoubleTapDrag;
+    private Binding firstSingleTap2nd;
+    private Binding firstLongPress2nd;
+    private Binding firstDoubleTap2nd;
+    private Binding firstSingleTapDrag2nd;
+    private Binding firstLongPressDrag2nd;
+    private Binding firstDoubleTapDrag2nd;
 
     // Gesture state
     private float fingerDownX;
@@ -118,8 +133,23 @@ public class TouchscreenGestureHandler {
         longPressHapticIntensity = profile.getLongPressHapticIntensity();
         longPressHapticEnabled = profile.getLongPressHapticEnabled();
         dragThreshold = profile.getDragThreshold();
+        dragThresholdSq = dragThreshold * dragThreshold;
         secondFingerMode = profile.getSecondFingerMode();
         isLongTapMode = secondFingerMode == SecondFingerMode.LONG_TAP_ACTION;
+
+        firstSingleTap = firstBinding(singleTapAction, Binding.NONE);
+        firstLongPress = firstBinding(longPressAction, Binding.NONE);
+        firstDoubleTap = firstBinding(doubleTapAction, Binding.NONE);
+        firstSingleTapDrag = firstBinding(singleTapDragAction, Binding.NONE);
+        firstLongPressDrag = firstBinding(longPressDragAction, Binding.NONE);
+        firstDoubleTapDrag = firstBinding(doubleTapDragAction, Binding.NONE);
+        firstSingleTap2nd = firstBinding(singleTap2ndFingerAction, Binding.NONE);
+        firstLongPress2nd = firstBinding(longPress2ndFingerAction, Binding.NONE);
+        firstDoubleTap2nd = firstBinding(doubleTap2ndFingerAction, Binding.NONE);
+        firstSingleTapDrag2nd = firstBinding(singleTap2ndFingerDragAction, Binding.NONE);
+        firstLongPressDrag2nd = firstBinding(longPress2ndFingerDragAction, Binding.NONE);
+        firstDoubleTapDrag2nd = firstBinding(doubleTap2ndFingerDragAction, Binding.NONE);
+
         updateActiveBindings();
     }
 
@@ -135,20 +165,19 @@ public class TouchscreenGestureHandler {
         activeSingleTapDragAction = secondFingerActive ? singleTap2ndFingerDragAction : singleTapDragAction;
         activeLongPressDragAction = secondFingerActive ? longPress2ndFingerDragAction : longPressDragAction;
         activeDoubleTapDragAction = secondFingerActive ? doubleTap2ndFingerDragAction : doubleTapDragAction;
-        Binding firstDoubleTap = firstBinding(activeDoubleTapAction, Binding.NONE);
-        Binding firstLongPress = firstBinding(activeLongPressAction, Binding.NONE);
-        Binding firstLongPressDrag = firstBinding(activeLongPressDragAction, Binding.NONE);
-        Binding firstSingleTapDrag = firstBinding(activeSingleTapDragAction, Binding.NONE);
-        Binding firstDoubleTapDrag = firstBinding(activeDoubleTapDragAction, Binding.NONE);
-        hasActiveDoubleTap = firstDoubleTap != Binding.NONE;
-        hasActiveLongPress = firstLongPress != Binding.NONE;
-        hasActiveLongPressDrag = firstLongPressDrag != Binding.NONE;
-        hasActiveDoubleTapDrag = firstDoubleTapDrag != Binding.NONE;
-        hasActiveSingleTapDrag = firstSingleTapDrag != Binding.NONE;
+        Binding firstST = secondFingerActive ? firstSingleTap2nd : firstSingleTap;
+        Binding firstLP = secondFingerActive ? firstLongPress2nd : firstLongPress;
+        Binding firstDT = secondFingerActive ? firstDoubleTap2nd : firstDoubleTap;
+        Binding firstSTD = secondFingerActive ? firstSingleTapDrag2nd : firstSingleTapDrag;
+        Binding firstLPD = secondFingerActive ? firstLongPressDrag2nd : firstLongPressDrag;
+        Binding firstDTD = secondFingerActive ? firstDoubleTapDrag2nd : firstDoubleTapDrag;
+        hasActiveDoubleTap = firstDT != Binding.NONE;
+        hasActiveLongPress = firstLP != Binding.NONE;
+        hasActiveLongPressDrag = firstLPD != Binding.NONE;
+        hasActiveDoubleTapDrag = firstDTD != Binding.NONE;
+        hasActiveSingleTapDrag = firstSTD != Binding.NONE;
         canHoldLongPress = !hasActiveLongPressDrag && hasActiveLongPress &&
-            !firstLongPress.isMouseMove() &&
-            firstLongPress != Binding.MOUSE_SCROLL_UP &&
-            firstLongPress != Binding.MOUSE_SCROLL_DOWN;
+            !firstLP.isMouseMove() && firstLP != Binding.MOUSE_SCROLL_UP && firstLP != Binding.MOUSE_SCROLL_DOWN;
     }
 
     public void onTouchEvent(MotionEvent event) {
@@ -306,28 +335,28 @@ public class TouchscreenGestureHandler {
 
         float cx = event.getX(mainIndex);
         float cy = event.getY(mainIndex);
-        float distance = (float) Math.hypot(cx - fingerDownX, cy - fingerDownY);
 
-        if (distance > dragThreshold) {
+        if (state == GestureState.DRAGGING) {
+            touchpadView.movePointer(cx, cy);
+            return;
+        }
+
+        float dx = cx - fingerDownX;
+        float dy = cy - fingerDownY;
+        if (dx * dx + dy * dy > dragThresholdSq) {
             touchpadView.removeCallbacks(longPressRunnable);
 
-            if (state == GestureState.TAP_WAITING || state == GestureState.LONG_PRESSING) {
-                List<Binding> dragBinding = resolveDragAction();
-
-                if (dragBinding != null && firstBinding(dragBinding, Binding.NONE) != Binding.NONE) {
-                    if (!isActionHeld || !dragBinding.equals(heldActions)) {
-                        releaseHeldAction();
-                        executeActionsAndHold(dragBinding);
-                    }
-                    pendingDoubleTapAction = null;
+            List<Binding> dragBinding = resolveDragAction();
+            if (dragBinding != null && firstBinding(dragBinding, Binding.NONE) != Binding.NONE) {
+                if (!isActionHeld || !dragBinding.equals(heldActions)) {
+                    releaseHeldAction();
+                    executeActionsAndHold(dragBinding);
                 }
-
-                state = GestureState.DRAGGING;
+                pendingDoubleTapAction = null;
             }
 
-            if (state == GestureState.DRAGGING) {
-                touchpadView.movePointer(cx, cy);
-            }
+            state = GestureState.DRAGGING;
+            touchpadView.movePointer(cx, cy);
         }
     }
 
