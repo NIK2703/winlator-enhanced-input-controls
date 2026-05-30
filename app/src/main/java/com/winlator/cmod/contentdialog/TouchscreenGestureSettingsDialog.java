@@ -17,7 +17,6 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.DragMode;
-import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.inputcontrols.MouseMode;
 import com.winlator.cmod.inputcontrols.SecondFingerMode;
 import com.winlator.cmod.widget.NumberPicker;
@@ -51,12 +50,10 @@ public class TouchscreenGestureSettingsDialog {
         builder.setView(view);
 
         Spinner spMouseMode = view.findViewById(R.id.SPMouseMode);
-        Spinner spInputMode = view.findViewById(R.id.SPInputMode);
         Spinner spDragMode = view.findViewById(R.id.SPDragMode);
         Spinner spSecondFingerMode = view.findViewById(R.id.SPSecondFingerMode);
 
         setupEnumSpinner(spMouseMode, MouseMode.values(), profile.getMouseMode());
-        setupEnumSpinner(spInputMode, InputMode.values(), profile.getInputMode());
         setupEnumSpinner(spDragMode, DragMode.values(), profile.getDragMode());
         setupEnumSpinner(spSecondFingerMode, SecondFingerMode.values(), profile.getSecondFingerMode());
 
@@ -73,46 +70,54 @@ public class TouchscreenGestureSettingsDialog {
 
         NumberPicker npLongPress = view.findViewById(R.id.NPLongPressTimeout);
         NumberPicker npDoubleTap = view.findViewById(R.id.NPDoubleTapTimeout);
-        NumberPicker npTapClickDelay = view.findViewById(R.id.NPTapClickDelay);
 
         npLongPress.setValue(profile.getLongPressTimeout());
         npDoubleTap.setValue(profile.getDoubleTapTimeout());
-        npTapClickDelay.setValue(profile.getTapClickDelay());
 
         LinearLayout llSingleFinger = view.findViewById(R.id.LLSingleFinger);
         addBindingPicker(llSingleFinger, "single", "Single Tap", profile.getSingleTapAction());
+        addBindingPicker(llSingleFinger, "single_drag", "  Single Tap Drag", profile.getSingleTapDragAction());
         addBindingPicker(llSingleFinger, "long", "Long Press", profile.getLongPressAction());
+        addBindingPicker(llSingleFinger, "long_drag", "  Long Press Drag", profile.getLongPressDragAction());
         addBindingPicker(llSingleFinger, "double", "Double Tap", profile.getDoubleTapAction());
+        addBindingPicker(llSingleFinger, "double_drag", "  Double Tap Drag", profile.getDoubleTapDragAction());
 
         LinearLayout llTwoFinger = view.findViewById(R.id.LLTwoFinger);
         addBindingPicker(llTwoFinger, "single_2nd", "Single Tap", profile.getSingleTap2ndFingerAction());
+        addBindingPicker(llTwoFinger, "single_2nd_drag", "  Single Tap Drag", profile.getSingleTap2ndFingerDragAction());
         addBindingPicker(llTwoFinger, "long_2nd", "Long Press", profile.getLongPress2ndFingerAction());
+        addBindingPicker(llTwoFinger, "long_2nd_drag", "  Long Press Drag", profile.getLongPress2ndFingerDragAction());
         addBindingPicker(llTwoFinger, "double_2nd", "Double Tap", profile.getDoubleTap2ndFingerAction());
+        addBindingPicker(llTwoFinger, "double_2nd_drag", "  Double Tap Drag", profile.getDoubleTap2ndFingerDragAction());
 
         builder.setPositiveButton("Save", (dialog, which) -> save(
-                spMouseMode, spInputMode, spDragMode, spSecondFingerMode,
-                npLongPress, npDoubleTap, npTapClickDelay));
+                spMouseMode, spDragMode, spSecondFingerMode,
+                npLongPress, npDoubleTap));
         builder.setNegativeButton("Cancel", null);
 
         builder.create().show();
     }
 
-    private void save(Spinner spMouseMode, Spinner spInputMode, Spinner spDragMode, Spinner spSecondFingerMode,
-                      NumberPicker npLongPress, NumberPicker npDoubleTap, NumberPicker npTapClickDelay) {
+    private void save(Spinner spMouseMode, Spinner spDragMode, Spinner spSecondFingerMode,
+                      NumberPicker npLongPress, NumberPicker npDoubleTap) {
         profile.setMouseMode((MouseMode) spMouseMode.getSelectedItem());
-        profile.setInputMode((InputMode) spInputMode.getSelectedItem());
         profile.setDragMode((DragMode) spDragMode.getSelectedItem());
         profile.setSecondFingerMode((SecondFingerMode) spSecondFingerMode.getSelectedItem());
         profile.setLongPressTimeout(npLongPress.getValue());
         profile.setDoubleTapTimeout(npDoubleTap.getValue());
-        profile.setTapClickDelay(npTapClickDelay.getValue());
 
         profile.setSingleTapAction(bindingValues.getOrDefault("single", Binding.NONE));
+        profile.setSingleTapDragAction(bindingValues.getOrDefault("single_drag", Binding.NONE));
         profile.setLongPressAction(bindingValues.getOrDefault("long", Binding.NONE));
+        profile.setLongPressDragAction(bindingValues.getOrDefault("long_drag", Binding.NONE));
         profile.setDoubleTapAction(bindingValues.getOrDefault("double", Binding.NONE));
+        profile.setDoubleTapDragAction(bindingValues.getOrDefault("double_drag", Binding.NONE));
         profile.setSingleTap2ndFingerAction(bindingValues.getOrDefault("single_2nd", Binding.NONE));
+        profile.setSingleTap2ndFingerDragAction(bindingValues.getOrDefault("single_2nd_drag", Binding.NONE));
         profile.setLongPress2ndFingerAction(bindingValues.getOrDefault("long_2nd", Binding.NONE));
+        profile.setLongPress2ndFingerDragAction(bindingValues.getOrDefault("long_2nd_drag", Binding.NONE));
         profile.setDoubleTap2ndFingerAction(bindingValues.getOrDefault("double_2nd", Binding.NONE));
+        profile.setDoubleTap2ndFingerDragAction(bindingValues.getOrDefault("double_2nd_drag", Binding.NONE));
 
         profile.save();
         if (onSaveListener != null) onSaveListener.onSave(profile);

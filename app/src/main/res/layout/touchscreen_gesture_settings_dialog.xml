@@ -36,19 +36,6 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Input Mode"
-            android:layout_marginTop="8dp" />
-
-        <Spinner
-            android:id="@+id/SPInputMode"
-            style="@style/ComboBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:spinnerMode="dialog" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
             android:text="Drag Mode"
             android:layout_marginTop="8dp" />
 
@@ -101,21 +88,6 @@
             app:maxValue="500"
             app:step="50"
             app:value="200" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Tap Click Delay (ms)"
-            android:layout_marginTop="8dp" />
-
-        <com.winlator.cmod.widget.NumberPicker
-            android:id="@+id/NPTapClickDelay"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:minValue="0"
-            app:maxValue="10"
-            app:step="1"
-            app:value="0" />
 
         <View style="@style/HorizontalLine"
             android:layout_marginTop="16dp" />
