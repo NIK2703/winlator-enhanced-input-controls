@@ -1,10 +1,8 @@
 package com.winlator.cmod.widget;
 
-import android.content.Context;
-import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
-import android.os.VibrationEffect;
-import android.os.Vibrator;
 import android.view.MotionEvent;
 
 import com.winlator.cmod.inputcontrols.Binding;
@@ -16,8 +14,6 @@ import java.util.Collections;
 import java.util.List;
 
 public class TouchscreenGestureHandler {
-    private static final byte TAP_TRAVEL_THRESHOLD = 10;
-
     private enum GestureState { IDLE, TAP_WAITING, DOUBLE_TAP_WAITING, LONG_PRESSING, DRAGGING }
 
     private GestureState state = GestureState.IDLE;
@@ -42,6 +38,9 @@ public class TouchscreenGestureHandler {
     private int bindingDelay;
     private int doubleTapTimeout = 200;
     private int longPressTimeout = 400;
+    private int longPressHapticIntensity = 50;
+    private boolean longPressHapticEnabled = true;
+    private int dragThreshold = 10;
     private SecondFingerMode secondFingerMode = SecondFingerMode.SECOND_TAP_ACTIONS;
     private boolean isLongTapMode;
 
@@ -116,6 +115,9 @@ public class TouchscreenGestureHandler {
         bindingDelay = profile.getBindingDelay();
         doubleTapTimeout = profile.getDoubleTapTimeout();
         longPressTimeout = profile.getLongPressTimeout();
+        longPressHapticIntensity = profile.getLongPressHapticIntensity();
+        longPressHapticEnabled = profile.getLongPressHapticEnabled();
+        dragThreshold = profile.getDragThreshold();
         secondFingerMode = profile.getSecondFingerMode();
         isLongTapMode = secondFingerMode == SecondFingerMode.LONG_TAP_ACTION;
         updateActiveBindings();
@@ -306,7 +308,7 @@ public class TouchscreenGestureHandler {
         float cy = event.getY(mainIndex);
         float distance = (float) Math.hypot(cx - fingerDownX, cy - fingerDownY);
 
-        if (distance > TAP_TRAVEL_THRESHOLD) {
+        if (distance > dragThreshold) {
             touchpadView.removeCallbacks(longPressRunnable);
 
             if (state == GestureState.TAP_WAITING || state == GestureState.LONG_PRESSING) {
@@ -410,13 +412,19 @@ public class TouchscreenGestureHandler {
 
         if (hasActiveDoubleTap) {
             deferredTapAction = activeSingleTapAction;
+            touchpadView.postDelayed(doubleTapRunnable, doubleTapTimeout);
+            state = GestureState.DOUBLE_TAP_WAITING;
         }
         else {
             executeActions(activeSingleTapAction);
+            if (hasActiveDoubleTapDrag) {
+                touchpadView.postDelayed(doubleTapRunnable, doubleTapTimeout);
+                state = GestureState.DOUBLE_TAP_WAITING;
+            }
+            else {
+                state = GestureState.IDLE;
+            }
         }
-
-        touchpadView.postDelayed(doubleTapRunnable, doubleTapTimeout);
-        state = GestureState.DOUBLE_TAP_WAITING;
     }
 
     private void handleCancel() {
@@ -433,17 +441,8 @@ public class TouchscreenGestureHandler {
         }
         state = GestureState.LONG_PRESSING;
 
-        Context context = touchpadView.getContext();
-        if (context != null) {
-            Vibrator vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
-            if (vibrator != null && vibrator.hasVibrator()) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK));
-                }
-                else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator.vibrate(VibrationEffect.createOneShot(30, 255));
-                }
-            }
+        if (longPressHapticEnabled && (hasActiveLongPress || hasActiveLongPressDrag)) {
+            com.winlator.cmod.core.AppUtils.performHapticFeedback(touchpadView.getContext(), longPressHapticIntensity);
         }
     }
 

@@ -37,20 +37,24 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private DragMode dragMode = DragMode.AUTO;
     private List<Binding> singleTapAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
     private List<Binding> longPressAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
-    private List<Binding> doubleTapAction = new ArrayList<>(Collections.singletonList(Binding.NONE));
+    private List<Binding> doubleTapAction = new ArrayList<>();
     private List<Binding> singleTap2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
     private List<Binding> longPress2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
-    private List<Binding> doubleTap2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.NONE));
-    private List<Binding> singleTapDragAction = new ArrayList<>(Collections.singletonList(Binding.NONE));
-    private List<Binding> longPressDragAction = new ArrayList<>(Collections.singletonList(Binding.NONE));
-    private List<Binding> doubleTapDragAction = new ArrayList<>(Collections.singletonList(Binding.NONE));
-    private List<Binding> singleTap2ndFingerDragAction = new ArrayList<>(Collections.singletonList(Binding.NONE));
-    private List<Binding> longPress2ndFingerDragAction = new ArrayList<>(Collections.singletonList(Binding.NONE));
-    private List<Binding> doubleTap2ndFingerDragAction = new ArrayList<>(Collections.singletonList(Binding.NONE));
+    private List<Binding> doubleTap2ndFingerAction = new ArrayList<>();
+    private List<Binding> singleTapDragAction = new ArrayList<>();
+    private List<Binding> longPressDragAction = new ArrayList<>();
+    private List<Binding> doubleTapDragAction = new ArrayList<>();
+    private List<Binding> singleTap2ndFingerDragAction = new ArrayList<>();
+    private List<Binding> longPress2ndFingerDragAction = new ArrayList<>();
+    private List<Binding> doubleTap2ndFingerDragAction = new ArrayList<>();
     private int doubleTapTimeout = 200;
     private int longPressTimeout = 400;
     private SecondFingerMode secondFingerMode = SecondFingerMode.SECOND_TAP_ACTIONS;
     private int bindingDelay;
+    private int longPressDelay;
+    private int longPressHapticIntensity = 50;
+    private boolean longPressHapticEnabled = true;
+    private int dragThreshold = 10;
     private boolean gestureSettingsLoaded = false;
 
     public ControlsProfile(Context context, int id) {
@@ -173,7 +177,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setSingleTapAction(List<Binding> bindings) {
         this.singleTapAction.clear();
         this.singleTapAction.addAll(bindings);
-        if (this.singleTapAction.isEmpty()) this.singleTapAction.add(Binding.NONE);
     }
 
     public List<Binding> getLongPressAction() {
@@ -189,7 +192,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setLongPressAction(List<Binding> bindings) {
         this.longPressAction.clear();
         this.longPressAction.addAll(bindings);
-        if (this.longPressAction.isEmpty()) this.longPressAction.add(Binding.NONE);
     }
 
     public List<Binding> getDoubleTapAction() {
@@ -205,7 +207,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setDoubleTapAction(List<Binding> bindings) {
         this.doubleTapAction.clear();
         this.doubleTapAction.addAll(bindings);
-        if (this.doubleTapAction.isEmpty()) this.doubleTapAction.add(Binding.NONE);
     }
 
     public List<Binding> getSingleTap2ndFingerAction() {
@@ -221,7 +222,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setSingleTap2ndFingerAction(List<Binding> bindings) {
         this.singleTap2ndFingerAction.clear();
         this.singleTap2ndFingerAction.addAll(bindings);
-        if (this.singleTap2ndFingerAction.isEmpty()) this.singleTap2ndFingerAction.add(Binding.NONE);
     }
 
     public List<Binding> getLongPress2ndFingerAction() {
@@ -237,7 +237,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setLongPress2ndFingerAction(List<Binding> bindings) {
         this.longPress2ndFingerAction.clear();
         this.longPress2ndFingerAction.addAll(bindings);
-        if (this.longPress2ndFingerAction.isEmpty()) this.longPress2ndFingerAction.add(Binding.NONE);
     }
 
     public List<Binding> getDoubleTap2ndFingerAction() {
@@ -253,7 +252,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setDoubleTap2ndFingerAction(List<Binding> bindings) {
         this.doubleTap2ndFingerAction.clear();
         this.doubleTap2ndFingerAction.addAll(bindings);
-        if (this.doubleTap2ndFingerAction.isEmpty()) this.doubleTap2ndFingerAction.add(Binding.NONE);
     }
 
     public int getDoubleTapTimeout() {
@@ -275,11 +273,52 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     }
 
     public int getBindingDelay() {
+        ensureGestureSettingsLoaded();
         return bindingDelay;
     }
 
     public void setBindingDelay(int bindingDelay) {
         this.bindingDelay = Math.max(0, Math.min(10, bindingDelay));
+    }
+
+    public int getLongPressDelay() {
+        ensureGestureSettingsLoaded();
+        return longPressDelay;
+    }
+
+    public void setLongPressDelay(int longPressDelay) {
+        ensureGestureSettingsLoaded();
+        this.longPressDelay = longPressDelay;
+    }
+
+    public int getLongPressHapticIntensity() {
+        ensureGestureSettingsLoaded();
+        return longPressHapticIntensity;
+    }
+
+    public void setLongPressHapticIntensity(int intensity) {
+        ensureGestureSettingsLoaded();
+        this.longPressHapticIntensity = intensity;
+    }
+
+    public boolean getLongPressHapticEnabled() {
+        ensureGestureSettingsLoaded();
+        return longPressHapticEnabled;
+    }
+
+    public void setLongPressHapticEnabled(boolean enabled) {
+        ensureGestureSettingsLoaded();
+        this.longPressHapticEnabled = enabled;
+    }
+
+    public int getDragThreshold() {
+        ensureGestureSettingsLoaded();
+        return dragThreshold;
+    }
+
+    public void setDragThreshold(int dragThreshold) {
+        ensureGestureSettingsLoaded();
+        this.dragThreshold = clamp(dragThreshold, 0, 30);
     }
 
     public SecondFingerMode getSecondFingerMode() {
@@ -304,7 +343,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setSingleTapDragAction(List<Binding> bindings) {
         this.singleTapDragAction.clear();
         this.singleTapDragAction.addAll(bindings);
-        if (this.singleTapDragAction.isEmpty()) this.singleTapDragAction.add(Binding.NONE);
     }
 
     public List<Binding> getLongPressDragAction() {
@@ -320,7 +358,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setLongPressDragAction(List<Binding> bindings) {
         this.longPressDragAction.clear();
         this.longPressDragAction.addAll(bindings);
-        if (this.longPressDragAction.isEmpty()) this.longPressDragAction.add(Binding.NONE);
     }
 
     public List<Binding> getDoubleTapDragAction() {
@@ -336,7 +373,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setDoubleTapDragAction(List<Binding> bindings) {
         this.doubleTapDragAction.clear();
         this.doubleTapDragAction.addAll(bindings);
-        if (this.doubleTapDragAction.isEmpty()) this.doubleTapDragAction.add(Binding.NONE);
     }
 
     public List<Binding> getSingleTap2ndFingerDragAction() {
@@ -352,7 +388,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setSingleTap2ndFingerDragAction(List<Binding> bindings) {
         this.singleTap2ndFingerDragAction.clear();
         this.singleTap2ndFingerDragAction.addAll(bindings);
-        if (this.singleTap2ndFingerDragAction.isEmpty()) this.singleTap2ndFingerDragAction.add(Binding.NONE);
     }
 
     public List<Binding> getLongPress2ndFingerDragAction() {
@@ -368,7 +403,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setLongPress2ndFingerDragAction(List<Binding> bindings) {
         this.longPress2ndFingerDragAction.clear();
         this.longPress2ndFingerDragAction.addAll(bindings);
-        if (this.longPress2ndFingerDragAction.isEmpty()) this.longPress2ndFingerDragAction.add(Binding.NONE);
     }
 
     public List<Binding> getDoubleTap2ndFingerDragAction() {
@@ -384,7 +418,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setDoubleTap2ndFingerDragAction(List<Binding> bindings) {
         this.doubleTap2ndFingerDragAction.clear();
         this.doubleTap2ndFingerDragAction.addAll(bindings);
-        if (this.doubleTap2ndFingerDragAction.isEmpty()) this.doubleTap2ndFingerDragAction.add(Binding.NONE);
     }
 
     private void ensureGestureSettingsLoaded() {
@@ -397,6 +430,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         try {
             JSONObject data = new JSONObject(FileUtils.readString(file));
             if (data.has("bindingDelay")) bindingDelay = data.getInt("bindingDelay");
+            if (data.has("longPressDelay")) longPressDelay = data.getInt("longPressDelay");
+            if (data.has("longPressHapticIntensity")) longPressHapticIntensity = data.getInt("longPressHapticIntensity");
+            if (data.has("longPressHapticEnabled")) longPressHapticEnabled = data.getBoolean("longPressHapticEnabled");
+            if (data.has("dragThreshold")) dragThreshold = clamp(data.getInt("dragThreshold"), 0, 30);
             if (data.has("touchscreenGestures")) {
                 loadGestureSettingsFromJson(data.getJSONObject("touchscreenGestures"));
             }
@@ -482,7 +519,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 for (int i = 0; i < arr.length(); i++) {
                     result.add(parseBinding(arr.getString(i), defaultBinding));
                 }
-                if (result.isEmpty()) result.add(defaultBinding);
                 return result;
             }
         } catch (JSONException ignored) {}
@@ -492,7 +528,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
     private static JSONArray bindingListToJSONArray(List<Binding> bindings) {
         JSONArray arr = new JSONArray();
-        for (Binding b : bindings) arr.put(b.name());
+        for (Binding b : bindings) {
+            if (b != null && b != Binding.NONE) arr.put(b.name());
+        }
         return arr;
     }
 
@@ -515,6 +553,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             data.put("name", name);
             data.put("cursorSpeed", Float.valueOf(cursorSpeed));
             if (bindingDelay > 0) data.put("bindingDelay", bindingDelay);
+            data.put("longPressDelay", longPressDelay);
+            data.put("longPressHapticIntensity", longPressHapticIntensity);
+            data.put("longPressHapticEnabled", longPressHapticEnabled);
+            if (dragThreshold != 10) data.put("dragThreshold", dragThreshold);
 
             JSONArray elementsJSONArray = new JSONArray();
             if (!elementsLoaded && file.isFile()) {
@@ -632,6 +674,11 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         try {
             JSONObject profileJSONObject = new JSONObject(FileUtils.readString(file));
 
+            if (profileJSONObject.has("bindingDelay")) bindingDelay = profileJSONObject.getInt("bindingDelay");
+            if (profileJSONObject.has("longPressDelay")) longPressDelay = profileJSONObject.getInt("longPressDelay");
+            if (profileJSONObject.has("longPressHapticIntensity")) longPressHapticIntensity = profileJSONObject.getInt("longPressHapticIntensity");
+            if (profileJSONObject.has("longPressHapticEnabled")) longPressHapticEnabled = profileJSONObject.getBoolean("longPressHapticEnabled");
+            if (profileJSONObject.has("dragThreshold")) dragThreshold = clamp(profileJSONObject.getInt("dragThreshold"), 0, 30);
             if (profileJSONObject.has("touchscreenGestures")) {
                 loadGestureSettingsFromJson(profileJSONObject.getJSONObject("touchscreenGestures"));
             }
@@ -672,6 +719,15 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                         element.setBindingAt(j, binding);
                         if (!binding.isGamepad()) hasGamepadBinding = false;
                     }
+                }
+
+                if (elementJSONObject.has("longPressBindings")) {
+                    JSONArray lpArray = elementJSONObject.getJSONArray("longPressBindings");
+                    List<Binding> lpList = new ArrayList<>();
+                    for (int k = 0; k < lpArray.length(); k++) {
+                        lpList.add(Binding.fromString(lpArray.getString(k)));
+                    }
+                    element.setLongPressBindings(lpList);
                 }
 
                 if (!virtualGamepad && hasGamepadBinding) virtualGamepad = true;
