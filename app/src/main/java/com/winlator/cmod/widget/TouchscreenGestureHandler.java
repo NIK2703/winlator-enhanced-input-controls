@@ -530,13 +530,11 @@ public class TouchscreenGestureHandler {
     private void executeActions(List<Binding> actions) {
         if (actions == null) return;
         int size = actions.size();
-        if (inputControlsView != null) {
-            for (int i = 0; i < size; i++) {
-                Binding b = actions.get(i);
-                if (b == null || b == Binding.NONE) continue;
-                Binding kb = b.toKeyboardBinding();
-                if (kb != null) inputControlsView.handleInputEvent(kb, true, 0);
-            }
+        for (int i = 0; i < size; i++) {
+            Binding b = actions.get(i);
+            if (b == null || b == Binding.NONE) continue;
+            Binding kb = b.toKeyboardBinding();
+            if (kb != null) inputControlsView.handleInputEvent(kb, true, 0);
         }
         for (int i = 0; i < size; i++) {
             Binding b = actions.get(i);
@@ -545,19 +543,15 @@ public class TouchscreenGestureHandler {
             if (b.isMouseMove()) continue;
             if (b.isModifier()) continue;
 
-            if (inputControlsView != null) {
-                inputControlsView.handleInputEvent(b, true, 0);
-                inputControlsView.handleInputEvent(b, false, 0);
-            }
+            inputControlsView.handleInputEvent(b, true, 0);
+            inputControlsView.handleInputEvent(b, false, 0);
             if (bindingDelay > 0 && i < size - 1) SystemClock.sleep(bindingDelay);
         }
-        if (inputControlsView != null) {
-            for (int i = size - 1; i >= 0; i--) {
-                Binding b = actions.get(i);
-                if (b == null || b == Binding.NONE) continue;
-                Binding kb = b.toKeyboardBinding();
-                if (kb != null) inputControlsView.handleInputEvent(kb, false, 0);
-            }
+        for (int i = size - 1; i >= 0; i--) {
+            Binding b = actions.get(i);
+            if (b == null || b == Binding.NONE) continue;
+            Binding kb = b.toKeyboardBinding();
+            if (kb != null) inputControlsView.handleInputEvent(kb, false, 0);
         }
     }
 
@@ -566,15 +560,13 @@ public class TouchscreenGestureHandler {
         heldActions.clear();
         heldModifiers.clear();
         int size = actions.size();
-        if (inputControlsView != null) {
-            for (int i = 0; i < size; i++) {
-                Binding b = actions.get(i);
-                if (b == null || b == Binding.NONE) continue;
-                Binding kb = b.toKeyboardBinding();
-                if (kb != null) {
-                    inputControlsView.handleInputEvent(kb, true, 0);
-                    heldModifiers.add(kb);
-                }
+        for (int i = 0; i < size; i++) {
+            Binding b = actions.get(i);
+            if (b == null || b == Binding.NONE) continue;
+            Binding kb = b.toKeyboardBinding();
+            if (kb != null) {
+                inputControlsView.handleInputEvent(kb, true, 0);
+                heldModifiers.add(kb);
             }
         }
         for (int i = 0; i < size; i++) {
@@ -584,17 +576,15 @@ public class TouchscreenGestureHandler {
             if (b == Binding.MOUSE_SCROLL_UP || b == Binding.MOUSE_SCROLL_DOWN) continue;
             if (b.isModifier()) continue;
 
-            if (inputControlsView != null) {
-                inputControlsView.handleInputEvent(b, true, 0);
-                heldActions.add(b);
-            }
+            inputControlsView.handleInputEvent(b, true, 0);
+            heldActions.add(b);
             if (bindingDelay > 0 && i < size - 1) SystemClock.sleep(bindingDelay);
         }
         isActionHeld = true;
     }
 
     private void releaseHeldAction() {
-        if (isActionHeld && inputControlsView != null) {
+        if (isActionHeld) {
             for (Binding b : heldActions) {
                 inputControlsView.handleInputEvent(b, false, 0);
             }
