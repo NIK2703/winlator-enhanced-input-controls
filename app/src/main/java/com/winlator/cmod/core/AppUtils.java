@@ -250,24 +250,24 @@ public abstract class AppUtils {
     }
 
     public static boolean setSpinnerSelectionFromValue(Spinner spinner, String value) {
-        spinner.setSelection(0, false);
         for (int i = 0; i < spinner.getCount(); i++) {
             if (spinner.getItemAtPosition(i).toString().equalsIgnoreCase(value)) {
                 spinner.setSelection(i, false);
                 return true;
             }
         }
+        spinner.setSelection(0, false);
         return false;
     }
 
     public static boolean setSpinnerSelectionFromIdentifier(Spinner spinner, String identifier) {
-        spinner.setSelection(0, false);
         for (int i = 0; i < spinner.getCount(); i++) {
             if (StringUtils.parseIdentifier(spinner.getItemAtPosition(i)).equals(identifier)) {
                 spinner.setSelection(i, false);
                 return true;
             }
         }
+        spinner.setSelection(0, false);
         return false;
     }
 

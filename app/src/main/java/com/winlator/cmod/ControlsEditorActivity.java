@@ -201,11 +201,11 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
     }
 
     private void loadTypeSpinner(final ControlElement element, Spinner spinner, Runnable callback) {
-        spinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, ControlElement.Type.names()));
-        spinner.setSelection(element.getType().ordinal(), false);
+        final boolean[] init = {true};
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (init[0]) return;
                 element.setType(ControlElement.Type.values()[position]);
                 profile.save();
                 callback.run();
@@ -215,6 +215,9 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             @Override
             public void onNothingSelected(AdapterView<?> parent) {}
         });
+        spinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, ControlElement.Type.names()));
+        spinner.setSelection(element.getType().ordinal(), false);
+        init[0] = false;
     }
 
     private void loadShapeSpinner(final ControlElement element, Spinner spinner) {
@@ -273,16 +276,6 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             AppUtils.setSpinnerSelectionFromValue(sBinding, element.getBindingAt(index).toString());
         };
 
-        sBindingType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                update.run();
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
-        });
-
         Binding selectedBinding = element.getBindingAt(index);
         if (selectedBinding.isKeyboard()) {
             sBindingType.setSelection(0, false);
@@ -293,6 +286,18 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         else if (selectedBinding.isGamepad()) {
             sBindingType.setSelection(2, false);
         }
+
+        update.run();
+
+        sBindingType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                update.run();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
 
         sBinding.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -321,7 +326,6 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        update.run();
         container.addView(view);
     }
 
