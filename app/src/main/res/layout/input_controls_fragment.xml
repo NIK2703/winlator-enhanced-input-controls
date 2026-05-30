@@ -179,6 +179,19 @@
             android:layout_height="wrap_content"
             android:spinnerMode="dialog" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Touch Activation"
+            android:layout_marginTop="8dp" />
+
+        <Spinner
+            android:id="@+id/SPTouchActivation"
+            style="@style/ComboBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:spinnerMode="dialog" />
+
 
 
         <View

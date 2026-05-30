@@ -88,6 +88,7 @@ public class ControlElement {
     private List<Binding> heldBindings;
     private List<Binding> longPressBindings = new ArrayList<>();
     private boolean longPressTriggered;
+    private boolean active;
     private android.os.Handler longPressHandler;
     private Range range;
     private byte orientation;
@@ -439,7 +440,7 @@ public class ControlElement {
     }
 
     private boolean isEngaged() {
-        return currentPointerId != -1 || (toggleSwitch && selected);
+        return currentPointerId != -1 || active || (toggleSwitch && selected);
     }
 
     public void draw(Canvas canvas) {
@@ -785,6 +786,20 @@ public class ControlElement {
         }
 
         heldBindings = null;
+    }
+
+    public void activate() {
+        if (bindings.isEmpty() || bindings.get(0).isEmpty()) return;
+        active = true;
+        heldBindings = new ArrayList<>(bindings.get(0));
+        pressBindings(bindings.get(0));
+        inputControlsView.invalidate();
+    }
+
+    public void deactivate() {
+        active = false;
+        releaseHeldBindings();
+        inputControlsView.invalidate();
     }
 
     public boolean handleTouchDown(int pointerId, float x, float y) {

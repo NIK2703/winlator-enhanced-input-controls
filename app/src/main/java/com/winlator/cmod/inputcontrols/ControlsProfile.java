@@ -55,6 +55,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private int longPressHapticIntensity = 50;
     private boolean longPressHapticEnabled = true;
     private int dragThreshold = 10;
+    private TouchActivationMode touchActivationMode = TouchActivationMode.LOCK;
     private boolean gestureSettingsLoaded = false;
 
     public ControlsProfile(Context context, int id) {
@@ -330,6 +331,15 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.secondFingerMode = mode;
     }
 
+    public TouchActivationMode getTouchActivationMode() {
+        ensureGestureSettingsLoaded();
+        return touchActivationMode;
+    }
+
+    public void setTouchActivationMode(TouchActivationMode mode) {
+        this.touchActivationMode = mode;
+    }
+
     public List<Binding> getSingleTapDragAction() {
         ensureGestureSettingsLoaded();
         return singleTapDragAction;
@@ -471,6 +481,8 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 longPressTimeout = clamp(gestureData.getInt("longPressTimeout"), 50, 1000);
             if (gestureData.has("secondFingerMode"))
                 secondFingerMode = parseEnum(SecondFingerMode.class, gestureData.getString("secondFingerMode"), SecondFingerMode.SECOND_TAP_ACTIONS);
+            if (gestureData.has("touchActivationMode"))
+                touchActivationMode = parseEnum(TouchActivationMode.class, gestureData.getString("touchActivationMode"), TouchActivationMode.LOCK);
         }
         catch (JSONException e) {
             Log.w("ControlsProfile", "Failed to parse gesture field in touchscreenGestures", e);
@@ -598,6 +610,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             gestureData.put("doubleTapTimeout", doubleTapTimeout);
             gestureData.put("longPressTimeout", longPressTimeout);
             gestureData.put("secondFingerMode", secondFingerMode.name());
+            gestureData.put("touchActivationMode", touchActivationMode.name());
             data.put("touchscreenGestures", gestureData);
 
             FileUtils.writeString(file, data.toString());

@@ -53,6 +53,7 @@ import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
 import com.winlator.cmod.inputcontrols.MouseMode;
+import com.winlator.cmod.inputcontrols.TouchActivationMode;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.widget.InputControlsView;
@@ -255,6 +256,21 @@ public class InputControlsFragment extends Fragment {
                     MouseMode newMode = (MouseMode) spMouseMode.getSelectedItem();
                     if (newMode != currentProfile.getMouseMode()) {
                         currentProfile.setMouseMode(newMode);
+                        currentProfile.save();
+                    }
+                }
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        Spinner spTouchActivation = view.findViewById(R.id.SPTouchActivation);
+        setupEnumSpinner(spTouchActivation, TouchActivationMode.values(), currentProfile != null ? currentProfile.getTouchActivationMode() : TouchActivationMode.LOCK);
+        spTouchActivation.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) {
+                if (currentProfile != null) {
+                    TouchActivationMode newMode = (TouchActivationMode) spTouchActivation.getSelectedItem();
+                    if (newMode != currentProfile.getTouchActivationMode()) {
+                        currentProfile.setTouchActivationMode(newMode);
                         currentProfile.save();
                     }
                 }
