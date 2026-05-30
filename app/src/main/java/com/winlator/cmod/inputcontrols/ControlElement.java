@@ -796,10 +796,36 @@ public class ControlElement {
         inputControlsView.invalidate();
     }
 
+    public void startLongPressTimer(int delay) {
+        if (!hasLongPressBinding() || toggleSwitch || delay <= 0) return;
+        if (longPressHandler == null) longPressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        longPressTriggered = false;
+        longPressHandler.postDelayed(() -> {
+            longPressTriggered = true;
+            ControlsProfile p = inputControlsView.getProfile();
+            if (p != null && p.getLongPressHapticEnabled()) {
+                com.winlator.cmod.core.AppUtils.performHapticFeedback(inputControlsView.getContext(), p.getLongPressHapticIntensity());
+            }
+            heldBindings = new ArrayList<>(longPressBindings);
+            pressBindings(longPressBindings);
+            inputControlsView.invalidate();
+        }, delay);
+    }
+
     public void deactivate() {
         active = false;
+        currentPointerId = -1;
+        cancelLongPress();
         releaseHeldBindings();
         inputControlsView.invalidate();
+    }
+
+    public void cancelLongPress() {
+        if (longPressHandler != null) {
+            longPressHandler.removeCallbacksAndMessages(null);
+            longPressHandler = null;
+        }
+        longPressTriggered = false;
     }
 
     public boolean handleTouchDown(int pointerId, float x, float y) {

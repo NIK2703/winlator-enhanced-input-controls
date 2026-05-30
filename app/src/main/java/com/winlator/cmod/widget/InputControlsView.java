@@ -651,6 +651,7 @@ public class InputControlsView extends View {
                 touchpadView.setPointerButtonLeftEnabled(false);
             }
         }
+        int longPressDelay = profile.getLongPressDelay();
         switch (actMode) {
             case LOCK: {
                 for (ControlElement element : profile.getElements()) {
@@ -685,6 +686,7 @@ public class InputControlsView extends View {
                     }
                     if (!tracked.contains(btn)) {
                         btn.activate();
+                        btn.startLongPressTimer(longPressDelay);
                         tracked.add(btn);
                     }
                     handled = true;
@@ -700,6 +702,7 @@ public class InputControlsView extends View {
                 ControlElement btn = findButtonAt(x, y);
                 if (btn != null) {
                     btn.activate();
+                    btn.startLongPressTimer(longPressDelay);
                     hoveredButtons.put(pointerId, btn);
                     buttonOwned.put(pointerId, true);
                     handled = true;
@@ -725,18 +728,19 @@ public class InputControlsView extends View {
                     int pid = event.getPointerId(i);
                     boolean h = processElementsTouchMove(i, x, y);
                     ArrayList<ControlElement> tracked = trackedButtons.get(pid);
-                    if (tracked != null) {
-                        ControlElement btn = findButtonAt(x, y);
-                        if (btn != null && !tracked.contains(btn)) {
-                            btn.activate();
-                            tracked.add(btn);
+                        if (tracked != null) {
+                            ControlElement btn = findButtonAt(x, y);
+                            if (btn != null && !tracked.contains(btn)) {
+                                btn.activate();
+                                tracked.add(btn);
+                                if (tracked.size() == 2) tracked.get(0).cancelLongPress();
+                            }
+                            h = true;
                         }
-                        h = true;
+                        if (!h) touchpadView.onTouchEvent(event);
                     }
-                    if (!h) touchpadView.onTouchEvent(event);
-                }
-                break;
-            case HOVER:
+                    break;
+                case HOVER:
                 for (byte i = 0, count = (byte) event.getPointerCount(); i < count; i++) {
                     float x = event.getX(i);
                     float y = event.getY(i);
