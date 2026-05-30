@@ -2,6 +2,8 @@ package com.winlator.cmod.widget;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -39,6 +41,34 @@ public class NumberPicker extends FrameLayout implements View.OnTouchListener {
         editText = findViewById(R.id.EditText);
         findViewById(R.id.BTDecrement).setOnTouchListener(this);
         findViewById(R.id.BTIncrement).setOnTouchListener(this);
+
+        editText.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                String text = s.toString();
+                if (!text.isEmpty()) {
+                    try {
+                        int newValue = Integer.parseInt(text);
+                        if (newValue != NumberPicker.this.value) {
+                            NumberPicker.this.value = Mathf.clamp(newValue, minValue, maxValue);
+                            if (onValueChangeListener != null) {
+                                onValueChangeListener.onValueChange(NumberPicker.this, NumberPicker.this.value);
+                            }
+                        }
+                    }
+                    catch (NumberFormatException ignored) {}
+                }
+            }
+        });
+        editText.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) {
+                setValue(value);
+            }
+            else {
+                editText.selectAll();
+            }
+        });
 
         if (attrs != null) {
             TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.NumberPicker);

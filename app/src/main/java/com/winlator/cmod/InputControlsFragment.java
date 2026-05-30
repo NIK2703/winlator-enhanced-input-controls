@@ -52,6 +52,7 @@ import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
+import com.winlator.cmod.inputcontrols.MouseMode;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.widget.InputControlsView;
@@ -71,6 +72,7 @@ public class InputControlsFragment extends Fragment {
     private Callback<ControlsProfile> importProfileCallback;
     private final int selectedProfileId;
     private SharedPreferences preferences;
+    private Spinner spMouseMode;
 
     private int[] keycodes;
 
@@ -155,8 +157,20 @@ public class InputControlsFragment extends Fragment {
         });
         sbUiOpacity.setProgress((int)(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY) * 100));
 
-
-
+        spMouseMode = view.findViewById(R.id.SPMouseMode);
+        setupEnumSpinner(spMouseMode, MouseMode.values(), currentProfile != null ? currentProfile.getMouseMode() : MouseMode.TOUCHPAD);
+        spMouseMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) {
+                if (currentProfile != null) {
+                    MouseMode newMode = (MouseMode) spMouseMode.getSelectedItem();
+                    if (newMode != currentProfile.getMouseMode()) {
+                        currentProfile.setMouseMode(newMode);
+                        currentProfile.save();
+                    }
+                }
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
 
         view.findViewById(R.id.BTAddProfile).setOnClickListener((v) -> ContentDialog.prompt(context, R.string.profile_name, null, (name) -> {
             currentProfile = manager.createProfile(name);
@@ -338,6 +352,9 @@ public class InputControlsFragment extends Fragment {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 currentProfile = position > 0 ? profiles.get(position - 1) : null;
                 updateLayout.run();
+                if (currentProfile != null) {
+                    AppUtils.setSpinnerSelectionFromValue(spMouseMode, currentProfile.getMouseMode().name());
+                }
             }
 
             @Override
@@ -398,4 +415,12 @@ public class InputControlsFragment extends Fragment {
         else view.findViewById(R.id.TVEmptyText).setVisibility(View.VISIBLE);
     }
 
+    private <T extends Enum<T>> void setupEnumSpinner(Spinner spinner, T[] values, T current) {
+        int selectedIndex = 0;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] == current) selectedIndex = i;
+        }
+        spinner.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, values));
+        spinner.setSelection(selectedIndex, false);
+    }
 }
