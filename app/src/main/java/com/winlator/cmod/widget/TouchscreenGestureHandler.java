@@ -8,7 +8,6 @@ import android.view.MotionEvent;
 
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
-import com.winlator.cmod.inputcontrols.DragMode;
 import com.winlator.cmod.inputcontrols.SecondFingerMode;
 
 public class TouchscreenGestureHandler {
@@ -23,7 +22,6 @@ public class TouchscreenGestureHandler {
     private InputControlsView inputControlsView;
 
     // Configuration (from profile)
-    private DragMode dragMode = DragMode.AUTO;
     private Binding singleTapAction = Binding.MOUSE_LEFT_BUTTON;
     private Binding longPressAction = Binding.MOUSE_LEFT_BUTTON;
     private Binding doubleTapAction = Binding.NONE;
@@ -87,7 +85,6 @@ public class TouchscreenGestureHandler {
     }
 
     public void applyConfig(ControlsProfile profile) {
-        this.dragMode = profile.getDragMode();
         this.singleTapAction = profile.getSingleTapAction();
         this.longPressAction = profile.getLongPressAction();
         this.doubleTapAction = profile.getDoubleTapAction();
@@ -292,19 +289,8 @@ public class TouchscreenGestureHandler {
 
             if (state == GestureState.TAP_WAITING || state == GestureState.LONG_PRESSING) {
                 Binding dragBinding = resolveDragAction();
-                boolean shouldDrag = false;
 
-                if (dragMode == DragMode.ALWAYS) {
-                    shouldDrag = true;
-                }
-                else if (dragMode == DragMode.AUTO && dragBinding != null &&
-                         (dragBinding == Binding.MOUSE_LEFT_BUTTON ||
-                          dragBinding == Binding.MOUSE_RIGHT_BUTTON ||
-                          dragBinding == Binding.MOUSE_MIDDLE_BUTTON)) {
-                    shouldDrag = true;
-                }
-
-                if (shouldDrag && dragBinding != null && dragBinding != Binding.NONE) {
+                if (dragBinding != null && dragBinding != Binding.NONE) {
                     if (!isActionHeld || dragBinding != activeAction) {
                         releaseHeldAction();
                         executeActionAndHold(dragBinding);

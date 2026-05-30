@@ -16,8 +16,6 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
-import com.winlator.cmod.inputcontrols.DragMode;
-import com.winlator.cmod.inputcontrols.MouseMode;
 import com.winlator.cmod.inputcontrols.SecondFingerMode;
 import com.winlator.cmod.widget.NumberPicker;
 
@@ -49,24 +47,28 @@ public class TouchscreenGestureSettingsDialog {
         View view = LayoutInflater.from(context).inflate(R.layout.touchscreen_gesture_settings_dialog, null);
         builder.setView(view);
 
-        Spinner spMouseMode = view.findViewById(R.id.SPMouseMode);
-        Spinner spDragMode = view.findViewById(R.id.SPDragMode);
-        Spinner spSecondFingerMode = view.findViewById(R.id.SPSecondFingerMode);
+        Spinner spHoldMode = view.findViewById(R.id.SPHoldMode);
 
-        setupEnumSpinner(spMouseMode, MouseMode.values(), profile.getMouseMode());
-        setupEnumSpinner(spDragMode, DragMode.values(), profile.getDragMode());
-        setupEnumSpinner(spSecondFingerMode, SecondFingerMode.values(), profile.getSecondFingerMode());
+        setupEnumSpinner(spHoldMode, SecondFingerMode.values(), profile.getSecondFingerMode());
 
+        LinearLayout llHoldModeOptions = view.findViewById(R.id.LLHoldModeOptions);
         LinearLayout llTwoFingerSection = view.findViewById(R.id.LLTwoFingerSection);
-        Runnable updateTwoFingerVisibility = () -> {
-            SecondFingerMode mode = (SecondFingerMode) spSecondFingerMode.getSelectedItem();
-            llTwoFingerSection.setVisibility(mode == SecondFingerMode.SECOND_TAP_ACTIONS ? View.VISIBLE : View.GONE);
+        Runnable updateHoldModeVisibility = () -> {
+            SecondFingerMode mode = (SecondFingerMode) spHoldMode.getSelectedItem();
+            boolean isLongTap = mode == SecondFingerMode.LONG_TAP_ACTION;
+            llHoldModeOptions.setVisibility(isLongTap ? View.VISIBLE : View.GONE);
+            llTwoFingerSection.setVisibility(isLongTap ? View.GONE : View.VISIBLE);
         };
-        spSecondFingerMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) { updateTwoFingerVisibility.run(); }
+        spHoldMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) { updateHoldModeVisibility.run(); }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
-        updateTwoFingerVisibility.run();
+        updateHoldModeVisibility.run();
+
+        view.findViewById(R.id.BTHelpHoldMode).setOnClickListener((v) ->
+                AppUtils.showHelpBox(context, v, R.string.hold_mode_help));
+        view.findViewById(R.id.BTHelpTwoFinger).setOnClickListener((v) ->
+                AppUtils.showHelpBox(context, v, R.string.two_finger_help));
 
         NumberPicker npLongPress = view.findViewById(R.id.NPLongPressTimeout);
         NumberPicker npDoubleTap = view.findViewById(R.id.NPDoubleTapTimeout);
@@ -77,10 +79,12 @@ public class TouchscreenGestureSettingsDialog {
         LinearLayout llSingleFinger = view.findViewById(R.id.LLSingleFinger);
         addBindingPicker(llSingleFinger, "single", "Single Tap", profile.getSingleTapAction());
         addBindingPicker(llSingleFinger, "single_drag", "  Single Tap Drag", profile.getSingleTapDragAction());
-        addBindingPicker(llSingleFinger, "long", "Long Press", profile.getLongPressAction());
-        addBindingPicker(llSingleFinger, "long_drag", "  Long Press Drag", profile.getLongPressDragAction());
         addBindingPicker(llSingleFinger, "double", "Double Tap", profile.getDoubleTapAction());
         addBindingPicker(llSingleFinger, "double_drag", "  Double Tap Drag", profile.getDoubleTapDragAction());
+
+        LinearLayout llHoldGestures = view.findViewById(R.id.LLHoldGestures);
+        addBindingPicker(llHoldGestures, "long", "Long Press", profile.getLongPressAction());
+        addBindingPicker(llHoldGestures, "long_drag", "  Long Press Drag", profile.getLongPressDragAction());
 
         LinearLayout llTwoFinger = view.findViewById(R.id.LLTwoFinger);
         addBindingPicker(llTwoFinger, "single_2nd", "Single Tap", profile.getSingleTap2ndFingerAction());
@@ -91,18 +95,16 @@ public class TouchscreenGestureSettingsDialog {
         addBindingPicker(llTwoFinger, "double_2nd_drag", "  Double Tap Drag", profile.getDoubleTap2ndFingerDragAction());
 
         builder.setPositiveButton("Save", (dialog, which) -> save(
-                spMouseMode, spDragMode, spSecondFingerMode,
+                spHoldMode,
                 npLongPress, npDoubleTap));
         builder.setNegativeButton("Cancel", null);
 
         builder.create().show();
     }
 
-    private void save(Spinner spMouseMode, Spinner spDragMode, Spinner spSecondFingerMode,
+    private void save(Spinner spHoldMode,
                       NumberPicker npLongPress, NumberPicker npDoubleTap) {
-        profile.setMouseMode((MouseMode) spMouseMode.getSelectedItem());
-        profile.setDragMode((DragMode) spDragMode.getSelectedItem());
-        profile.setSecondFingerMode((SecondFingerMode) spSecondFingerMode.getSelectedItem());
+        profile.setSecondFingerMode((SecondFingerMode) spHoldMode.getSelectedItem());
         profile.setLongPressTimeout(npLongPress.getValue());
         profile.setDoubleTapTimeout(npDoubleTap.getValue());
 

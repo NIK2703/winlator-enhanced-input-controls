@@ -632,4 +632,6 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="vkbasalt_sharpness_denoise">Sharpeness Denoise</string>
     <string name="shutdown">Shutdown</string>
     <string name="disable_mouse">Toggle Mouse</string>
+    <string name="hold_mode_help">Long tap — press and hold one finger for hold gestures\nSecond tap — hold one finger, then a second finger performs tap/long press/double tap actions</string>
+    <string name="two_finger_help">Gestures triggered by a second finger while the first finger stays held on screen.</string>
 </resources>
