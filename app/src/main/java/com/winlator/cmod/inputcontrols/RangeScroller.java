@@ -16,6 +16,7 @@ public class RangeScroller {
     private float lastPosition;
     private long touchTime;
     private Binding binding = Binding.NONE;
+    private int pressedIndex = -1;
     private boolean isActionDown = false;
     private boolean scrolling = false;
     private Timer timer;
@@ -38,6 +39,14 @@ public class RangeScroller {
         return scrollOffset;
     }
 
+    public boolean isActionDown() {
+        return isActionDown;
+    }
+
+    public int getPressedIndex() {
+        return pressedIndex;
+    }
+
     public byte[] getRangeIndex() {
         ControlElement.Range range = element.getRange();
         byte from = (byte)Math.floor((scrollOffset / getElementSize()) % range.max);
@@ -46,12 +55,18 @@ public class RangeScroller {
         return new byte[]{from, to};
     }
 
-    private Binding getBindingByPosition(float x, float y) {
+    private int getIndexByPosition(float x, float y) {
         Rect boundingBox = element.getBoundingBox();
         ControlElement.Range range = element.getRange();
         float offset = element.getOrientation() == 0 ? x - boundingBox.left - currentOffset : y - boundingBox.top - currentOffset;
         int index = (int)Math.floor((offset / getElementSize()) % range.max);
         if (index < 0) index = range.max + index;
+        return index;
+    }
+
+    private Binding getBindingByPosition(float x, float y) {
+        int index = getIndexByPosition(x, y);
+        ControlElement.Range range = element.getRange();
 
         switch (range) {
             case FROM_A_TO_Z:
@@ -84,6 +99,7 @@ public class RangeScroller {
         scrolling = false;
         isActionDown = true;
         binding = getBindingByPosition(x, y);
+        pressedIndex = binding != Binding.NONE ? getIndexByPosition(x, y) : -1;
         touchTime = System.currentTimeMillis();
         lastPosition = element.getOrientation() == 0 ? x : y;
         element.setBinding(Binding.NONE);
@@ -104,6 +120,7 @@ public class RangeScroller {
 
             if (Math.abs(deltaPosition) >= TouchpadView.MAX_TAP_TRAVEL_DISTANCE) {
                 scrolling = true;
+                pressedIndex = -1;
                 destroyTimer();
             }
 
@@ -131,5 +148,6 @@ public class RangeScroller {
             else inputControlsView.handleInputEvent(binding, false);
         }
         isActionDown = false;
+        pressedIndex = -1;
     }
 }

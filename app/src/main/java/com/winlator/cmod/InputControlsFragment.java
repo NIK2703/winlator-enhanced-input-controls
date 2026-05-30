@@ -83,6 +83,12 @@ public class InputControlsFragment extends Fragment {
     private CheckBox cbLongPressHaptic;
     private SeekBar sbGestureThreshold;
     private TextView tvGestureThreshold;
+    private SeekBar sbStrokeWidth;
+    private TextView tvStrokeWidth;
+    private SeekBar sbFillAlphaActive;
+    private TextView tvFillAlphaActive;
+    private SeekBar sbFillAlphaInactive;
+    private TextView tvFillAlphaInactive;
 
     private int[] keycodes;
 
@@ -269,6 +275,67 @@ public class InputControlsFragment extends Fragment {
             int threshold = currentProfile != null ? currentProfile.getGestureThreshold() : 20;
             sbGestureThreshold.setProgress(threshold - 10);
             tvGestureThreshold.setText(threshold + " px");
+        });
+
+        tvStrokeWidth = view.findViewById(R.id.TVStrokeWidth);
+        sbStrokeWidth = view.findViewById(R.id.SBStrokeWidth);
+        sbStrokeWidth.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                float value = 0.05f + progress * 0.01f;
+                tvStrokeWidth.setText(String.format("%.2fx", value));
+                if (fromUser && currentProfile != null) {
+                    currentProfile.setStrokeWidth(value);
+                    currentProfile.save();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbStrokeWidth.post(() -> {
+            float sw = currentProfile != null ? currentProfile.getStrokeWidth() : 0.2f;
+            sbStrokeWidth.setProgress(Math.round((sw - 0.05f) * 100));
+            tvStrokeWidth.setText(String.format("%.2fx", sw));
+        });
+
+        tvFillAlphaActive = view.findViewById(R.id.TVFillAlphaActive);
+        sbFillAlphaActive = view.findViewById(R.id.SBFillAlphaActive);
+        sbFillAlphaActive.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvFillAlphaActive.setText(String.valueOf(progress));
+                if (fromUser && currentProfile != null) {
+                    currentProfile.setFillAlphaActive(progress);
+                    currentProfile.save();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbFillAlphaActive.post(() -> {
+            int fa = currentProfile != null ? currentProfile.getFillAlphaActive() : 80;
+            sbFillAlphaActive.setProgress(fa);
+            tvFillAlphaActive.setText(String.valueOf(fa));
+        });
+
+        tvFillAlphaInactive = view.findViewById(R.id.TVFillAlphaInactive);
+        sbFillAlphaInactive = view.findViewById(R.id.SBFillAlphaInactive);
+        sbFillAlphaInactive.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvFillAlphaInactive.setText(String.valueOf(progress));
+                if (fromUser && currentProfile != null) {
+                    currentProfile.setFillAlphaInactive(progress);
+                    currentProfile.save();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbFillAlphaInactive.post(() -> {
+            int fa = currentProfile != null ? currentProfile.getFillAlphaInactive() : 50;
+            sbFillAlphaInactive.setProgress(fa);
+            tvFillAlphaInactive.setText(String.valueOf(fa));
         });
 
         spMouseMode = view.findViewById(R.id.SPMouseMode);
@@ -495,6 +562,15 @@ public class InputControlsFragment extends Fragment {
                     int gThreshold = currentProfile.getGestureThreshold();
                     sbGestureThreshold.setProgress(gThreshold - 10);
                     tvGestureThreshold.setText(gThreshold + " px");
+                    float sw = currentProfile.getStrokeWidth();
+                    sbStrokeWidth.setProgress(Math.round((sw - 0.05f) * 100));
+                    tvStrokeWidth.setText(String.format("%.2fx", sw));
+                    int fa = currentProfile.getFillAlphaActive();
+                    sbFillAlphaActive.setProgress(fa);
+                    tvFillAlphaActive.setText(String.valueOf(fa));
+                    int fina = currentProfile.getFillAlphaInactive();
+                    sbFillAlphaInactive.setProgress(fina);
+                    tvFillAlphaInactive.setText(String.valueOf(fina));
                 }
             }
 

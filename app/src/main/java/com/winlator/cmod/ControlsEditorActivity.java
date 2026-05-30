@@ -117,25 +117,34 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
 
         final Runnable updateLayout = () -> {
             ControlElement.Type type = element.getType();
+            ControlElement.Shape shape = element.getShape();
             view.findViewById(R.id.LLShape).setVisibility(View.GONE);
             view.findViewById(R.id.CBToggleSwitch).setVisibility(View.GONE);
             view.findViewById(R.id.LLCustomTextIcon).setVisibility(View.GONE);
             view.findViewById(R.id.LLRangeOptions).setVisibility(View.GONE);
+            view.findViewById(R.id.LLRectDimensions).setVisibility(View.GONE);
+            view.findViewById(R.id.LLDPadOptions).setVisibility(View.GONE);
 
             if (type == ControlElement.Type.BUTTON) {
                 view.findViewById(R.id.LLShape).setVisibility(View.VISIBLE);
                 view.findViewById(R.id.CBToggleSwitch).setVisibility(View.VISIBLE);
                 view.findViewById(R.id.LLCustomTextIcon).setVisibility(View.VISIBLE);
+                if (shape == ControlElement.Shape.RECT) {
+                    view.findViewById(R.id.LLRectDimensions).setVisibility(View.VISIBLE);
+                }
             }
             else if (type == ControlElement.Type.RANGE_BUTTON) {
                 view.findViewById(R.id.LLRangeOptions).setVisibility(View.VISIBLE);
+            }
+            else if (type == ControlElement.Type.D_PAD) {
+                view.findViewById(R.id.LLDPadOptions).setVisibility(View.VISIBLE);
             }
 
             loadBindingSpinners(element, view);
         };
 
         loadTypeSpinner(element, view.findViewById(R.id.SType), updateLayout);
-        loadShapeSpinner(element, view.findViewById(R.id.SShape));
+        loadShapeSpinner(element, view.findViewById(R.id.SShape), updateLayout);
         loadRangeSpinner(element, view.findViewById(R.id.SRange));
 
         RadioGroup rgOrientation = view.findViewById(R.id.RGOrientation);
@@ -176,6 +185,74 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
         sbScale.setProgress((int)(element.getScale() * 100));
+
+        final TextView tvWidth = view.findViewById(R.id.TVWidth);
+        SeekBar sbWidth = view.findViewById(R.id.SBWidth);
+        sbWidth.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvWidth.setText(String.format("%.1f", progress / 10.0f));
+                if (fromUser) {
+                    element.setElementWidth(progress / 10.0f);
+                    profile.save();
+                    inputControlsView.invalidate();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbWidth.setProgress((int)(element.getElementWidth() * 10));
+
+        final TextView tvHeight = view.findViewById(R.id.TVHeight);
+        SeekBar sbHeight = view.findViewById(R.id.SBHeight);
+        sbHeight.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvHeight.setText(String.format("%.1f", progress / 10.0f));
+                if (fromUser) {
+                    element.setElementHeight(progress / 10.0f);
+                    profile.save();
+                    inputControlsView.invalidate();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbHeight.setProgress((int)(element.getElementHeight() * 10));
+
+        final TextView tvRadius = view.findViewById(R.id.TVRadius);
+        SeekBar sbRadius = view.findViewById(R.id.SBRadius);
+        sbRadius.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvRadius.setText(String.format("%.1f", progress / 10.0f));
+                if (fromUser) {
+                    element.setCornerRadius(progress / 10.0f);
+                    profile.save();
+                    inputControlsView.invalidate();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbRadius.setProgress((int)(element.getCornerRadius() * 10));
+
+        final TextView tvDPadRadius = view.findViewById(R.id.TVDPadRadius);
+        SeekBar sbDPadRadius = view.findViewById(R.id.SBDPadRadius);
+        sbDPadRadius.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvDPadRadius.setText(String.format("%.1f", progress / 10.0f));
+                if (fromUser) {
+                    element.setDpadCornerRadius(progress / 10.0f);
+                    profile.save();
+                    inputControlsView.invalidate();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbDPadRadius.setProgress((int)(element.getDpadCornerRadius() * 10));
 
         CheckBox cbToggleSwitch = view.findViewById(R.id.CBToggleSwitch);
         cbToggleSwitch.setChecked(element.isToggleSwitch());
@@ -230,14 +307,18 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         init[0] = false;
     }
 
-    private void loadShapeSpinner(final ControlElement element, Spinner spinner) {
+    private void loadShapeSpinner(final ControlElement element, Spinner spinner, Runnable callback) {
+        final boolean[] init = {true};
         spinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, ControlElement.Shape.names()));
         spinner.setSelection(element.getShape().ordinal(), false);
+        init[0] = false;
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (init[0]) return;
                 element.setShape(ControlElement.Shape.values()[position]);
                 profile.save();
+                callback.run();
                 inputControlsView.invalidate();
             }
 

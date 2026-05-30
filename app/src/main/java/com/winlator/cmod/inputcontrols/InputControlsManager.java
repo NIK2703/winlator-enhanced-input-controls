@@ -70,7 +70,7 @@ public class InputControlsManager {
         if (oldVersion == newVersion) return;
         preferences.edit().putInt("inputcontrols_app_version", newVersion).apply();
 
-        File[] files = profilesDir.listFiles();
+        File[] files = profilesDir.listFiles((d, n) -> n.endsWith(".icp"));
         if (files == null) return;
 
         try {
@@ -79,11 +79,12 @@ public class InputControlsManager {
             for (String assetFile : assetFiles) {
                 String assetPath = "inputcontrols/profiles/"+assetFile;
                 ControlsProfile originProfile = loadProfile(context, assetManager.open(assetPath));
+                if (originProfile == null) continue;
 
                 File targetFile = null;
                 for (File file : files) {
                     ControlsProfile targetProfile = loadProfile(context, file);
-                    if (originProfile.id == targetProfile.id && originProfile.getName().equals(targetProfile.getName())) {
+                    if (targetProfile != null && originProfile.id == targetProfile.id && originProfile.getName().equals(targetProfile.getName())) {
                         targetFile = file;
                         break;
                     }
@@ -102,12 +103,14 @@ public class InputControlsManager {
         copyAssetProfilesIfNeeded();
 
         ArrayList<ControlsProfile> profiles = new ArrayList<>();
-        File[] files = profilesDir.listFiles();
+        File[] files = profilesDir.listFiles((d, n) -> n.endsWith(".icp"));
         if (files != null) {
             for (File file : files) {
                 ControlsProfile profile = loadProfile(context, file);
-                if (!(ignoreTemplates && profile.isTemplate())) profiles.add(profile);
-                maxProfileId = Math.max(maxProfileId, profile.id);
+                if (profile != null) {
+                    if (!(ignoreTemplates && profile.isTemplate())) profiles.add(profile);
+                    maxProfileId = Math.max(maxProfileId, profile.id);
+                }
             }
         }
 
