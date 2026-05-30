@@ -87,7 +87,6 @@ public class InputControlsView extends View {
 
     private final SparseArray<ControlElement> hoveredButtons = new SparseArray<>();
     private final SparseArray<ArrayList<ControlElement>> trackedButtons = new SparseArray<>();
-    private final SparseArray<Boolean> buttonOwned = new SparseArray<>();
 
     private ControlElement findButtonAt(float x, float y) {
         for (ControlElement element : profile.getElements()) {
@@ -671,28 +670,7 @@ public class InputControlsView extends View {
                 }
                 break;
             }
-            case TRACK: {
-                for (ControlElement element : profile.getElements()) {
-                    if (element.getType() != ControlElement.Type.BUTTON && element.handleTouchDown(pointerId, x, y)) {
-                        handled = true;
-                    }
-                }
-                ControlElement btn = findButtonAt(x, y);
-                if (btn != null) {
-                    ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
-                    if (tracked == null) {
-                        tracked = new ArrayList<>();
-                        trackedButtons.put(pointerId, tracked);
-                    }
-                    if (!tracked.contains(btn)) {
-                        btn.activate();
-                        btn.startLongPressTimer(longPressDelay);
-                        tracked.add(btn);
-                    }
-                    handled = true;
-                }
-                break;
-            }
+            case TRACK:
             case HOVER: {
                 for (ControlElement element : profile.getElements()) {
                     if (element.getType() != ControlElement.Type.BUTTON && element.handleTouchDown(pointerId, x, y)) {
@@ -701,10 +679,19 @@ public class InputControlsView extends View {
                 }
                 ControlElement btn = findButtonAt(x, y);
                 if (btn != null) {
-                    btn.activate();
-                    btn.startLongPressTimer(longPressDelay);
-                    hoveredButtons.put(pointerId, btn);
-                    buttonOwned.put(pointerId, true);
+                    btn.setGestureDownPosition(x, y);
+                    ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
+                    if (tracked == null) {
+                        tracked = new ArrayList<>();
+                        trackedButtons.put(pointerId, tracked);
+                    }
+                    if (!tracked.contains(btn)) {
+                        btn.handleTouchDown(pointerId, x, y);
+                        tracked.add(btn);
+                    }
+                    if (actMode == TouchActivationMode.HOVER) {
+                        hoveredButtons.put(pointerId, btn);
+                    }
                     handled = true;
                 }
                 break;
@@ -717,7 +704,7 @@ public class InputControlsView extends View {
         switch (actMode) {
             case LOCK:
                 for (byte i = 0, count = (byte) event.getPointerCount(); i < count; i++) {
-                    boolean h = processElementsTouchMove(i, event.getX(i), event.getY(i));
+                    boolean h = processElementsTouchMove(event.getPointerId(i), event.getX(i), event.getY(i));
                     if (!h) touchpadView.onTouchEvent(event);
                 }
                 break;
@@ -726,7 +713,7 @@ public class InputControlsView extends View {
                     float x = event.getX(i);
                     float y = event.getY(i);
                     int pid = event.getPointerId(i);
-                    boolean h = processElementsTouchMove(i, x, y);
+                    boolean h = processElementsTouchMove(pid, x, y);
                     ArrayList<ControlElement> tracked = trackedButtons.get(pid);
                         if (tracked != null) {
                             ControlElement btn = findButtonAt(x, y);
@@ -745,15 +732,26 @@ public class InputControlsView extends View {
                     float x = event.getX(i);
                     float y = event.getY(i);
                     int pid = event.getPointerId(i);
-                    boolean h = processElementsTouchMove(i, x, y);
-                    if (buttonOwned.get(pid) != null) {
+                    boolean h = processElementsTouchMove(pid, x, y);
+                    ArrayList<ControlElement> tracked = trackedButtons.get(pid);
+                    if (tracked != null) {
                         ControlElement btn = findButtonAt(x, y);
                         ControlElement prev = hoveredButtons.get(pid);
                         if (btn != prev) {
-                            if (prev != null) prev.deactivate();
-                            if (btn != null) btn.activate();
-                            if (btn != null) hoveredButtons.put(pid, btn);
-                            else hoveredButtons.remove(pid);
+                            if (prev != null) {
+                                prev.deactivate();
+                            }
+                            if (btn != null) {
+                                btn.activate();
+                                if (!tracked.contains(btn)) {
+                                    tracked.add(btn);
+                                    if (tracked.size() == 2) tracked.get(0).cancelLongPress();
+                                }
+                                hoveredButtons.put(pid, btn);
+                            }
+                            else {
+                                hoveredButtons.remove(pid);
+                            }
                         }
                         h = true;
                     }
@@ -766,24 +764,18 @@ public class InputControlsView extends View {
     private boolean handleUpByMode(int pointerId, TouchActivationMode actMode) {
         boolean handled = false;
         switch (actMode) {
-            case TRACK: {
+            case TRACK:
+            case HOVER: {
                 ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
                 if (tracked != null) {
-                    for (ControlElement btn : tracked) btn.deactivate();
+                    if (tracked.size() > 1) {
+                        for (ControlElement btn : tracked) btn.deactivate();
+                    }
                     tracked.clear();
                     trackedButtons.remove(pointerId);
-                    handled = true;
-                }
-                break;
-            }
-            case HOVER: {
-                ControlElement btn = hoveredButtons.get(pointerId);
-                if (btn != null) {
-                    btn.deactivate();
-                    hoveredButtons.remove(pointerId);
-                }
-                if (buttonOwned.get(pointerId) != null) {
-                    buttonOwned.remove(pointerId);
+                    if (actMode == TouchActivationMode.HOVER) {
+                        hoveredButtons.remove(pointerId);
+                    }
                     handled = true;
                 }
                 break;
@@ -792,9 +784,9 @@ public class InputControlsView extends View {
         return handled;
     }
 
-    private boolean processElementsTouchMove(int i, float x, float y) {
+    private boolean processElementsTouchMove(int pointerId, float x, float y) {
         for (ControlElement element : profile.getElements()) {
-            if (element.handleTouchMove(i, x, y)) return true;
+            if (element.handleTouchMove(pointerId, x, y)) return true;
         }
         return false;
     }
