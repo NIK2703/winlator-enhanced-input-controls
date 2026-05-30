@@ -55,7 +55,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private int longPressHapticIntensity = 50;
     private boolean longPressHapticEnabled = true;
     private int dragThreshold = 10;
+    private int gestureThreshold = 20;
     private TouchActivationMode touchActivationMode = TouchActivationMode.LOCK;
+
     private boolean gestureSettingsLoaded = false;
 
     public ControlsProfile(Context context, int id) {
@@ -322,6 +324,16 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.dragThreshold = clamp(dragThreshold, 0, 30);
     }
 
+    public int getGestureThreshold() {
+        ensureGestureSettingsLoaded();
+        return gestureThreshold;
+    }
+
+    public void setGestureThreshold(int gestureThreshold) {
+        ensureGestureSettingsLoaded();
+        this.gestureThreshold = clamp(gestureThreshold, 10, 50);
+    }
+
     public SecondFingerMode getSecondFingerMode() {
         ensureGestureSettingsLoaded();
         return secondFingerMode;
@@ -444,6 +456,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (data.has("longPressHapticIntensity")) longPressHapticIntensity = data.getInt("longPressHapticIntensity");
             if (data.has("longPressHapticEnabled")) longPressHapticEnabled = data.getBoolean("longPressHapticEnabled");
             if (data.has("dragThreshold")) dragThreshold = clamp(data.getInt("dragThreshold"), 0, 30);
+            if (data.has("gestureThreshold")) gestureThreshold = clamp(data.getInt("gestureThreshold"), 10, 50);
             if (data.has("touchscreenGestures")) {
                 loadGestureSettingsFromJson(data.getJSONObject("touchscreenGestures"));
             }
@@ -564,11 +577,13 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             data.put("id", id);
             data.put("name", name);
             data.put("cursorSpeed", Float.valueOf(cursorSpeed));
+
             if (bindingDelay > 0) data.put("bindingDelay", bindingDelay);
             data.put("longPressDelay", longPressDelay);
             data.put("longPressHapticIntensity", longPressHapticIntensity);
             data.put("longPressHapticEnabled", longPressHapticEnabled);
             if (dragThreshold != 10) data.put("dragThreshold", dragThreshold);
+            if (gestureThreshold != 20) data.put("gestureThreshold", gestureThreshold);
 
             JSONArray elementsJSONArray = new JSONArray();
             if (!elementsLoaded && file.isFile()) {
@@ -687,8 +702,8 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         try {
             JSONObject profileJSONObject = new JSONObject(FileUtils.readString(file));
 
+
             if (profileJSONObject.has("bindingDelay")) bindingDelay = profileJSONObject.getInt("bindingDelay");
-            if (profileJSONObject.has("longPressDelay")) longPressDelay = profileJSONObject.getInt("longPressDelay");
             if (profileJSONObject.has("longPressHapticIntensity")) longPressHapticIntensity = profileJSONObject.getInt("longPressHapticIntensity");
             if (profileJSONObject.has("longPressHapticEnabled")) longPressHapticEnabled = profileJSONObject.getBoolean("longPressHapticEnabled");
             if (profileJSONObject.has("dragThreshold")) dragThreshold = clamp(profileJSONObject.getInt("dragThreshold"), 0, 30);
@@ -741,6 +756,15 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                         lpList.add(Binding.fromString(lpArray.getString(k)));
                     }
                     element.setLongPressBindings(lpList);
+                }
+
+                if (elementJSONObject.has("gestureBindings")) {
+                    JSONArray gArray = elementJSONObject.getJSONArray("gestureBindings");
+                    List<Binding> gList = new ArrayList<>();
+                    for (int k = 0; k < gArray.length(); k++) {
+                        gList.add(Binding.fromString(gArray.getString(k)));
+                    }
+                    element.setGestureBindings(gList);
                 }
 
                 if (!virtualGamepad && hasGamepadBinding) virtualGamepad = true;

@@ -81,6 +81,8 @@ public class InputControlsFragment extends Fragment {
     private SeekBar sbLongPressHaptic;
     private TextView tvLongPressHaptic;
     private CheckBox cbLongPressHaptic;
+    private SeekBar sbGestureThreshold;
+    private TextView tvGestureThreshold;
 
     private int[] keycodes;
 
@@ -246,6 +248,27 @@ public class InputControlsFragment extends Fragment {
             if (currentProfile != null) {
                 cbLongPressHaptic.setChecked(currentProfile.getLongPressHapticEnabled());
             }
+        });
+
+        tvGestureThreshold = view.findViewById(R.id.TVGestureThreshold);
+        sbGestureThreshold = view.findViewById(R.id.SBGestureThreshold);
+        sbGestureThreshold.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int value = progress + 10;
+                tvGestureThreshold.setText(value + " px");
+                if (fromUser && currentProfile != null) {
+                    currentProfile.setGestureThreshold(value);
+                    currentProfile.save();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbGestureThreshold.post(() -> {
+            int threshold = currentProfile != null ? currentProfile.getGestureThreshold() : 20;
+            sbGestureThreshold.setProgress(threshold - 10);
+            tvGestureThreshold.setText(threshold + " px");
         });
 
         spMouseMode = view.findViewById(R.id.SPMouseMode);
@@ -469,6 +492,9 @@ public class InputControlsFragment extends Fragment {
                     sbLongPressHaptic.setProgress(haptic);
                     tvLongPressHaptic.setText(haptic > 0 ? haptic + "%" : "Off");
                     cbLongPressHaptic.setChecked(currentProfile.getLongPressHapticEnabled());
+                    int gThreshold = currentProfile.getGestureThreshold();
+                    sbGestureThreshold.setProgress(gThreshold - 10);
+                    tvGestureThreshold.setText(gThreshold + " px");
                 }
             }
 

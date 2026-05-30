@@ -74,7 +74,7 @@ public class InputControlsView extends View {
     private Timer mouseMoveTimer;
     private final PointF mouseMoveOffset = new PointF();
     private boolean showTouchscreenControls = true;
-
+    private boolean cachesPreBuilt = false;
     private Handler timeoutHandler; // Reference to the activity's timeout handler
     private Runnable hideControlsRunnable; // Runnable to hide the controls
 
@@ -165,6 +165,18 @@ public class InputControlsView extends View {
 
     public void setOverlayOpacity(float overlayOpacity) {
         this.overlayOpacity = overlayOpacity;
+        invalidateCache();
+    }
+
+    public void invalidateCache() {
+        if (profile != null) {
+            for (ControlElement element : profile.getElements()) {
+                element.invalidateElementCache();
+            }
+        }
+        ControlElement.clearSharedPool();
+        cachesPreBuilt = false;
+        invalidate();
     }
 
     public int getSnappingSize() {
@@ -203,8 +215,22 @@ public class InputControlsView extends View {
 
         if (profile != null && showTouchscreenControls && !isFocusedOnStick()) {
             if (!profile.isElementsLoaded()) profile.loadElements(this);
-            for (ControlElement element : profile.getElements()) {
-                element.draw(canvas);
+            boolean globalCache = PreferenceManager.getDefaultSharedPreferences(getContext()).getBoolean("cached_rendering", false);
+            if (globalCache) {
+                if (!cachesPreBuilt) {
+                    for (ControlElement element : profile.getElements()) {
+                        element.buildCache();
+                    }
+                    cachesPreBuilt = true;
+                }
+                for (ControlElement element : profile.getElements()) {
+                    element.drawCached(canvas);
+                }
+            }
+            else {
+                for (ControlElement element : profile.getElements()) {
+                    element.draw(canvas);
+                }
             }
         }
 
@@ -296,6 +322,7 @@ public class InputControlsView extends View {
             element.setY(cursor.y);
             profile.addElement(element);
             profile.save();
+            invalidateCache();
             selectElement(element);
             return true;
         }
@@ -321,6 +348,7 @@ public class InputControlsView extends View {
             element.setY(cursor.y);
             profile.addElement(element);
             profile.save();
+            invalidateCache();
             selectElement(element);
             return true;
         }
@@ -332,7 +360,7 @@ public class InputControlsView extends View {
             profile.removeElement(selectedElement);
             selectedElement = null;
             profile.save();
-            invalidate();
+            invalidateCache();
             return true;
         }
         else return false;
@@ -368,6 +396,8 @@ public class InputControlsView extends View {
             deselectAllElements();
         }
         else this.profile = null;
+        cachesPreBuilt = false;
+        invalidateCache();
     }
 
     public boolean isShowTouchscreenControls() {

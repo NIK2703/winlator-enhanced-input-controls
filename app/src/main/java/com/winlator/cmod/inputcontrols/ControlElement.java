@@ -2,6 +2,7 @@ package com.winlator.cmod.inputcontrols;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
@@ -10,14 +11,19 @@ import android.graphics.Rect;
 import android.os.SystemClock;
 
 import androidx.core.graphics.ColorUtils;
+import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.core.CubicBezierInterpolator;
 import com.winlator.cmod.inputcontrols.InputMode;
+import com.winlator.cmod.inputcontrols.InputControlsManager;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.widget.TouchpadView;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.xserver.XServer;
+
+import java.io.File;
+import java.io.FileOutputStream;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -26,6 +32,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 public class ControlElement {
@@ -71,6 +78,7 @@ public class ControlElement {
             return names;
         }
     }
+    private static final HashMap<String, Bitmap> sharedPool = new HashMap<>();
     private final InputControlsView inputControlsView;
     private Type type = Type.BUTTON;
     private Shape shape = Shape.CIRCLE;
@@ -84,6 +92,14 @@ public class ControlElement {
     private final Rect boundingBox = new Rect();
     private boolean[] states = new boolean[4];
     private boolean boundingBoxNeedsUpdate = true;
+    private Bitmap cacheBase;
+    private Bitmap cacheFill;
+    private boolean cacheBaseDirty = true;
+    private boolean cacheFillDirty = true;
+    private Bitmap dpadPetalStroke;
+    private Bitmap dpadPetalFill;
+    private boolean dpadCacheDirty = true;
+    private String cacheKey = "";
     private String text = "";
     private byte iconId;
     private List<Binding> heldBindings;
@@ -153,6 +169,7 @@ public class ControlElement {
         if (this.type == type) return;
         this.type = type;
         reset();
+        invalidateElementCache();
     }
 
     public int getBindingCount() {
@@ -170,6 +187,7 @@ public class ControlElement {
         }
         states = new boolean[bindingCount];
         boundingBoxNeedsUpdate = true;
+        invalidateElementCache();
     }
 
     public Shape getShape() {
@@ -179,6 +197,7 @@ public class ControlElement {
     public void setShape(Shape shape) {
         this.shape = shape;
         boundingBoxNeedsUpdate = true;
+        invalidateElementCache();
     }
 
     public Range getRange() {
@@ -187,6 +206,7 @@ public class ControlElement {
 
     public void setRange(Range range) {
         this.range = range;
+        invalidateElementCache();
     }
 
     public byte getOrientation() {
@@ -196,6 +216,7 @@ public class ControlElement {
     public void setOrientation(byte orientation) {
         this.orientation = orientation;
         boundingBoxNeedsUpdate = true;
+        invalidateElementCache();
     }
 
     public boolean isToggleSwitch() {
@@ -219,6 +240,7 @@ public class ControlElement {
         List<Binding> seq = bindings.get(index);
         seq.clear();
         seq.add(binding);
+        invalidateElementCache();
     }
 
     public void setBinding(Binding binding) {
@@ -226,6 +248,7 @@ public class ControlElement {
             seq.clear();
             seq.add(binding);
         }
+        invalidateElementCache();
     }
 
     public List<Binding> getBindingSequence(int index) {
@@ -240,6 +263,7 @@ public class ControlElement {
         List<Binding> seq = bindings.get(index);
         seq.clear();
         seq.addAll(sequence);
+        invalidateElementCache();
     }
 
     public void addBindingToSequence(int index, Binding binding) {
@@ -247,6 +271,7 @@ public class ControlElement {
             bindings.add(new ArrayList<Binding>());
         }
         bindings.get(index).add(binding);
+        invalidateElementCache();
     }
 
     public void removeBindingFromSequence(int index, int seqIndex) {
@@ -254,6 +279,7 @@ public class ControlElement {
             List<Binding> seq = bindings.get(index);
             if (seqIndex >= 0 && seqIndex < seq.size()) {
                 seq.remove(seqIndex);
+                invalidateElementCache();
             }
         }
     }
@@ -263,6 +289,7 @@ public class ControlElement {
             List<Binding> seq = bindings.get(slotIndex);
             if (seqIndex >= 0 && seqIndex < seq.size()) {
                 seq.set(seqIndex, binding);
+                invalidateElementCache();
             }
         }
     }
@@ -337,6 +364,7 @@ public class ControlElement {
     public void setScale(float scale) {
         this.scale = scale;
         boundingBoxNeedsUpdate = true;
+        invalidateElementCache();
     }
 
     public short getX() {
@@ -346,6 +374,7 @@ public class ControlElement {
     public void setX(int x) {
         this.x = (short)x;
         boundingBoxNeedsUpdate = true;
+        invalidateElementCache();
     }
 
     public short getY() {
@@ -355,6 +384,7 @@ public class ControlElement {
     public void setY(int y) {
         this.y = (short)y;
         boundingBoxNeedsUpdate = true;
+        invalidateElementCache();
     }
 
     public boolean isSelected() {
@@ -371,6 +401,7 @@ public class ControlElement {
 
     public void setText(String text) {
         this.text = text != null ? text : "";
+        invalidateElementCache();
     }
 
     public byte getIconId() {
@@ -379,6 +410,7 @@ public class ControlElement {
 
     public void setIconId(int iconId) {
         this.iconId = (byte)iconId;
+        invalidateElementCache();
     }
 
     public Rect getBoundingBox() {
@@ -484,8 +516,342 @@ public class ControlElement {
         return text;
     }
 
-    private boolean isEngaged() {
+    public boolean isEngaged() {
         return currentPointerId != -1 || active || (toggleSwitch && selected);
+    }
+
+    public void invalidateElementCache() {
+        cacheBase = null;
+        cacheFill = null;
+        dpadPetalStroke = null;
+        dpadPetalFill = null;
+        cacheBaseDirty = true;
+        cacheFillDirty = true;
+        dpadCacheDirty = true;
+        if (!cacheKey.isEmpty()) {
+            File dir = cacheDir();
+            File[] files = dir.listFiles((d, n) -> n.startsWith(cacheKey));
+            if (files != null) for (File f : files) f.delete();
+        }
+    }
+
+    public void buildCache() {
+        if (!isCachingEnabled()) return;
+        if (getBoundingBox().width() <= 0) return;
+        if (type == Type.D_PAD) {
+            ensureDPadCaches(inputControlsView.getSnappingSize());
+        } else {
+            ensureBaseCache();
+            ensureFillCache();
+        }
+    }
+
+    public static void clearSharedPool() {
+        for (Bitmap bmp : sharedPool.values()) {
+            if (bmp != null && !bmp.isRecycled()) bmp.recycle();
+        }
+        sharedPool.clear();
+    }
+
+    public static void deleteProfileCache(Context context, int profileId) {
+        File dir = new File(InputControlsManager.getProfilesDir(context), "cache_" + profileId);
+        if (dir.isDirectory()) {
+            File[] files = dir.listFiles();
+            if (files != null) for (File f : files) f.delete();
+            dir.delete();
+        }
+    }
+
+    public static void deleteAllCaches(Context context) {
+        File profilesDir = InputControlsManager.getProfilesDir(context);
+        File[] dirs = profilesDir.listFiles((d, n) -> n.startsWith("cache_"));
+        if (dirs != null) for (File dir : dirs) {
+            File[] files = dir.listFiles();
+            if (files != null) for (File f : files) f.delete();
+            dir.delete();
+        }
+    }
+
+    private File cacheDir() {
+        ControlsProfile profile = inputControlsView.getProfile();
+        int id = profile != null ? profile.id : 0;
+        File dir = new File(InputControlsManager.getProfilesDir(inputControlsView.getContext()), "cache_" + id);
+        if (!dir.exists()) dir.mkdirs();
+        return dir;
+    }
+
+    private String visualKey(boolean isFill) {
+        if (isFill) {
+            return type.ordinal() + "_" + shape.ordinal() + "_" + scale + "_fill";
+        }
+        return type.ordinal() + "_" + shape.ordinal() + "_" + scale + "_" + getDisplayText() + "_" + iconId;
+    }
+
+    private String diskKey(boolean isFill) {
+        return type.ordinal() + "_" + shape.ordinal() + "_" + scale + "_" + x + "_" + y + "_" + text + "_" + iconId
+            + (isFill ? "_fill" : "");
+    }
+
+    private boolean isCachingEnabled() {
+        return PreferenceManager.getDefaultSharedPreferences(inputControlsView.getContext())
+            .getBoolean("cached_rendering", false);
+    }
+
+    private int strokePad() {
+        return Math.max(1, (int)Math.ceil(inputControlsView.getSnappingSize() * 0.2f / 2) + 1);
+    }
+
+    private Bitmap loadFromDisk(String key) {
+        File file = new File(cacheDir(), key + ".png");
+        if (!file.isFile()) return null;
+        return BitmapFactory.decodeFile(file.getAbsolutePath());
+    }
+
+    private void saveToDisk(String key, Bitmap bitmap) {
+        try (FileOutputStream out = new FileOutputStream(new File(cacheDir(), key + ".png"))) {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+        } catch (Exception e) {
+            android.util.Log.w("ControlElement", "save cache " + key + " failed", e);
+        }
+    }
+
+    private Bitmap obtainPoolBitmap(String vKey, int width, int height) {
+        Bitmap bmp = sharedPool.get(vKey);
+        if (bmp != null && !bmp.isRecycled() && bmp.getWidth() == width && bmp.getHeight() == height)
+            return bmp;
+        return null;
+    }
+
+    private void ensureBaseCache() {
+        if (!cacheBaseDirty && cacheBase != null) {
+            Rect box = getBoundingBox();
+            int pad = strokePad();
+            if (cacheBase.getWidth() == box.width() + pad * 2 &&
+                cacheBase.getHeight() == box.height() + pad * 2) return;
+        }
+        cacheBase = null;
+        Rect box = getBoundingBox();
+        int pad = strokePad();
+        int w = box.width() + pad * 2;
+        int h = box.height() + pad * 2;
+        if (w <= 0 || h <= 0) return;
+        cacheKey = diskKey(false);
+        String vKey = visualKey(false);
+        cacheBase = obtainPoolBitmap(vKey, w, h);
+        if (cacheBase == null) {
+            cacheBase = loadFromDisk(cacheKey);
+            if (cacheBase != null && (cacheBase.getWidth() != w || cacheBase.getHeight() != h)) {
+                cacheBase.recycle();
+                cacheBase = null;
+            }
+        }
+        if (cacheBase == null) {
+            cacheBase = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(cacheBase);
+            c.translate(-box.left + pad, -box.top + pad);
+            boolean savedSelected = selected;
+            int savedPointerId = currentPointerId;
+            boolean savedActive = active;
+            boolean[] savedStates = states.clone();
+            selected = false;
+            currentPointerId = -1;
+            active = false;
+            Arrays.fill(states, false);
+            draw(c);
+            selected = savedSelected;
+            currentPointerId = savedPointerId;
+            active = savedActive;
+            states = savedStates;
+            sharedPool.put(vKey, cacheBase);
+            saveToDisk(cacheKey, cacheBase);
+        }
+        cacheBaseDirty = false;
+    }
+
+    private void ensureFillCache() {
+        if (!cacheFillDirty && cacheFill != null) {
+            Rect box = getBoundingBox();
+            int pad = strokePad();
+            if (cacheFill.getWidth() == box.width() + pad * 2 &&
+                cacheFill.getHeight() == box.height() + pad * 2) return;
+        }
+        cacheFill = null;
+        Rect box = getBoundingBox();
+        int pad = strokePad();
+        int w = box.width() + pad * 2;
+        int h = box.height() + pad * 2;
+        if (w <= 0 || h <= 0) return;
+        String vKey = visualKey(true);
+        cacheFill = obtainPoolBitmap(vKey, w, h);
+        if (cacheFill == null) {
+            cacheFill = loadFromDisk(diskKey(true));
+            if (cacheFill != null && (cacheFill.getWidth() != w || cacheFill.getHeight() != h)) {
+                cacheFill.recycle();
+                cacheFill = null;
+            }
+        }
+        if (cacheFill == null) {
+            cacheFill = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(cacheFill);
+            c.translate(-box.left + pad, -box.top + pad);
+            Paint paint = inputControlsView.getPaint();
+            int primaryColor = inputControlsView.getPrimaryColor();
+            int fillColor = ColorUtils.setAlphaComponent(primaryColor, 80);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(fillColor);
+            switch (type) {
+                case BUTTON: {
+                    float cx = box.centerX();
+                    float cy = box.centerY();
+                    switch (shape) {
+                        case CIRCLE: c.drawCircle(cx, cy, box.width() * 0.5f, paint); break;
+                        case RECT:   c.drawRect(box, paint); break;
+                        case ROUND_RECT: {
+                            float r = box.height() * 0.5f;
+                            c.drawRoundRect(box.left, box.top, box.right, box.bottom, r, r, paint);
+                            break;
+                        }
+                        case SQUARE: {
+                            float r = inputControlsView.getSnappingSize() * 0.75f * scale;
+                            c.drawRoundRect(box.left, box.top, box.right, box.bottom, r, r, paint);
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case STICK: {
+                    float cx = box.centerX();
+                    float cy = box.centerY();
+                    short thumbRadius = (short) (inputControlsView.getSnappingSize() * 3.5f * scale);
+                    c.drawCircle(cx, cy, thumbRadius, paint);
+                    break;
+                }
+                default: break;
+            }
+            paint.setStyle(Paint.Style.STROKE);
+            sharedPool.put(vKey, cacheFill);
+            saveToDisk(diskKey(true), cacheFill);
+        }
+        cacheFillDirty = false;
+    }
+
+    private Path buildUpPetal(Rect box, int snappingSize) {
+        float cx = box.centerX();
+        float cy = box.centerY();
+        float offsetX = snappingSize * 2 * scale;
+        float offsetY = snappingSize * 3 * scale;
+        float start = snappingSize * scale;
+        Path path = new Path();
+        path.moveTo(cx, cy - start);
+        path.lineTo(cx - offsetX, cy - offsetY);
+        path.lineTo(cx - offsetX, box.top);
+        path.lineTo(cx + offsetX, box.top);
+        path.lineTo(cx + offsetX, cy - offsetY);
+        path.close();
+        return path;
+    }
+
+    private void ensureDPadCaches(int snappingSize) {
+        if (!dpadCacheDirty && dpadPetalStroke != null) {
+            Rect box = getBoundingBox();
+            int pad = strokePad();
+            if (dpadPetalStroke.getWidth() == box.width() + pad * 2 &&
+                dpadPetalStroke.getHeight() == box.height() + pad * 2) return;
+        }
+        dpadPetalStroke = null;
+        dpadPetalFill = null;
+        Rect box = getBoundingBox();
+        int pad = strokePad();
+        int w = box.width() + pad * 2;
+        int h = box.height() + pad * 2;
+        if (w <= 0 || h <= 0) return;
+        Paint paint = inputControlsView.getPaint();
+        int primaryColor = inputControlsView.getPrimaryColor();
+        float strokeWidth = snappingSize * 0.2f;
+        String strokeKey = diskKey(false) + "_dpad_stroke";
+        String fillKey = diskKey(false) + "_dpad_fill";
+        dpadPetalStroke = loadFromDisk(strokeKey);
+        if (dpadPetalStroke != null && (dpadPetalStroke.getWidth() != w || dpadPetalStroke.getHeight() != h)) {
+            dpadPetalStroke.recycle();
+            dpadPetalStroke = null;
+        }
+        if (dpadPetalStroke == null) {
+            dpadPetalStroke = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(dpadPetalStroke);
+            c.translate(-box.left + pad, -box.top + pad);
+            paint.setColor(primaryColor);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(strokeWidth);
+            c.drawPath(buildUpPetal(box, snappingSize), paint);
+            saveToDisk(strokeKey, dpadPetalStroke);
+        }
+        dpadPetalFill = loadFromDisk(fillKey);
+        if (dpadPetalFill != null && (dpadPetalFill.getWidth() != w || dpadPetalFill.getHeight() != h)) {
+            dpadPetalFill.recycle();
+            dpadPetalFill = null;
+        }
+        if (dpadPetalFill == null) {
+            dpadPetalFill = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(dpadPetalFill);
+            c.translate(-box.left + pad, -box.top + pad);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(ColorUtils.setAlphaComponent(primaryColor, 80));
+            c.drawPath(buildUpPetal(box, snappingSize), paint);
+            paint.setStyle(Paint.Style.STROKE);
+            saveToDisk(fillKey, dpadPetalFill);
+        }
+        dpadCacheDirty = false;
+    }
+
+    public void drawCached(Canvas canvas) {
+        if (!isCachingEnabled()) { draw(canvas); return; }
+        Rect box = getBoundingBox();
+        if (box.width() <= 0 || box.height() <= 0) return;
+        if (selected) { draw(canvas); return; }
+        int pad = strokePad();
+        if (type == Type.D_PAD) {
+            int snappingSize = inputControlsView.getSnappingSize();
+            ensureDPadCaches(snappingSize);
+            if (dpadPetalStroke == null) { draw(canvas); return; }
+            float cx = box.centerX();
+            float cy = box.centerY();
+            Paint paint = inputControlsView.getPaint();
+            int primaryColor = inputControlsView.getPrimaryColor();
+            float strokeWidth = snappingSize * 0.2f;
+            for (int i = 0; i < 4; i++) {
+                canvas.save();
+                canvas.rotate(i * 90, cx, cy);
+                canvas.drawBitmap(dpadPetalStroke, box.left - pad, box.top - pad, null);
+                canvas.restore();
+            }
+            if (isEngaged()) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, 80));
+                for (int i = 0; i < 4; i++) {
+                    if (states[i]) {
+                        canvas.save();
+                        canvas.rotate(i * 90, cx, cy);
+                        canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, null);
+                        canvas.restore();
+                    }
+                }
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(strokeWidth);
+                paint.setColor(primaryColor);
+            }
+            return;
+        }
+        boolean engaged = isEngaged();
+        if (engaged && type != Type.RANGE_BUTTON && type != Type.TRACKPAD) {
+            ensureFillCache();
+            if (cacheFill != null)
+                canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, null);
+        }
+        ensureBaseCache();
+        if (cacheBase != null)
+            canvas.drawBitmap(cacheBase, box.left - pad, box.top - pad, null);
+        else
+            draw(canvas);
     }
 
     public void draw(Canvas canvas) {

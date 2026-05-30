@@ -84,6 +84,7 @@ public class SettingsFragment extends Fragment {
     
 	private CheckBox cbCursorLock;
     private CheckBox cbXinputToggle;
+    private CheckBox cbCachedRendering;
 
     private CheckBox cbEnableBigPictureMode;
     private CheckBox cbEnableCustomApiKey;
@@ -152,6 +153,9 @@ public class SettingsFragment extends Fragment {
         
         cbXinputToggle = view.findViewById(R.id.CBXinputToggle);
         cbXinputToggle.setChecked(preferences.getBoolean("xinput_toggle", false));
+
+        cbCachedRendering = view.findViewById(R.id.CBCachedRendering);
+        cbCachedRendering.setChecked(preferences.getBoolean("cached_rendering", false));
 
         Button btnChooseWinlatorPath = view.findViewById(R.id.BTChooseWinlatorPath);
         TextView tvWinlatorPath = view.findViewById(R.id.TVWinlatorPath);
@@ -302,6 +306,11 @@ public class SettingsFragment extends Fragment {
             ContentDialog.confirm(context, R.string.do_you_want_to_reinstall_imagefs, () -> ImageFsInstaller.installFromAssets((MainActivity) getActivity()));
         });
 
+        view.findViewById(R.id.BTClearControlCache).setOnClickListener(v -> {
+            ControlElement.deleteAllCaches(context);
+            AppUtils.showToast(context, "Touch controls cache cleared");
+        });
+
         view.findViewById(R.id.BTConfirm).setOnClickListener((v) -> {
             SharedPreferences.Editor editor = preferences.edit();
 
@@ -316,6 +325,7 @@ public class SettingsFragment extends Fragment {
             editor.putBoolean("enable_box64_logs", cbEnableBox64Logs.isChecked());
             editor.putBoolean("cursor_lock", cbCursorLock.isChecked()); 
             editor.putBoolean("xinput_toggle", cbXinputToggle.isChecked()); 
+            editor.putBoolean("cached_rendering", cbCachedRendering.isChecked());
             editor.putBoolean("enable_file_provider", cbEnableFileProvider.isChecked());
             editor.putBoolean("open_with_android_browser", cbOpenInBrowser.isChecked());
             editor.putBoolean("share_android_clipboard", cbShareClipboard.isChecked());
