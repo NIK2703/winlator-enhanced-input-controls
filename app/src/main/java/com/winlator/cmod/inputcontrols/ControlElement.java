@@ -746,36 +746,30 @@ public class ControlElement {
     }
 
     private void pressBindings(List<Binding> seq) {
-        int delay = inputControlsView.getProfile() != null ? inputControlsView.getProfile().getBindingDelay() : 0;
+        ControlsProfile profile = inputControlsView.getProfile();
+        int delay = profile != null ? profile.getBindingDelay() : 0;
         int size = seq.size();
 
-        // Press modifier keys first
-        if (inputControlsView != null) {
-            for (int i = 0; i < size; i++) {
-                Binding b = seq.get(i);
-                if (b == null || b == Binding.NONE) continue;
-                Binding kb = b.toKeyboardBinding();
-                if (kb != null) inputControlsView.handleInputEvent(kb, true);
-            }
+        for (int i = 0; i < size; i++) {
+            Binding b = seq.get(i);
+            if (b == null || b == Binding.NONE) continue;
+            Binding kb = b.toKeyboardBinding();
+            if (kb != null) inputControlsView.handleInputEvent(kb, true);
         }
 
-        // Press non-modifier bindings with delay
         for (int i = 0; i < size; i++) {
             Binding b = seq.get(i);
             if (b == null || b == Binding.NONE) continue;
             if (b.isModifier()) continue;
-            if (inputControlsView != null) {
-                inputControlsView.handleInputEvent(b, true);
-            }
+            inputControlsView.handleInputEvent(b, true);
             if (delay > 0 && i < size - 1) SystemClock.sleep(delay);
         }
     }
 
     private void releaseHeldBindings() {
-        if (heldBindings == null || inputControlsView == null) return;
+        if (heldBindings == null) return;
         int size = heldBindings.size();
 
-        // Release non-modifier bindings in reverse order
         for (int i = size - 1; i >= 0; i--) {
             Binding b = heldBindings.get(i);
             if (b == null || b == Binding.NONE) continue;
@@ -783,7 +777,6 @@ public class ControlElement {
             inputControlsView.handleInputEvent(b, false);
         }
 
-        // Release modifier keys in reverse order
         for (int i = size - 1; i >= 0; i--) {
             Binding b = heldBindings.get(i);
             if (b == null || b == Binding.NONE) continue;
@@ -804,14 +797,15 @@ public class ControlElement {
                 }
                 else if (hasLongPressBinding() && !toggleSwitch) {
                     longPressTriggered = false;
-                    int delay = inputControlsView.getProfile() != null ? inputControlsView.getProfile().getLongPressDelay() : 0;
+                    ControlsProfile localProfile = inputControlsView.getProfile();
+                    int delay = localProfile != null ? localProfile.getLongPressDelay() : 0;
                     if (delay > 0) {
                         if (longPressHandler == null) longPressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
                         longPressHandler.postDelayed(() -> {
                             longPressTriggered = true;
-                            ControlsProfile profile = inputControlsView.getProfile();
-                            if (profile != null && profile.getLongPressHapticEnabled()) {
-                                com.winlator.cmod.core.AppUtils.performHapticFeedback(inputControlsView.getContext(), profile.getLongPressHapticIntensity());
+                            ControlsProfile p = inputControlsView.getProfile();
+                            if (p != null && p.getLongPressHapticEnabled()) {
+                                com.winlator.cmod.core.AppUtils.performHapticFeedback(inputControlsView.getContext(), p.getLongPressHapticIntensity());
                             }
                             heldBindings = new ArrayList<>(longPressBindings);
                             pressBindings(longPressBindings);
@@ -820,9 +814,8 @@ public class ControlElement {
                     }
                 }
                 else {
-                    List<Binding> seq = bindings.get(0);
-                    heldBindings = new ArrayList<>(seq);
-                    pressBindings(seq);
+                    heldBindings = bindings.get(0);
+                    pressBindings(bindings.get(0));
                 }
                 inputControlsView.invalidate();
                 return true;
@@ -905,11 +898,13 @@ public class ControlElement {
                     final boolean[] states = {deltaY <= -STICK_DEAD_ZONE, deltaX >= STICK_DEAD_ZONE, deltaY >= STICK_DEAD_ZONE, deltaX <= -STICK_DEAD_ZONE};
                     for (byte i = 0; i < 4; i++) {
                         float value = i == 1 || i == 3 ? deltaX : deltaY;
-                        for (Binding binding : bindings.get(i)) {
+                        List<Binding> seq = bindings.get(i);
+                        for (int j = 0, sz = seq.size(); j < sz; j++) {
+                            Binding binding = seq.get(j);
                             boolean state = binding.isMouseMove() ? (states[i] || states[(i+2)%4]) : states[i];
                             inputControlsView.handleInputEvent(binding, state, value);
+                            this.states[i] = state;
                         }
-                        this.states[i] = states[i];
                     }
                 }
 
@@ -945,7 +940,9 @@ public class ControlElement {
                     for (byte i = 0; i < 4; i++) {
                         float value = (i == 1 || i == 3 ? deltaX : deltaY);
                         if (Math.abs(value) > TouchpadView.CURSOR_ACCELERATION_THRESHOLD) value *= TouchpadView.CURSOR_ACCELERATION;
-                        for (Binding binding : bindings.get(i)) {
+                        List<Binding> seq = bindings.get(i);
+                        for (int j = 0, sz = seq.size(); j < sz; j++) {
+                            Binding binding = seq.get(j);
                             if (binding == Binding.MOUSE_MOVE_LEFT || binding == Binding.MOUSE_MOVE_RIGHT) {
                                 cursorDx = Mathf.roundPoint(value);
                             }
@@ -973,11 +970,13 @@ public class ControlElement {
 
                 for (byte i = 0; i < 4; i++) {
                     float value = i == 1 || i == 3 ? deltaX : deltaY;
-                    for (Binding binding : bindings.get(i)) {
+                    List<Binding> seq = bindings.get(i);
+                    for (int j = 0, sz = seq.size(); j < sz; j++) {
+                        Binding binding = seq.get(j);
                         boolean state = binding.isMouseMove() ? (states[i] || states[(i+2)%4]) : states[i];
                         inputControlsView.handleInputEvent(binding, state, value);
+                        this.states[i] = state;
                     }
-                    this.states[i] = states[i];
                 }
                 inputControlsView.invalidate();
             }
