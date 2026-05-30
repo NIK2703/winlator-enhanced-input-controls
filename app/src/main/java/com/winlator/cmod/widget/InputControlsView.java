@@ -45,6 +45,8 @@ import com.winlator.cmod.xserver.XServer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -276,6 +278,31 @@ public class InputControlsView extends View {
     public synchronized boolean addElement() {
         if (editMode && profile != null) {
             ControlElement element = new ControlElement(this);
+            element.setX(cursor.x);
+            element.setY(cursor.y);
+            profile.addElement(element);
+            profile.save();
+            selectElement(element);
+            return true;
+        }
+        else return false;
+    }
+
+    public synchronized boolean copyElement() {
+        if (editMode && selectedElement != null && profile != null) {
+            ControlElement element = new ControlElement(this);
+            element.setType(selectedElement.getType());
+            element.setBindingCount(selectedElement.getBindingCount());
+            for (int i = 0; i < element.getBindingCount(); i++) {
+                element.setBindingSequence(i, new ArrayList<>(selectedElement.getBindingSequence(i)));
+            }
+            element.setShape(selectedElement.getShape());
+            element.setToggleSwitch(selectedElement.isToggleSwitch());
+            element.setScale(selectedElement.getScale());
+            element.setText(selectedElement.getText());
+            element.setIconId(selectedElement.getIconId());
+            if (selectedElement.getRange() != null) element.setRange(selectedElement.getRange());
+            element.setOrientation(selectedElement.getOrientation());
             element.setX(cursor.x);
             element.setY(cursor.y);
             profile.addElement(element);

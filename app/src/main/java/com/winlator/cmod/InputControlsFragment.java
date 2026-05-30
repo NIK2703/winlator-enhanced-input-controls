@@ -73,6 +73,8 @@ public class InputControlsFragment extends Fragment {
     private final int selectedProfileId;
     private SharedPreferences preferences;
     private Spinner spMouseMode;
+    private SeekBar sbBindingDelay;
+    private TextView tvBindingDelay;
 
     private int[] keycodes;
 
@@ -156,6 +158,25 @@ public class InputControlsFragment extends Fragment {
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
         sbUiOpacity.setProgress((int)(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY) * 100));
+
+        tvBindingDelay = view.findViewById(R.id.TVBindingDelay);
+        sbBindingDelay = view.findViewById(R.id.SBBindingDelay);
+        sbBindingDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvBindingDelay.setText(progress + " ms");
+                if (fromUser && currentProfile != null) {
+                    currentProfile.setBindingDelay(progress);
+                    currentProfile.save();
+                }
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        if (currentProfile != null) {
+            sbBindingDelay.setProgress(currentProfile.getBindingDelay());
+        }
 
         spMouseMode = view.findViewById(R.id.SPMouseMode);
         setupEnumSpinner(spMouseMode, MouseMode.values(), currentProfile != null ? currentProfile.getMouseMode() : MouseMode.TOUCHPAD);
@@ -354,6 +375,8 @@ public class InputControlsFragment extends Fragment {
                 updateLayout.run();
                 if (currentProfile != null) {
                     AppUtils.setSpinnerSelectionFromValue(spMouseMode, currentProfile.getMouseMode().name());
+                    sbBindingDelay.setProgress(currentProfile.getBindingDelay());
+                    tvBindingDelay.setText(currentProfile.getBindingDelay() + " ms");
                 }
             }
 

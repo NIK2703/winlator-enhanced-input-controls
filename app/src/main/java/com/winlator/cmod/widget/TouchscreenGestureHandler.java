@@ -2,6 +2,7 @@ package com.winlator.cmod.widget;
 
 import android.content.Context;
 import android.os.Build;
+import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.view.MotionEvent;
@@ -9,6 +10,10 @@ import android.view.MotionEvent;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.SecondFingerMode;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class TouchscreenGestureHandler {
     private static final byte TAP_TRAVEL_THRESHOLD = 10;
@@ -21,31 +26,32 @@ public class TouchscreenGestureHandler {
     private final TouchpadView touchpadView;
     private InputControlsView inputControlsView;
 
-    // Configuration (from profile)
-    private Binding singleTapAction = Binding.MOUSE_LEFT_BUTTON;
-    private Binding longPressAction = Binding.MOUSE_LEFT_BUTTON;
-    private Binding doubleTapAction = Binding.NONE;
-    private Binding singleTap2ndFingerAction = Binding.MOUSE_RIGHT_BUTTON;
-    private Binding longPress2ndFingerAction = Binding.MOUSE_RIGHT_BUTTON;
-    private Binding doubleTap2ndFingerAction = Binding.NONE;
-    private Binding singleTapDragAction = Binding.NONE;
-    private Binding longPressDragAction = Binding.NONE;
-    private Binding doubleTapDragAction = Binding.NONE;
-    private Binding singleTap2ndFingerDragAction = Binding.NONE;
-    private Binding longPress2ndFingerDragAction = Binding.NONE;
-    private Binding doubleTap2ndFingerDragAction = Binding.NONE;
+    // Configuration (from profile) — full binding lists
+    private List<Binding> singleTapAction = Collections.singletonList(Binding.MOUSE_LEFT_BUTTON);
+    private List<Binding> longPressAction = Collections.singletonList(Binding.MOUSE_LEFT_BUTTON);
+    private List<Binding> doubleTapAction = Collections.singletonList(Binding.NONE);
+    private List<Binding> singleTap2ndFingerAction = Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON);
+    private List<Binding> longPress2ndFingerAction = Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON);
+    private List<Binding> doubleTap2ndFingerAction = Collections.singletonList(Binding.NONE);
+    private List<Binding> singleTapDragAction = Collections.singletonList(Binding.NONE);
+    private List<Binding> longPressDragAction = Collections.singletonList(Binding.NONE);
+    private List<Binding> doubleTapDragAction = Collections.singletonList(Binding.NONE);
+    private List<Binding> singleTap2ndFingerDragAction = Collections.singletonList(Binding.NONE);
+    private List<Binding> longPress2ndFingerDragAction = Collections.singletonList(Binding.NONE);
+    private List<Binding> doubleTap2ndFingerDragAction = Collections.singletonList(Binding.NONE);
+    private int bindingDelay;
     private int doubleTapTimeout = 200;
     private int longPressTimeout = 400;
     private SecondFingerMode secondFingerMode = SecondFingerMode.SECOND_TAP_ACTIONS;
     private boolean isLongTapMode;
 
-    // Pre-resolved active bindings (set via updateActiveBindings when secondFingerActive changes)
-    private Binding activeSingleTapAction;
-    private Binding activeLongPressAction;
-    private Binding activeDoubleTapAction;
-    private Binding activeSingleTapDragAction;
-    private Binding activeLongPressDragAction;
-    private Binding activeDoubleTapDragAction;
+    // Pre-resolved active binding lists
+    private List<Binding> activeSingleTapAction;
+    private List<Binding> activeLongPressAction;
+    private List<Binding> activeDoubleTapAction;
+    private List<Binding> activeSingleTapDragAction;
+    private List<Binding> activeLongPressDragAction;
+    private List<Binding> activeDoubleTapDragAction;
     private boolean hasActiveDoubleTap;
     private boolean hasActiveLongPress;
     private boolean hasActiveLongPressDrag;
@@ -59,18 +65,19 @@ public class TouchscreenGestureHandler {
     private int mainPointerId = -1;
     private boolean secondFingerActive;
     private int originalPointerId = -1;
-    private Binding deferredTapAction;
+    private List<Binding> deferredTapAction;
     private boolean deferredSecondFingerTap;
 
     // Held action tracking
-    private Binding activeAction;
+    private final List<Binding> heldActions = new ArrayList<>();
+    private final List<Binding> heldModifiers = new ArrayList<>();
     private boolean isActionHeld;
 
     private boolean postDoubleTapDrag;
-    private Binding pendingDoubleTapAction;
+    private List<Binding> pendingDoubleTapAction;
 
     // Stored at tap-up time for handleDoubleTapConfirmed
-    private Binding pendingDeferredDoubleAction;
+    private List<Binding> pendingDeferredDoubleAction;
 
     // Timer callback references
     private final Runnable longPressRunnable = this::onLongPressTimer;
@@ -84,23 +91,33 @@ public class TouchscreenGestureHandler {
         this.inputControlsView = inputControlsView;
     }
 
+    private static Binding firstBinding(List<Binding> list, Binding defaultVal) {
+        if (list != null) {
+            for (Binding b : list) {
+                if (b != null && b != Binding.NONE) return b;
+            }
+        }
+        return defaultVal;
+    }
+
     public void applyConfig(ControlsProfile profile) {
-        this.singleTapAction = profile.getSingleTapAction();
-        this.longPressAction = profile.getLongPressAction();
-        this.doubleTapAction = profile.getDoubleTapAction();
-        this.singleTap2ndFingerAction = profile.getSingleTap2ndFingerAction();
-        this.longPress2ndFingerAction = profile.getLongPress2ndFingerAction();
-        this.doubleTap2ndFingerAction = profile.getDoubleTap2ndFingerAction();
-        this.singleTapDragAction = profile.getSingleTapDragAction();
-        this.longPressDragAction = profile.getLongPressDragAction();
-        this.doubleTapDragAction = profile.getDoubleTapDragAction();
-        this.singleTap2ndFingerDragAction = profile.getSingleTap2ndFingerDragAction();
-        this.longPress2ndFingerDragAction = profile.getLongPress2ndFingerDragAction();
-        this.doubleTap2ndFingerDragAction = profile.getDoubleTap2ndFingerDragAction();
-        this.doubleTapTimeout = profile.getDoubleTapTimeout();
-        this.longPressTimeout = profile.getLongPressTimeout();
-        this.secondFingerMode = profile.getSecondFingerMode();
-        this.isLongTapMode = secondFingerMode == SecondFingerMode.LONG_TAP_ACTION;
+        singleTapAction = new ArrayList<>(profile.getSingleTapAction());
+        longPressAction = new ArrayList<>(profile.getLongPressAction());
+        doubleTapAction = new ArrayList<>(profile.getDoubleTapAction());
+        singleTap2ndFingerAction = new ArrayList<>(profile.getSingleTap2ndFingerAction());
+        longPress2ndFingerAction = new ArrayList<>(profile.getLongPress2ndFingerAction());
+        doubleTap2ndFingerAction = new ArrayList<>(profile.getDoubleTap2ndFingerAction());
+        singleTapDragAction = new ArrayList<>(profile.getSingleTapDragAction());
+        longPressDragAction = new ArrayList<>(profile.getLongPressDragAction());
+        doubleTapDragAction = new ArrayList<>(profile.getDoubleTapDragAction());
+        singleTap2ndFingerDragAction = new ArrayList<>(profile.getSingleTap2ndFingerDragAction());
+        longPress2ndFingerDragAction = new ArrayList<>(profile.getLongPress2ndFingerDragAction());
+        doubleTap2ndFingerDragAction = new ArrayList<>(profile.getDoubleTap2ndFingerDragAction());
+        bindingDelay = profile.getBindingDelay();
+        doubleTapTimeout = profile.getDoubleTapTimeout();
+        longPressTimeout = profile.getLongPressTimeout();
+        secondFingerMode = profile.getSecondFingerMode();
+        isLongTapMode = secondFingerMode == SecondFingerMode.LONG_TAP_ACTION;
         updateActiveBindings();
     }
 
@@ -116,15 +133,20 @@ public class TouchscreenGestureHandler {
         activeSingleTapDragAction = secondFingerActive ? singleTap2ndFingerDragAction : singleTapDragAction;
         activeLongPressDragAction = secondFingerActive ? longPress2ndFingerDragAction : longPressDragAction;
         activeDoubleTapDragAction = secondFingerActive ? doubleTap2ndFingerDragAction : doubleTapDragAction;
-        hasActiveDoubleTap = activeDoubleTapAction != Binding.NONE;
-        hasActiveLongPress = activeLongPressAction != null && activeLongPressAction != Binding.NONE;
-        hasActiveLongPressDrag = activeLongPressDragAction != Binding.NONE;
-        hasActiveDoubleTapDrag = activeDoubleTapDragAction != Binding.NONE;
-        hasActiveSingleTapDrag = activeSingleTapDragAction != Binding.NONE;
+        Binding firstDoubleTap = firstBinding(activeDoubleTapAction, Binding.NONE);
+        Binding firstLongPress = firstBinding(activeLongPressAction, Binding.NONE);
+        Binding firstLongPressDrag = firstBinding(activeLongPressDragAction, Binding.NONE);
+        Binding firstSingleTapDrag = firstBinding(activeSingleTapDragAction, Binding.NONE);
+        Binding firstDoubleTapDrag = firstBinding(activeDoubleTapDragAction, Binding.NONE);
+        hasActiveDoubleTap = firstDoubleTap != Binding.NONE;
+        hasActiveLongPress = firstLongPress != Binding.NONE;
+        hasActiveLongPressDrag = firstLongPressDrag != Binding.NONE;
+        hasActiveDoubleTapDrag = firstDoubleTapDrag != Binding.NONE;
+        hasActiveSingleTapDrag = firstSingleTapDrag != Binding.NONE;
         canHoldLongPress = !hasActiveLongPressDrag && hasActiveLongPress &&
-            !activeLongPressAction.isMouseMove() &&
-            activeLongPressAction != Binding.MOUSE_SCROLL_UP &&
-            activeLongPressAction != Binding.MOUSE_SCROLL_DOWN;
+            !firstLongPress.isMouseMove() &&
+            firstLongPress != Binding.MOUSE_SCROLL_UP &&
+            firstLongPress != Binding.MOUSE_SCROLL_DOWN;
     }
 
     public void onTouchEvent(MotionEvent event) {
@@ -249,7 +271,7 @@ public class TouchscreenGestureHandler {
                 handleDoubleTapConfirmed();
                 originalPointerId = savedOriginalPointerId;
                 if (pendingDoubleTapAction != null) {
-                    executeAction(pendingDoubleTapAction);
+                    executeActions(pendingDoubleTapAction);
                     pendingDoubleTapAction = null;
                 }
                 return;
@@ -288,12 +310,12 @@ public class TouchscreenGestureHandler {
             touchpadView.removeCallbacks(longPressRunnable);
 
             if (state == GestureState.TAP_WAITING || state == GestureState.LONG_PRESSING) {
-                Binding dragBinding = resolveDragAction();
+                List<Binding> dragBinding = resolveDragAction();
 
-                if (dragBinding != null && dragBinding != Binding.NONE) {
-                    if (!isActionHeld || dragBinding != activeAction) {
+                if (dragBinding != null && firstBinding(dragBinding, Binding.NONE) != Binding.NONE) {
+                    if (!isActionHeld || !dragBinding.equals(heldActions)) {
                         releaseHeldAction();
-                        executeActionAndHold(dragBinding);
+                        executeActionsAndHold(dragBinding);
                     }
                     pendingDoubleTapAction = null;
                 }
@@ -319,7 +341,7 @@ public class TouchscreenGestureHandler {
                 case TAP_WAITING:
                     if (wasPostDoubleTapDrag) {
                         if (pendingDoubleTapAction != null) {
-                            executeAction(pendingDoubleTapAction);
+                            executeActions(pendingDoubleTapAction);
                             pendingDoubleTapAction = null;
                         }
                         state = GestureState.IDLE;
@@ -337,7 +359,7 @@ public class TouchscreenGestureHandler {
                         releaseHeldAction();
                     }
                     else if (hasActiveLongPress) {
-                        executeAction(activeLongPressAction);
+                        executeActions(activeLongPressAction);
                     }
                     setSecondFingerActive(false);
                     state = GestureState.IDLE;
@@ -351,7 +373,7 @@ public class TouchscreenGestureHandler {
                     break;
                 case DOUBLE_TAP_WAITING:
                     deferredTapAction = null;
-                    executeAction(activeSingleTapAction);
+                    executeActions(activeSingleTapAction);
                     state = GestureState.IDLE;
                     mainPointerId = -1;
                     setSecondFingerActive(false);
@@ -390,7 +412,7 @@ public class TouchscreenGestureHandler {
             deferredTapAction = activeSingleTapAction;
         }
         else {
-            executeAction(activeSingleTapAction);
+            executeActions(activeSingleTapAction);
         }
 
         touchpadView.postDelayed(doubleTapRunnable, doubleTapTimeout);
@@ -407,7 +429,7 @@ public class TouchscreenGestureHandler {
         if (state != GestureState.TAP_WAITING) return;
 
         if (canHoldLongPress) {
-            executeActionAndHold(activeLongPressAction);
+            executeActionsAndHold(activeLongPressAction);
         }
         state = GestureState.LONG_PRESSING;
 
@@ -428,7 +450,7 @@ public class TouchscreenGestureHandler {
     private void onDoubleTapTimer() {
         if (state != GestureState.DOUBLE_TAP_WAITING) return;
         if (deferredTapAction != null) {
-            executeAction(deferredTapAction);
+            executeActions(deferredTapAction);
             deferredTapAction = null;
         }
         deferredSecondFingerTap = false;
@@ -456,12 +478,12 @@ public class TouchscreenGestureHandler {
 
     // --- Action resolution ---
 
-    private Binding resolveDragAction() {
+    private List<Binding> resolveDragAction() {
         if (state == GestureState.LONG_PRESSING) {
             return hasActiveLongPressDrag ? activeLongPressDragAction : activeLongPressAction;
         }
         else if (postDoubleTapDrag) {
-            Binding fallback = hasActiveDoubleTap ? activeDoubleTapAction : activeSingleTapAction;
+            List<Binding> fallback = hasActiveDoubleTap ? activeDoubleTapAction : activeSingleTapAction;
             return hasActiveDoubleTapDrag ? activeDoubleTapDragAction : fallback;
         }
         else {
@@ -477,34 +499,83 @@ public class TouchscreenGestureHandler {
         }
     }
 
-    private void executeAction(Binding binding) {
-        if (binding == null || binding == Binding.NONE) return;
-        if (binding == Binding.MOUSE_SCROLL_UP || binding == Binding.MOUSE_SCROLL_DOWN) return;
-        if (binding.isMouseMove()) return;
-
+    private void executeActions(List<Binding> actions) {
+        if (actions == null) return;
+        int size = actions.size();
         if (inputControlsView != null) {
-            inputControlsView.handleInputEvent(binding, true, 0);
-            inputControlsView.handleInputEvent(binding, false, 0);
+            for (int i = 0; i < size; i++) {
+                Binding b = actions.get(i);
+                if (b == null || b == Binding.NONE) continue;
+                Binding kb = b.toKeyboardBinding();
+                if (kb != null) inputControlsView.handleInputEvent(kb, true, 0);
+            }
+        }
+        for (int i = 0; i < size; i++) {
+            Binding b = actions.get(i);
+            if (b == null || b == Binding.NONE) continue;
+            if (b == Binding.MOUSE_SCROLL_UP || b == Binding.MOUSE_SCROLL_DOWN) continue;
+            if (b.isMouseMove()) continue;
+            if (b.isModifier()) continue;
+
+            if (inputControlsView != null) {
+                inputControlsView.handleInputEvent(b, true, 0);
+                inputControlsView.handleInputEvent(b, false, 0);
+            }
+            if (bindingDelay > 0 && i < size - 1) SystemClock.sleep(bindingDelay);
+        }
+        if (inputControlsView != null) {
+            for (int i = size - 1; i >= 0; i--) {
+                Binding b = actions.get(i);
+                if (b == null || b == Binding.NONE) continue;
+                Binding kb = b.toKeyboardBinding();
+                if (kb != null) inputControlsView.handleInputEvent(kb, false, 0);
+            }
         }
     }
 
-    private void executeActionAndHold(Binding binding) {
-        if (binding == null || binding == Binding.NONE) return;
-        if (binding.isMouseMove()) return;
-        if (binding == Binding.MOUSE_SCROLL_UP || binding == Binding.MOUSE_SCROLL_DOWN) return;
-
+    private void executeActionsAndHold(List<Binding> actions) {
+        if (actions == null) return;
+        heldActions.clear();
+        heldModifiers.clear();
+        int size = actions.size();
         if (inputControlsView != null) {
-            inputControlsView.handleInputEvent(binding, true, 0);
+            for (int i = 0; i < size; i++) {
+                Binding b = actions.get(i);
+                if (b == null || b == Binding.NONE) continue;
+                Binding kb = b.toKeyboardBinding();
+                if (kb != null) {
+                    inputControlsView.handleInputEvent(kb, true, 0);
+                    heldModifiers.add(kb);
+                }
+            }
         }
-        activeAction = binding;
+        for (int i = 0; i < size; i++) {
+            Binding b = actions.get(i);
+            if (b == null || b == Binding.NONE) continue;
+            if (b.isMouseMove()) continue;
+            if (b == Binding.MOUSE_SCROLL_UP || b == Binding.MOUSE_SCROLL_DOWN) continue;
+            if (b.isModifier()) continue;
+
+            if (inputControlsView != null) {
+                inputControlsView.handleInputEvent(b, true, 0);
+                heldActions.add(b);
+            }
+            if (bindingDelay > 0 && i < size - 1) SystemClock.sleep(bindingDelay);
+        }
         isActionHeld = true;
     }
 
     private void releaseHeldAction() {
-        if (isActionHeld && activeAction != null && inputControlsView != null) {
-            inputControlsView.handleInputEvent(activeAction, false, 0);
+        if (isActionHeld && inputControlsView != null) {
+            for (Binding b : heldActions) {
+                inputControlsView.handleInputEvent(b, false, 0);
+            }
+            for (Binding b : heldModifiers) {
+                inputControlsView.handleInputEvent(b, false, 0);
+            }
         }
-        activeAction = null;
+        heldActions.clear();
+        heldModifiers.clear();
         isActionHeld = false;
     }
 
