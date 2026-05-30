@@ -166,6 +166,31 @@
             android:text="Long Press Haptic Enabled"
             android:checked="true" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Gesture Threshold (px)"/>
+
+            <TextView
+                android:id="@+id/TVGestureThreshold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/SBGestureThreshold"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="40"
+            android:progress="10"
+            android:progressTint="@color/colorAccent" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -191,8 +216,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:spinnerMode="dialog" />
-
-
 
         <View
             style="@style/HorizontalLine"

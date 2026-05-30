@@ -422,6 +422,13 @@
                         android:text="Disable Xinput (Used for Exclusive M/KB support)"
                         android:layout_marginTop="8dp" />
 
+                    <CheckBox
+                        android:id="@+id/CBCachedRendering"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Cached Rendering (improves touch controls performance)"
+                        android:layout_marginTop="8dp" />
+
                 </LinearLayout>
 
                 <TextView
@@ -552,6 +559,28 @@
                     android:id="@+id/TVImageFs"
                     style="@style/FieldSetLabel"
                     android:text="@string/imagefs" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout style="@style/FieldSet">
+
+                    <Button
+                        style="@style/ButtonNeutral"
+                        android:id="@+id/BTClearControlCache"
+                        android:layout_width="240dp"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:text="Clear Touch Controls Cache" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/TVCache"
+                    style="@style/FieldSetLabel"
+                    android:text="Cache" />
             </FrameLayout>
         </LinearLayout>
     </ScrollView>
