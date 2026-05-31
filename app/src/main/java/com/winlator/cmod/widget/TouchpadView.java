@@ -14,7 +14,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
-import com.winlator.cmod.BuildConfig;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
@@ -331,7 +330,6 @@ public class TouchpadView extends View {
                     }
                 }
                 else if (touchpadGestureHandler != null && !isTouchscreenMode) {
-                    if (BuildConfig.DEBUG) Log.d("TouchpadGesture", "ACTION_DOWN ptr=" + pointerId + " numFingers=" + numFingers + " (" + fingers[pointerId].x + "," + fingers[pointerId].y + ")");
                     touchpadGestureHandler.onFingerDown(pointerId, fingers[pointerId].x, fingers[pointerId].y);
                 }
                 break;
@@ -361,7 +359,6 @@ public class TouchpadView extends View {
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_POINTER_UP:
-                if (BuildConfig.DEBUG) Log.d("TouchpadGesture", "ACTION_UP ptr=" + pointerId + " numFingers-before=" + numFingers);
                 if (fingers[pointerId] != null) {
                     fingers[pointerId].update(event.getX(actionIndex), event.getY(actionIndex));
                     handleFingerUp(fingers[pointerId]);
@@ -370,7 +367,6 @@ public class TouchpadView extends View {
                 }
                 break;
             case MotionEvent.ACTION_CANCEL:
-                if (BuildConfig.DEBUG) Log.d("TouchpadGesture", "ACTION_CANCEL");
                 if (touchpadGestureHandler != null) touchpadGestureHandler.reset();
                 for (byte i = 0; i < MAX_FINGERS; i++) fingers[i] = null;
                 numFingers = 0;
@@ -487,23 +483,19 @@ public class TouchpadView extends View {
         boolean gestureHandlerActive = !simTouchScreen && touchpadGestureHandler != null;
         boolean handledByGesture = false;
 
-        if (BuildConfig.DEBUG) Log.d("TouchpadGesture", "handleFingerUp ptr=" + pointerId + " numFingers=" + numFingers + " isTap=" + finger1.isTap() + " travel=" + finger1.travelDistance() + " simTouch=" + simTouchScreen + " gestureActive=" + gestureHandlerActive + " mainPtr=" + (touchpadGestureHandler != null ? touchpadGestureHandler.getMainPointerId() : -1));
 
         if (gestureHandlerActive) {
             int mainId = touchpadGestureHandler.getMainPointerId();
             if (pointerId >= 0 && pointerId == mainId) {
                 if (finger1.isTap() || !touchpadGestureHandler.isInTapWaiting()) {
-                    if (BuildConfig.DEBUG) Log.d("TouchpadGesture", "  → delegating to gesture handler onFingerUp (isTap=" + finger1.isTap() + " isInTapWaiting=" + touchpadGestureHandler.isInTapWaiting() + ")");
                     touchpadGestureHandler.onFingerUp(pointerId);
                     handledByGesture = true;
                 }
                 else {
-                    if (BuildConfig.DEBUG) Log.d("TouchpadGesture", "  → not a tap, resetting gesture handler");
                     touchpadGestureHandler.reset();
                 }
             }
             else if (pointerId >= 0) {
-                if (BuildConfig.DEBUG) Log.d("TouchpadGesture", "  → delegating second-finger lift to gesture handler");
                 touchpadGestureHandler.onFingerUp(pointerId);
                 handledByGesture = true;
             }
@@ -544,11 +536,9 @@ public class TouchpadView extends View {
         releasePointerButtonRight(finger1);
     }
 
-    private static int moveCount = 0;
     private void handleFingerMove(Finger finger1) {
         boolean skipPointerMove = false;
         boolean isSecondFinger = numFingers == 2 && fingers[0] != null && finger1 != fingers[0];
-        if (BuildConfig.DEBUG) Log.d("TouchpadGesture", "handleFingerMove #" + (++moveCount) + " numFingers=" + numFingers + " scrolling=" + scrolling + " isSecondFinger=" + isSecondFinger);
 
         boolean gestureHandlesSecond = touchpadGestureHandler != null && touchpadGestureHandler.isSecondFingerActive();
         Finger finger2 = numFingers == 2 ? findSecondFinger(finger1) : null;
