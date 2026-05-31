@@ -486,8 +486,15 @@ public class TouchpadView extends View {
         if (gestureHandlerActive) {
             int mainId = touchpadGestureHandler.getMainPointerId();
             if (pointerId >= 0 && pointerId == mainId) {
-                touchpadGestureHandler.onFingerUp(pointerId);
-                handledByGesture = true;
+                // Only handle via gesture if it's a real tap OR we're past TAP_WAITING
+                // (long press/drag already in progress)
+                if (finger1.isTap() || !touchpadGestureHandler.isInTapWaiting()) {
+                    touchpadGestureHandler.onFingerUp(pointerId);
+                    handledByGesture = true;
+                }
+                else {
+                    touchpadGestureHandler.reset();
+                }
             }
         }
 
