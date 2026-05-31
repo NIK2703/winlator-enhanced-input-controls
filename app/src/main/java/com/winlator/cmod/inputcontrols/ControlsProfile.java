@@ -52,8 +52,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private SecondFingerMode secondFingerMode = SecondFingerMode.SECOND_TAP_ACTIONS;
     private int bindingDelay;
     private int longPressDelay;
-    private int longPressHapticIntensity = 50;
-    private boolean longPressHapticEnabled = true;
+    private boolean hapticFeedbackEnabled = true;
     private int dragThreshold = 10;
     private int gestureThreshold = 20;
     private float strokeWidth = 0.2f;
@@ -297,24 +296,14 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.longPressDelay = longPressDelay;
     }
 
-    public int getLongPressHapticIntensity() {
+    public boolean getHapticFeedbackEnabled() {
         ensureGestureSettingsLoaded();
-        return longPressHapticIntensity;
+        return hapticFeedbackEnabled;
     }
 
-    public void setLongPressHapticIntensity(int intensity) {
+    public void setHapticFeedbackEnabled(boolean enabled) {
         ensureGestureSettingsLoaded();
-        this.longPressHapticIntensity = intensity;
-    }
-
-    public boolean getLongPressHapticEnabled() {
-        ensureGestureSettingsLoaded();
-        return longPressHapticEnabled;
-    }
-
-    public void setLongPressHapticEnabled(boolean enabled) {
-        ensureGestureSettingsLoaded();
-        this.longPressHapticEnabled = enabled;
+        this.hapticFeedbackEnabled = enabled;
     }
 
     public int getDragThreshold() {
@@ -483,8 +472,8 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             JSONObject data = new JSONObject(FileUtils.readString(file));
             if (data.has("bindingDelay")) bindingDelay = data.getInt("bindingDelay");
             if (data.has("longPressDelay")) longPressDelay = data.getInt("longPressDelay");
-            if (data.has("longPressHapticIntensity")) longPressHapticIntensity = data.getInt("longPressHapticIntensity");
-            if (data.has("longPressHapticEnabled")) longPressHapticEnabled = data.getBoolean("longPressHapticEnabled");
+            if (data.has("hapticFeedbackEnabled")) hapticFeedbackEnabled = data.getBoolean("hapticFeedbackEnabled");
+            else if (data.has("longPressHapticEnabled")) hapticFeedbackEnabled = data.getBoolean("longPressHapticEnabled");
             if (data.has("dragThreshold")) dragThreshold = clamp(data.getInt("dragThreshold"), 0, 30);
             if (data.has("gestureThreshold")) gestureThreshold = clamp(data.getInt("gestureThreshold"), 10, 50);
             if (data.has("strokeWidth")) strokeWidth = (float)data.getDouble("strokeWidth");
@@ -613,8 +602,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
             if (bindingDelay > 0) data.put("bindingDelay", bindingDelay);
             data.put("longPressDelay", longPressDelay);
-            data.put("longPressHapticIntensity", longPressHapticIntensity);
-            data.put("longPressHapticEnabled", longPressHapticEnabled);
+            data.put("hapticFeedbackEnabled", hapticFeedbackEnabled);
             if (dragThreshold != 10) data.put("dragThreshold", dragThreshold);
             if (gestureThreshold != 20) data.put("gestureThreshold", gestureThreshold);
             if (strokeWidth != 0.2f) data.put("strokeWidth", strokeWidth);
@@ -740,8 +728,8 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
 
             if (profileJSONObject.has("bindingDelay")) bindingDelay = profileJSONObject.getInt("bindingDelay");
-            if (profileJSONObject.has("longPressHapticIntensity")) longPressHapticIntensity = profileJSONObject.getInt("longPressHapticIntensity");
-            if (profileJSONObject.has("longPressHapticEnabled")) longPressHapticEnabled = profileJSONObject.getBoolean("longPressHapticEnabled");
+            if (profileJSONObject.has("hapticFeedbackEnabled")) hapticFeedbackEnabled = profileJSONObject.getBoolean("hapticFeedbackEnabled");
+            else if (profileJSONObject.has("longPressHapticEnabled")) hapticFeedbackEnabled = profileJSONObject.getBoolean("longPressHapticEnabled");
             if (profileJSONObject.has("dragThreshold")) dragThreshold = clamp(profileJSONObject.getInt("dragThreshold"), 0, 30);
             if (profileJSONObject.has("strokeWidth")) strokeWidth = (float)profileJSONObject.getDouble("strokeWidth");
             if (profileJSONObject.has("fillAlphaActive")) fillAlphaActive = profileJSONObject.getInt("fillAlphaActive");

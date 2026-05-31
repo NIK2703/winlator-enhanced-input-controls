@@ -68,6 +68,7 @@ public class InputControlsView extends View {
     private ControlElement selectedElement;
     private ControlsProfile profile;
     private float overlayOpacity = DEFAULT_OVERLAY_OPACITY;
+    private float cacheAlphaOverride = -1;
     private TouchpadView touchpadView;
     private XServer xServer;
     private final Bitmap[] icons = new Bitmap[17];
@@ -165,13 +166,20 @@ public class InputControlsView extends View {
 
     public void setOverlayOpacity(float overlayOpacity) {
         this.overlayOpacity = overlayOpacity;
-        invalidateCache();
+        if (profile != null) {
+            for (ControlElement element : profile.getElements()) {
+                element.invalidateElementCachesKeepDisk();
+            }
+        }
+        ControlElement.clearSharedPool();
+        cachesPreBuilt = false;
+        invalidate();
     }
 
     public void invalidateCache() {
         if (profile != null) {
             for (ControlElement element : profile.getElements()) {
-                element.invalidateElementCache();
+                element.invalidateElementCachesKeepDisk();
             }
         }
         ControlElement.clearSharedPool();
@@ -418,12 +426,22 @@ public class InputControlsView extends View {
         this.showTouchscreenControls = showTouchscreenControls;
     }
 
+    public float getOverlayOpacity() {
+        return cacheAlphaOverride >= 0 ? cacheAlphaOverride : overlayOpacity;
+    }
+
     public int getPrimaryColor() {
-        return Color.argb((int)(overlayOpacity * 255), 255, 255, 255);
+        float alpha = cacheAlphaOverride >= 0 ? cacheAlphaOverride : overlayOpacity;
+        return Color.argb((int)(alpha * 255), 255, 255, 255);
     }
 
     public int getSecondaryColor() {
-        return Color.argb((int)(overlayOpacity * 255), 2, 119, 189);
+        float alpha = cacheAlphaOverride >= 0 ? cacheAlphaOverride : overlayOpacity;
+        return Color.argb((int)(alpha * 255), 2, 119, 189);
+    }
+
+    public void setCacheAlphaOverride(float alpha) {
+        this.cacheAlphaOverride = alpha;
     }
 
     private synchronized ControlElement intersectElement(float x, float y) {
@@ -606,7 +624,7 @@ public class InputControlsView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        boolean hapticsEnabled = preferences.getBoolean("touchscreen_haptics_enabled", true);
+        boolean hapticsEnabled = profile != null && profile.getHapticFeedbackEnabled();
         resetTouchscreenTimeout();
 
         if (editMode && readyToDraw) {

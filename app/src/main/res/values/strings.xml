@@ -634,7 +634,6 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="disable_mouse">Toggle Mouse</string>
     <string name="hold_mode_help">Long tap — press and hold one finger for hold gestures\nSecond tap — hold one finger, then a second finger performs tap/long press/double tap actions</string>
     <string name="two_finger_help">Gestures triggered by a second finger while the first finger stays held on screen.</string>
-    <string name="long_press_haptic_help">Adjusts on Android 8-10 (custom amplitude) or Android 13+ (PRIMITIVE_TICK). Does not work on Android 10-13 with EFFECT_TICK. Also depends on device hardware support.</string>
     <string name="single_tap_delay_help"><![CDATA[When <b>Double Tap</b> or <b>Double Tap Drag</b> actions are assigned, single tap response is delayed by the Double Tap Timeout.]]></string>
     <string name="long_press_drag_help"><![CDATA[When <b>Long Press Drag</b> action is assigned, long press fires after releasing the finger instead of immediately after the Long Press Timeout.]]></string>
     <string name="binding_delay_help">Adds a delay (ms) between each binding in a sequence.</string>
