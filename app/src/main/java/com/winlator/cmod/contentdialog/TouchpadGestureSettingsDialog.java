@@ -57,7 +57,6 @@ public class TouchpadGestureSettingsDialog {
 
         LinearLayout llSingleFinger = view.findViewById(R.id.LLSingleFinger);
         addBindingSection(llSingleFinger, "single", "Single Tap", profile.getSingleTapAction(), R.string.single_tap_delay_help);
-        addBindingSection(llSingleFinger, "single_drag", "  Single Tap Drag", profile.getSingleTapDragAction());
         addBindingSection(llSingleFinger, "double", "Double Tap", profile.getDoubleTapAction());
         addBindingSection(llSingleFinger, "double_drag", "  Double Tap Drag", profile.getDoubleTapDragAction());
 
@@ -67,7 +66,6 @@ public class TouchpadGestureSettingsDialog {
 
         LinearLayout llTwoFinger = view.findViewById(R.id.LLTwoFinger);
         addBindingSection(llTwoFinger, "single_2nd", "Single Tap", profile.getSingleTap2ndFingerAction());
-        addBindingSection(llTwoFinger, "single_2nd_drag", "  Single Tap Drag", profile.getSingleTap2ndFingerDragAction());
         addBindingSection(llTwoFinger, "long_2nd", "Long Press", profile.getLongPress2ndFingerAction(), R.string.long_press_drag_help);
         addBindingSection(llTwoFinger, "long_2nd_drag", "  Long Press Drag", profile.getLongPress2ndFingerDragAction());
         addBindingSection(llTwoFinger, "double_2nd", "Double Tap", profile.getDoubleTap2ndFingerAction());
@@ -86,13 +84,11 @@ public class TouchpadGestureSettingsDialog {
         profile.setDragThreshold(npDragThreshold.getValue());
 
         profile.setSingleTapAction(bindingValues.getOrDefault("single", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setSingleTapDragAction(bindingValues.getOrDefault("single_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setLongPressAction(bindingValues.getOrDefault("long", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setLongPressDragAction(bindingValues.getOrDefault("long_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setDoubleTapAction(bindingValues.getOrDefault("double", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setDoubleTapDragAction(bindingValues.getOrDefault("double_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setSingleTap2ndFingerAction(bindingValues.getOrDefault("single_2nd", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setSingleTap2ndFingerDragAction(bindingValues.getOrDefault("single_2nd_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setLongPress2ndFingerAction(bindingValues.getOrDefault("long_2nd", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setLongPress2ndFingerDragAction(bindingValues.getOrDefault("long_2nd_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setDoubleTap2ndFingerAction(bindingValues.getOrDefault("double_2nd", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));

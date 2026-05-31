@@ -24,10 +24,8 @@ public class TouchpadGestureHandler {
     private List<Binding> singleTap2ndFingerAction = Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON);
     private List<Binding> longPress2ndFingerAction = Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON);
     private List<Binding> doubleTap2ndFingerAction = Collections.singletonList(Binding.NONE);
-    private List<Binding> singleTapDragAction = Collections.singletonList(Binding.NONE);
     private List<Binding> longPressDragAction = Collections.singletonList(Binding.NONE);
     private List<Binding> doubleTapDragAction = Collections.singletonList(Binding.NONE);
-    private List<Binding> singleTap2ndFingerDragAction = Collections.singletonList(Binding.NONE);
     private List<Binding> longPress2ndFingerDragAction = Collections.singletonList(Binding.NONE);
     private List<Binding> doubleTap2ndFingerDragAction = Collections.singletonList(Binding.NONE);
     private int doubleTapTimeout = 200;
@@ -40,27 +38,23 @@ public class TouchpadGestureHandler {
     private List<Binding> activeSingleTapAction;
     private List<Binding> activeLongPressAction;
     private List<Binding> activeDoubleTapAction;
-    private List<Binding> activeSingleTapDragAction;
     private List<Binding> activeLongPressDragAction;
     private List<Binding> activeDoubleTapDragAction;
     private boolean hasActiveDoubleTap;
     private boolean hasActiveLongPress;
     private boolean hasActiveLongPressDrag;
     private boolean hasActiveDoubleTapDrag;
-    private boolean hasActiveSingleTapDrag;
     private boolean canHoldLongPress;
 
     // Cached firstBinding values
     private Binding firstSingleTap;
     private Binding firstLongPress;
     private Binding firstDoubleTap;
-    private Binding firstSingleTapDrag;
     private Binding firstLongPressDrag;
     private Binding firstDoubleTapDrag;
     private Binding firstSingleTap2nd;
     private Binding firstLongPress2nd;
     private Binding firstDoubleTap2nd;
-    private Binding firstSingleTapDrag2nd;
     private Binding firstLongPressDrag2nd;
     private Binding firstDoubleTapDrag2nd;
 
@@ -103,10 +97,8 @@ public class TouchpadGestureHandler {
         singleTap2ndFingerAction = new ArrayList<>(profile.getSingleTap2ndFingerAction());
         longPress2ndFingerAction = new ArrayList<>(profile.getLongPress2ndFingerAction());
         doubleTap2ndFingerAction = new ArrayList<>(profile.getDoubleTap2ndFingerAction());
-        singleTapDragAction = new ArrayList<>(profile.getSingleTapDragAction());
         longPressDragAction = new ArrayList<>(profile.getLongPressDragAction());
         doubleTapDragAction = new ArrayList<>(profile.getDoubleTapDragAction());
-        singleTap2ndFingerDragAction = new ArrayList<>(profile.getSingleTap2ndFingerDragAction());
         longPress2ndFingerDragAction = new ArrayList<>(profile.getLongPress2ndFingerDragAction());
         doubleTap2ndFingerDragAction = new ArrayList<>(profile.getDoubleTap2ndFingerDragAction());
         doubleTapTimeout = profile.getDoubleTapTimeout();
@@ -119,13 +111,11 @@ public class TouchpadGestureHandler {
         firstSingleTap = firstBinding(singleTapAction, Binding.NONE);
         firstLongPress = firstBinding(longPressAction, Binding.NONE);
         firstDoubleTap = firstBinding(doubleTapAction, Binding.NONE);
-        firstSingleTapDrag = firstBinding(singleTapDragAction, Binding.NONE);
         firstLongPressDrag = firstBinding(longPressDragAction, Binding.NONE);
         firstDoubleTapDrag = firstBinding(doubleTapDragAction, Binding.NONE);
         firstSingleTap2nd = firstBinding(singleTap2ndFingerAction, Binding.NONE);
         firstLongPress2nd = firstBinding(longPress2ndFingerAction, Binding.NONE);
         firstDoubleTap2nd = firstBinding(doubleTap2ndFingerAction, Binding.NONE);
-        firstSingleTapDrag2nd = firstBinding(singleTap2ndFingerDragAction, Binding.NONE);
         firstLongPressDrag2nd = firstBinding(longPress2ndFingerDragAction, Binding.NONE);
         firstDoubleTapDrag2nd = firstBinding(doubleTap2ndFingerDragAction, Binding.NONE);
 
@@ -141,20 +131,16 @@ public class TouchpadGestureHandler {
         activeSingleTapAction = secondFingerActive ? singleTap2ndFingerAction : singleTapAction;
         activeLongPressAction = secondFingerActive ? longPress2ndFingerAction : longPressAction;
         activeDoubleTapAction = secondFingerActive ? doubleTap2ndFingerAction : doubleTapAction;
-        activeSingleTapDragAction = secondFingerActive ? singleTap2ndFingerDragAction : singleTapDragAction;
         activeLongPressDragAction = secondFingerActive ? longPress2ndFingerDragAction : longPressDragAction;
         activeDoubleTapDragAction = secondFingerActive ? doubleTap2ndFingerDragAction : doubleTapDragAction;
-        Binding firstST = secondFingerActive ? firstSingleTap2nd : firstSingleTap;
         Binding firstLP = secondFingerActive ? firstLongPress2nd : firstLongPress;
         Binding firstDT = secondFingerActive ? firstDoubleTap2nd : firstDoubleTap;
-        Binding firstSTD = secondFingerActive ? firstSingleTapDrag2nd : firstSingleTapDrag;
         Binding firstLPD = secondFingerActive ? firstLongPressDrag2nd : firstLongPressDrag;
         Binding firstDTD = secondFingerActive ? firstDoubleTapDrag2nd : firstDoubleTapDrag;
         hasActiveDoubleTap = firstDT != Binding.NONE;
         hasActiveLongPress = firstLP != Binding.NONE;
         hasActiveLongPressDrag = firstLPD != Binding.NONE;
         hasActiveDoubleTapDrag = firstDTD != Binding.NONE;
-        hasActiveSingleTapDrag = firstSTD != Binding.NONE;
         canHoldLongPress = !hasActiveLongPressDrag && hasActiveLongPress &&
             !firstLP.isMouseMove() && firstLP != Binding.MOUSE_SCROLL_UP && firstLP != Binding.MOUSE_SCROLL_DOWN;
     }
@@ -364,7 +350,7 @@ public class TouchpadGestureHandler {
             return hasActiveDoubleTapDrag ? activeDoubleTapDragAction : fallback;
         }
         else {
-            return hasActiveSingleTapDrag ? activeSingleTapDragAction : activeSingleTapAction;
+            return activeSingleTapAction;
         }
     }
 
