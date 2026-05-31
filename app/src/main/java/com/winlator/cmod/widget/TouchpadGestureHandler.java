@@ -343,14 +343,13 @@ public class TouchpadGestureHandler {
 
     private List<Binding> resolveDragAction() {
         if (state == State.LONG_PRESSING) {
-            return hasActiveLongPressDrag ? activeLongPressDragAction : activeLongPressAction;
+            return hasActiveLongPressDrag ? activeLongPressDragAction : null;
         }
         else if (postDoubleTapDrag) {
-            List<Binding> fallback = hasActiveDoubleTap ? activeDoubleTapAction : activeSingleTapAction;
-            return hasActiveDoubleTapDrag ? activeDoubleTapDragAction : fallback;
+            return hasActiveDoubleTapDrag ? activeDoubleTapDragAction : null;
         }
         else {
-            return activeSingleTapAction;
+            return null;
         }
     }
 
