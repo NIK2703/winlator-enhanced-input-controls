@@ -155,7 +155,7 @@ public class SettingsFragment extends Fragment {
         cbXinputToggle.setChecked(preferences.getBoolean("xinput_toggle", false));
 
         cbCachedRendering = view.findViewById(R.id.CBCachedRendering);
-        cbCachedRendering.setChecked(preferences.getBoolean("cached_rendering", false));
+        cbCachedRendering.setChecked(preferences.getBoolean("cached_rendering", true));
 
         Button btnChooseWinlatorPath = view.findViewById(R.id.BTChooseWinlatorPath);
         TextView tvWinlatorPath = view.findViewById(R.id.TVWinlatorPath);

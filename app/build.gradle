@@ -132,6 +132,7 @@ android {
     // Keep Winlator’s buildTypes
     buildTypes {
         debug {
+            applicationIdSuffix ".debug"
             minifyEnabled false
         }
         release {

@@ -504,8 +504,8 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 shortcut.putExtra("sharpnessDenoise", sharpeningDenoise);
 
                 ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
-                int controlsProfile = sControlsProfile.getSelectedItemPosition() > 0 ? profiles.get(sControlsProfile.getSelectedItemPosition() - 1).id : 0;
-                shortcut.putExtra("controlsProfile", controlsProfile > 0 ? String.valueOf(controlsProfile) : null);
+                int pos = sControlsProfile.getSelectedItemPosition();
+                shortcut.putExtra("controlsProfile", pos >= 0 && pos < profiles.size() ? String.valueOf(profiles.get(pos).id) : null);
 
                 String cpuList = cpuListView.getCheckedCPUListAsString();
                 shortcut.putExtra("cpuList", cpuList);
@@ -711,13 +711,11 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         final Context context = fragment.getContext();
         final ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
         ArrayList<String> values = new ArrayList<>();
-        values.add(context.getString(R.string.none));
-
         int selectedPosition = 0;
         int selectedId = Integer.parseInt(selectedValue);
         for (int i = 0; i < profiles.size(); i++) {
             ControlsProfile profile = profiles.get(i);
-            if (profile.id == selectedId) selectedPosition = i + 1;
+            if (profile.id == selectedId) selectedPosition = i;
             values.add(profile.getName());
         }
 

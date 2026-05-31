@@ -49,6 +49,11 @@
                 android:id="@+id/BTRemoveProfile"
                 android:layout_marginRight="0dp"
                 android:src="@drawable/icon_remove" />
+
+            <ImageButton
+                style="@style/ListMenuButton"
+                android:id="@+id/BTStarDefault"
+                android:src="@drawable/icon_star_outline" />
         </LinearLayout>
 
         <LinearLayout

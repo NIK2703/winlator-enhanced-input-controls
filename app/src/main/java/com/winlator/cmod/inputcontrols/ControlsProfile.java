@@ -136,6 +136,8 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
     @Override
     public int compareTo(ControlsProfile o) {
+        if (this.name.equals("Default")) return -1;
+        if (o.name.equals("Default")) return 1;
         return Integer.compare(id, o.id);
     }
 

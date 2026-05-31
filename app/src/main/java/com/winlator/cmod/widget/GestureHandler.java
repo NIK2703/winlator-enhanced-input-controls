@@ -76,19 +76,19 @@ public abstract class GestureHandler {
     protected BindingSet cur;  // points to firstFingerSet or secondFingerSet
 
     // Convenience accessors via cur
-    protected final List<Binding> activeSingleTapAction() { return cur.singleTapAction; }
-    protected final List<Binding> activeLongPressAction() { return cur.longPressAction; }
-    protected final List<Binding> activeDoubleTapAction() { return cur.doubleTapAction; }
-    protected final List<Binding> activeSingleTapDragAction() { return cur.singleTapDragAction; }
-    protected final List<Binding> activeLongPressDragAction() { return cur.longPressDragAction; }
-    protected final List<Binding> activeDoubleTapDragAction() { return cur.doubleTapDragAction; }
-    protected final boolean hasActiveDoubleTap() { return cur.hasActiveDoubleTap; }
-    protected final boolean hasActiveLongPress() { return cur.hasActiveLongPress; }
-    protected final boolean hasActiveLongPressDrag() { return cur.hasActiveLongPressDrag; }
-    protected final boolean hasActiveDoubleTapDrag() { return cur.hasActiveDoubleTapDrag; }
-    protected final boolean hasActiveSingleTapDrag() { return cur.hasActiveSingleTapDrag; }
-    protected final boolean canHoldLongPress() { return cur.canHoldLongPress; }
-    protected final boolean hasLongPressTimer() { return cur.hasLongPressTimer; }
+    protected final List<Binding> activeSingleTapAction() { return cur != null ? cur.singleTapAction : singleTapAction; }
+    protected final List<Binding> activeLongPressAction() { return cur != null ? cur.longPressAction : longPressAction; }
+    protected final List<Binding> activeDoubleTapAction() { return cur != null ? cur.doubleTapAction : doubleTapAction; }
+    protected final List<Binding> activeSingleTapDragAction() { return cur != null ? cur.singleTapDragAction : singleTapDragAction; }
+    protected final List<Binding> activeLongPressDragAction() { return cur != null ? cur.longPressDragAction : longPressDragAction; }
+    protected final List<Binding> activeDoubleTapDragAction() { return cur != null ? cur.doubleTapDragAction : doubleTapDragAction; }
+    protected final boolean hasActiveDoubleTap() { return cur != null && cur.hasActiveDoubleTap; }
+    protected final boolean hasActiveLongPress() { return cur != null && cur.hasActiveLongPress; }
+    protected final boolean hasActiveLongPressDrag() { return cur != null && cur.hasActiveLongPressDrag; }
+    protected final boolean hasActiveDoubleTapDrag() { return cur != null && cur.hasActiveDoubleTapDrag; }
+    protected final boolean hasActiveSingleTapDrag() { return cur != null && cur.hasActiveSingleTapDrag; }
+    protected final boolean canHoldLongPress() { return cur != null && cur.canHoldLongPress; }
+    protected final boolean hasLongPressTimer() { return cur != null && cur.hasLongPressTimer; }
 
     // Gesture state shared by both subclasses
     protected float fingerDownX;

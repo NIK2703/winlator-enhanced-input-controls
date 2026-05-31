@@ -23,6 +23,7 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
+
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
@@ -958,14 +959,33 @@ if (enableLogs) {
             touchpadView.toggleFullscreen();
         }
 
+        boolean profileLoaded = false;
         if (shortcut != null) {
             String controlsProfile = shortcut.getExtra("controlsProfile");
             String simTouchScreen = shortcut.getExtra("simTouchScreen");
             touchpadView.setSimTouchScreen(simTouchScreen.equals("1"));
             if (!controlsProfile.isEmpty()) {
                 ControlsProfile profile = inputControlsManager.getProfile(Integer.parseInt(controlsProfile));
-                if (profile != null) showInputControls(profile);
+                if (profile != null) { showInputControls(profile); profileLoaded = true; }
             }
+        }
+
+        if (!profileLoaded) {
+            int defaultProfileId = preferences.getInt("default_profile_id", -1);
+            ControlsProfile profile = null;
+            if (defaultProfileId >= 0) {
+                profile = inputControlsManager.getProfile(defaultProfileId);
+            }
+            if (profile == null) {
+                for (ControlsProfile p : inputControlsManager.getProfiles()) {
+                    if (p.getName().equals("Default")) {
+                        profile = p;
+                        preferences.edit().putInt("default_profile_id", p.id).apply();
+                        break;
+                    }
+                }
+            }
+            if (profile != null) showInputControls(profile);
         }
 
         AppUtils.observeSoftKeyboardVisibility(drawerLayout, renderer::setScreenOffsetYRelativeToCursor);
@@ -1397,22 +1417,26 @@ private void applySidebarSettings() {
         ViewGroup dialogViewGroup = (ViewGroup) dialog.getWindow().getDecorView().findViewById(android.R.id.content);
         setTextColorForDialog(dialogViewGroup, textColor);
 
-        Runnable loadProfileSpinner = () -> {
+        Runnable loadProfileShown = () -> {
             ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
             ArrayList<String> profileItems = new ArrayList<>();
             int selectedPosition = 0;
-            profileItems.add("-- "+getString(R.string.disabled)+" --");
+            int defaultProfileId = preferences.getInt("default_profile_id", -1);
             for (int i = 0; i < profiles.size(); i++) {
                 ControlsProfile profile = profiles.get(i);
-                if (inputControlsView.getProfile() != null && profile.id == inputControlsView.getProfile().id)
-                    selectedPosition = i + 1;
+                if (inputControlsView.getProfile() != null && profile.id == inputControlsView.getProfile().id) {
+                    selectedPosition = i;
+                }
+                else if (defaultProfileId >= 0 && profile.id == defaultProfileId) {
+                    selectedPosition = i;
+                }
                 profileItems.add(profile.getName());
             }
 
             sProfile.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, profileItems));
             sProfile.setSelection(selectedPosition);
         };
-        loadProfileSpinner.run();
+        loadProfileShown.run();
 
         final CheckBox cbShowTouchscreenControls = dialog.findViewById(R.id.CBShowTouchscreenControls);
         cbShowTouchscreenControls.setChecked(inputControlsView.isShowTouchscreenControls());
@@ -1425,20 +1449,20 @@ private void applySidebarSettings() {
 
         final Runnable updateProfile = () -> {
             int position = sProfile.getSelectedItemPosition();
-            if (position > 0) {
-                showInputControls(inputControlsManager.getProfiles().get(position - 1));
+            ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
+            if (position >= 0 && position < profiles.size()) {
+                showInputControls(profiles.get(position));
             }
-            else hideInputControls();
         };
         dialog.findViewById(R.id.BTSettings).setOnClickListener((v) -> {
             int position = sProfile.getSelectedItemPosition();
+            ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
             Intent intent = new Intent(this, MainActivity.class);
             intent.putExtra("edit_input_controls", true);
-            intent.putExtra("selected_profile_id", position > 0 ? inputControlsManager.getProfiles().get(position - 1).id : 0);
+            intent.putExtra("selected_profile_id", position >= 0 && position < profiles.size() ? profiles.get(position).id : 0);
             editInputControlsCallback = () -> {
-                hideInputControls();
                 inputControlsManager.loadProfiles(true);
-                loadProfileSpinner.run();
+                loadProfileShown.run();
                 updateProfile.run();
             };
             controlsEditorActivityResultLauncher.launch(intent);
@@ -1451,6 +1475,14 @@ private void applySidebarSettings() {
             SharedPreferences.Editor editor = preferences.edit();
             editor.putBoolean("touchscreen_timeout_enabled", isTimeoutEnabled);
             editor.putBoolean("touchscreen_haptics_enabled", isHapticsEnabled);
+
+            int position = sProfile.getSelectedItemPosition();
+            ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
+            if (position >= 0 && position < profiles.size()) {
+                ControlsProfile selectedProfile = profiles.get(position);
+                showInputControls(selectedProfile);
+                editor.putInt("default_profile_id", selectedProfile.id);
+            }
             editor.apply();
 
             if (isTimeoutEnabled) {
@@ -1458,11 +1490,6 @@ private void applySidebarSettings() {
             } else {
                 touchpadView.setOnTouchListener(null); 
             }
-            int position = sProfile.getSelectedItemPosition();
-            if (position > 0) {
-                showInputControls(inputControlsManager.getProfiles().get(position - 1));
-            }
-            else hideInputControls();
             updateProfile.run();
         });
 
@@ -1472,9 +1499,6 @@ private void applySidebarSettings() {
         dialog.show();
     }
     private void simulateConfirmInputControlsDialog() {
-        boolean isShowTouchscreenControls = preferences.getBoolean("show_touchscreen_controls_enabled", false); 
-        inputControlsView.setShowTouchscreenControls(isShowTouchscreenControls);
-
         boolean isTimeoutEnabled = preferences.getBoolean("touchscreen_timeout_enabled", false);
         boolean isHapticsEnabled = preferences.getBoolean("touchscreen_haptics_enabled", false);
 
@@ -1483,14 +1507,6 @@ private void applySidebarSettings() {
         editor.putBoolean("touchscreen_haptics_enabled", isHapticsEnabled);
         editor.apply();
 
-        int selectedProfileIndex = preferences.getInt("selected_profile_index", -1); 
-
-        if (selectedProfileIndex >= 0 && selectedProfileIndex < inputControlsManager.getProfiles().size()) {
-            ControlsProfile profile = inputControlsManager.getProfiles().get(selectedProfileIndex);
-            showInputControls(profile);
-        } else {
-            hideInputControls();
-        }
         if (isTimeoutEnabled && inputControlsView.getVisibility() == View.VISIBLE) {
             startTouchscreenTimeout(); 
         } else {
@@ -1523,6 +1539,7 @@ private void applySidebarSettings() {
         }
     }
     private void showInputControls(ControlsProfile profile) {
+        inputControlsView.setShowTouchscreenControls(true);
         inputControlsView.setVisibility(View.VISIBLE);
         inputControlsView.requestFocus();
         inputControlsView.setProfile(profile);

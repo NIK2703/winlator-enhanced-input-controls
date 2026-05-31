@@ -92,6 +92,7 @@ public class InputControlsFragment extends Fragment {
 
 
     private boolean isDarkMode;
+    private Runnable updateStarIcon;
 
     public InputControlsFragment(int selectedProfileId) {
         this.selectedProfileId = selectedProfileId;
@@ -140,6 +141,35 @@ public class InputControlsFragment extends Fragment {
         final Spinner sProfile = view.findViewById(R.id.SProfile);
 
         sProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+
+        ImageButton btStarDefault = view.findViewById(R.id.BTStarDefault);
+
+        updateStarIcon = () -> {
+            if (currentProfile != null) {
+                int defaultId = preferences.getInt("default_profile_id", -1);
+                boolean isDefault = currentProfile.id == defaultId;
+                btStarDefault.setImageResource(isDefault ? R.drawable.icon_star_filled : R.drawable.icon_star_outline);
+                btStarDefault.clearColorFilter();
+                btStarDefault.setAlpha(1.0f);
+            }
+            else {
+                btStarDefault.setImageResource(R.drawable.icon_star_outline);
+                btStarDefault.setAlpha(0.3f);
+            }
+        };
+
+        btStarDefault.setOnClickListener((v) -> {
+            if (currentProfile == null) return;
+
+            int defaultId = preferences.getInt("default_profile_id", -1);
+            if (currentProfile.id == defaultId) {
+                preferences.edit().putInt("default_profile_id", -1).apply();
+            }
+            else {
+                preferences.edit().putInt("default_profile_id", currentProfile.id).apply();
+            }
+            updateStarIcon.run();
+        });
 
         loadProfileSpinner(sProfile);
 
@@ -352,6 +382,10 @@ public class InputControlsFragment extends Fragment {
 
         view.findViewById(R.id.BTRemoveProfile).setOnClickListener((v) -> {
             if (currentProfile != null) {
+                if (currentProfile.getName().equals("Default")) {
+                    AppUtils.showToast(context, R.string.cannot_remove_default_profile);
+                    return;
+                }
                 ContentDialog.confirm(context, R.string.do_you_want_to_remove_this_profile, () -> {
                     manager.removeProfile(currentProfile);
                     currentProfile = null;
@@ -510,7 +544,6 @@ public class InputControlsFragment extends Fragment {
         }
 
         spinner.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, values));
-        spinner.setSelection(selectedPosition, false);
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -534,11 +567,15 @@ public class InputControlsFragment extends Fragment {
                     sbFillAlphaInactive.setProgress(fina);
                     tvFillAlphaInactive.setText(String.valueOf(fina));
                 }
+                updateStarIcon.run();
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+            public void onNothingSelected(AdapterView<?> parent) {
+                updateStarIcon.run();
+            }
         });
+        spinner.setSelection(selectedPosition, false);
     }
 
     private void loadExternalControllers(final View view) {

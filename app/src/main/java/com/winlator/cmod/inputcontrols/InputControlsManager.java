@@ -159,8 +159,21 @@ public class InputControlsManager {
     }
 
     public void removeProfile(ControlsProfile profile) {
+        if (profile.getName().equals("Default")) return;
         File file = ControlsProfile.getProfileFile(context, profile.id);
-        if (file.isFile() && file.delete()) profiles.remove(profile);
+        if (!file.isFile() || !file.delete()) return;
+        profiles.remove(profile);
+
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        int defaultProfileId = preferences.getInt("default_profile_id", -1);
+        if (defaultProfileId == profile.id) {
+            for (ControlsProfile p : profiles) {
+                if (p.getName().equals("Default")) {
+                    preferences.edit().putInt("default_profile_id", p.id).apply();
+                    break;
+                }
+            }
+        }
     }
 
     public ControlsProfile importProfile(JSONObject data) {
