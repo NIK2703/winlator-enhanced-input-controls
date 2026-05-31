@@ -282,6 +282,15 @@
             android:layout_marginTop="8dp"
             android:text="Touchscreen Gestures" />
 
+        <Button
+            style="@style/ButtonPositive"
+            android:id="@+id/BTTouchpadGestureSettings"
+            android:layout_width="240dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:text="Touchpad Gestures" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
