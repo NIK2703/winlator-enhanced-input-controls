@@ -81,7 +81,7 @@ public class InputControlsView extends View {
     private SharedPreferences preferences;
     private boolean cachedRenderingEnabled;
     private final SharedPreferences.OnSharedPreferenceChangeListener prefListener = (prefs, key) -> {
-        if ("cached_rendering".equals(key)) cachedRenderingEnabled = prefs.getBoolean(key, false);
+        if ("cached_rendering".equals(key)) cachedRenderingEnabled = prefs.getBoolean(key, true);
     };
 
     public boolean isCachingEnabled() {
@@ -90,7 +90,7 @@ public class InputControlsView extends View {
 
     private void initPreferences() {
         preferences = PreferenceManager.getDefaultSharedPreferences(getContext());
-        cachedRenderingEnabled = preferences.getBoolean("cached_rendering", false);
+        cachedRenderingEnabled = preferences.getBoolean("cached_rendering", true);
         preferences.registerOnSharedPreferenceChangeListener(prefListener);
     }
 

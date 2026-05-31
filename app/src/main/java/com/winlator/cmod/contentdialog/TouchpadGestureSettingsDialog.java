@@ -44,8 +44,6 @@ public class TouchpadGestureSettingsDialog {
         View view = LayoutInflater.from(context).inflate(R.layout.touchpad_gesture_settings_dialog, null);
         builder.setView(view);
 
-        view.findViewById(R.id.BTHelpHoldGestures).setOnClickListener((v) ->
-                AppUtils.showHelpBox(context, v, R.string.hold_mode_help));
         view.findViewById(R.id.BTHelpTwoFinger).setOnClickListener((v) ->
                 AppUtils.showHelpBox(context, v, R.string.two_finger_help));
 
@@ -78,10 +76,8 @@ public class TouchpadGestureSettingsDialog {
         addBindingSection(llSingleFinger, "single", "Single Tap", profile.getSingleTapAction(), R.string.single_tap_delay_help);
         addBindingSection(llSingleFinger, "double", "Double Tap", profile.getDoubleTapAction(), R.string.single_tap_delay_help);
         addBindingSection(llSingleFinger, "double_drag", "  Double Tap Drag", profile.getDoubleTapDragAction(), R.string.single_tap_delay_help);
-
-        LinearLayout llHoldGestures = view.findViewById(R.id.LLHoldGestures);
-        addBindingSection(llHoldGestures, "long", "Long Press", profile.getLongPressAction(), R.string.long_press_drag_help);
-        addBindingSection(llHoldGestures, "long_drag", "  Long Press Drag", profile.getLongPressDragAction(), R.string.long_press_drag_help);
+        addBindingSection(llSingleFinger, "long", "Long Press", profile.getLongPressAction(), R.string.long_press_drag_help);
+        addBindingSection(llSingleFinger, "long_drag", "  Long Press Drag", profile.getLongPressDragAction(), R.string.long_press_drag_help);
 
         LinearLayout llTwoFinger = view.findViewById(R.id.LLTwoFinger);
         addBindingSection(llTwoFinger, "single_2nd", "Single Tap", profile.getSingleTap2ndFingerAction());
