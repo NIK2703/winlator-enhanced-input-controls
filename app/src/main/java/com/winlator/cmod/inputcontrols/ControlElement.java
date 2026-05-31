@@ -1416,8 +1416,18 @@ public class ControlElement {
     public void activate() {
         if (bindings.isEmpty() || bindings.get(0).isEmpty()) return;
         active = true;
-        heldBindings = new ArrayList<>(bindings.get(0));
-        pressBindings(bindings.get(0));
+        if (toggleSwitch) {
+            selected = !selected;
+            if (selected) {
+                heldBindings = new ArrayList<>(bindings.get(0));
+                pressBindings(bindings.get(0));
+            } else {
+                releaseHeldBindings();
+            }
+        } else {
+            heldBindings = new ArrayList<>(bindings.get(0));
+            pressBindings(bindings.get(0));
+        }
         inputControlsView.invalidate();
     }
 
@@ -1449,7 +1459,7 @@ public class ControlElement {
         active = false;
         currentPointerId = -1;
         cancelLongPress();
-        releaseHeldBindings();
+        if (!(toggleSwitch && selected)) releaseHeldBindings();
         inputControlsView.invalidate();
     }
 
@@ -1464,7 +1474,6 @@ public class ControlElement {
             longPressHandler.removeCallbacksAndMessages(null);
             longPressHandler = null;
         }
-        currentPointerId = -1;
         longPressTriggered = false;
         gestureTriggered = false;
     }
@@ -1723,7 +1732,10 @@ public class ControlElement {
 
                 if (toggleSwitch) {
                     selected = !selected;
-                    if (selected) return true;
+                    if (selected) {
+                        currentPointerId = -1;
+                        return true;
+                    }
                 }
 
                 if (longPressTriggered) {
