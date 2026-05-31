@@ -79,6 +79,20 @@ public class InputControlsView extends View {
     private Runnable hideControlsRunnable; // Runnable to hide the controls
 
     private SharedPreferences preferences;
+    private boolean cachedRenderingEnabled;
+    private final SharedPreferences.OnSharedPreferenceChangeListener prefListener = (prefs, key) -> {
+        if ("cached_rendering".equals(key)) cachedRenderingEnabled = prefs.getBoolean(key, false);
+    };
+
+    public boolean isCachingEnabled() {
+        return cachedRenderingEnabled;
+    }
+
+    private void initPreferences() {
+        preferences = PreferenceManager.getDefaultSharedPreferences(getContext());
+        cachedRenderingEnabled = preferences.getBoolean("cached_rendering", false);
+        preferences.registerOnSharedPreferenceChangeListener(prefListener);
+    }
 
     private ControlElement stickElement;
 
@@ -118,26 +132,26 @@ public class InputControlsView extends View {
         setClickable(true);
         setFocusable(true);
         setFocusableInTouchMode(true);
-        requestFocus(); // Add this line to request focus
+        requestFocus();
         setBackgroundColor(0x00000000);
         setPointerIcon(PointerIcon.load(getResources(), R.drawable.hidden_pointer_arrow));
         setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        preferences = PreferenceManager.getDefaultSharedPreferences(this.getContext());
+        initPreferences();
     }
 
     @SuppressLint("ResourceType")
     public InputControlsView(Context context, Handler timeoutHandler, Runnable hideControlsRunnable) {
         super(context);
-        this.timeoutHandler = timeoutHandler; // Store the reference to timeout handler
-        this.hideControlsRunnable = hideControlsRunnable; // Store the reference to the hide controls runnable
+        this.timeoutHandler = timeoutHandler;
+        this.hideControlsRunnable = hideControlsRunnable;
         setClickable(true);
         setFocusable(true);
         setFocusableInTouchMode(true);
-        requestFocus(); // Add this line to request focus
+        requestFocus();
         setBackgroundColor(0x00000000);
         setPointerIcon(PointerIcon.load(getResources(), R.drawable.hidden_pointer_arrow));
         setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        preferences = PreferenceManager.getDefaultSharedPreferences(this.getContext());
+        initPreferences();
     }
 
     public InputControlsView(Context context, boolean focusOnStick) {
@@ -145,7 +159,7 @@ public class InputControlsView extends View {
         setClickable(true);
         setFocusable(true);
         setFocusableInTouchMode(true);
-        requestFocus(); // Add this line to request focus
+        requestFocus();
         setBackgroundColor(0x00000000);
         setPointerIcon(PointerIcon.load(getResources(), R.drawable.hidden_pointer_arrow));
 
@@ -155,7 +169,7 @@ public class InputControlsView extends View {
             setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
 
-        preferences = PreferenceManager.getDefaultSharedPreferences(this.getContext());
+        initPreferences();
     }
 
 
@@ -222,17 +236,12 @@ public class InputControlsView extends View {
 
         if (profile != null && showTouchscreenControls && !isFocusedOnStick()) {
             if (!profile.isElementsLoaded()) profile.loadElements(this);
-            boolean globalCache = PreferenceManager.getDefaultSharedPreferences(getContext()).getBoolean("cached_rendering", false);
-            if (globalCache) {
-                if (!cachesPreBuilt) {
-                    for (ControlElement element : profile.getElements()) {
-                        element.buildCache();
-                    }
-                    cachesPreBuilt = true;
-                }
+            if (cachedRenderingEnabled) {
                 for (ControlElement element : profile.getElements()) {
+                    if (!cachesPreBuilt) element.buildCache();
                     element.drawCached(canvas);
                 }
+                cachesPreBuilt = true;
             }
             else {
                 for (ControlElement element : profile.getElements()) {

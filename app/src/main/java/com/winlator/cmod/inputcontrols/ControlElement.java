@@ -14,11 +14,10 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
+import android.graphics.Xfermode;
 import android.os.SystemClock;
 
 import androidx.core.graphics.ColorUtils;
-import androidx.preference.PreferenceManager;
-
 import com.winlator.cmod.core.CubicBezierInterpolator;
 import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
@@ -72,9 +71,19 @@ public class ControlElement {
     public enum Range {
         FROM_A_TO_Z(26), FROM_0_TO_9(10), FROM_F1_TO_F12(12), FROM_NP0_TO_NP9(10);
         public final byte max;
+        public final String[] texts;
 
         Range(int max) {
             this.max = (byte)max;
+            this.texts = new String[max];
+            for (int i = 0; i < max; i++) {
+                switch (ordinal()) {
+                    case 0: texts[i] = String.valueOf((char)(65 + i)); break;
+                    case 1: texts[i] = String.valueOf((i + 1) % 10); break;
+                    case 2: texts[i] = "F" + (i + 1); break;
+                    case 3: texts[i] = "NP" + ((i + 1) % 10); break;
+                }
+            }
         }
 
         public static String[] names() {
@@ -85,6 +94,8 @@ public class ControlElement {
         }
     }
     private static final HashMap<String, Bitmap> sharedPool = new HashMap<>();
+    private static final Xfermode XFERMODE_CLEAR = new PorterDuffXfermode(PorterDuff.Mode.CLEAR);
+    private static final Xfermode XFERMODE_DST_OUT = new PorterDuffXfermode(PorterDuff.Mode.DST_OUT);
     private final InputControlsView inputControlsView;
     private Type type = Type.BUTTON;
     private Shape shape = Shape.CIRCLE;
@@ -120,6 +131,8 @@ public class ControlElement {
     private String cacheCombinedKey = "";
     private String text = "";
     private byte iconId;
+    private String cachedDisplayText;
+    private boolean displayTextDirty = true;
     private List<Binding> heldBindings;
     private List<Binding> longPressBindings = new ArrayList<>();
     private boolean longPressTriggered;
@@ -137,7 +150,10 @@ public class ControlElement {
     private PointF currentPosition;
     private RangeScroller scroller;
     private CubicBezierInterpolator interpolator;
-    private Object touchTime;
+    private long touchTime;
+    private final boolean[] scratchStates = new boolean[4];
+    private final Rect drawIconSrcRect = new Rect();
+    private final Rect drawIconDstRect = new Rect();
 
     public ControlElement(InputControlsView inputControlsView) {
         this.inputControlsView = inputControlsView;
@@ -297,6 +313,7 @@ public class ControlElement {
         List<Binding> seq = bindings.get(index);
         seq.clear();
         seq.add(binding);
+        markDisplayTextDirty();
         invalidateElementCache();
     }
 
@@ -305,6 +322,7 @@ public class ControlElement {
             seq.clear();
             seq.add(binding);
         }
+        markDisplayTextDirty();
         invalidateElementCache();
     }
 
@@ -530,17 +548,23 @@ public class ControlElement {
         if (text != null && !text.isEmpty()) {
             return text;
         }
-        else {
-            Binding binding = getBindingAt(0);
-            String text = binding.toString().replace("NUMPAD ", "NP").replace("BUTTON ", "");
-            if (text.length() > 7) {
-                String[] parts = text.split(" ");
-                StringBuilder sb = new StringBuilder();
-                for (String part : parts) sb.append(part.charAt(0));
-                return (binding.isMouse() ? "M" : "")+ sb;
-            }
-            else return text;
+        if (!displayTextDirty && cachedDisplayText != null) return cachedDisplayText;
+        displayTextDirty = false;
+        Binding binding = getBindingAt(0);
+        String display = binding.toString().replace("NUMPAD ", "NP").replace("BUTTON ", "");
+        if (display.length() > 7) {
+            String[] parts = display.split(" ");
+            StringBuilder sb = new StringBuilder();
+            for (String part : parts) sb.append(part.charAt(0));
+            cachedDisplayText = (binding.isMouse() ? "M" : "")+ sb;
+        } else {
+            cachedDisplayText = display;
         }
+        return cachedDisplayText;
+    }
+
+    public void markDisplayTextDirty() {
+        displayTextDirty = true;
     }
 
     private static float getTextSizeForWidth(Paint paint, String text, float desiredWidth) {
@@ -550,22 +574,7 @@ public class ControlElement {
     }
 
     private static String getRangeTextForIndex(Range range, int index) {
-        String text = "";
-        switch (range) {
-            case FROM_A_TO_Z:
-                text = String.valueOf((char)(65 + index));
-                break;
-            case FROM_0_TO_9:
-                text = String.valueOf((index + 1) % 10);
-                break;
-            case FROM_F1_TO_F12:
-                text = "F"+(index + 1);
-                break;
-            case FROM_NP0_TO_NP9:
-                text = "NP"+((index + 1) % 10);
-                break;
-        }
-        return text;
+        return range.texts[index % range.max];
     }
 
     public boolean isEngaged() {
@@ -573,6 +582,8 @@ public class ControlElement {
     }
 
     public void invalidateElementCache() {
+        cachedDisplayText = null;
+        displayTextDirty = true;
         cacheCombined = null;
         cacheFill = null;
         dpadPetalStroke = null;
@@ -686,8 +697,7 @@ public class ControlElement {
     }
 
     private boolean isCachingEnabled() {
-        return PreferenceManager.getDefaultSharedPreferences(inputControlsView.getContext())
-            .getBoolean("cached_rendering", false);
+        return inputControlsView.isCachingEnabled();
     }
 
     private int strokePad() {
@@ -744,18 +754,14 @@ public class ControlElement {
     }
 
     private void ensureCombinedCache() {
-        if (!cacheCombinedDirty && cacheCombined != null) {
-            Rect box = getBoundingBox();
-            int pad = strokePad();
-            if (cacheCombined.getWidth() == box.width() + pad * 2 &&
-                cacheCombined.getHeight() == box.height() + pad * 2) return;
-        }
-        cacheCombined = null;
         Rect box = getBoundingBox();
         int pad = strokePad();
         int w = box.width() + pad * 2;
         int h = box.height() + pad * 2;
         if (w <= 0 || h <= 0) return;
+        if (!cacheCombinedDirty && cacheCombined != null &&
+            cacheCombined.getWidth() == w && cacheCombined.getHeight() == h) return;
+        cacheCombined = null;
         cacheCombinedKey = diskKey(LAYER_COMBINED);
         String vKey = visualKey(LAYER_COMBINED);
         cacheCombined = obtainPoolBitmap(vKey, w, h);
@@ -798,18 +804,14 @@ public class ControlElement {
     }
 
     private void ensureFillCache() {
-        if (!cacheFillDirty && cacheFill != null) {
-            Rect box = getBoundingBox();
-            int pad = strokePad();
-            if (cacheFill.getWidth() == box.width() + pad * 2 &&
-                cacheFill.getHeight() == box.height() + pad * 2) return;
-        }
-        cacheFill = null;
         Rect box = getBoundingBox();
         int pad = strokePad();
         int w = box.width() + pad * 2;
         int h = box.height() + pad * 2;
         if (w <= 0 || h <= 0) return;
+        if (!cacheFillDirty && cacheFill != null &&
+            cacheFill.getWidth() == w && cacheFill.getHeight() == h) return;
+        cacheFill = null;
         String vKey = visualKey(LAYER_FILL);
         cacheFill = obtainPoolBitmap(vKey, w, h);
         if (cacheFill == null) {
@@ -841,10 +843,10 @@ public class ControlElement {
                         if (icon != null) {
                             int margin = (int)(snappingSize * (shape == Shape.CIRCLE ? 2.0f : 1.0f) * scale);
                             int halfSize = (int)((Math.min(box.width(), box.height()) - margin) * 0.5f);
-                            Rect srcRect = new Rect(0, 0, icon.getWidth(), icon.getHeight());
-                            Rect dstRect = new Rect((int)(cx - halfSize), (int)(cy - halfSize), (int)(cx + halfSize), (int)(cy + halfSize));
-                            paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
-                            c.drawBitmap(icon, srcRect, dstRect, paint);
+                            drawIconSrcRect.set(0, 0, icon.getWidth(), icon.getHeight());
+                            drawIconDstRect.set((int)(cx - halfSize), (int)(cy - halfSize), (int)(cx + halfSize), (int)(cy + halfSize));
+                            paint.setXfermode(XFERMODE_DST_OUT);
+                            c.drawBitmap(icon, drawIconSrcRect, drawIconDstRect, paint);
                             paint.setXfermode(null);
                         }
                     } else {
@@ -852,7 +854,7 @@ public class ControlElement {
                         paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, box.width() - strW * 2), snappingSize * 2 * scale));
                         paint.setTextAlign(Paint.Align.CENTER);
                         paint.setStyle(Paint.Style.FILL);
-                        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
+                        paint.setXfermode(XFERMODE_CLEAR);
                         c.drawText(text, x, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
                         paint.setXfermode(null);
                     }
@@ -955,19 +957,15 @@ public class ControlElement {
     }
 
     private void ensureDPadCaches(int snappingSize) {
-        if (!dpadCacheDirty && dpadPetalStroke != null) {
-            Rect box = getBoundingBox();
-            int pad = strokePad();
-            if (dpadPetalStroke.getWidth() == box.width() + pad * 2 &&
-                dpadPetalStroke.getHeight() == box.height() + pad * 2) return;
-        }
-        dpadPetalStroke = null;
-        dpadPetalFill = null;
         Rect box = getBoundingBox();
         int pad = strokePad();
         int w = box.width() + pad * 2;
         int h = box.height() + pad * 2;
         if (w <= 0 || h <= 0) return;
+        if (!dpadCacheDirty && dpadPetalStroke != null &&
+            dpadPetalStroke.getWidth() == w && dpadPetalStroke.getHeight() == h) return;
+        dpadPetalStroke = null;
+        dpadPetalFill = null;
         Paint paint = inputControlsView.getPaint();
         float strokeWidth = snappingSize * strokeWidthMultiplier();
         paint.setPathEffect(null);
@@ -1028,19 +1026,19 @@ public class ControlElement {
             int primaryColor = inputControlsView.getPrimaryColor();
             float strokeWidth = snappingSize * strokeWidthMultiplier();
             boolean engagedDpad = isEngaged();
+            int baseAlpha = Color.alpha(primaryColor);
+            int fillActive = baseAlpha * fillAlphaActive() / 255;
+            int fillInactive = baseAlpha * fillAlphaInactive() / 255;
+            paint.setStyle(Paint.Style.FILL);
             for (int i = 0; i < 4; i++) {
                 canvas.save();
                 canvas.rotate(i * 90, cx, cy);
                 if (engagedDpad && states[i]) {
-                    int alpha = fillAlphaActive();
-                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor) * alpha / 255));
-                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillActive));
                     canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, paint);
                 } else {
                     canvas.drawBitmap(dpadPetalStroke, box.left - pad, box.top - pad, null);
-                    int alpha = fillAlphaInactive();
-                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor) * alpha / 255));
-                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillInactive));
                     canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, paint);
                 }
                 canvas.restore();
@@ -1150,7 +1148,6 @@ public class ControlElement {
                 float elementSize = scroller.getElementSize();
                 float minTextSize = snappingSize * 2 * scale;
                 float scrollOffset = scroller.getScrollOffset();
-                byte[] rangeIndex = scroller.getRangeIndex();
                 Range range = getRange();
                 Path path = inputControlsView.getPath();
                 path.reset();
@@ -1161,7 +1158,7 @@ public class ControlElement {
                     path.addRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, Path.Direction.CW);
                     canvas.clipPath(path);
                     float startX = box.left - scrollOffset % elementSize;
-                    for (byte i = rangeIndex[0]; i < rangeIndex[1]; i++) {
+                    for (int i = scroller.getRangeIndexFrom(); i < scroller.getRangeIndexTo(); i++) {
                         int index = i % range.max;
                         paint.setStyle(Paint.Style.STROKE);
                         paint.setColor(primaryColor);
@@ -1174,7 +1171,7 @@ public class ControlElement {
                                 canvas.drawRect(startX, lineTop, startX + elementSize, lineBottom, paint);
                                 paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, elementSize - strokeWidth * 2), minTextSize));
                                 paint.setTextAlign(Paint.Align.CENTER);
-                                paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
+                                paint.setXfermode(XFERMODE_CLEAR);
                                 canvas.drawText(text, startX + elementSize * 0.5f, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
                                 paint.setXfermode(null);
                             } else {
@@ -1197,7 +1194,7 @@ public class ControlElement {
                     path.addRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, Path.Direction.CW);
                     canvas.clipPath(path);
                     float startY = box.top - scrollOffset % elementSize;
-                    for (byte i = rangeIndex[0]; i < rangeIndex[1]; i++) {
+                    for (int i = scroller.getRangeIndexFrom(); i < scroller.getRangeIndexTo(); i++) {
                         paint.setStyle(Paint.Style.STROKE);
                         paint.setColor(primaryColor);
                         if (startY > box.top && startY < box.bottom) canvas.drawLine(lineLeft, startY, lineRight, startY, paint);
@@ -1209,7 +1206,7 @@ public class ControlElement {
                                 canvas.drawRect(lineLeft, startY, lineRight, startY + elementSize, paint);
                                 paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, box.width() - strokeWidth * 2), minTextSize));
                                 paint.setTextAlign(Paint.Align.CENTER);
-                                paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
+                                paint.setXfermode(XFERMODE_CLEAR);
                                 canvas.drawText(text, x, startY + elementSize * 0.5f - ((paint.descent() + paint.ascent()) * 0.5f), paint);
                                 paint.setXfermode(null);
                             } else {
@@ -1234,10 +1231,12 @@ public class ControlElement {
         int snappingSize = inputControlsView.getSnappingSize();
         Paint paint = inputControlsView.getPaint();
         int primaryColor = inputControlsView.getPrimaryColor();
+        int secondaryColor = inputControlsView.getSecondaryColor();
 
-        paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
+        paint.setColor(selected ? secondaryColor : primaryColor);
         paint.setStyle(Paint.Style.STROKE);
-        float strokeWidth = snappingSize * strokeWidthMultiplier();
+        ControlsProfile profile = inputControlsView.getProfile();
+        float strokeWidth = snappingSize * (profile != null ? profile.getStrokeWidth() : 0.2f);
         paint.setStrokeWidth(strokeWidth);
         Rect boundingBox = getBoundingBox();
         boolean engaged = isEngaged();
@@ -1277,56 +1276,92 @@ public class ControlElement {
                 float offsetY = snappingSize * 3 * scale;
                 float start = snappingSize * scale;
 
-                Path upPath = new Path();
-                upPath.moveTo(cx, cy - start);
-                upPath.lineTo(cx - offsetX, cy - offsetY);
-                upPath.lineTo(cx - offsetX, boundingBox.top);
-                upPath.lineTo(cx + offsetX, boundingBox.top);
-                upPath.lineTo(cx + offsetX, cy - offsetY);
-                upPath.close();
-
-                Path rightPath = new Path();
-                rightPath.moveTo(cx + start, cy);
-                rightPath.lineTo(cx + offsetY, cy - offsetX);
-                rightPath.lineTo(boundingBox.right, cy - offsetX);
-                rightPath.lineTo(boundingBox.right, cy + offsetX);
-                rightPath.lineTo(cx + offsetY, cy + offsetX);
-                rightPath.close();
-
-                Path downPath = new Path();
-                downPath.moveTo(cx, cy + start);
-                downPath.lineTo(cx - offsetX, cy + offsetY);
-                downPath.lineTo(cx - offsetX, boundingBox.bottom);
-                downPath.lineTo(cx + offsetX, boundingBox.bottom);
-                downPath.lineTo(cx + offsetX, cy + offsetY);
-                downPath.close();
-
-                Path leftPath = new Path();
-                leftPath.moveTo(cx - start, cy);
-                leftPath.lineTo(cx - offsetY, cy - offsetX);
-                leftPath.lineTo(boundingBox.left, cy - offsetX);
-                leftPath.lineTo(boundingBox.left, cy + offsetX);
-                leftPath.lineTo(cx - offsetY, cy + offsetX);
-                leftPath.close();
+                Path dpadPath = inputControlsView.getPath();
 
                 paint.setPathEffect(null);
                 if (dpadCornerRadius > 0) paint.setPathEffect(new CornerPathEffect(dpadCornerRadius * snappingSize * scale));
 
-                canvas.drawPath(upPath, paint);
-                canvas.drawPath(rightPath, paint);
-                canvas.drawPath(downPath, paint);
-                canvas.drawPath(leftPath, paint);
+                // Draw all 4 petal strokes
+                dpadPath.rewind();
+                dpadPath.moveTo(cx, cy - start);
+                dpadPath.lineTo(cx - offsetX, cy - offsetY);
+                dpadPath.lineTo(cx - offsetX, boundingBox.top);
+                dpadPath.lineTo(cx + offsetX, boundingBox.top);
+                dpadPath.lineTo(cx + offsetX, cy - offsetY);
+                dpadPath.close();
+                canvas.drawPath(dpadPath, paint);
 
+                dpadPath.rewind();
+                dpadPath.moveTo(cx + start, cy);
+                dpadPath.lineTo(cx + offsetY, cy - offsetX);
+                dpadPath.lineTo(boundingBox.right, cy - offsetX);
+                dpadPath.lineTo(boundingBox.right, cy + offsetX);
+                dpadPath.lineTo(cx + offsetY, cy + offsetX);
+                dpadPath.close();
+                canvas.drawPath(dpadPath, paint);
+
+                dpadPath.rewind();
+                dpadPath.moveTo(cx, cy + start);
+                dpadPath.lineTo(cx - offsetX, cy + offsetY);
+                dpadPath.lineTo(cx - offsetX, boundingBox.bottom);
+                dpadPath.lineTo(cx + offsetX, boundingBox.bottom);
+                dpadPath.lineTo(cx + offsetX, cy + offsetY);
+                dpadPath.close();
+                canvas.drawPath(dpadPath, paint);
+
+                dpadPath.rewind();
+                dpadPath.moveTo(cx - start, cy);
+                dpadPath.lineTo(cx - offsetY, cy - offsetX);
+                dpadPath.lineTo(boundingBox.left, cy - offsetX);
+                dpadPath.lineTo(boundingBox.left, cy + offsetX);
+                dpadPath.lineTo(cx - offsetY, cy + offsetX);
+                dpadPath.close();
+                canvas.drawPath(dpadPath, paint);
+
+                // Draw all 4 petal fills
                 paint.setStyle(Paint.Style.FILL);
                 int baseAlpha = Color.alpha(primaryColor);
+
+                dpadPath.rewind();
+                dpadPath.moveTo(cx, cy - start);
+                dpadPath.lineTo(cx - offsetX, cy - offsetY);
+                dpadPath.lineTo(cx - offsetX, boundingBox.top);
+                dpadPath.lineTo(cx + offsetX, boundingBox.top);
+                dpadPath.lineTo(cx + offsetX, cy - offsetY);
+                dpadPath.close();
                 paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[0] ? fillAlphaActive() : fillAlphaInactive()) / 255));
-                canvas.drawPath(upPath, paint);
+                canvas.drawPath(dpadPath, paint);
+
+                dpadPath.rewind();
+                dpadPath.moveTo(cx + start, cy);
+                dpadPath.lineTo(cx + offsetY, cy - offsetX);
+                dpadPath.lineTo(boundingBox.right, cy - offsetX);
+                dpadPath.lineTo(boundingBox.right, cy + offsetX);
+                dpadPath.lineTo(cx + offsetY, cy + offsetX);
+                dpadPath.close();
                 paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[1] ? fillAlphaActive() : fillAlphaInactive()) / 255));
-                canvas.drawPath(rightPath, paint);
+                canvas.drawPath(dpadPath, paint);
+
+                dpadPath.rewind();
+                dpadPath.moveTo(cx, cy + start);
+                dpadPath.lineTo(cx - offsetX, cy + offsetY);
+                dpadPath.lineTo(cx - offsetX, boundingBox.bottom);
+                dpadPath.lineTo(cx + offsetX, boundingBox.bottom);
+                dpadPath.lineTo(cx + offsetX, cy + offsetY);
+                dpadPath.close();
                 paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[2] ? fillAlphaActive() : fillAlphaInactive()) / 255));
-                canvas.drawPath(downPath, paint);
+                canvas.drawPath(dpadPath, paint);
+
+                dpadPath.rewind();
+                dpadPath.moveTo(cx - start, cy);
+                dpadPath.lineTo(cx - offsetY, cy - offsetX);
+                dpadPath.lineTo(boundingBox.left, cy - offsetX);
+                dpadPath.lineTo(boundingBox.left, cy + offsetX);
+                dpadPath.lineTo(cx - offsetY, cy + offsetX);
+                dpadPath.close();
                 paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[3] ? fillAlphaActive() : fillAlphaInactive()) / 255));
-                canvas.drawPath(leftPath, paint);
+                canvas.drawPath(dpadPath, paint);
+
                 paint.setStyle(Paint.Style.STROKE);
                 paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
                 paint.setStrokeWidth(strokeWidth);
@@ -1339,7 +1374,6 @@ public class ControlElement {
                 float elementSize = scroller.getElementSize();
                 float minTextSize = snappingSize * 2 * scale;
                 float scrollOffset = scroller.getScrollOffset();
-                byte[] rangeIndex = scroller.getRangeIndex();
                 Path path = inputControlsView.getPath();
                 path.reset();
 
@@ -1361,7 +1395,7 @@ public class ControlElement {
                         canvas.clipPath(path);
                         startX -= scrollOffset % elementSize;
 
-                        for (byte i = rangeIndex[0]; i < rangeIndex[1]; i++) {
+                        for (int i = scroller.getRangeIndexFrom(); i < scroller.getRangeIndexTo(); i++) {
                             int index = i % range.max;
                             paint.setStyle(Paint.Style.STROKE);
                             paint.setColor(primaryColor);
@@ -1408,7 +1442,7 @@ public class ControlElement {
                         canvas.clipPath(inputControlsView.getPath());
                         startY -= scrollOffset % elementSize;
 
-                        for (byte i = rangeIndex[0]; i < rangeIndex[1]; i++) {
+                        for (int i = scroller.getRangeIndexFrom(); i < scroller.getRangeIndexTo(); i++) {
                             paint.setStyle(Paint.Style.STROKE);
                             paint.setColor(primaryColor);
 
@@ -1506,9 +1540,9 @@ public class ControlElement {
         int margin = (int)(inputControlsView.getSnappingSize() * (shape == Shape.CIRCLE ? 2.0f : 1.0f) * scale);
         int halfSize = (int)((Math.min(width, height) - margin) * 0.5f);
 
-        Rect srcRect = new Rect(0, 0, icon.getWidth(), icon.getHeight());
-        Rect dstRect = new Rect((int)(cx - halfSize), (int)(cy - halfSize), (int)(cx + halfSize), (int)(cy + halfSize));
-        canvas.drawBitmap(icon, srcRect, dstRect, paint);
+        drawIconSrcRect.set(0, 0, icon.getWidth(), icon.getHeight());
+        drawIconDstRect.set((int)(cx - halfSize), (int)(cy - halfSize), (int)(cx + halfSize), (int)(cy + halfSize));
+        canvas.drawBitmap(icon, drawIconSrcRect, drawIconDstRect, paint);
         paint.setColorFilter(null);
     }
 
@@ -1722,8 +1756,7 @@ public class ControlElement {
                 gestureDownX = x;
                 gestureDownY = y;
                 if (isKeepButtonPressedAfterMinTime()) touchTime = System.currentTimeMillis();
-                if (toggleSwitch && selected) {
-                    releaseHeldBindings();
+                if (toggleSwitch && selected) {                    releaseHeldBindings();
                 }
                 else if (hasLongPressBinding() && !toggleSwitch) {
                     longPressTriggered = false;
@@ -1849,13 +1882,16 @@ public class ControlElement {
                         this.states[i] = true;
                     }
                 } else {
-                    final boolean[] states = {deltaY <= -STICK_DEAD_ZONE, deltaX >= STICK_DEAD_ZONE, deltaY >= STICK_DEAD_ZONE, deltaX <= -STICK_DEAD_ZONE};
+                    scratchStates[0] = deltaY <= -STICK_DEAD_ZONE;
+                    scratchStates[1] = deltaX >= STICK_DEAD_ZONE;
+                    scratchStates[2] = deltaY >= STICK_DEAD_ZONE;
+                    scratchStates[3] = deltaX <= -STICK_DEAD_ZONE;
                     for (byte i = 0; i < 4; i++) {
                         float value = i == 1 || i == 3 ? deltaX : deltaY;
                         List<Binding> seq = bindings.get(i);
                         for (int j = 0, sz = seq.size(); j < sz; j++) {
                             Binding binding = seq.get(j);
-                            boolean state = binding.isMouseMove() ? (states[i] || states[(i+2)%4]) : states[i];
+                            boolean state = binding.isMouseMove() ? (scratchStates[i] || scratchStates[(i+2)%4]) : scratchStates[i];
                             inputControlsView.handleInputEvent(binding, state, value);
                             this.states[i] = state;
                         }
@@ -1887,7 +1923,10 @@ public class ControlElement {
                         this.states[i] = true;
                     }
                 } else {
-                    final boolean[] states = {deltaY <= -TRACKPAD_MIN_SPEED, deltaX >= TRACKPAD_MIN_SPEED, deltaY >= TRACKPAD_MIN_SPEED, deltaX <= -TRACKPAD_MIN_SPEED};
+                    scratchStates[0] = deltaY <= -TRACKPAD_MIN_SPEED;
+                    scratchStates[1] = deltaX >= TRACKPAD_MIN_SPEED;
+                    scratchStates[2] = deltaY >= TRACKPAD_MIN_SPEED;
+                    scratchStates[3] = deltaX <= -TRACKPAD_MIN_SPEED;
                     int cursorDx = 0;
                     int cursorDy = 0;
 
@@ -1904,10 +1943,10 @@ public class ControlElement {
                                 cursorDy = Mathf.roundPoint(value);
                             }
                             else {
-                                inputControlsView.handleInputEvent(binding, states[i], value);
+                                inputControlsView.handleInputEvent(binding, scratchStates[i], value);
                             }
                         }
-                        this.states[i] = states[i];
+                        this.states[i] = scratchStates[i];
                     }
 
                     if (cursorDx != 0 || cursorDy != 0)  {
@@ -1920,14 +1959,17 @@ public class ControlElement {
                 }
             }
             else {
-                final boolean[] states = {deltaY <= -DPAD_DEAD_ZONE, deltaX >= DPAD_DEAD_ZONE, deltaY >= DPAD_DEAD_ZONE, deltaX <= -DPAD_DEAD_ZONE};
+                scratchStates[0] = deltaY <= -DPAD_DEAD_ZONE;
+                scratchStates[1] = deltaX >= DPAD_DEAD_ZONE;
+                scratchStates[2] = deltaY >= DPAD_DEAD_ZONE;
+                scratchStates[3] = deltaX <= -DPAD_DEAD_ZONE;
 
                 for (byte i = 0; i < 4; i++) {
                     float value = i == 1 || i == 3 ? deltaX : deltaY;
                     List<Binding> seq = bindings.get(i);
                     for (int j = 0, sz = seq.size(); j < sz; j++) {
                         Binding binding = seq.get(j);
-                        boolean state = binding.isMouseMove() ? (states[i] || states[(i+2)%4]) : states[i];
+                        boolean state = binding.isMouseMove() ? (scratchStates[i] || scratchStates[(i+2)%4]) : scratchStates[i];
                         inputControlsView.handleInputEvent(binding, state, value);
                         this.states[i] = state;
                     }
@@ -1948,9 +1990,9 @@ public class ControlElement {
     public boolean handleTouchUp(int pointerId) {
         if (pointerId == currentPointerId) {
             if (type == Type.BUTTON) {
-                if (isKeepButtonPressedAfterMinTime() && touchTime != null) {
-                    selected = (System.currentTimeMillis() - (long)touchTime) > BUTTON_MIN_TIME_TO_KEEP_PRESSED;
-                    touchTime = null;
+                if (isKeepButtonPressedAfterMinTime() && touchTime != 0) {
+                    selected = (System.currentTimeMillis() - touchTime) > BUTTON_MIN_TIME_TO_KEEP_PRESSED;
+                    touchTime = 0;
                 }
 
                 if (toggleSwitch) {

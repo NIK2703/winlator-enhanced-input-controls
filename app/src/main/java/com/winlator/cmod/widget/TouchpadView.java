@@ -690,20 +690,20 @@ public class TouchpadView extends View {
     }
 
 
+    private final float[] deltaResult = new float[2];
+
     public float[] computeDeltaPoint(float lastX, float lastY, float x, float y) {
-        final float[] result = {0, 0};
+        XForm.transformPoint(xform, lastX, lastY, deltaResult);
+        lastX = deltaResult[0];
+        lastY = deltaResult[1];
 
-        XForm.transformPoint(xform, lastX, lastY, result);
-        lastX = result[0];
-        lastY = result[1];
+        XForm.transformPoint(xform, x, y, deltaResult);
+        x = deltaResult[0];
+        y = deltaResult[1];
 
-        XForm.transformPoint(xform, x, y, result);
-        x = result[0];
-        y = result[1];
-
-        result[0] = x - lastX;
-        result[1] = y - lastY;
-        return result;
+        deltaResult[0] = x - lastX;
+        deltaResult[1] = y - lastY;
+        return deltaResult;
     }
 
     private StateListDrawable createTransparentBg() {
