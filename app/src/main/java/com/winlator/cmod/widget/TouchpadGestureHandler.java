@@ -263,6 +263,10 @@ public class TouchpadGestureHandler {
         return mainPointerId;
     }
 
+    public boolean isInTapWaiting() {
+        return state == State.TAP_WAITING;
+    }
+
     public void reset() {
         removeAllCallbacks();
         if (actionExecutor != null) actionExecutor.releaseHeldAction();
