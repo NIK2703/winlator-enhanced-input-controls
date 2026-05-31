@@ -5,6 +5,8 @@ import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
+import android.widget.TextView;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
@@ -55,6 +57,23 @@ public class TouchpadGestureSettingsDialog {
         npDoubleTap.setValue(profile.getDoubleTapTimeout());
         npDragThreshold.setValue(profile.getDragThreshold());
 
+        SeekBar sbCursorSpeed = view.findViewById(R.id.SBCursorSpeed);
+        TextView tvCursorSpeed = view.findViewById(R.id.TVCursorSpeed);
+        float initialSpeed = profile.getCursorSpeed();
+        sbCursorSpeed.setProgress(Math.round((initialSpeed - 0.25f) / 2.75f * 100f));
+        tvCursorSpeed.setText(Math.round(initialSpeed * 100) + "%");
+        sbCursorSpeed.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                float speed = 0.25f + (progress / 100.0f) * 2.75f;
+                tvCursorSpeed.setText(Math.round(speed * 100) + "%");
+            }
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
         LinearLayout llSingleFinger = view.findViewById(R.id.LLSingleFinger);
         addBindingSection(llSingleFinger, "single", "Single Tap", profile.getSingleTapAction(), R.string.single_tap_delay_help);
         addBindingSection(llSingleFinger, "double", "Double Tap", profile.getDoubleTapAction(), R.string.single_tap_delay_help);
@@ -73,16 +92,17 @@ public class TouchpadGestureSettingsDialog {
         addBindingSection(llTwoFinger, "double_2nd_drag", "  Double Tap Drag", profile.getDoubleTap2ndFingerDragAction(), R.string.single_tap_delay_help);
 
         builder.setPositiveButton("Save", (dialog, which) -> save(
-                npLongPress, npDoubleTap, npDragThreshold));
+                npLongPress, npDoubleTap, npDragThreshold, sbCursorSpeed));
         builder.setNegativeButton("Cancel", null);
 
         builder.create().show();
     }
 
-    private void save(NumberPicker npLongPress, NumberPicker npDoubleTap, NumberPicker npDragThreshold) {
+    private void save(NumberPicker npLongPress, NumberPicker npDoubleTap, NumberPicker npDragThreshold, SeekBar sbCursorSpeed) {
         profile.setLongPressTimeout(npLongPress.getValue());
         profile.setDoubleTapTimeout(npDoubleTap.getValue());
         profile.setDragThreshold(npDragThreshold.getValue());
+        profile.setCursorSpeed(0.25f + (sbCursorSpeed.getProgress() / 100.0f) * 2.75f);
 
         profile.setSingleTapAction(bindingValues.getOrDefault("single", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setLongPressAction(bindingValues.getOrDefault("long", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));

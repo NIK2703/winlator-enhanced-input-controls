@@ -460,6 +460,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         }
         try {
             JSONObject data = new JSONObject(FileUtils.readString(file));
+            if (data.has("cursorSpeed")) cursorSpeed = (float)data.getDouble("cursorSpeed");
             if (data.has("bindingDelay")) bindingDelay = data.getInt("bindingDelay");
             if (data.has("longPressDelay")) longPressDelay = data.getInt("longPressDelay");
             if (data.has("hapticFeedbackEnabled")) hapticFeedbackEnabled = data.getBoolean("hapticFeedbackEnabled");
