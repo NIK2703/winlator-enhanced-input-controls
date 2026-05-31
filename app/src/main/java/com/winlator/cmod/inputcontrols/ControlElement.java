@@ -154,12 +154,27 @@ public class ControlElement {
     private final boolean[] scratchStates = new boolean[4];
     private final Rect drawIconSrcRect = new Rect();
     private final Rect drawIconDstRect = new Rect();
+    private PathEffect dpadPathEffect;
+    private PorterDuffColorFilter colorFilterPrimary;
+    private PorterDuffColorFilter colorFilterSecondary;
+
+    private float cachedStrokeWidth;
+    private int cachedFillAlphaInactive;
+    private boolean cachedHapticEnabled;
+
+    private void refreshProfileCache() {
+        ControlsProfile p = inputControlsView.getProfile();
+        cachedStrokeWidth = p != null ? p.getStrokeWidth() : 0.2f;
+        cachedFillAlphaInactive = p != null ? p.getFillAlphaInactive() : 50;
+        cachedHapticEnabled = p != null && p.getHapticFeedbackEnabled();
+    }
 
     public ControlElement(InputControlsView inputControlsView) {
         this.inputControlsView = inputControlsView;
         for (int i = 0; i < 4; i++) {
             bindings.add(new ArrayList<Binding>());
         }
+        refreshProfileCache();
     }
 
     private void reset() {
@@ -194,6 +209,8 @@ public class ControlElement {
         iconId = 0;
         range = null;
         boundingBoxNeedsUpdate = true;
+        refreshProfileCache();
+        invalidateElementCache();
     }
 
     public Type getType() {
@@ -204,7 +221,6 @@ public class ControlElement {
         if (this.type == type) return;
         this.type = type;
         reset();
-        invalidateElementCache();
     }
 
     public int getBindingCount() {
@@ -584,6 +600,9 @@ public class ControlElement {
     public void invalidateElementCache() {
         cachedDisplayText = null;
         displayTextDirty = true;
+        dpadPathEffect = null;
+        colorFilterPrimary = null;
+        colorFilterSecondary = null;
         cacheCombined = null;
         cacheFill = null;
         dpadPetalStroke = null;
@@ -659,13 +678,19 @@ public class ControlElement {
         }
     }
 
+    private static final char[] HEX = "0123456789abcdef".toCharArray();
+
     private static String md5(String input) {
         try {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
             byte[] digest = md.digest(input.getBytes("UTF-8"));
-            StringBuilder sb = new StringBuilder(32);
-            for (byte b : digest) sb.append(String.format("%02x", b & 0xff));
-            return sb.toString();
+            char[] hexChars = new char[digest.length * 2];
+            for (int i = 0; i < digest.length; i++) {
+                int v = digest[i] & 0xFF;
+                hexChars[i * 2] = HEX[v >>> 4];
+                hexChars[i * 2 + 1] = HEX[v & 0x0F];
+            }
+            return new String(hexChars);
         } catch (Exception e) {
             return input.replaceAll("[^a-zA-Z0-9]", "_");
         }
@@ -705,18 +730,11 @@ public class ControlElement {
     }
 
     private float strokeWidthMultiplier() {
-        ControlsProfile p = inputControlsView.getProfile();
-        return p != null ? p.getStrokeWidth() : 0.2f;
-    }
-
-    private int fillAlphaActive() {
-        ControlsProfile p = inputControlsView.getProfile();
-        return p != null ? p.getFillAlphaActive() : 80;
+        return cachedStrokeWidth;
     }
 
     private int fillAlphaInactive() {
-        ControlsProfile p = inputControlsView.getProfile();
-        return p != null ? p.getFillAlphaInactive() : 50;
+        return cachedFillAlphaInactive;
     }
 
     private Bitmap loadFromDisk(String key) {
@@ -746,21 +764,22 @@ public class ControlElement {
         int h = src.getHeight();
         Bitmap result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(result);
-        Paint p = new Paint();
+        Paint p = inputControlsView.getPaint();
+        int savedAlpha = p.getAlpha();
         p.setAlpha((int)(opacity * 255));
         c.drawBitmap(src, 0, 0, p);
+        p.setAlpha(savedAlpha);
         src.recycle();
         return result;
     }
 
     private void ensureCombinedCache() {
+        if (!cacheCombinedDirty && cacheCombined != null) return;
         Rect box = getBoundingBox();
         int pad = strokePad();
         int w = box.width() + pad * 2;
         int h = box.height() + pad * 2;
         if (w <= 0 || h <= 0) return;
-        if (!cacheCombinedDirty && cacheCombined != null &&
-            cacheCombined.getWidth() == w && cacheCombined.getHeight() == h) return;
         cacheCombined = null;
         cacheCombinedKey = diskKey(LAYER_COMBINED);
         String vKey = visualKey(LAYER_COMBINED);
@@ -782,7 +801,11 @@ public class ControlElement {
             boolean savedSelected = selected;
             int savedPointerId = currentPointerId;
             boolean savedActive = active;
-            boolean[] savedStates = states.clone();
+            boolean[] savedStates = scratchStates;
+            scratchStates[0] = states[0];
+            scratchStates[1] = states[1];
+            scratchStates[2] = states[2];
+            scratchStates[3] = states[3];
             selected = false;
             currentPointerId = -1;
             active = false;
@@ -795,7 +818,10 @@ public class ControlElement {
             selected = savedSelected;
             currentPointerId = savedPointerId;
             active = savedActive;
-            states = savedStates;
+            states[0] = savedStates[0];
+            states[1] = savedStates[1];
+            states[2] = savedStates[2];
+            states[3] = savedStates[3];
             saveToDisk(cacheCombinedKey, cacheCombined);
             cacheCombined = applyOpacity(cacheCombined, inputControlsView.getOverlayOpacity());
             sharedPool.put(vKey, cacheCombined);
@@ -804,13 +830,12 @@ public class ControlElement {
     }
 
     private void ensureFillCache() {
+        if (!cacheFillDirty && cacheFill != null) return;
         Rect box = getBoundingBox();
         int pad = strokePad();
         int w = box.width() + pad * 2;
         int h = box.height() + pad * 2;
         if (w <= 0 || h <= 0) return;
-        if (!cacheFillDirty && cacheFill != null &&
-            cacheFill.getWidth() == w && cacheFill.getHeight() == h) return;
         cacheFill = null;
         String vKey = visualKey(LAYER_FILL);
         cacheFill = obtainPoolBitmap(vKey, w, h);
@@ -907,7 +932,7 @@ public class ControlElement {
         if (size <= 0) return;
 
         int baseAlpha = Color.alpha(inputControlsView.getPrimaryColor());
-        int fillActiveAlpha = baseAlpha * fillAlphaActive() / 255;
+        int fillActiveAlpha = baseAlpha;
         int fillInactiveAlpha = baseAlpha * fillAlphaInactive() / 255;
 
         cacheThumbFillActive = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
@@ -929,31 +954,35 @@ public class ControlElement {
         c = new Canvas(cacheThumbStrokePrimary);
         p.setStyle(Paint.Style.STROKE);
         p.setStrokeWidth(strokeWidth);
-        p.setColorFilter(new PorterDuffColorFilter(primaryColor, PorterDuff.Mode.SRC_IN));
-        p.setColor(Color.WHITE);
-        c.drawCircle(halfSize, halfSize, thumbRadius + strokeWidth * 0.5f, p);
+        p.setColor(ColorUtils.setAlphaComponent(Color.WHITE, 255));
+        if (colorFilterPrimary == null) colorFilterPrimary = new PorterDuffColorFilter(primaryColor, PorterDuff.Mode.SRC_IN);
+        p.setColorFilter(colorFilterPrimary);
+        c.drawCircle(halfSize, halfSize, thumbRadius, p);
 
         cacheThumbStrokeSelected = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         c = new Canvas(cacheThumbStrokeSelected);
-        p.setColorFilter(new PorterDuffColorFilter(secondaryColor, PorterDuff.Mode.SRC_IN));
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(strokeWidth);
+        p.setColor(ColorUtils.setAlphaComponent(Color.WHITE, 255));
+        if (colorFilterSecondary == null) colorFilterSecondary = new PorterDuffColorFilter(secondaryColor, PorterDuff.Mode.SRC_IN);
+        p.setColorFilter(colorFilterSecondary);
         p.setColor(Color.WHITE);
         c.drawCircle(halfSize, halfSize, thumbRadius + strokeWidth * 0.5f, p);
     }
 
-    private Path buildUpPetal(Rect box, int snappingSize) {
+    private void buildUpPetal(Rect box, int snappingSize, Path path) {
         float cx = box.centerX();
         float cy = box.centerY();
         float offsetX = snappingSize * 2 * scale;
         float offsetY = snappingSize * 3 * scale;
         float start = snappingSize * scale;
-        Path path = new Path();
+        path.rewind();
         path.moveTo(cx, cy - start);
         path.lineTo(cx - offsetX, cy - offsetY);
         path.lineTo(cx - offsetX, box.top);
         path.lineTo(cx + offsetX, box.top);
         path.lineTo(cx + offsetX, cy - offsetY);
         path.close();
-        return path;
     }
 
     private void ensureDPadCaches(int snappingSize) {
@@ -969,7 +998,10 @@ public class ControlElement {
         Paint paint = inputControlsView.getPaint();
         float strokeWidth = snappingSize * strokeWidthMultiplier();
         paint.setPathEffect(null);
-        if (dpadCornerRadius > 0) paint.setPathEffect(new CornerPathEffect(dpadCornerRadius * snappingSize * scale));
+        if (dpadCornerRadius > 0) {
+            if (dpadPathEffect == null) dpadPathEffect = new CornerPathEffect(dpadCornerRadius * snappingSize * scale);
+            paint.setPathEffect(dpadPathEffect);
+        }
         String strokeKey = diskKey(LAYER_FILL) + "_dpad_stroke";
         String fillKey = diskKey(LAYER_FILL) + "_dpad_fill";
         dpadPetalStroke = loadFromDisk(strokeKey);
@@ -987,7 +1019,9 @@ public class ControlElement {
             paint.setColor(ColorUtils.setAlphaComponent(Color.WHITE, 255));
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(strokeWidth);
-            c.drawPath(buildUpPetal(box, snappingSize), paint);
+            Path petalPath = inputControlsView.getPath();
+            buildUpPetal(box, snappingSize, petalPath);
+            c.drawPath(petalPath, paint);
             saveToDisk(strokeKey, dpadPetalStroke);
             dpadPetalStroke = applyOpacity(dpadPetalStroke, inputControlsView.getOverlayOpacity());
         }
@@ -1002,7 +1036,9 @@ public class ControlElement {
             c.translate(-box.left + pad, -box.top + pad);
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(ColorUtils.setAlphaComponent(Color.WHITE, 255));
-            c.drawPath(buildUpPetal(box, snappingSize), paint);
+            Path petalPath = inputControlsView.getPath();
+            buildUpPetal(box, snappingSize, petalPath);
+            c.drawPath(petalPath, paint);
             paint.setStyle(Paint.Style.STROKE);
             saveToDisk(fillKey, dpadPetalFill);
         }
@@ -1016,19 +1052,21 @@ public class ControlElement {
         if (box.width() <= 0 || box.height() <= 0) return;
         if (selected && !(toggleSwitch && type == Type.BUTTON)) { draw(canvas); return; }
         int pad = strokePad();
+        int snappingSize = inputControlsView.getSnappingSize();
+        Paint paint = inputControlsView.getPaint();
+        int primaryColor = inputControlsView.getPrimaryColor();
+        int secondaryColor = inputControlsView.getSecondaryColor();
+        int colorAlpha = Color.alpha(primaryColor);
+        int inactiveAlpha = colorAlpha * fillAlphaInactive() / 255;
         if (type == Type.D_PAD) {
-            int snappingSize = inputControlsView.getSnappingSize();
             ensureDPadCaches(snappingSize);
             if (dpadPetalStroke == null) { draw(canvas); return; }
             float cx = box.centerX();
             float cy = box.centerY();
-            Paint paint = inputControlsView.getPaint();
-            int primaryColor = inputControlsView.getPrimaryColor();
             float strokeWidth = snappingSize * strokeWidthMultiplier();
             boolean engagedDpad = isEngaged();
-            int baseAlpha = Color.alpha(primaryColor);
-            int fillActive = baseAlpha * fillAlphaActive() / 255;
-            int fillInactive = baseAlpha * fillAlphaInactive() / 255;
+            int fillActive = colorAlpha;
+            int fillInactive = inactiveAlpha;
             paint.setStyle(Paint.Style.FILL);
             for (int i = 0; i < 4; i++) {
                 canvas.save();
@@ -1053,24 +1091,19 @@ public class ControlElement {
 
         // 1. Engaged: BUTTON/TRACKPAD — fill cache replaces normal rendering
         if (engaged && (type == Type.BUTTON || type == Type.TRACKPAD)) {
-            Paint p = inputControlsView.getPaint();
-            int pc = inputControlsView.getPrimaryColor();
-            int savedColor = p.getColor();
-            Paint.Style savedStyle = p.getStyle();
-            float savedStrokeWidth = p.getStrokeWidth();
-            int targetAlpha = fillAlphaActive();
-            if (targetAlpha > 0) {
-                ensureFillCache();
-                if (cacheFill != null) {
-                    int alpha = Color.alpha(pc) * targetAlpha / 255;
-                    p.setColor(ColorUtils.setAlphaComponent(pc, alpha));
-                    p.setStyle(Paint.Style.FILL);
-                    canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, p);
-                }
+            int savedColor = paint.getColor();
+            Paint.Style savedStyle = paint.getStyle();
+            float savedStrokeWidth = paint.getStrokeWidth();
+            ensureFillCache();
+            if (cacheFill != null) {
+                int alpha = colorAlpha;
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, alpha));
+                paint.setStyle(Paint.Style.FILL);
+                canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, paint);
             }
-            p.setStyle(savedStyle);
-            p.setColor(savedColor);
-            p.setStrokeWidth(savedStrokeWidth);
+            paint.setStyle(savedStyle);
+            paint.setColor(savedColor);
+            paint.setStrokeWidth(savedStrokeWidth);
             return;
         }
 
@@ -1080,18 +1113,16 @@ public class ControlElement {
             if (targetAlpha > 0) {
                 ensureFillCache();
                 if (cacheFill != null) {
-                    Paint p = inputControlsView.getPaint();
-                    int savedColor = p.getColor();
-                    Paint.Style savedStyle = p.getStyle();
-                    float savedStrokeWidth = p.getStrokeWidth();
-                    int pc = inputControlsView.getPrimaryColor();
-                    int fillAlpha = Color.alpha(pc) * targetAlpha / 255;
-                    p.setColor(ColorUtils.setAlphaComponent(pc, fillAlpha));
-                    p.setStyle(Paint.Style.FILL);
-                    canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, p);
-                    p.setStyle(savedStyle);
-                    p.setColor(savedColor);
-                    p.setStrokeWidth(savedStrokeWidth);
+                    int savedColor = paint.getColor();
+                    Paint.Style savedStyle = paint.getStyle();
+                    float savedStrokeWidth = paint.getStrokeWidth();
+                    int fillAlpha = colorAlpha * targetAlpha / 255;
+                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillAlpha));
+                    paint.setStyle(Paint.Style.FILL);
+                    canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, paint);
+                    paint.setStyle(savedStyle);
+                    paint.setColor(savedColor);
+                    paint.setStrokeWidth(savedStrokeWidth);
                 }
             }
         }
@@ -1107,12 +1138,9 @@ public class ControlElement {
 
         // 4. Dynamic content
         if (type == Type.STICK || type == Type.RANGE_BUTTON) {
-            int snappingSize = inputControlsView.getSnappingSize();
-            Paint paint = inputControlsView.getPaint();
-            int primaryColor = inputControlsView.getPrimaryColor();
-            paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
-            paint.setStyle(Paint.Style.STROKE);
             float strokeWidth = snappingSize * strokeWidthMultiplier();
+            paint.setColor(selected ? secondaryColor : primaryColor);
+            paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(strokeWidth);
             if (type == Type.STICK) {
                 float thumbstickX = getCurrentPosition().x;
@@ -1133,7 +1161,7 @@ public class ControlElement {
                     int savedColor = paint.getColor();
                     paint.setStyle(Paint.Style.FILL);
                     paint.setColorFilter(null);
-                    paint.setColor(ColorUtils.setAlphaComponent(Color.WHITE, Color.alpha(primaryColor) * (engaged ? fillAlphaActive() : fillAlphaInactive()) / 255));
+                    paint.setColor(ColorUtils.setAlphaComponent(Color.WHITE, (engaged ? colorAlpha : inactiveAlpha)));
                     canvas.drawCircle(thumbstickX, thumbstickY, thumbRadius, paint);
                     if (!engaged) {
                         paint.setStyle(Paint.Style.STROKE);
@@ -1167,7 +1195,7 @@ public class ControlElement {
                         if (startX < box.right && startX + elementSize > box.left) {
                             if (scroller.isActionDown() && scroller.getPressedIndex() == index) {
                                 paint.setStyle(Paint.Style.FILL);
-                                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor) * fillAlphaActive() / 255));
+                                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, colorAlpha));
                                 canvas.drawRect(startX, lineTop, startX + elementSize, lineBottom, paint);
                                 paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, elementSize - strokeWidth * 2), minTextSize));
                                 paint.setTextAlign(Paint.Align.CENTER);
@@ -1202,7 +1230,7 @@ public class ControlElement {
                         if (startY < box.bottom && startY + elementSize > box.top) {
                             if (scroller.isActionDown() && scroller.getPressedIndex() == (i % range.max)) {
                                 paint.setStyle(Paint.Style.FILL);
-                                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor) * fillAlphaActive() / 255));
+                                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, colorAlpha));
                                 canvas.drawRect(lineLeft, startY, lineRight, startY + elementSize, paint);
                                 paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, box.width() - strokeWidth * 2), minTextSize));
                                 paint.setTextAlign(Paint.Align.CENTER);
@@ -1232,15 +1260,16 @@ public class ControlElement {
         Paint paint = inputControlsView.getPaint();
         int primaryColor = inputControlsView.getPrimaryColor();
         int secondaryColor = inputControlsView.getSecondaryColor();
+        int colorAlpha = Color.alpha(primaryColor);
+        int inactiveFillAlpha = colorAlpha * fillAlphaInactive() / 255;
 
         paint.setColor(selected ? secondaryColor : primaryColor);
         paint.setStyle(Paint.Style.STROKE);
-        ControlsProfile profile = inputControlsView.getProfile();
-        float strokeWidth = snappingSize * (profile != null ? profile.getStrokeWidth() : 0.2f);
+        float strokeWidth = snappingSize * cachedStrokeWidth;
         paint.setStrokeWidth(strokeWidth);
         Rect boundingBox = getBoundingBox();
         boolean engaged = isEngaged();
-        int fillAlpha = engaged ? (Color.alpha(primaryColor) * fillAlphaActive() / 255) : (Color.alpha(primaryColor) * fillAlphaInactive() / 255);
+        int fillAlpha = engaged ? colorAlpha : inactiveFillAlpha;
         int fillColor = ColorUtils.setAlphaComponent(primaryColor, fillAlpha);
 
         switch (type) {
@@ -1279,7 +1308,10 @@ public class ControlElement {
                 Path dpadPath = inputControlsView.getPath();
 
                 paint.setPathEffect(null);
-                if (dpadCornerRadius > 0) paint.setPathEffect(new CornerPathEffect(dpadCornerRadius * snappingSize * scale));
+                if (dpadCornerRadius > 0) {
+                    if (dpadPathEffect == null) dpadPathEffect = new CornerPathEffect(dpadCornerRadius * snappingSize * scale);
+                    paint.setPathEffect(dpadPathEffect);
+                }
 
                 // Draw all 4 petal strokes
                 dpadPath.rewind();
@@ -1329,7 +1361,7 @@ public class ControlElement {
                 dpadPath.lineTo(cx + offsetX, boundingBox.top);
                 dpadPath.lineTo(cx + offsetX, cy - offsetY);
                 dpadPath.close();
-                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[0] ? fillAlphaActive() : fillAlphaInactive()) / 255));
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, (engaged && states[0] ? baseAlpha : (baseAlpha * fillAlphaInactive() / 255))));
                 canvas.drawPath(dpadPath, paint);
 
                 dpadPath.rewind();
@@ -1339,7 +1371,7 @@ public class ControlElement {
                 dpadPath.lineTo(boundingBox.right, cy + offsetX);
                 dpadPath.lineTo(cx + offsetY, cy + offsetX);
                 dpadPath.close();
-                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[1] ? fillAlphaActive() : fillAlphaInactive()) / 255));
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, (engaged && states[1] ? baseAlpha : (baseAlpha * fillAlphaInactive() / 255))));
                 canvas.drawPath(dpadPath, paint);
 
                 dpadPath.rewind();
@@ -1349,7 +1381,7 @@ public class ControlElement {
                 dpadPath.lineTo(cx + offsetX, boundingBox.bottom);
                 dpadPath.lineTo(cx + offsetX, cy + offsetY);
                 dpadPath.close();
-                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[2] ? fillAlphaActive() : fillAlphaInactive()) / 255));
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, (engaged && states[2] ? baseAlpha : (baseAlpha * fillAlphaInactive() / 255))));
                 canvas.drawPath(dpadPath, paint);
 
                 dpadPath.rewind();
@@ -1359,7 +1391,7 @@ public class ControlElement {
                 dpadPath.lineTo(boundingBox.left, cy + offsetX);
                 dpadPath.lineTo(cx - offsetY, cy + offsetX);
                 dpadPath.close();
-                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, baseAlpha * (engaged && states[3] ? fillAlphaActive() : fillAlphaInactive()) / 255));
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, (engaged && states[3] ? baseAlpha : (baseAlpha * fillAlphaInactive() / 255))));
                 canvas.drawPath(dpadPath, paint);
 
                 paint.setStyle(Paint.Style.STROKE);
@@ -1406,7 +1438,7 @@ public class ControlElement {
                             if (startX < boundingBox.right && startX + elementSize > boundingBox.left) {
                                 if (scroller.isActionDown() && scroller.getPressedIndex() == index) {
                                     paint.setStyle(Paint.Style.FILL);
-                                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor) * fillAlphaActive() / 255));
+                                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor)));
                                     float r = elementSize * 0.2f;
                                     canvas.drawRoundRect(startX, lineTop, startX + elementSize, lineBottom, r, r, paint);
                                 }
@@ -1439,7 +1471,7 @@ public class ControlElement {
                     if (!buildingCache) {
                         canvas.save();
                         path.addRoundRect(boundingBox.left, startY, boundingBox.right, boundingBox.bottom, radius, radius, Path.Direction.CW);
-                        canvas.clipPath(inputControlsView.getPath());
+                        canvas.clipPath(path);
                         startY -= scrollOffset % elementSize;
 
                         for (int i = scroller.getRangeIndexFrom(); i < scroller.getRangeIndexTo(); i++) {
@@ -1452,7 +1484,7 @@ public class ControlElement {
                             if (startY < boundingBox.bottom && startY + elementSize > boundingBox.top) {
                                 if (scroller.isActionDown() && scroller.getPressedIndex() == (i % range.max)) {
                                     paint.setStyle(Paint.Style.FILL);
-                                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor) * fillAlphaActive() / 255));
+                                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, Color.alpha(primaryColor)));
                                     float r = elementSize * 0.2f;
                                     canvas.drawRoundRect(lineLeft, startY, lineRight, startY + elementSize, r, r, paint);
                                 }
@@ -1485,7 +1517,7 @@ public class ControlElement {
 
                     short thumbRadius = (short) (snappingSize * 3.5f * scale);
                     paint.setStyle(Paint.Style.FILL);
-                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, engaged ? (Color.alpha(primaryColor) * fillAlphaActive() / 255) : (Color.alpha(primaryColor) * fillAlphaInactive() / 255)));
+                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, engaged ? colorAlpha : inactiveFillAlpha));
                     canvas.drawCircle(thumbstickX, thumbstickY, thumbRadius, paint);
 
                     paint.setStyle(Paint.Style.STROKE);
@@ -1674,8 +1706,7 @@ public class ControlElement {
     }
 
     private boolean isHapticEnabled() {
-        ControlsProfile p = inputControlsView.getProfile();
-        return p != null && p.getHapticFeedbackEnabled();
+        return cachedHapticEnabled;
     }
 
     private void vibrate(long milliseconds) {
