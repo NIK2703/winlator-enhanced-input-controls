@@ -60,12 +60,12 @@ public class TouchpadGestureSettingsDialog {
         SeekBar sbCursorSpeed = view.findViewById(R.id.SBCursorSpeed);
         TextView tvCursorSpeed = view.findViewById(R.id.TVCursorSpeed);
         float initialSpeed = profile.getCursorSpeed();
-        sbCursorSpeed.setProgress(Math.round((initialSpeed - 0.25f) / 2.75f * 100f));
+        sbCursorSpeed.setProgress(Math.round((initialSpeed - 0.25f) / 2.75f * 55f));
         tvCursorSpeed.setText(Math.round(initialSpeed * 100) + "%");
         sbCursorSpeed.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                float speed = 0.25f + (progress / 100.0f) * 2.75f;
+                float speed = 0.25f + (progress / 55.0f) * 2.75f;
                 tvCursorSpeed.setText(Math.round(speed * 100) + "%");
             }
             @Override
@@ -102,7 +102,7 @@ public class TouchpadGestureSettingsDialog {
         profile.setLongPressTimeout(npLongPress.getValue());
         profile.setDoubleTapTimeout(npDoubleTap.getValue());
         profile.setDragThreshold(npDragThreshold.getValue());
-        profile.setCursorSpeed(0.25f + (sbCursorSpeed.getProgress() / 100.0f) * 2.75f);
+        profile.setCursorSpeed(0.25f + (sbCursorSpeed.getProgress() / 55.0f) * 2.75f);
 
         profile.setSingleTapAction(bindingValues.getOrDefault("single", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setLongPressAction(bindingValues.getOrDefault("long", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
