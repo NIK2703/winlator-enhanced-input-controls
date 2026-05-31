@@ -20,6 +20,8 @@ public class RangeScroller {
     private boolean isActionDown = false;
     private boolean scrolling = false;
     private Timer timer;
+    private byte rangeIndexFrom;
+    private byte rangeIndexTo;
 
     public RangeScroller(InputControlsView inputControlsView, ControlElement element) {
         this.inputControlsView = inputControlsView;
@@ -47,12 +49,23 @@ public class RangeScroller {
         return pressedIndex;
     }
 
-    public byte[] getRangeIndex() {
+    public int getRangeIndexFrom() {
+        updateRangeIndex();
+        return rangeIndexFrom;
+    }
+
+    public int getRangeIndexTo() {
+        updateRangeIndex();
+        return rangeIndexTo;
+    }
+
+    private void updateRangeIndex() {
         ControlElement.Range range = element.getRange();
         byte from = (byte)Math.floor((scrollOffset / getElementSize()) % range.max);
         if (from < 0) from = (byte)(range.max + from);
         byte to = (byte)(from + element.getBindingCount() + 1);
-        return new byte[]{from, to};
+        rangeIndexFrom = from;
+        rangeIndexTo = to;
     }
 
     private int getIndexByPosition(float x, float y) {
@@ -131,6 +144,7 @@ public class RangeScroller {
                 scrollOffset = -currentOffset % scrollSize;
                 if (scrollOffset < 0) scrollOffset = scrollSize + scrollOffset;
 
+                updateRangeIndex();
                 lastPosition = position;
                 inputControlsView.invalidate();
             }
