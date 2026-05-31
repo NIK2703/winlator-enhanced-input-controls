@@ -47,16 +47,16 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private List<Binding> singleTap2ndFingerDragAction = new ArrayList<>();
     private List<Binding> longPress2ndFingerDragAction = new ArrayList<>();
     private List<Binding> doubleTap2ndFingerDragAction = new ArrayList<>();
-    private int doubleTapTimeout = 200;
-    private int longPressTimeout = 400;
+    private int doubleTapTimeout = 150;
+    private int longPressTimeout = 200;
     private SecondFingerMode secondFingerMode = SecondFingerMode.SECOND_TAP_ACTIONS;
     private int bindingDelay;
-    private int longPressDelay;
+    private int longPressDelay = 200;
     private boolean hapticFeedbackEnabled = true;
     private int dragThreshold = 10;
     private int gestureThreshold = 20;
-    private float strokeWidth = 0.2f;
-    private int fillAlphaInactive = 50;
+    private float strokeWidth = 0.15f;
+    private int fillAlphaInactive = 0;
     private TouchActivationMode touchActivationMode = TouchActivationMode.LOCK;
 
     private boolean gestureSettingsLoaded = false;

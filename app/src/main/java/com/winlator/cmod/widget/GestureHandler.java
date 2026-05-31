@@ -21,8 +21,8 @@ public abstract class GestureHandler {
     private List<Binding> singleTap2ndFingerDragAction, longPress2ndFingerDragAction, doubleTap2ndFingerDragAction;
 
     protected int bindingDelay;
-    protected int doubleTapTimeout = 200;
-    protected int longPressTimeout = 400;
+    protected int doubleTapTimeout = 150;
+    protected int longPressTimeout = 200;
     protected boolean hapticFeedbackEnabled = true;
     protected int dragThreshold = 10;
 

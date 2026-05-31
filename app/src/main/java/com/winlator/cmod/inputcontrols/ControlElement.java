@@ -101,8 +101,8 @@ public class ControlElement {
     private Shape shape = Shape.CIRCLE;
     private float elementWidth = 8f;
     private float elementHeight = 4f;
-    private float cornerRadius;
-    private float dpadCornerRadius;
+    private float cornerRadius = 0.6f;
+    private float dpadCornerRadius = 0.6f;
     private List<List<Binding>> bindings = new ArrayList<>();
     private float scale = 1.0f;
     private short x;
