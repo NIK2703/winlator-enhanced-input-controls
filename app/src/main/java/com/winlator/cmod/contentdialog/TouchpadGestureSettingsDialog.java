@@ -57,20 +57,20 @@ public class TouchpadGestureSettingsDialog {
 
         LinearLayout llSingleFinger = view.findViewById(R.id.LLSingleFinger);
         addBindingSection(llSingleFinger, "single", "Single Tap", profile.getSingleTapAction(), R.string.single_tap_delay_help);
-        addBindingSection(llSingleFinger, "double", "Double Tap", profile.getDoubleTapAction());
-        addBindingSection(llSingleFinger, "double_drag", "  Double Tap Drag", profile.getDoubleTapDragAction());
+        addBindingSection(llSingleFinger, "double", "Double Tap", profile.getDoubleTapAction(), R.string.single_tap_delay_help);
+        addBindingSection(llSingleFinger, "double_drag", "  Double Tap Drag", profile.getDoubleTapDragAction(), R.string.single_tap_delay_help);
 
         LinearLayout llHoldGestures = view.findViewById(R.id.LLHoldGestures);
         addBindingSection(llHoldGestures, "long", "Long Press", profile.getLongPressAction(), R.string.long_press_drag_help);
-        addBindingSection(llHoldGestures, "long_drag", "  Long Press Drag", profile.getLongPressDragAction());
+        addBindingSection(llHoldGestures, "long_drag", "  Long Press Drag", profile.getLongPressDragAction(), R.string.long_press_drag_help);
 
         LinearLayout llTwoFinger = view.findViewById(R.id.LLTwoFinger);
         addBindingSection(llTwoFinger, "single_2nd", "Single Tap", profile.getSingleTap2ndFingerAction());
         addBindingSection(llTwoFinger, "single_2nd_drag", "  Single Tap Drag", profile.getSingleTap2ndFingerDragAction());
         addBindingSection(llTwoFinger, "long_2nd", "Long Press", profile.getLongPress2ndFingerAction(), R.string.long_press_drag_help);
-        addBindingSection(llTwoFinger, "long_2nd_drag", "  Long Press Drag", profile.getLongPress2ndFingerDragAction());
-        addBindingSection(llTwoFinger, "double_2nd", "Double Tap", profile.getDoubleTap2ndFingerAction());
-        addBindingSection(llTwoFinger, "double_2nd_drag", "  Double Tap Drag", profile.getDoubleTap2ndFingerDragAction());
+        addBindingSection(llTwoFinger, "long_2nd_drag", "  Long Press Drag", profile.getLongPress2ndFingerDragAction(), R.string.long_press_drag_help);
+        addBindingSection(llTwoFinger, "double_2nd", "Double Tap", profile.getDoubleTap2ndFingerAction(), R.string.single_tap_delay_help);
+        addBindingSection(llTwoFinger, "double_2nd_drag", "  Double Tap Drag", profile.getDoubleTap2ndFingerDragAction(), R.string.single_tap_delay_help);
 
         builder.setPositiveButton("Save", (dialog, which) -> save(
                 npLongPress, npDoubleTap, npDragThreshold));
