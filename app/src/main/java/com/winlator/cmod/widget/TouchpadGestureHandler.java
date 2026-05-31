@@ -78,6 +78,7 @@ public class TouchpadGestureHandler {
     private List<Binding> pendingDoubleTapAction;
     private List<Binding> pendingDeferredDoubleAction;
     private List<Binding> pendingSecondTapAction;
+    private List<Binding> pendingSecondDoubleTapAction;
     private boolean doubleTapConsumed;
     private boolean secondFingerDoubleTapWaiting;
     private List<Binding> secondFingerDoubleTapFallback;
@@ -199,7 +200,11 @@ public class TouchpadGestureHandler {
                 touchpadView.removeCallbacks(secondFingerDoubleTapRunnable);
                 setSecondFingerActive(true);
 
-                actionExecutor.executeActions(activeDoubleTapAction);
+                if (hasActiveDoubleTapDrag) {
+                    pendingSecondDoubleTapAction = activeDoubleTapAction;
+                } else {
+                    actionExecutor.executeActions(activeDoubleTapAction);
+                }
                 secondFingerDoubleTapFallback = null;
 
                 if (hasActiveDoubleTapDrag) postDoubleTapDrag = true;
@@ -269,6 +274,7 @@ public class TouchpadGestureHandler {
                 }
                 pendingDoubleTapAction = null;
                 pendingSecondTapAction = null;
+                pendingSecondDoubleTapAction = null;
                 state = State.DRAGGING;
                 return true;
             }
@@ -289,6 +295,10 @@ public class TouchpadGestureHandler {
                 else if (pendingSecondTapAction != null) {
                     actionExecutor.executeActions(pendingSecondTapAction);
                     pendingSecondTapAction = null;
+                }
+                if (pendingSecondDoubleTapAction != null) {
+                    actionExecutor.executeActions(pendingSecondDoubleTapAction);
+                    pendingSecondDoubleTapAction = null;
                 }
                 actionExecutor.releaseHeldAction();
                 if (touchpadView.getXServer() != null) {
@@ -375,6 +385,7 @@ public class TouchpadGestureHandler {
         pendingDoubleTapAction = null;
         pendingDeferredDoubleAction = null;
         pendingSecondTapAction = null;
+        pendingSecondDoubleTapAction = null;
         doubleTapConsumed = false;
         secondFingerDoubleTapWaiting = false;
         secondFingerDoubleTapFallback = null;
@@ -434,6 +445,7 @@ public class TouchpadGestureHandler {
         if (state != State.TAP_WAITING) return;
 
         pendingSecondTapAction = null;
+        pendingSecondDoubleTapAction = null;
 
         if (canHoldLongPress) {
             actionExecutor.executeActionsAndHold(activeLongPressAction);
