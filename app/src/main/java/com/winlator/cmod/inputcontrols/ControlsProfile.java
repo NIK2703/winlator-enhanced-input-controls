@@ -56,7 +56,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private int dragThreshold = 10;
     private int gestureThreshold = 20;
     private float strokeWidth = 0.2f;
-    private int fillAlphaActive = 80;
     private int fillAlphaInactive = 50;
     private TouchActivationMode touchActivationMode = TouchActivationMode.LOCK;
 
@@ -335,15 +334,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.strokeWidth = strokeWidth;
     }
 
-    public int getFillAlphaActive() {
-        ensureGestureSettingsLoaded();
-        return fillAlphaActive;
-    }
-
-    public void setFillAlphaActive(int fillAlphaActive) {
-        this.fillAlphaActive = fillAlphaActive;
-    }
-
     public int getFillAlphaInactive() {
         ensureGestureSettingsLoaded();
         return fillAlphaInactive;
@@ -477,7 +467,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (data.has("dragThreshold")) dragThreshold = clamp(data.getInt("dragThreshold"), 0, 30);
             if (data.has("gestureThreshold")) gestureThreshold = clamp(data.getInt("gestureThreshold"), 10, 50);
             if (data.has("strokeWidth")) strokeWidth = (float)data.getDouble("strokeWidth");
-            if (data.has("fillAlphaActive")) fillAlphaActive = data.getInt("fillAlphaActive");
             if (data.has("fillAlphaInactive")) fillAlphaInactive = data.getInt("fillAlphaInactive");
             if (data.has("touchscreenGestures")) {
                 loadGestureSettingsFromJson(data.getJSONObject("touchscreenGestures"));
@@ -606,7 +595,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (dragThreshold != 10) data.put("dragThreshold", dragThreshold);
             if (gestureThreshold != 20) data.put("gestureThreshold", gestureThreshold);
             if (strokeWidth != 0.2f) data.put("strokeWidth", strokeWidth);
-            data.put("fillAlphaActive", fillAlphaActive);
             data.put("fillAlphaInactive", fillAlphaInactive);
 
             JSONArray elementsJSONArray = new JSONArray();
@@ -732,7 +720,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             else if (profileJSONObject.has("longPressHapticEnabled")) hapticFeedbackEnabled = profileJSONObject.getBoolean("longPressHapticEnabled");
             if (profileJSONObject.has("dragThreshold")) dragThreshold = clamp(profileJSONObject.getInt("dragThreshold"), 0, 30);
             if (profileJSONObject.has("strokeWidth")) strokeWidth = (float)profileJSONObject.getDouble("strokeWidth");
-            if (profileJSONObject.has("fillAlphaActive")) fillAlphaActive = profileJSONObject.getInt("fillAlphaActive");
             if (profileJSONObject.has("fillAlphaInactive")) fillAlphaInactive = profileJSONObject.getInt("fillAlphaInactive");
             if (profileJSONObject.has("touchscreenGestures")) {
                 loadGestureSettingsFromJson(profileJSONObject.getJSONObject("touchscreenGestures"));

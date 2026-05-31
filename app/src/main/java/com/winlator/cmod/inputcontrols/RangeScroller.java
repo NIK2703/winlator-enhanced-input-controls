@@ -1,12 +1,11 @@
 package com.winlator.cmod.inputcontrols;
 
 import android.graphics.Rect;
+import android.os.Handler;
+import android.os.Looper;
 
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.widget.TouchpadView;
-
-import java.util.Timer;
-import java.util.TimerTask;
 
 public class RangeScroller {
     private final InputControlsView inputControlsView;
@@ -19,13 +18,34 @@ public class RangeScroller {
     private int pressedIndex = -1;
     private boolean isActionDown = false;
     private boolean scrolling = false;
-    private Timer timer;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable tapRunnable;
     private byte rangeIndexFrom;
     private byte rangeIndexTo;
+
+    private static final Binding[][] RANGE_BINDINGS = new Binding[4][];
+    static {
+        for (ControlElement.Range range : ControlElement.Range.values()) {
+            int max = range.max;
+            Binding[] arr = new Binding[max];
+            for (int i = 0; i < max; i++) {
+                switch (range.ordinal()) {
+                    case 0: arr[i] = Binding.valueOf("KEY_" + (char)(65 + i)); break;
+                    case 1: arr[i] = Binding.valueOf("KEY_" + ((i + 1) % 10)); break;
+                    case 2: arr[i] = Binding.valueOf("KEY_F" + (i + 1)); break;
+                    case 3: arr[i] = Binding.valueOf("KEY_KP_" + ((i + 1) % 10)); break;
+                }
+            }
+            RANGE_BINDINGS[range.ordinal()] = arr;
+        }
+    }
 
     public RangeScroller(InputControlsView inputControlsView, ControlElement element) {
         this.inputControlsView = inputControlsView;
         this.element = element;
+        this.tapRunnable = () -> {
+            if (!scrolling) inputControlsView.handleInputEvent(binding, true);
+        };
     }
 
     public float getElementSize() {
@@ -79,35 +99,19 @@ public class RangeScroller {
 
     private Binding getBindingByPosition(float x, float y) {
         int index = getIndexByPosition(x, y);
-        ControlElement.Range range = element.getRange();
-
-        switch (range) {
-            case FROM_A_TO_Z:
-                return Binding.valueOf("KEY_"+((char)(65 + index)));
-            case FROM_0_TO_9:
-                return Binding.valueOf("KEY_"+((index + 1) % 10));
-            case FROM_F1_TO_F12:
-                return Binding.valueOf("KEY_F"+(index + 1));
-            case FROM_NP0_TO_NP9:
-                return Binding.valueOf("KEY_KP_"+((index + 1) % 10));
-            default:
-                return Binding.NONE;
-        }
+        int ordinal = element.getRange().ordinal();
+        if (ordinal < 0 || ordinal >= RANGE_BINDINGS.length) return Binding.NONE;
+        Binding[] arr = RANGE_BINDINGS[ordinal];
+        if (index < 0 || index >= arr.length) return Binding.NONE;
+        return arr[index];
     }
 
     private boolean isTap() {
         return (System.currentTimeMillis() - touchTime) < TouchpadView.MAX_TAP_MILLISECONDS;
     }
 
-    private void destroyTimer() {
-        if (timer != null) {
-            timer.cancel();
-            timer = null;
-        }
-    }
-
     public void handleTouchDown(float x, float y) {
-        destroyTimer();
+        handler.removeCallbacks(tapRunnable);
 
         scrolling = false;
         isActionDown = true;
@@ -117,13 +121,7 @@ public class RangeScroller {
         lastPosition = element.getOrientation() == 0 ? x : y;
         element.setBinding(Binding.NONE);
 
-        timer = new Timer(true);
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                if (!scrolling) inputControlsView.post(() -> inputControlsView.handleInputEvent(binding, true));
-            }
-        }, TouchpadView.MAX_TAP_MILLISECONDS);
+        handler.postDelayed(tapRunnable, TouchpadView.MAX_TAP_MILLISECONDS);
     }
 
     public void handleTouchMove(float x, float y) {
@@ -134,7 +132,7 @@ public class RangeScroller {
             if (Math.abs(deltaPosition) >= TouchpadView.MAX_TAP_TRAVEL_DISTANCE) {
                 scrolling = true;
                 pressedIndex = -1;
-                destroyTimer();
+                handler.removeCallbacks(tapRunnable);
             }
 
             if (scrolling) {
@@ -153,7 +151,7 @@ public class RangeScroller {
 
     public void handleTouchUp() {
         if (isActionDown) {
-            destroyTimer();
+            handler.removeCallbacks(tapRunnable);
             if (isTap() && !scrolling) {
                 inputControlsView.handleInputEvent(binding, true);
                 final Binding finalBinding = binding;
