@@ -1703,12 +1703,16 @@ public class ControlElement {
     }
 
     public void cancelLongPress() {
+        cancelPendingLongPress();
+        longPressTriggered = false;
+        gestureTriggered = false;
+    }
+
+    public void cancelPendingLongPress() {
         if (longPressHandler != null) {
             longPressHandler.removeCallbacksAndMessages(null);
             longPressHandler = null;
         }
-        longPressTriggered = false;
-        gestureTriggered = false;
     }
 
     public boolean handleTouchDown(int pointerId, float x, float y) {
