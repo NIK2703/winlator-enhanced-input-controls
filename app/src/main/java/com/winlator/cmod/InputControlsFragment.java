@@ -78,9 +78,7 @@ public class InputControlsFragment extends Fragment {
     private TextView tvBindingDelay;
     private SeekBar sbLongPressDelay;
     private TextView tvLongPressDelay;
-    private SeekBar sbLongPressHaptic;
-    private TextView tvLongPressHaptic;
-    private CheckBox cbLongPressHaptic;
+    private CheckBox cbHapticFeedback;
     private SeekBar sbGestureThreshold;
     private TextView tvGestureThreshold;
     private SeekBar sbStrokeWidth;
@@ -220,39 +218,16 @@ public class InputControlsFragment extends Fragment {
             tvLongPressDelay.setText(delay + " ms");
         });
 
-        tvLongPressHaptic = view.findViewById(R.id.TVLongPressHaptic);
-        sbLongPressHaptic = view.findViewById(R.id.SBLongPressHaptic);
-        view.findViewById(R.id.BTHelpLongPressHaptic).setOnClickListener((v) ->
-                AppUtils.showHelpBox(context, v, R.string.long_press_haptic_help));
-        sbLongPressHaptic.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvLongPressHaptic.setText(progress > 0 ? progress + "%" : "Off");
-                if (fromUser && currentProfile != null) {
-                    currentProfile.setLongPressHapticIntensity(progress);
-                    currentProfile.save();
-                }
-            }
-
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-        sbLongPressHaptic.post(() -> {
-            int haptic = currentProfile != null ? currentProfile.getLongPressHapticIntensity() : 50;
-            sbLongPressHaptic.setProgress(haptic);
-            tvLongPressHaptic.setText(haptic > 0 ? haptic + "%" : "Off");
-        });
-
-        cbLongPressHaptic = view.findViewById(R.id.CBLongPressHaptic);
-        cbLongPressHaptic.setOnCheckedChangeListener((buttonView, isChecked) -> {
+        cbHapticFeedback = view.findViewById(R.id.CBHapticFeedback);
+        cbHapticFeedback.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (currentProfile != null) {
-                currentProfile.setLongPressHapticEnabled(isChecked);
+                currentProfile.setHapticFeedbackEnabled(isChecked);
                 currentProfile.save();
             }
         });
-        cbLongPressHaptic.post(() -> {
+        cbHapticFeedback.post(() -> {
             if (currentProfile != null) {
-                cbLongPressHaptic.setChecked(currentProfile.getLongPressHapticEnabled());
+                cbHapticFeedback.setChecked(currentProfile.getHapticFeedbackEnabled());
             }
         });
 
@@ -555,10 +530,7 @@ public class InputControlsFragment extends Fragment {
                     int lpDelay = currentProfile.getLongPressDelay();
                     sbLongPressDelay.setProgress(lpDelay);
                     tvLongPressDelay.setText(lpDelay + " ms");
-                    int haptic = currentProfile.getLongPressHapticIntensity();
-                    sbLongPressHaptic.setProgress(haptic);
-                    tvLongPressHaptic.setText(haptic > 0 ? haptic + "%" : "Off");
-                    cbLongPressHaptic.setChecked(currentProfile.getLongPressHapticEnabled());
+                    cbHapticFeedback.setChecked(currentProfile.getHapticFeedbackEnabled());
                     int gThreshold = currentProfile.getGestureThreshold();
                     sbGestureThreshold.setProgress(gThreshold - 10);
                     tvGestureThreshold.setText(gThreshold + " px");

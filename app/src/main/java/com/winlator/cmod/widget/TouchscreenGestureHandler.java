@@ -38,8 +38,7 @@ public class TouchscreenGestureHandler {
     private int bindingDelay;
     private int doubleTapTimeout = 200;
     private int longPressTimeout = 400;
-    private int longPressHapticIntensity = 50;
-    private boolean longPressHapticEnabled = true;
+    private boolean hapticFeedbackEnabled = true;
     private int dragThreshold = 10;
     private int dragThresholdSq = 100;
     private SecondFingerMode secondFingerMode = SecondFingerMode.SECOND_TAP_ACTIONS;
@@ -130,8 +129,7 @@ public class TouchscreenGestureHandler {
         bindingDelay = profile.getBindingDelay();
         doubleTapTimeout = profile.getDoubleTapTimeout();
         longPressTimeout = profile.getLongPressTimeout();
-        longPressHapticIntensity = profile.getLongPressHapticIntensity();
-        longPressHapticEnabled = profile.getLongPressHapticEnabled();
+        hapticFeedbackEnabled = profile.getHapticFeedbackEnabled();
         dragThreshold = profile.getDragThreshold();
         dragThresholdSq = dragThreshold * dragThreshold;
         secondFingerMode = profile.getSecondFingerMode();
@@ -470,8 +468,8 @@ public class TouchscreenGestureHandler {
         }
         state = GestureState.LONG_PRESSING;
 
-        if (longPressHapticEnabled && (hasActiveLongPress || hasActiveLongPressDrag)) {
-            com.winlator.cmod.core.AppUtils.performHapticFeedback(touchpadView.getContext(), longPressHapticIntensity);
+        if (hapticFeedbackEnabled && (hasActiveLongPress || hasActiveLongPressDrag)) {
+            com.winlator.cmod.core.AppUtils.performHapticFeedback(touchpadView.getContext(), 255);
         }
     }
 

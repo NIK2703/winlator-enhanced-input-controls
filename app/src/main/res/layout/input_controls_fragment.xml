@@ -203,40 +203,11 @@
             android:progress="50"
             android:progressTint="@color/colorAccent" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Long Press Haptic"/>
-
-            <ImageView
-                android:id="@+id/BTHelpLongPressHaptic"
-                style="@style/HelpButton" />
-
-            <TextView
-                android:id="@+id/TVLongPressHaptic"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="end" />
-        </LinearLayout>
-
-        <SeekBar
-            android:id="@+id/SBLongPressHaptic"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:max="100"
-            android:progress="50" />
-
         <CheckBox
-            android:id="@+id/CBLongPressHaptic"
+            android:id="@+id/CBHapticFeedback"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Long Press Haptic Enabled"
+            android:text="Haptic Feedback Enabled"
             android:checked="true" />
 
         <LinearLayout

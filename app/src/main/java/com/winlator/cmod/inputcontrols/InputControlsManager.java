@@ -263,7 +263,6 @@ public class InputControlsManager {
             List<Binding> doubleTap2ndFingerDragAction = null;
             int bindingDelay = -1;
             int longPressDelay = -1;
-            int longPressHapticIntensity = -1;
             int dragThreshold = -1;
             int doubleTapTimeout = -1;
             int longPressTimeout = -1;
@@ -287,9 +286,6 @@ public class InputControlsManager {
                 }
                 else if (name.equals("longPressDelay")) {
                     longPressDelay = reader.nextInt();
-                }
-                else if (name.equals("longPressHapticIntensity")) {
-                    longPressHapticIntensity = reader.nextInt();
                 }
                 else if (name.equals("dragThreshold")) {
                     dragThreshold = reader.nextInt();
@@ -352,7 +348,6 @@ public class InputControlsManager {
             if (secondFingerModeStr != null) profile.setSecondFingerMode(ControlsProfile.parseEnum(SecondFingerMode.class, secondFingerModeStr, SecondFingerMode.SECOND_TAP_ACTIONS));
             if (bindingDelay >= 0) profile.setBindingDelay(bindingDelay);
             if (longPressDelay >= 0) profile.setLongPressDelay(longPressDelay);
-            if (longPressHapticIntensity >= 0) profile.setLongPressHapticIntensity(longPressHapticIntensity);
             if (dragThreshold >= 0) profile.setDragThreshold(dragThreshold);
 
             profile.markGestureSettingsLoaded();
