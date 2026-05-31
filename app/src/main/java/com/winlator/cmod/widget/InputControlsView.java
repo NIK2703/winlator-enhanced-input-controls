@@ -767,7 +767,7 @@ public class InputControlsView extends View {
                         if (btn != null && !tracked.contains(btn)) {
                             btn.activate();
                             tracked.add(btn);
-                            if (tracked.size() == 2) tracked.get(0).cancelLongPress();
+                            if (tracked.size() == 2) tracked.get(0).cancelPendingLongPress();
                         }
                         h = true;
                     }
@@ -792,7 +792,7 @@ public class InputControlsView extends View {
                                 btn.activate();
                                 if (!tracked.contains(btn)) {
                                     tracked.add(btn);
-                                    if (tracked.size() == 2) tracked.get(0).cancelLongPress();
+                                    if (tracked.size() == 2) tracked.get(0).cancelPendingLongPress();
                                 }
                                 hoveredButtons.put(pid, btn);
                             }
