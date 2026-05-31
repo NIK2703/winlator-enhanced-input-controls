@@ -208,10 +208,9 @@ public class TouchpadGestureHandler {
                     actionExecutor.executeActionsAndHold(dragBinding);
                 }
                 pendingDoubleTapAction = null;
+                state = State.DRAGGING;
+                return true;
             }
-
-            state = State.DRAGGING;
-            return true;
         }
         return false;
     }
