@@ -208,6 +208,8 @@ public class TouchpadView extends View {
 
         if (toolType == MotionEvent.TOOL_TYPE_STYLUS) {
             return handleStylusEvent(event);
+        } else if (isTouchscreenMode && currentProfile != null) {
+            return handleTouchscreenEvent(event);
         } else {
             return handleTouchpadEvent(event);
         }
@@ -327,7 +329,7 @@ public class TouchpadView extends View {
                             continueClick = System.currentTimeMillis() - fingers[0].touchTime > CLICK_DELAYED_TIME;
                     }
                 }
-                else if (touchpadGestureHandler != null) {
+                else if (touchpadGestureHandler != null && !isTouchscreenMode) {
                     touchpadGestureHandler.onFingerDown(pointerId, fingers[pointerId].x, fingers[pointerId].y);
                 }
                 break;
