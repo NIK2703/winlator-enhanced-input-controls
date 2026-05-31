@@ -16,8 +16,7 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.os.Handler;
-import android.os.VibrationEffect;
-import android.os.Vibrator;
+import android.os.Looper;
 import android.util.Log;
 import android.util.SparseArray;
 import android.view.KeyEvent;
@@ -678,7 +677,7 @@ public class InputControlsView extends View {
                     float y = event.getY(actionIndex);
                     touchpadView.setPointerButtonLeftEnabled(true);
 
-                    boolean handled = handleDownByMode(pointerId, x, y, actMode, hapticsEnabled);
+                    boolean handled = handleDownByMode(pointerId, x, y, actMode);
                     if (!handled) touchpadView.onTouchEvent(event);
                     break;
                 }
@@ -701,7 +700,7 @@ public class InputControlsView extends View {
         return true;
     }
 
-    private boolean handleDownByMode(int pointerId, float x, float y, TouchActivationMode actMode, boolean hapticsEnabled) {
+    private boolean handleDownByMode(int pointerId, float x, float y, TouchActivationMode actMode) {
         boolean handled = false;
         for (ControlElement element : profile.getElements()) {
             if (element.getBindingAt(0) == Binding.MOUSE_LEFT_BUTTON) {
@@ -714,16 +713,6 @@ public class InputControlsView extends View {
                 for (ControlElement element : profile.getElements()) {
                     if (element.handleTouchDown(pointerId, x, y)) {
                         handled = true;
-                        if (hapticsEnabled) {
-                            Vibrator vibrator = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
-                            if (vibrator != null && vibrator.hasVibrator()) {
-                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                    vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE));
-                                } else {
-                                    vibrator.vibrate(50);
-                                }
-                            }
-                        }
                     }
                 }
                 break;

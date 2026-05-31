@@ -103,14 +103,11 @@ public class ControlElement {
     private boolean[] states = new boolean[4];
     private boolean boundingBoxNeedsUpdate = true;
     private static final int LAYER_FILL = 0;
-    private static final int LAYER_SHAPE = 1;
-    private static final int LAYER_TEXTICON = 2;
+    private static final int LAYER_COMBINED = 1;
 
-    private Bitmap cacheShape;
-    private Bitmap cacheTextIcon;
+    private Bitmap cacheCombined;
     private Bitmap cacheFill;
-    private boolean cacheShapeDirty = true;
-    private boolean cacheTextIconDirty = true;
+    private boolean cacheCombinedDirty = true;
     private boolean cacheFillDirty = true;
     private Bitmap dpadPetalStroke;
     private Bitmap dpadPetalFill;
@@ -120,9 +117,7 @@ public class ControlElement {
     private Bitmap cacheThumbStrokePrimary;
     private Bitmap cacheThumbStrokeSelected;
     private boolean cacheThumbDirty = true;
-    private String cacheShapeKey = "";
-    private String cacheTextIconKey = "";
-    private int cacheLayer;
+    private String cacheCombinedKey = "";
     private String text = "";
     private byte iconId;
     private List<Binding> heldBindings;
@@ -578,8 +573,7 @@ public class ControlElement {
     }
 
     public void invalidateElementCache() {
-        cacheShape = null;
-        cacheTextIcon = null;
+        cacheCombined = null;
         cacheFill = null;
         dpadPetalStroke = null;
         dpadPetalFill = null;
@@ -587,17 +581,15 @@ public class ControlElement {
         cacheThumbFillInactive = null;
         cacheThumbStrokePrimary = null;
         cacheThumbStrokeSelected = null;
-        cacheShapeDirty = true;
-        cacheTextIconDirty = true;
+        cacheCombinedDirty = true;
         cacheFillDirty = true;
         dpadCacheDirty = true;
         cacheThumbDirty = true;
         if (inputControlsView != null) {
             File dir = cacheDir();
-            String shapeKey = diskKey(LAYER_SHAPE);
-            String textIconKey = diskKey(LAYER_TEXTICON);
+            String combinedKey = diskKey(LAYER_COMBINED);
             String fillKey = diskKey(LAYER_FILL);
-            for (String name : new String[]{shapeKey, textIconKey, fillKey, fillKey + "_dpad_stroke", fillKey + "_dpad_fill"}) {
+            for (String name : new String[]{combinedKey, fillKey, fillKey + "_dpad_stroke", fillKey + "_dpad_fill"}) {
                 File f = new File(dir, name + ".png");
                 if (f.exists()) f.delete();
             }
@@ -605,8 +597,7 @@ public class ControlElement {
     }
 
     public void invalidateElementCachesKeepDisk() {
-        cacheShape = null;
-        cacheTextIcon = null;
+        cacheCombined = null;
         cacheFill = null;
         dpadPetalStroke = null;
         dpadPetalFill = null;
@@ -614,8 +605,7 @@ public class ControlElement {
         cacheThumbFillInactive = null;
         cacheThumbStrokePrimary = null;
         cacheThumbStrokeSelected = null;
-        cacheShapeDirty = true;
-        cacheTextIconDirty = true;
+        cacheCombinedDirty = true;
         cacheFillDirty = true;
         dpadCacheDirty = true;
         cacheThumbDirty = true;
@@ -627,8 +617,7 @@ public class ControlElement {
         if (type == Type.D_PAD) {
             ensureDPadCaches(inputControlsView.getSnappingSize());
         } else {
-            ensureShapeCache();
-            if (type == Type.BUTTON) ensureTextIconCache();
+            ensureCombinedCache();
             ensureFillCache();
             if (type == Type.STICK) ensureThumbCaches();
         }
@@ -680,10 +669,10 @@ public class ControlElement {
     private String diskKey(int layer) {
         ControlsProfile p = inputControlsView.getProfile();
         int pid = p != null ? p.id : 0;
-        String prefix = layer == LAYER_FILL ? "f_" : layer == LAYER_SHAPE ? "s_" : "t_";
+        String prefix = layer == LAYER_FILL ? "f_" : "c_";
         String raw = pid + "|" + type.ordinal() + "|" + shape.ordinal() + "|" + elementWidth + "|" + elementHeight
             + "|" + cornerRadius + "|" + scale;
-        if (layer == LAYER_FILL || layer == LAYER_TEXTICON) raw += "|" + getDisplayText() + "|" + iconId;
+        if (layer == LAYER_FILL || layer == LAYER_COMBINED) raw += "|" + getDisplayText() + "|" + iconId;
         return pid + "_" + prefix + md5(raw);
     }
 
@@ -691,8 +680,7 @@ public class ControlElement {
         String base = type.ordinal() + "_" + shape.ordinal() + "_" + elementWidth + "_" + elementHeight + "_" + cornerRadius + "_" + scale;
         switch (layer) {
             case 0: return base + "_" + getDisplayText() + "_" + iconId + "_fill";
-            case 1: return base + "_shape";
-            case 2: return base + "_" + getDisplayText() + "_" + iconId + "_texticon";
+            case 1: return base + "_" + getDisplayText() + "_" + iconId + "_combined";
             default: return base;
         }
     }
@@ -755,35 +743,35 @@ public class ControlElement {
         return result;
     }
 
-    private void ensureShapeCache() {
-        if (!cacheShapeDirty && cacheShape != null) {
+    private void ensureCombinedCache() {
+        if (!cacheCombinedDirty && cacheCombined != null) {
             Rect box = getBoundingBox();
             int pad = strokePad();
-            if (cacheShape.getWidth() == box.width() + pad * 2 &&
-                cacheShape.getHeight() == box.height() + pad * 2) return;
+            if (cacheCombined.getWidth() == box.width() + pad * 2 &&
+                cacheCombined.getHeight() == box.height() + pad * 2) return;
         }
-        cacheShape = null;
+        cacheCombined = null;
         Rect box = getBoundingBox();
         int pad = strokePad();
         int w = box.width() + pad * 2;
         int h = box.height() + pad * 2;
         if (w <= 0 || h <= 0) return;
-        cacheShapeKey = diskKey(LAYER_SHAPE);
-        String vKey = visualKey(LAYER_SHAPE);
-        cacheShape = obtainPoolBitmap(vKey, w, h);
-        if (cacheShape == null) {
-            cacheShape = loadFromDisk(cacheShapeKey);
-            if (cacheShape != null && (cacheShape.getWidth() != w || cacheShape.getHeight() != h)) {
-                cacheShape.recycle();
-                cacheShape = null;
+        cacheCombinedKey = diskKey(LAYER_COMBINED);
+        String vKey = visualKey(LAYER_COMBINED);
+        cacheCombined = obtainPoolBitmap(vKey, w, h);
+        if (cacheCombined == null) {
+            cacheCombined = loadFromDisk(cacheCombinedKey);
+            if (cacheCombined != null && (cacheCombined.getWidth() != w || cacheCombined.getHeight() != h)) {
+                cacheCombined.recycle();
+                cacheCombined = null;
             }
-            if (cacheShape != null) {
-                cacheShape = applyOpacity(cacheShape, inputControlsView.getOverlayOpacity());
+            if (cacheCombined != null) {
+                cacheCombined = applyOpacity(cacheCombined, inputControlsView.getOverlayOpacity());
             }
         }
-        if (cacheShape == null) {
-            cacheShape = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-            Canvas c = new Canvas(cacheShape);
+        if (cacheCombined == null) {
+            cacheCombined = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(cacheCombined);
             c.translate(-box.left + pad, -box.top + pad);
             boolean savedSelected = selected;
             int savedPointerId = currentPointerId;
@@ -794,78 +782,19 @@ public class ControlElement {
             active = false;
             Arrays.fill(states, false);
             inputControlsView.setCacheAlphaOverride(1.0f);
-            cacheLayer = LAYER_SHAPE;
             buildingCache = true;
             draw(c);
             buildingCache = false;
-            cacheLayer = 0;
             inputControlsView.setCacheAlphaOverride(-1);
             selected = savedSelected;
             currentPointerId = savedPointerId;
             active = savedActive;
             states = savedStates;
-            saveToDisk(cacheShapeKey, cacheShape);
-            cacheShape = applyOpacity(cacheShape, inputControlsView.getOverlayOpacity());
-            sharedPool.put(vKey, cacheShape);
+            saveToDisk(cacheCombinedKey, cacheCombined);
+            cacheCombined = applyOpacity(cacheCombined, inputControlsView.getOverlayOpacity());
+            sharedPool.put(vKey, cacheCombined);
         }
-        cacheShapeDirty = false;
-    }
-
-    private void ensureTextIconCache() {
-        if (type != Type.BUTTON) { cacheTextIcon = null; cacheTextIconDirty = false; return; }
-        if (!cacheTextIconDirty && cacheTextIcon != null) {
-            Rect box = getBoundingBox();
-            int pad = strokePad();
-            if (cacheTextIcon.getWidth() == box.width() + pad * 2 &&
-                cacheTextIcon.getHeight() == box.height() + pad * 2) return;
-        }
-        cacheTextIcon = null;
-        Rect box = getBoundingBox();
-        int pad = strokePad();
-        int w = box.width() + pad * 2;
-        int h = box.height() + pad * 2;
-        if (w <= 0 || h <= 0) return;
-        cacheTextIconKey = diskKey(LAYER_TEXTICON);
-        String vKey = visualKey(LAYER_TEXTICON);
-        cacheTextIcon = obtainPoolBitmap(vKey, w, h);
-        if (cacheTextIcon == null) {
-            cacheTextIcon = loadFromDisk(cacheTextIconKey);
-            if (cacheTextIcon != null && (cacheTextIcon.getWidth() != w || cacheTextIcon.getHeight() != h)) {
-                cacheTextIcon.recycle();
-                cacheTextIcon = null;
-            }
-            if (cacheTextIcon != null) {
-                cacheTextIcon = applyOpacity(cacheTextIcon, inputControlsView.getOverlayOpacity());
-            }
-        }
-        if (cacheTextIcon == null) {
-            cacheTextIcon = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-            Canvas c = new Canvas(cacheTextIcon);
-            c.translate(-box.left + pad, -box.top + pad);
-            boolean savedSelected = selected;
-            int savedPointerId = currentPointerId;
-            boolean savedActive = active;
-            boolean[] savedStates = states.clone();
-            selected = false;
-            currentPointerId = -1;
-            active = false;
-            Arrays.fill(states, false);
-            inputControlsView.setCacheAlphaOverride(1.0f);
-            cacheLayer = LAYER_TEXTICON;
-            buildingCache = true;
-            draw(c);
-            buildingCache = false;
-            cacheLayer = 0;
-            inputControlsView.setCacheAlphaOverride(-1);
-            selected = savedSelected;
-            currentPointerId = savedPointerId;
-            active = savedActive;
-            states = savedStates;
-            saveToDisk(cacheTextIconKey, cacheTextIcon);
-            cacheTextIcon = applyOpacity(cacheTextIcon, inputControlsView.getOverlayOpacity());
-            sharedPool.put(vKey, cacheTextIcon);
-        }
-        cacheTextIconDirty = false;
+        cacheCombinedDirty = false;
     }
 
     private void ensureFillCache() {
@@ -1169,23 +1098,16 @@ public class ControlElement {
             }
         }
 
-        // 3. Shape layer (stroke + backgrounds, overlay opacity baked in)
-        ensureShapeCache();
-        if (cacheShape != null)
-            canvas.drawBitmap(cacheShape, box.left - pad, box.top - pad, null);
+        // 3. Combined layer (shape + text/icon, overlay opacity baked in)
+        ensureCombinedCache();
+        if (cacheCombined != null)
+            canvas.drawBitmap(cacheCombined, box.left - pad, box.top - pad, null);
         else {
             draw(canvas);
             return;
         }
 
-        // 4. Text/icon layer (BUTTON only, overlay opacity baked in)
-        if (type == Type.BUTTON) {
-            ensureTextIconCache();
-            if (cacheTextIcon != null)
-                canvas.drawBitmap(cacheTextIcon, box.left - pad, box.top - pad, null);
-        }
-
-        // 5. Dynamic content
+        // 4. Dynamic content
         if (type == Type.STICK || type == Type.RANGE_BUTTON) {
             int snappingSize = inputControlsView.getSnappingSize();
             Paint paint = inputControlsView.getPaint();
@@ -1327,28 +1249,24 @@ public class ControlElement {
                 float cx = boundingBox.centerX();
                 float cy = boundingBox.centerY();
 
-                if (cacheLayer != LAYER_TEXTICON) {
-                    paint.setStyle(Paint.Style.FILL);
-                    paint.setColor(fillColor);
-                    drawButtonShape(canvas, boundingBox, snappingSize, paint);
-                    paint.setStyle(Paint.Style.STROKE);
-                    paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
-                    paint.setStrokeWidth(strokeWidth);
-                    drawButtonShape(canvas, boundingBox, snappingSize, paint);
-                }
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(fillColor);
+                drawButtonShape(canvas, boundingBox, snappingSize, paint);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
+                paint.setStrokeWidth(strokeWidth);
+                drawButtonShape(canvas, boundingBox, snappingSize, paint);
 
-                if (cacheLayer != LAYER_SHAPE) {
-                    if (iconId > 0) {
-                        drawIcon(canvas, cx, cy, boundingBox.width(), boundingBox.height(), iconId);
-                    }
-                    else {
-                        String text = getDisplayText();
-                        paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, boundingBox.width() - strokeWidth * 2), snappingSize * 2 * scale));
-                        paint.setTextAlign(Paint.Align.CENTER);
-                        paint.setStyle(Paint.Style.FILL);
-                        paint.setColor(primaryColor);
-                        canvas.drawText(text, x, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
-                    }
+                if (iconId > 0) {
+                    drawIcon(canvas, cx, cy, boundingBox.width(), boundingBox.height(), iconId);
+                }
+                else {
+                    String text = getDisplayText();
+                    paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, boundingBox.width() - strokeWidth * 2), snappingSize * 2 * scale));
+                    paint.setTextAlign(Paint.Align.CENTER);
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(primaryColor);
+                    canvas.drawText(text, x, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
                 }
                 break;
             }
