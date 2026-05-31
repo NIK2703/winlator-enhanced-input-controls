@@ -57,6 +57,7 @@ public class TouchpadView extends View {
     private boolean mouseEnabled = true;
 
     private TouchscreenGestureHandler gestureHandler;
+    private TouchpadGestureHandler touchpadGestureHandler;
     private InputControlsView inputControlsView;
     private ControlsProfile currentProfile;
     private boolean isTouchscreenMode = false;
@@ -98,6 +99,7 @@ public class TouchpadView extends View {
         });
 
         gestureHandler = new TouchscreenGestureHandler(this);
+        touchpadGestureHandler = new TouchpadGestureHandler(this);
     }
 
     @Override
@@ -327,6 +329,9 @@ public class TouchpadView extends View {
                             continueClick = System.currentTimeMillis() - fingers[0].touchTime > CLICK_DELAYED_TIME;
                     }
                 }
+                else if (touchpadGestureHandler != null && !isTouchscreenMode) {
+                    touchpadGestureHandler.onFingerDown(pointerId, fingers[pointerId].x, fingers[pointerId].y);
+                }
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (event.isFromSource(InputDevice.SOURCE_MOUSE)) {
@@ -362,6 +367,7 @@ public class TouchpadView extends View {
                 }
                 break;
             case MotionEvent.ACTION_CANCEL:
+                if (touchpadGestureHandler != null) touchpadGestureHandler.reset();
                 for (byte i = 0; i < MAX_FINGERS; i++) fingers[i] = null;
                 numFingers = 0;
                 break;
@@ -473,29 +479,47 @@ public class TouchpadView extends View {
 
 
     private void handleFingerUp(Finger finger1) {
-        switch (numFingers) {
-            case 1:
-                if (simTouchScreen) {
-                    final Runnable clickDelay = () -> {
-                        if (continueClick)
-                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
-                    };
-                    postDelayed(clickDelay, CLICK_DELAYED_TIME);
-                }
-                else if (finger1.isTap()) pressPointerButtonLeft(finger1);
-                break;
-            case 2:
-                Finger finger2 = findSecondFinger(finger1);
-                if (finger2 != null && finger1.isTap()) pressPointerButtonRight(finger1);
-                break;
-            case 4:
-                if (fourFingersTapCallback != null) {
-                    for (byte i = 0; i < 4; i++) {
-                        if (fingers[i] != null && !fingers[i].isTap()) return;
+        int pointerId = findPointerId(finger1);
+        boolean gestureHandlerActive = !simTouchScreen && touchpadGestureHandler != null;
+        boolean handledByGesture = false;
+
+        if (gestureHandlerActive) {
+            int mainId = touchpadGestureHandler.getMainPointerId();
+            if (pointerId >= 0 && pointerId == mainId) {
+                touchpadGestureHandler.onFingerUp(pointerId);
+                handledByGesture = true;
+            }
+        }
+
+        if (!handledByGesture) {
+            switch (numFingers) {
+                case 1:
+                    if (simTouchScreen) {
+                        final Runnable clickDelay = () -> {
+                            if (continueClick)
+                                xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+                        };
+                        postDelayed(clickDelay, CLICK_DELAYED_TIME);
                     }
-                    fourFingersTapCallback.run();
-                }
-                break;
+                    else if (!gestureHandlerActive && finger1.isTap()) {
+                        pressPointerButtonLeft(finger1);
+                    }
+                    break;
+                case 2:
+                    if (!gestureHandlerActive) {
+                        Finger finger2 = findSecondFinger(finger1);
+                        if (finger2 != null && finger1.isTap()) pressPointerButtonRight(finger1);
+                    }
+                    break;
+                case 4:
+                    if (fourFingersTapCallback != null) {
+                        for (byte i = 0; i < 4; i++) {
+                            if (fingers[i] != null && !fingers[i].isTap()) return;
+                        }
+                        fourFingersTapCallback.run();
+                    }
+                    break;
+            }
         }
 
         releasePointerButtonLeft(finger1);
@@ -547,6 +571,14 @@ public class TouchpadView extends View {
             }
             else xServer.injectPointerMoveDelta(dx, dy);
         }
+
+        // Notify touchpad gesture handler of finger movement (drag detection)
+        if (touchpadGestureHandler != null) {
+            int pointerId = findPointerId(finger1);
+            if (pointerId >= 0) {
+                touchpadGestureHandler.onFingerMove(pointerId, finger1.x, finger1.y);
+            }
+        }
     }
 
     private Finger findSecondFinger(Finger finger) {
@@ -554,6 +586,13 @@ public class TouchpadView extends View {
             if (fingers[i] != null && fingers[i] != finger) return fingers[i];
         }
         return null;
+    }
+
+    private int findPointerId(Finger finger) {
+        for (int i = 0; i < MAX_FINGERS; i++) {
+            if (fingers[i] == finger) return i;
+        }
+        return -1;
     }
 
     private void pressPointerButtonLeft(Finger finger) {
@@ -723,6 +762,9 @@ public class TouchpadView extends View {
         if (gestureHandler != null) {
             gestureHandler.setInputControlsView(iv);
         }
+        if (touchpadGestureHandler != null) {
+            touchpadGestureHandler.setInputControlsView(iv);
+        }
     }
 
     public void setProfile(ControlsProfile profile) {
@@ -732,6 +774,10 @@ public class TouchpadView extends View {
             gestureHandler.applyConfig(profile);
             gestureHandler.reset();
         }
+        if (touchpadGestureHandler != null) {
+            touchpadGestureHandler.applyConfig(profile);
+            touchpadGestureHandler.reset();
+        }
     }
 
     public void clearProfile() {
@@ -739,6 +785,9 @@ public class TouchpadView extends View {
         this.isTouchscreenMode = false;
         if (gestureHandler != null) {
             gestureHandler.reset();
+        }
+        if (touchpadGestureHandler != null) {
+            touchpadGestureHandler.reset();
         }
     }
 

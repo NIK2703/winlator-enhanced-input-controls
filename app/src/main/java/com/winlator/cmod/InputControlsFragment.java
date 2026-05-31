@@ -43,6 +43,7 @@ import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.contentdialog.TouchpadGestureSettingsDialog;
 import com.winlator.cmod.contentdialog.TouchscreenGestureSettingsDialog;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
@@ -414,6 +415,20 @@ public class InputControlsFragment extends Fragment {
                     loadProfileSpinner(view.findViewById(R.id.SProfile));
                     XServerDisplayActivity.updateGestureConfig();
                     AppUtils.showToast(getContext(), "Gesture settings saved");
+                });
+                dialog.show();
+            } else {
+                AppUtils.showToast(context, R.string.no_profile_selected);
+            }
+        });
+
+        view.findViewById(R.id.BTTouchpadGestureSettings).setOnClickListener((v) -> {
+            if (currentProfile != null) {
+                TouchpadGestureSettingsDialog dialog = new TouchpadGestureSettingsDialog(getContext(), currentProfile);
+                dialog.setOnSaveListener((savedProfile) -> {
+                    loadProfileSpinner(view.findViewById(R.id.SProfile));
+                    XServerDisplayActivity.updateGestureConfig();
+                    AppUtils.showToast(getContext(), "Touchpad gesture settings saved");
                 });
                 dialog.show();
             } else {
