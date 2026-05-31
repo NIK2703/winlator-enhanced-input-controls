@@ -743,20 +743,17 @@ public class InputControlsView extends View {
     private void handleMoveByMode(MotionEvent event, TouchActivationMode actMode) {
         switch (actMode) {
             case LOCK:
-                boolean lockedHandled = false;
                 for (byte i = 0, count = (byte) event.getPointerCount(); i < count; i++) {
-                    if (processElementsTouchMove(event.getPointerId(i), event.getX(i), event.getY(i)))
-                        lockedHandled = true;
+                    if (!processElementsTouchMove(event.getPointerId(i), event.getX(i), event.getY(i)))
+                        touchpadView.onTouchEvent(event);
                 }
-                if (!lockedHandled) touchpadView.onTouchEvent(event);
                 break;
             case TRACK:
-                boolean trackHandled = false;
                 for (byte i = 0, count = (byte) event.getPointerCount(); i < count; i++) {
                     float x = event.getX(i);
                     float y = event.getY(i);
                     int pid = event.getPointerId(i);
-                    if (processElementsTouchMove(pid, x, y)) trackHandled = true;
+                    boolean h = processElementsTouchMove(pid, x, y);
                     ArrayList<ControlElement> tracked = trackedButtons.get(pid);
                     if (tracked != null) {
                         ControlElement btn = findButtonAt(x, y);
@@ -765,18 +762,17 @@ public class InputControlsView extends View {
                             tracked.add(btn);
                             if (tracked.size() == 2) tracked.get(0).cancelLongPress();
                         }
-                        trackHandled = true;
+                        h = true;
                     }
+                    if (!h) touchpadView.onTouchEvent(event);
                 }
-                if (!trackHandled) touchpadView.onTouchEvent(event);
                 break;
             case HOVER:
-                boolean hoverHandled = false;
                 for (byte i = 0, count = (byte) event.getPointerCount(); i < count; i++) {
                     float x = event.getX(i);
                     float y = event.getY(i);
                     int pid = event.getPointerId(i);
-                    if (processElementsTouchMove(pid, x, y)) hoverHandled = true;
+                    boolean h = processElementsTouchMove(pid, x, y);
                     ArrayList<ControlElement> tracked = trackedButtons.get(pid);
                     if (tracked != null) {
                         ControlElement btn = findButtonAt(x, y);
@@ -797,10 +793,10 @@ public class InputControlsView extends View {
                                 hoveredButtons.remove(pid);
                             }
                         }
-                        hoverHandled = true;
+                        h = true;
                     }
+                    if (!h) touchpadView.onTouchEvent(event);
                 }
-                if (!hoverHandled) touchpadView.onTouchEvent(event);
                 break;
         }
     }
