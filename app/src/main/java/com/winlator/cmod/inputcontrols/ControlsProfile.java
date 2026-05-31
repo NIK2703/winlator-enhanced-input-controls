@@ -36,13 +36,13 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private InputMode inputMode = InputMode.ABSOLUTE;
     private DragMode dragMode = DragMode.AUTO;
     private List<Binding> singleTapAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
-    private List<Binding> longPressAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
+    private List<Binding> longPressAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
     private List<Binding> doubleTapAction = new ArrayList<>();
     private List<Binding> singleTap2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
     private List<Binding> longPress2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
     private List<Binding> doubleTap2ndFingerAction = new ArrayList<>();
     private List<Binding> singleTapDragAction = new ArrayList<>();
-    private List<Binding> longPressDragAction = new ArrayList<>();
+    private List<Binding> longPressDragAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
     private List<Binding> doubleTapDragAction = new ArrayList<>();
     private List<Binding> singleTap2ndFingerDragAction = new ArrayList<>();
     private List<Binding> longPress2ndFingerDragAction = new ArrayList<>();

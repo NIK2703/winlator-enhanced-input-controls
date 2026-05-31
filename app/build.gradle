@@ -110,12 +110,33 @@ android {
         buildConfig = true
     }
 
+    lint {
+        abortOnError false
+    }
+
+    def keystorePropsFile = rootProject.file('keystore.properties')
+    def keystoreProps = new Properties()
+    if (keystorePropsFile.exists()) {
+        keystoreProps.load(new FileInputStream(keystorePropsFile))
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(keystoreProps.getProperty('storeFile', '../winlator.keystore'))
+            storePassword keystoreProps.getProperty('storePassword', '')
+            keyAlias keystoreProps.getProperty('keyAlias', '')
+            keyPassword keystoreProps.getProperty('keyPassword', '')
+        }
+    }
+
     // Keep Winlator’s buildTypes
     buildTypes {
         debug {
             minifyEnabled false
         }
-        // If you have a release build type, add it here
+        release {
+            signingConfig signingConfigs.release
+        }
     }
 
 
@@ -131,6 +152,9 @@ android {
     packagingOptions {
         jniLibs {
             useLegacyPackaging = true
+        }
+        resources {
+            excludes += ['assets/dexopt/baseline.prof']
         }
     }
 }

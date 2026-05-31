@@ -801,9 +801,11 @@ public class TouchpadView extends View {
         this.currentProfile = null;
         this.isTouchscreenMode = false;
         if (gestureHandler != null) {
+            gestureHandler.applyDefaultBindings();
             gestureHandler.reset();
         }
         if (touchpadGestureHandler != null) {
+            touchpadGestureHandler.applyDefaultBindings();
             touchpadGestureHandler.reset();
         }
     }
