@@ -464,6 +464,7 @@ public class ControlElement {
 
     public void setX(int x) {
         this.x = (short)x;
+        if (currentPosition != null) currentPosition.x = x;
         boundingBoxNeedsUpdate = true;
         invalidateElementCache();
     }
@@ -474,6 +475,7 @@ public class ControlElement {
 
     public void setY(int y) {
         this.y = (short)y;
+        if (currentPosition != null) currentPosition.y = y;
         boundingBoxNeedsUpdate = true;
         invalidateElementCache();
     }
