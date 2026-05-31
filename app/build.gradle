@@ -106,6 +106,10 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     // Keep Winlator’s buildTypes
     buildTypes {
         debug {
