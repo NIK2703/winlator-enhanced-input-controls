@@ -4,6 +4,7 @@ import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public abstract class GestureHandler {
@@ -15,10 +16,18 @@ public abstract class GestureHandler {
     protected GestureActionExecutor actionExecutor;
 
     // All 12 binding lists from profile
-    private List<Binding> singleTapAction, longPressAction, doubleTapAction;
-    private List<Binding> singleTap2ndFingerAction, longPress2ndFingerAction, doubleTap2ndFingerAction;
-    private List<Binding> singleTapDragAction, longPressDragAction, doubleTapDragAction;
-    private List<Binding> singleTap2ndFingerDragAction, longPress2ndFingerDragAction, doubleTap2ndFingerDragAction;
+    private List<Binding> singleTapAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
+    private List<Binding> longPressAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
+    private List<Binding> doubleTapAction = new ArrayList<>();
+    private List<Binding> singleTap2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
+    private List<Binding> longPress2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
+    private List<Binding> doubleTap2ndFingerAction = new ArrayList<>();
+    private List<Binding> singleTapDragAction = new ArrayList<>();
+    private List<Binding> longPressDragAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
+    private List<Binding> doubleTapDragAction = new ArrayList<>();
+    private List<Binding> singleTap2ndFingerDragAction = new ArrayList<>();
+    private List<Binding> longPress2ndFingerDragAction = new ArrayList<>();
+    private List<Binding> doubleTap2ndFingerDragAction = new ArrayList<>();
 
     protected int bindingDelay;
     protected int doubleTapTimeout = 150;
@@ -119,6 +128,15 @@ public abstract class GestureHandler {
 
     protected GestureHandler(TouchpadView touchpadView) {
         this.touchpadView = touchpadView;
+        applyDefaultBindings();
+    }
+
+    void applyDefaultBindings() {
+        firstFingerSet = buildBindingSet(singleTapAction, longPressAction, doubleTapAction,
+            singleTapDragAction, longPressDragAction, doubleTapDragAction);
+        secondFingerSet = buildBindingSet(singleTap2ndFingerAction, longPress2ndFingerAction, doubleTap2ndFingerAction,
+            singleTap2ndFingerDragAction, longPress2ndFingerDragAction, doubleTap2ndFingerDragAction);
+        cur = firstFingerSet;
     }
 
     public void setInputControlsView(InputControlsView inputControlsView) {
