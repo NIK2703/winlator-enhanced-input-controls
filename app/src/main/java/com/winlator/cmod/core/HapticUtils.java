@@ -111,7 +111,12 @@ public class HapticUtils {
         Vibrator vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
         if (vibrator == null || !vibrator.hasVibrator()) return false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            return vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_TICK);
+            if (vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_TICK)) {
+                return true;
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return vibrator.hasAmplitudeControl();
         }
         return false;
     }
