@@ -36,6 +36,7 @@ public abstract class GestureHandler {
     protected int longPressTimeout = 200;
     protected boolean hapticFeedbackEnabled = true;
     protected int dragThreshold = 10;
+    protected int doubleTapDistance = 50;
     protected int singleTapDelay;
     protected int gestureLongPressHaptic = 1;
 
@@ -102,6 +103,8 @@ public abstract class GestureHandler {
     protected float fingerDownY;
     protected int mainPointerId = -1;
     protected boolean secondFingerActive;
+    protected float tapUpX;
+    protected float tapUpY;
     protected List<Binding> deferredTapAction;
     protected boolean postDoubleTapDrag;
     protected List<Binding> pendingDoubleTapAction;
@@ -175,6 +178,7 @@ public abstract class GestureHandler {
         longPressTimeout = profile.getLongPressTimeout();
         gestureLongPressHaptic = profile.getGestureLongPressHaptic();
         dragThreshold = profile.getDragThreshold();
+        doubleTapDistance = profile.getDoubleTapDistance();
         singleTapDelay = profile.getSingleTapDelay();
         if (actionExecutor != null) actionExecutor.setBindingDelay(bindingDelay);
 
@@ -201,6 +205,8 @@ public abstract class GestureHandler {
         pendingDoubleTapAction = null;
         pendingDeferredDoubleAction = null;
         doubleTapConsumed = false;
+        tapUpX = 0;
+        tapUpY = 0;
     }
 
     // --- Timer callbacks ---
@@ -362,6 +368,20 @@ public abstract class GestureHandler {
             }
         }
         return false;
+    }
+
+    protected boolean isWithinTapDistance(float x, float y) {
+        return Math.abs(x - tapUpX) <= doubleTapDistance && Math.abs(y - tapUpY) <= doubleTapDistance;
+    }
+
+    protected void cancelDoubleTapWait() {
+        touchpadView.removeCallbacks(doubleTapRunnable);
+        if (deferredTapAction != null) {
+            actionExecutor.executeActions(deferredTapAction);
+            deferredTapAction = null;
+        }
+        pendingDeferredDoubleAction = null;
+        state = State.IDLE;
     }
 
     // Returns true if the event is consumed (drag active or just started)

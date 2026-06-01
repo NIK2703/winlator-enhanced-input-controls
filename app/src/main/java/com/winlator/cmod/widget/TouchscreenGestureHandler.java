@@ -66,15 +66,21 @@ public class TouchscreenGestureHandler extends GestureHandler {
         if (mainPointerId < 0) {
             if (originalPointerId >= 0 && pointerId != originalPointerId) {
                 if (state == State.DOUBLE_TAP_WAITING) {
-                    int savedOriginalPointerId = originalPointerId;
-                    handleDoubleTapConfirmed();
-                    originalPointerId = savedOriginalPointerId;
-                    mainPointerId = pointerId;
-                    fingerDownX = event.getX(actionIndex);
-                    fingerDownY = event.getY(actionIndex);
-                    setSecondFingerActive(true);
-                    state = State.TAP_WAITING;
-                    return;
+                    float newX = event.getX(actionIndex);
+                    float newY = event.getY(actionIndex);
+                    if (isWithinTapDistance(newX, newY)) {
+                        int savedOriginalPointerId = originalPointerId;
+                        handleDoubleTapConfirmed();
+                        originalPointerId = savedOriginalPointerId;
+                        mainPointerId = pointerId;
+                        fingerDownX = newX;
+                        fingerDownY = newY;
+                        setSecondFingerActive(true);
+                        state = State.TAP_WAITING;
+                        return;
+                    } else {
+                        cancelDoubleTapWait();
+                    }
                 }
 
                 secondPointerId = pointerId;
@@ -109,22 +115,28 @@ public class TouchscreenGestureHandler extends GestureHandler {
             touchpadView.removeCallbacks(longPressRunnable);
 
             if (state == State.DOUBLE_TAP_WAITING) {
-                int savedOriginalPointerId = originalPointerId;
-                boolean wasSecondFingerDeferred = deferredSecondFingerTap;
-                handleDoubleTapConfirmed();
-                originalPointerId = savedOriginalPointerId;
-                if (savedOriginalPointerId >= 0) {
-                    mainPointerId = savedOriginalPointerId;
-                    setSecondFingerActive(false);
-                    movePointerToTapPoint();
-                    state = State.TAP_WAITING;
-                    return;
-                }
-                mainPointerId = pointerId;
-                fingerDownX = event.getX(actionIndex);
-                fingerDownY = event.getY(actionIndex);
-                if (wasSecondFingerDeferred) {
-                    setSecondFingerActive(true);
+                float newX = event.getX(actionIndex);
+                float newY = event.getY(actionIndex);
+                if (isWithinTapDistance(newX, newY)) {
+                    int savedOriginalPointerId = originalPointerId;
+                    boolean wasSecondFingerDeferred = deferredSecondFingerTap;
+                    handleDoubleTapConfirmed();
+                    originalPointerId = savedOriginalPointerId;
+                    if (savedOriginalPointerId >= 0) {
+                        mainPointerId = savedOriginalPointerId;
+                        setSecondFingerActive(false);
+                        movePointerToTapPoint();
+                        state = State.TAP_WAITING;
+                        return;
+                    }
+                    mainPointerId = pointerId;
+                    fingerDownX = newX;
+                    fingerDownY = newY;
+                    if (wasSecondFingerDeferred) {
+                        setSecondFingerActive(true);
+                    }
+                } else {
+                    cancelDoubleTapWait();
                 }
             }
 
@@ -153,14 +165,20 @@ public class TouchscreenGestureHandler extends GestureHandler {
             }
 
             if (state == State.DOUBLE_TAP_WAITING) {
-                int savedOriginalPointerId = originalPointerId;
-                handleDoubleTapConfirmed();
-                originalPointerId = savedOriginalPointerId;
-                if (pendingDoubleTapAction != null) {
-                    actionExecutor.executeActions(pendingDoubleTapAction);
-                    pendingDoubleTapAction = null;
+                float newX = event.getX(actionIndex);
+                float newY = event.getY(actionIndex);
+                if (isWithinTapDistance(newX, newY)) {
+                    int savedOriginalPointerId = originalPointerId;
+                    handleDoubleTapConfirmed();
+                    originalPointerId = savedOriginalPointerId;
+                    if (pendingDoubleTapAction != null) {
+                        actionExecutor.executeActions(pendingDoubleTapAction);
+                        pendingDoubleTapAction = null;
+                    }
+                    return;
+                } else {
+                    cancelDoubleTapWait();
                 }
-                return;
             }
 
             secondPointerId = pointerId;
@@ -233,12 +251,18 @@ public class TouchscreenGestureHandler extends GestureHandler {
                             }
                             pendingDoubleTapAction = null;
                         }
+                        actionExecutor.releaseHeldAction();
                         state = State.IDLE;
                         setSecondFingerActive(false);
                         mainPointerId = -1;
                     }
                     else {
                         deferredSecondFingerTap = secondFingerActive;
+                        int mainIndex = event.findPointerIndex(mainPointerId);
+                        if (mainIndex >= 0) {
+                            tapUpX = event.getX(mainIndex);
+                            tapUpY = event.getY(mainIndex);
+                        }
                         handleTapUp();
                         actionExecutor.releaseHeldAction();
                         setSecondFingerActive(false);

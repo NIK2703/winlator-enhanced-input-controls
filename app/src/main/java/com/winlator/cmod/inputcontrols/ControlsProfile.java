@@ -57,6 +57,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private int gestureLongPressHaptic = 3;
     private int dragThreshold = 10;
     private int gestureThreshold = 20;
+    private int doubleTapDistance = 50;
     private int singleTapDelay;
     private float strokeWidth = 0.15f;
     private int fillAlphaInactive = 0;
@@ -355,6 +356,16 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.dragThreshold = clamp(dragThreshold, 0, 30);
     }
 
+    public int getDoubleTapDistance() {
+        ensureGestureSettingsLoaded();
+        return doubleTapDistance;
+    }
+
+    public void setDoubleTapDistance(int distance) {
+        ensureGestureSettingsLoaded();
+        this.doubleTapDistance = clamp(distance, 10, 100);
+    }
+
     public int getSingleTapDelay() {
         ensureGestureSettingsLoaded();
         return singleTapDelay;
@@ -596,6 +607,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 }
             }
             if (data.has("dragThreshold")) dragThreshold = clamp(data.getInt("dragThreshold"), 0, 30);
+            if (data.has("doubleTapDistance")) doubleTapDistance = clamp(data.getInt("doubleTapDistance"), 10, 100);
             if (data.has("gestureThreshold")) gestureThreshold = clamp(data.getInt("gestureThreshold"), 10, 50);
             if (data.has("strokeWidth")) strokeWidth = (float)data.getDouble("strokeWidth");
             if (data.has("fillAlphaInactive")) fillAlphaInactive = data.getInt("fillAlphaInactive");
@@ -763,6 +775,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (buttonGestureHaptic != 5) data.put("buttonGestureHaptic", buttonGestureHaptic);
             if (gestureLongPressHaptic != 3) data.put("gestureLongPressHaptic", gestureLongPressHaptic);
             if (dragThreshold != 10) data.put("dragThreshold", dragThreshold);
+            if (doubleTapDistance != 50) data.put("doubleTapDistance", doubleTapDistance);
             if (gestureThreshold != 20) data.put("gestureThreshold", gestureThreshold);
             if (strokeWidth != 0.2f) data.put("strokeWidth", strokeWidth);
             data.put("fillAlphaInactive", fillAlphaInactive);

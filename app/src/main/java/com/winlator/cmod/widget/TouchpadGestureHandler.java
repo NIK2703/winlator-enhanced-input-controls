@@ -54,6 +54,7 @@ public class TouchpadGestureHandler extends GestureHandler {
         longPressTimeout = profile.getTouchpadLongPressTimeout();
         gestureLongPressHaptic = profile.getGestureLongPressHaptic();
         dragThreshold = profile.getTouchpadDragThreshold();
+        doubleTapDistance = profile.getDoubleTapDistance();
         if (actionExecutor != null) actionExecutor.setBindingDelay(bindingDelay);
 
         firstFingerSet = buildBindingSet(singleTapAction, longPressAction, doubleTapAction,
@@ -98,9 +99,12 @@ public class TouchpadGestureHandler extends GestureHandler {
             touchpadView.removeCallbacks(doubleTapRunnable);
             touchpadView.removeCallbacks(longPressRunnable);
 
-            boolean wasDoubleTapWaiting = state == State.DOUBLE_TAP_WAITING;
-            if (wasDoubleTapWaiting) {
-                handleDoubleTapConfirmed();
+            if (state == State.DOUBLE_TAP_WAITING) {
+                if (isWithinTapDistance(x, y)) {
+                    handleDoubleTapConfirmed();
+                } else {
+                    cancelDoubleTapWait();
+                }
             }
             else if (hasLongPressTimer()) {
                 touchpadView.postDelayed(longPressRunnable, longPressTimeout);
@@ -132,8 +136,12 @@ public class TouchpadGestureHandler extends GestureHandler {
             setSecondFingerActive(true);
 
             if (state == State.DOUBLE_TAP_WAITING) {
-                handleDoubleTapConfirmed();
-                setSecondFingerActive(true);
+                if (isWithinTapDistance(x, y)) {
+                    handleDoubleTapConfirmed();
+                    setSecondFingerActive(true);
+                } else {
+                    cancelDoubleTapWait();
+                }
             }
 
             if (actionExecutor.isActionHeld()) {
@@ -220,6 +228,8 @@ public class TouchpadGestureHandler extends GestureHandler {
 
         touchpadView.removeCallbacks(longPressRunnable);
 
+        tapUpX = mainFingerX;
+        tapUpY = mainFingerY;
         switch (state) {
             case TAP_WAITING:
                 handleTapUp();

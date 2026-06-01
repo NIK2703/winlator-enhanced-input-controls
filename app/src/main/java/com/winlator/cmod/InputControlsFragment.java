@@ -86,6 +86,8 @@ public class InputControlsFragment extends Fragment {
     private Spinner spGestureLongPressHaptic;
     private SeekBar sbGestureThreshold;
     private TextView tvGestureThreshold;
+    private SeekBar sbDoubleTapDistance;
+    private TextView tvDoubleTapDistance;
     private SeekBar sbStrokeWidth;
     private TextView tvStrokeWidth;
     private SeekBar sbFillAlphaInactive;
@@ -282,6 +284,27 @@ public class InputControlsFragment extends Fragment {
             int threshold = currentProfile != null ? currentProfile.getGestureThreshold() : 20;
             sbGestureThreshold.setProgress(threshold - 10);
             tvGestureThreshold.setText(threshold + " px");
+        });
+
+        tvDoubleTapDistance = view.findViewById(R.id.TVDoubleTapDistance);
+        sbDoubleTapDistance = view.findViewById(R.id.SBDoubleTapDistance);
+        sbDoubleTapDistance.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int value = progress + 10;
+                tvDoubleTapDistance.setText(value + " px");
+                if (fromUser && currentProfile != null) {
+                    currentProfile.setDoubleTapDistance(value);
+                    currentProfile.save();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbDoubleTapDistance.post(() -> {
+            int distance = currentProfile != null ? currentProfile.getDoubleTapDistance() : 50;
+            sbDoubleTapDistance.setProgress(distance - 10);
+            tvDoubleTapDistance.setText(distance + " px");
         });
 
         tvStrokeWidth = view.findViewById(R.id.TVStrokeWidth);
@@ -565,6 +588,9 @@ public class InputControlsFragment extends Fragment {
                     int gThreshold = currentProfile.getGestureThreshold();
                     sbGestureThreshold.setProgress(gThreshold - 10);
                     tvGestureThreshold.setText(gThreshold + " px");
+                    int ddDistance = currentProfile.getDoubleTapDistance();
+                    sbDoubleTapDistance.setProgress(ddDistance - 10);
+                    tvDoubleTapDistance.setText(ddDistance + " px");
                     float sw = currentProfile.getStrokeWidth();
                     sbStrokeWidth.setProgress(Math.round((sw - 0.05f) * 100));
                     tvStrokeWidth.setText(String.format("%.2fx", sw));

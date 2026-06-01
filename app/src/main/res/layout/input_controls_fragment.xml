@@ -248,6 +248,31 @@
             android:progress="10"
             android:progressTint="@color/colorAccent" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Double Tap Distance (px)"/>
+
+            <TextView
+                android:id="@+id/TVDoubleTapDistance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/SBDoubleTapDistance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="90"
+            android:progress="40"
+            android:progressTint="@color/colorAccent" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
