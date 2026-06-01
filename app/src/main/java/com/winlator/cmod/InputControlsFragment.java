@@ -65,6 +65,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 public class InputControlsFragment extends Fragment {
     private static final String INPUT_CONTROLS_URL = "https://raw.githubusercontent.com/brunodev85/winlator/main/input_controls/%s";
@@ -79,7 +81,9 @@ public class InputControlsFragment extends Fragment {
     private TextView tvBindingDelay;
     private SeekBar sbLongPressDelay;
     private TextView tvLongPressDelay;
-    private CheckBox cbHapticFeedback;
+    private Spinner spButtonLongPressHaptic;
+    private Spinner spButtonGestureHaptic;
+    private Spinner spGestureLongPressHaptic;
     private SeekBar sbGestureThreshold;
     private TextView tvGestureThreshold;
     private SeekBar sbStrokeWidth;
@@ -247,18 +251,17 @@ public class InputControlsFragment extends Fragment {
             tvLongPressDelay.setText(delay + " ms");
         });
 
-        cbHapticFeedback = view.findViewById(R.id.CBHapticFeedback);
-        cbHapticFeedback.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (currentProfile != null) {
-                currentProfile.setHapticFeedbackEnabled(isChecked);
-                currentProfile.save();
-            }
-        });
-        cbHapticFeedback.post(() -> {
-            if (currentProfile != null) {
-                cbHapticFeedback.setChecked(currentProfile.getHapticFeedbackEnabled());
-            }
-        });
+        spButtonLongPressHaptic = setupHapticSpinner(view, R.id.SPButtonLongPressHaptic,
+            profile -> profile.getButtonLongPressHaptic(),
+            (profile, value) -> { profile.setButtonLongPressHaptic(value); profile.save(); });
+
+        spButtonGestureHaptic = setupHapticSpinner(view, R.id.SPButtonGestureHaptic,
+            profile -> profile.getButtonGestureHaptic(),
+            (profile, value) -> { profile.setButtonGestureHaptic(value); profile.save(); });
+
+        spGestureLongPressHaptic = setupHapticSpinner(view, R.id.SPGestureLongPressHaptic,
+            profile -> profile.getGestureLongPressHaptic(),
+            (profile, value) -> { profile.setGestureLongPressHaptic(value); profile.save(); });
 
         tvGestureThreshold = view.findViewById(R.id.TVGestureThreshold);
         sbGestureThreshold = view.findViewById(R.id.SBGestureThreshold);
@@ -556,7 +559,9 @@ public class InputControlsFragment extends Fragment {
                     int lpDelay = currentProfile.getLongPressDelay();
                     sbLongPressDelay.setProgress(lpDelay);
                     tvLongPressDelay.setText(lpDelay + " ms");
-                    cbHapticFeedback.setChecked(currentProfile.getHapticFeedbackEnabled());
+                    spButtonLongPressHaptic.setSelection(currentProfile.getButtonLongPressHaptic());
+                    spButtonGestureHaptic.setSelection(currentProfile.getButtonGestureHaptic());
+                    spGestureLongPressHaptic.setSelection(currentProfile.getGestureLongPressHaptic());
                     int gThreshold = currentProfile.getGestureThreshold();
                     sbGestureThreshold.setProgress(gThreshold - 10);
                     tvGestureThreshold.setText(gThreshold + " px");
@@ -629,6 +634,31 @@ public class InputControlsFragment extends Fragment {
             }
         }
         else view.findViewById(R.id.TVEmptyText).setVisibility(View.VISIBLE);
+    }
+
+    private Spinner setupHapticSpinner(View view, int id, Function<ControlsProfile, Integer> getter, BiConsumer<ControlsProfile, Integer> setter) {
+        String[] labels = new String[com.winlator.cmod.core.HapticUtils.getTypeCount()];
+        for (int i = 0; i < labels.length; i++) {
+            labels[i] = com.winlator.cmod.core.HapticUtils.getName(com.winlator.cmod.core.HapticUtils.getType(i));
+        }
+        Spinner spinner = view.findViewById(id);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, labels);
+        spinner.setAdapter(adapter);
+        Context ctx = getContext();
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View v, int position, long id) {
+                com.winlator.cmod.core.HapticUtils.perform(ctx, com.winlator.cmod.core.HapticUtils.getType(position));
+                if (currentProfile != null) {
+                    setter.accept(currentProfile, position);
+                }
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        if (currentProfile != null) {
+            spinner.post(() -> spinner.setSelection(getter.apply(currentProfile), false));
+        }
+        return spinner;
     }
 
     private <T extends Enum<T>> void setupEnumSpinner(Spinner spinner, T[] values, T current) {

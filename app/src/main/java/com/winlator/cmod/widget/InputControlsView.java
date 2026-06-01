@@ -632,7 +632,6 @@ public class InputControlsView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        boolean hapticsEnabled = profile != null && profile.getHapticFeedbackEnabled();
         resetTouchscreenTimeout();
 
         if (editMode && readyToDraw) {

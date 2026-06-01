@@ -122,6 +122,17 @@ public class InputControlsManager {
     public ControlsProfile createProfile(String name) {
         ControlsProfile profile = new ControlsProfile(context, ++maxProfileId);
         profile.setName(name);
+        if (com.winlator.cmod.core.HapticUtils.hasVibrator(context)) {
+            if (!com.winlator.cmod.core.HapticUtils.hasLinearVibrator(context)) {
+                profile.setButtonLongPressHaptic(com.winlator.cmod.core.HapticUtils.HAPTIC_PULSE);
+                profile.setButtonGestureHaptic(com.winlator.cmod.core.HapticUtils.HAPTIC_PULSE);
+                profile.setGestureLongPressHaptic(com.winlator.cmod.core.HapticUtils.HAPTIC_PULSE);
+            }
+        } else {
+            profile.setButtonLongPressHaptic(com.winlator.cmod.core.HapticUtils.HAPTIC_NONE);
+            profile.setButtonGestureHaptic(com.winlator.cmod.core.HapticUtils.HAPTIC_NONE);
+            profile.setGestureLongPressHaptic(com.winlator.cmod.core.HapticUtils.HAPTIC_NONE);
+        }
         profile.save();
         profiles.add(profile);
         return profile;

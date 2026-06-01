@@ -568,8 +568,8 @@ public class TouchpadView extends View {
             }
         }
 
-        // Only first finger controls pointer movement
-        if (isSecondFinger) {
+        // Only first finger controls pointer movement (unless gesture handles second finger)
+        if (isSecondFinger && !gestureHandlesSecond) {
             skipPointerMove = true;
         }
 

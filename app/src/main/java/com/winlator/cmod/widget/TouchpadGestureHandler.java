@@ -1,13 +1,17 @@
 package com.winlator.cmod.widget;
 
 import com.winlator.cmod.inputcontrols.Binding;
+import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.xserver.Pointer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class TouchpadGestureHandler extends GestureHandler {
     private float mainFingerX;
     private float mainFingerY;
+    private float secondFingerDownX;
+    private float secondFingerDownY;
 
     // Deferred second-finger actions (execute on lift if no drag)
     private List<Binding> pendingSecondTapAction;
@@ -29,6 +33,34 @@ public class TouchpadGestureHandler extends GestureHandler {
         pendingSecondDoubleTapAction = null;
         secondFingerDoubleTapWaiting = false;
         secondFingerDoubleTapFallback = null;
+    }
+
+    @Override
+    public void applyConfig(ControlsProfile profile) {
+        singleTapAction = new ArrayList<>(profile.getTouchpadSingleTapAction());
+        longPressAction = new ArrayList<>(profile.getTouchpadLongPressAction());
+        doubleTapAction = new ArrayList<>(profile.getTouchpadDoubleTapAction());
+        singleTap2ndFingerAction = new ArrayList<>(profile.getTouchpadSingleTap2ndFingerAction());
+        longPress2ndFingerAction = new ArrayList<>(profile.getTouchpadLongPress2ndFingerAction());
+        doubleTap2ndFingerAction = new ArrayList<>(profile.getTouchpadDoubleTap2ndFingerAction());
+        singleTapDragAction = new ArrayList<>(profile.getTouchpadSingleTapDragAction());
+        longPressDragAction = new ArrayList<>(profile.getTouchpadLongPressDragAction());
+        doubleTapDragAction = new ArrayList<>(profile.getTouchpadDoubleTapDragAction());
+        singleTap2ndFingerDragAction = new ArrayList<>(profile.getTouchpadSingleTap2ndFingerDragAction());
+        longPress2ndFingerDragAction = new ArrayList<>(profile.getTouchpadLongPress2ndFingerDragAction());
+        doubleTap2ndFingerDragAction = new ArrayList<>(profile.getTouchpadDoubleTap2ndFingerDragAction());
+        bindingDelay = profile.getBindingDelay();
+        doubleTapTimeout = profile.getTouchpadDoubleTapTimeout();
+        longPressTimeout = profile.getTouchpadLongPressTimeout();
+        gestureLongPressHaptic = profile.getGestureLongPressHaptic();
+        dragThreshold = profile.getTouchpadDragThreshold();
+        if (actionExecutor != null) actionExecutor.setBindingDelay(bindingDelay);
+
+        firstFingerSet = buildBindingSet(singleTapAction, longPressAction, doubleTapAction,
+            singleTapDragAction, longPressDragAction, doubleTapDragAction);
+        secondFingerSet = buildBindingSet(singleTap2ndFingerAction, longPress2ndFingerAction, doubleTap2ndFingerAction,
+            singleTap2ndFingerDragAction, longPress2ndFingerDragAction, doubleTap2ndFingerDragAction);
+        cur = firstFingerSet;
     }
 
     public int getMainPointerId() {
@@ -66,7 +98,8 @@ public class TouchpadGestureHandler extends GestureHandler {
             touchpadView.removeCallbacks(doubleTapRunnable);
             touchpadView.removeCallbacks(longPressRunnable);
 
-            if (state == State.DOUBLE_TAP_WAITING) {
+            boolean wasDoubleTapWaiting = state == State.DOUBLE_TAP_WAITING;
+            if (wasDoubleTapWaiting) {
                 handleDoubleTapConfirmed();
             }
             else if (hasLongPressTimer()) {
@@ -84,7 +117,7 @@ public class TouchpadGestureHandler extends GestureHandler {
                 if (hasActiveDoubleTapDrag()) {
                     pendingSecondDoubleTapAction = activeDoubleTapAction();
                 } else {
-                    actionExecutor.executeActions(activeDoubleTapAction());
+                    actionExecutor.executeActionsAndHold(activeDoubleTapAction());
                 }
                 secondFingerDoubleTapFallback = null;
 
@@ -107,17 +140,19 @@ public class TouchpadGestureHandler extends GestureHandler {
                 actionExecutor.releaseHeldAction();
             }
 
+            // Store second finger down position for drag detection
+            secondFingerDownX = x;
+            secondFingerDownY = y;
+
             // Anchor first finger position for drag threshold
             fingerDownX = mainFingerX;
             fingerDownY = mainFingerY;
-
-            // Always defer second-finger tap — execute only on lift if no drag/longpress consumed it
-            pendingSecondTapAction = activeSingleTapAction();
 
             // Post long press timer for second finger
             resetLongPressTimer();
 
             state = State.TAP_WAITING;
+            pendingSecondTapAction = activeSingleTapAction();
             return true;
         }
         return false;
@@ -131,7 +166,12 @@ public class TouchpadGestureHandler extends GestureHandler {
     }
 
     public boolean onFingerMove(int pointerId, float x, float y) {
-        if (pointerId != mainPointerId) return false;
+        if (pointerId != mainPointerId) {
+            if (secondFingerActive) {
+                return handleMoveDelta(x - secondFingerDownX, y - secondFingerDownY);
+            }
+            return false;
+        }
         mainFingerX = x;
         mainFingerY = y;
         return handleMoveDelta(x - fingerDownX, y - fingerDownY);
@@ -141,7 +181,12 @@ public class TouchpadGestureHandler extends GestureHandler {
     public void onFingerUp(int pointerId) {
         if (pointerId != mainPointerId) {
             if (secondFingerActive) {
-                if (pendingSecondTapAction != null && hasActiveDoubleTap()) {
+                if (actionExecutor.isActionHeld()) {
+                    // Action held from finger-down, skip deferred execution
+                    pendingSecondTapAction = null;
+                    pendingSecondDoubleTapAction = null;
+                }
+                else if (pendingSecondTapAction != null && hasActiveDoubleTap()) {
                     secondFingerDoubleTapWaiting = true;
                     secondFingerDoubleTapFallback = pendingSecondTapAction;
                     pendingSecondTapAction = null;
@@ -178,6 +223,7 @@ public class TouchpadGestureHandler extends GestureHandler {
         switch (state) {
             case TAP_WAITING:
                 handleTapUp();
+                actionExecutor.releaseHeldAction();
                 mainPointerId = -1;
                 setSecondFingerActive(false);
                 break;
@@ -195,7 +241,12 @@ public class TouchpadGestureHandler extends GestureHandler {
                 cleanupMainPointer();
                 break;
             case DOUBLE_TAP_WAITING:
-                actionExecutor.executeActions(activeSingleTapAction());
+                if (!hasActiveSingleTapDrag()) {
+                    actionExecutor.executeActionsAndHold(activeSingleTapAction());
+                    actionExecutor.releaseHeldAction();
+                } else {
+                    actionExecutor.executeActions(activeSingleTapAction());
+                }
                 cleanupMainPointer();
                 break;
             default:
@@ -216,8 +267,8 @@ public class TouchpadGestureHandler extends GestureHandler {
         }
         state = State.LONG_PRESSING;
 
-        if (hapticFeedbackEnabled && hasLongPressTimer()) {
-            com.winlator.cmod.core.AppUtils.performHapticFeedback(touchpadView.getContext(), 255);
+        if (hasLongPressTimer()) {
+            com.winlator.cmod.core.HapticUtils.perform(touchpadView.getContext(), gestureLongPressHaptic);
         }
     }
 

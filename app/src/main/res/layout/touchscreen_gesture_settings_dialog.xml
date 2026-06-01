@@ -66,6 +66,21 @@
             app:value="10" />
 
         <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Single Tap Delay (ms)"
+            android:layout_marginTop="8dp" />
+
+        <com.winlator.cmod.widget.NumberPicker
+            android:id="@+id/NPSingleTapDelay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:minValue="0"
+            app:maxValue="10"
+            app:step="1"
+            app:value="0" />
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Single Finger Gestures"

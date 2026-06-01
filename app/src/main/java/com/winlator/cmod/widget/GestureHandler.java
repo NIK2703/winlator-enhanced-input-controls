@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import android.os.SystemClock;
+
 public abstract class GestureHandler {
     protected enum State { IDLE, TAP_WAITING, DOUBLE_TAP_WAITING, LONG_PRESSING, DRAGGING }
     protected State state = State.IDLE;
@@ -16,24 +18,26 @@ public abstract class GestureHandler {
     protected GestureActionExecutor actionExecutor;
 
     // All 12 binding lists from profile
-    private List<Binding> singleTapAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
-    private List<Binding> longPressAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
-    private List<Binding> doubleTapAction = new ArrayList<>();
-    private List<Binding> singleTap2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
-    private List<Binding> longPress2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
-    private List<Binding> doubleTap2ndFingerAction = new ArrayList<>();
-    private List<Binding> singleTapDragAction = new ArrayList<>();
-    private List<Binding> longPressDragAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
-    private List<Binding> doubleTapDragAction = new ArrayList<>();
-    private List<Binding> singleTap2ndFingerDragAction = new ArrayList<>();
-    private List<Binding> longPress2ndFingerDragAction = new ArrayList<>();
-    private List<Binding> doubleTap2ndFingerDragAction = new ArrayList<>();
+    protected List<Binding> singleTapAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
+    protected List<Binding> longPressAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
+    protected List<Binding> doubleTapAction = new ArrayList<>();
+    protected List<Binding> singleTap2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
+    protected List<Binding> longPress2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
+    protected List<Binding> doubleTap2ndFingerAction = new ArrayList<>();
+    protected List<Binding> singleTapDragAction = new ArrayList<>();
+    protected List<Binding> longPressDragAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
+    protected List<Binding> doubleTapDragAction = new ArrayList<>();
+    protected List<Binding> singleTap2ndFingerDragAction = new ArrayList<>();
+    protected List<Binding> longPress2ndFingerDragAction = new ArrayList<>();
+    protected List<Binding> doubleTap2ndFingerDragAction = new ArrayList<>();
 
     protected int bindingDelay;
     protected int doubleTapTimeout = 150;
     protected int longPressTimeout = 200;
     protected boolean hapticFeedbackEnabled = true;
     protected int dragThreshold = 10;
+    protected int singleTapDelay;
+    protected int gestureLongPressHaptic = 1;
 
     // Active bindings — two precomputed sets, pointer-swapped on secondFingerActive change
     private static class BindingSet {
@@ -43,6 +47,7 @@ public abstract class GestureHandler {
         final List<Binding> singleTapDragAction;
         final List<Binding> longPressDragAction;
         final List<Binding> doubleTapDragAction;
+        final boolean hasActiveSingleTap;
         final boolean hasActiveDoubleTap;
         final boolean hasActiveLongPress;
         final boolean hasActiveLongPressDrag;
@@ -53,13 +58,14 @@ public abstract class GestureHandler {
 
         BindingSet(List<Binding> st, List<Binding> lp, List<Binding> dt,
                    List<Binding> std, List<Binding> lpd, List<Binding> dtd,
-                   Binding firstLP, Binding firstDT, Binding firstSTD, Binding firstLPD, Binding firstDTD) {
+                   Binding firstST, Binding firstLP, Binding firstDT, Binding firstSTD, Binding firstLPD, Binding firstDTD) {
             singleTapAction = st;
             longPressAction = lp;
             doubleTapAction = dt;
             singleTapDragAction = std;
             longPressDragAction = lpd;
             doubleTapDragAction = dtd;
+            hasActiveSingleTap = firstST != Binding.NONE;
             hasActiveDoubleTap = firstDT != Binding.NONE;
             hasActiveLongPress = firstLP != Binding.NONE;
             hasActiveLongPressDrag = firstLPD != Binding.NONE;
@@ -71,8 +77,8 @@ public abstract class GestureHandler {
         }
     }
 
-    private BindingSet firstFingerSet;
-    private BindingSet secondFingerSet;
+    protected BindingSet firstFingerSet;
+    protected BindingSet secondFingerSet;
     protected BindingSet cur;  // points to firstFingerSet or secondFingerSet
 
     // Convenience accessors via cur
@@ -82,6 +88,7 @@ public abstract class GestureHandler {
     protected final List<Binding> activeSingleTapDragAction() { return cur != null ? cur.singleTapDragAction : singleTapDragAction; }
     protected final List<Binding> activeLongPressDragAction() { return cur != null ? cur.longPressDragAction : longPressDragAction; }
     protected final List<Binding> activeDoubleTapDragAction() { return cur != null ? cur.doubleTapDragAction : doubleTapDragAction; }
+    protected final boolean hasActiveSingleTap() { return cur != null && cur.hasActiveSingleTap; }
     protected final boolean hasActiveDoubleTap() { return cur != null && cur.hasActiveDoubleTap; }
     protected final boolean hasActiveLongPress() { return cur != null && cur.hasActiveLongPress; }
     protected final boolean hasActiveLongPressDrag() { return cur != null && cur.hasActiveLongPressDrag; }
@@ -104,6 +111,11 @@ public abstract class GestureHandler {
     // Timer callbacks
     protected final Runnable longPressRunnable = this::onLongPressTimer;
     protected final Runnable doubleTapRunnable = this::onDoubleTapTimer;
+    protected final Runnable singleTapHoldRunnable = () -> {
+        if (state == State.TAP_WAITING && hasActiveSingleTap() && !actionExecutor.isActionHeld()) {
+            actionExecutor.executeActionsAndHold(activeSingleTapAction());
+        }
+    };
 
     private static Binding firstBinding(List<Binding> list, Binding defaultVal) {
         if (list != null) {
@@ -114,10 +126,11 @@ public abstract class GestureHandler {
         return defaultVal;
     }
 
-    private static BindingSet buildBindingSet(List<Binding> st, List<Binding> lp, List<Binding> dt,
+    protected static BindingSet buildBindingSet(List<Binding> st, List<Binding> lp, List<Binding> dt,
                                                List<Binding> std, List<Binding> lpd, List<Binding> dtd) {
         return new BindingSet(
             st, lp, dt, std, lpd, dtd,
+            firstBinding(st, Binding.NONE),
             firstBinding(lp, Binding.NONE),
             firstBinding(dt, Binding.NONE),
             firstBinding(std, Binding.NONE),
@@ -160,8 +173,9 @@ public abstract class GestureHandler {
         bindingDelay = profile.getBindingDelay();
         doubleTapTimeout = profile.getDoubleTapTimeout();
         longPressTimeout = profile.getLongPressTimeout();
-        hapticFeedbackEnabled = profile.getHapticFeedbackEnabled();
+        gestureLongPressHaptic = profile.getGestureLongPressHaptic();
         dragThreshold = profile.getDragThreshold();
+        singleTapDelay = profile.getSingleTapDelay();
         if (actionExecutor != null) actionExecutor.setBindingDelay(bindingDelay);
 
         firstFingerSet = buildBindingSet(singleTapAction, longPressAction, doubleTapAction,
@@ -199,8 +213,8 @@ public abstract class GestureHandler {
         }
         state = State.LONG_PRESSING;
 
-        if (hapticFeedbackEnabled && hasLongPressTimer()) {
-            com.winlator.cmod.core.AppUtils.performHapticFeedback(touchpadView.getContext(), 255);
+        if (hasLongPressTimer()) {
+            com.winlator.cmod.core.HapticUtils.perform(touchpadView.getContext(), gestureLongPressHaptic);
         }
     }
 
@@ -225,7 +239,7 @@ public abstract class GestureHandler {
 
         if (pendingDoubleTapAction != null) {
             if (!hasActiveDoubleTapDrag()) {
-                actionExecutor.executeActions(pendingDoubleTapAction);
+                actionExecutor.executeActionsAndHold(pendingDoubleTapAction);
                 pendingDoubleTapAction = null;
             }
         }
@@ -236,8 +250,16 @@ public abstract class GestureHandler {
     }
 
     protected void handleTapUp() {
+        if (singleTapDelay > 0) {
+            SystemClock.sleep(singleTapDelay);
+        }
+
         if (pendingDoubleTapAction != null) {
-            actionExecutor.executeActions(pendingDoubleTapAction);
+            if (!hasActiveDoubleTapDrag()) {
+                actionExecutor.executeActionsAndHold(pendingDoubleTapAction);
+            } else {
+                actionExecutor.executeActions(pendingDoubleTapAction);
+            }
             pendingDoubleTapAction = null;
             deferredTapAction = null;
             pendingDeferredDoubleAction = null;
@@ -258,7 +280,13 @@ public abstract class GestureHandler {
 
         if (doubleTapConsumed) {
             doubleTapConsumed = false;
-            actionExecutor.executeActions(activeSingleTapAction());
+            if (!actionExecutor.isActionHeld()) {
+                if (!hasActiveSingleTapDrag()) {
+                    actionExecutor.executeActionsAndHold(activeSingleTapAction());
+                } else {
+                    actionExecutor.executeActions(activeSingleTapAction());
+                }
+            }
             state = State.IDLE;
             return;
         }
@@ -272,7 +300,13 @@ public abstract class GestureHandler {
             state = State.DOUBLE_TAP_WAITING;
         }
         else {
-            actionExecutor.executeActions(activeSingleTapAction());
+            if (!actionExecutor.isActionHeld()) {
+                if (!hasActiveSingleTapDrag()) {
+                    actionExecutor.executeActionsAndHold(activeSingleTapAction());
+                } else {
+                    actionExecutor.executeActions(activeSingleTapAction());
+                }
+            }
             if (hasActiveDoubleTapDrag()) {
                 touchpadView.postDelayed(doubleTapRunnable, doubleTapTimeout);
                 state = State.DOUBLE_TAP_WAITING;
@@ -350,5 +384,6 @@ public abstract class GestureHandler {
     protected void removeAllCallbacks() {
         touchpadView.removeCallbacks(longPressRunnable);
         touchpadView.removeCallbacks(doubleTapRunnable);
+        touchpadView.removeCallbacks(singleTapHoldRunnable);
     }
 }

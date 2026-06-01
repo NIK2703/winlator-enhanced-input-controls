@@ -86,6 +86,18 @@ public class TouchscreenGestureHandler extends GestureHandler {
 
                 if (hasLongPressTimer()) touchpadView.postDelayed(longPressRunnable, longPressTimeout);
                 state = State.TAP_WAITING;
+                if (hasActiveSingleTap() && !hasActiveSingleTapDrag()) {
+                    boolean hasDoubleTapAction = hasActiveDoubleTap() || hasActiveDoubleTapDrag();
+                    if (hasDoubleTapAction) {
+                        touchpadView.postDelayed(singleTapHoldRunnable, doubleTapTimeout);
+                    } else {
+                        if (singleTapDelay > 0) {
+                            touchpadView.postDelayed(singleTapHoldRunnable, singleTapDelay);
+                        } else {
+                            actionExecutor.executeActionsAndHold(activeSingleTapAction());
+                        }
+                    }
+                }
                 return;
             }
 
@@ -123,6 +135,18 @@ public class TouchscreenGestureHandler extends GestureHandler {
                 touchpadView.postDelayed(longPressRunnable, longPressTimeout);
             }
             state = State.TAP_WAITING;
+            if (hasActiveSingleTap() && !hasActiveSingleTapDrag()) {
+                boolean hasDoubleTapAction = hasActiveDoubleTap() || hasActiveDoubleTapDrag();
+                if (hasDoubleTapAction) {
+                    touchpadView.postDelayed(singleTapHoldRunnable, doubleTapTimeout);
+                } else {
+                    if (singleTapDelay > 0) {
+                        touchpadView.postDelayed(singleTapHoldRunnable, singleTapDelay);
+                    } else {
+                        actionExecutor.executeActionsAndHold(activeSingleTapAction());
+                    }
+                }
+            }
         }
         else if (pointerId != mainPointerId) {
             if (isLongTapMode) {
@@ -158,6 +182,18 @@ public class TouchscreenGestureHandler extends GestureHandler {
 
             if (hasLongPressTimer()) touchpadView.postDelayed(longPressRunnable, longPressTimeout);
             state = State.TAP_WAITING;
+            if (hasActiveSingleTap() && !hasActiveSingleTapDrag()) {
+                boolean hasDoubleTapAction = hasActiveDoubleTap() || hasActiveDoubleTapDrag();
+                if (hasDoubleTapAction) {
+                    touchpadView.postDelayed(singleTapHoldRunnable, doubleTapTimeout);
+                } else {
+                    if (singleTapDelay > 0) {
+                        touchpadView.postDelayed(singleTapHoldRunnable, singleTapDelay);
+                    } else {
+                        actionExecutor.executeActionsAndHold(activeSingleTapAction());
+                    }
+                }
+            }
         }
     }
 
@@ -170,9 +206,16 @@ public class TouchscreenGestureHandler extends GestureHandler {
         float cx = event.getX(mainIndex);
         float cy = event.getY(mainIndex);
 
-        if (handleMoveDelta(cx - fingerDownX, cy - fingerDownY)) {
-            touchpadView.movePointer(cx, cy);
+        if (!hasActiveSingleTapDrag()) {
+            touchpadView.removeCallbacks(longPressRunnable);
+            if (hasActiveSingleTap()) {
+                touchpadView.movePointer(cx, cy);
+                return;
+            }
         }
+
+        handleMoveDelta(cx - fingerDownX, cy - fingerDownY);
+        touchpadView.movePointer(cx, cy);
     }
 
     // --- Up handling ---
@@ -187,7 +230,12 @@ public class TouchscreenGestureHandler extends GestureHandler {
                 case TAP_WAITING:
                     if (wasPostDoubleTapDrag) {
                         if (pendingDoubleTapAction != null) {
-                            actionExecutor.executeActions(pendingDoubleTapAction);
+                            if (!hasActiveDoubleTapDrag()) {
+                                actionExecutor.executeActionsAndHold(pendingDoubleTapAction);
+                                actionExecutor.releaseHeldAction();
+                            } else {
+                                actionExecutor.executeActions(pendingDoubleTapAction);
+                            }
                             pendingDoubleTapAction = null;
                         }
                         state = State.IDLE;
@@ -197,6 +245,7 @@ public class TouchscreenGestureHandler extends GestureHandler {
                     else {
                         deferredSecondFingerTap = secondFingerActive;
                         handleTapUp();
+                        actionExecutor.releaseHeldAction();
                         setSecondFingerActive(false);
                         mainPointerId = -1;
                     }
@@ -215,7 +264,12 @@ public class TouchscreenGestureHandler extends GestureHandler {
                     cleanupMainPointer();
                     break;
                 case DOUBLE_TAP_WAITING:
-                    actionExecutor.executeActions(activeSingleTapAction());
+                    if (!hasActiveSingleTapDrag()) {
+                        actionExecutor.executeActionsAndHold(activeSingleTapAction());
+                        actionExecutor.releaseHeldAction();
+                    } else {
+                        actionExecutor.executeActions(activeSingleTapAction());
+                    }
                     cleanupMainPointer();
                     break;
                 default:
@@ -265,7 +319,7 @@ public class TouchscreenGestureHandler extends GestureHandler {
             return hasActiveDoubleTapDrag() ? activeDoubleTapDragAction() : fallback;
         }
         else {
-            return hasActiveSingleTapDrag() ? activeSingleTapDragAction() : activeSingleTapAction();
+            return hasActiveSingleTapDrag() ? activeSingleTapDragAction() : null;
         }
     }
 }

@@ -160,13 +160,15 @@ public class ControlElement {
 
     private float cachedStrokeWidth;
     private int cachedFillAlphaInactive;
-    private boolean cachedHapticEnabled;
+    private int cachedButtonLongPressHaptic = 1;
+    private int cachedButtonGestureHaptic = 1;
 
     private void refreshProfileCache() {
         ControlsProfile p = inputControlsView.getProfile();
         cachedStrokeWidth = p != null ? p.getStrokeWidth() : 0.2f;
         cachedFillAlphaInactive = p != null ? p.getFillAlphaInactive() : 50;
-        cachedHapticEnabled = p != null && p.getHapticFeedbackEnabled();
+        cachedButtonLongPressHaptic = p != null ? p.getButtonLongPressHaptic() : 1;
+        cachedButtonGestureHaptic = p != null ? p.getButtonGestureHaptic() : 1;
     }
 
     public ControlElement(InputControlsView inputControlsView) {
@@ -1707,38 +1709,11 @@ public class ControlElement {
         inputControlsView.invalidate();
     }
 
-    private boolean isHapticEnabled() {
-        return cachedHapticEnabled;
-    }
-
-    private void vibrate(long milliseconds) {
-        if (!isHapticEnabled()) return;
+    private void vibrateHaptic(int hapticType, int fallbackMs) {
+        if (hapticType <= 0) return;
         android.os.Vibrator vib = (android.os.Vibrator) inputControlsView.getContext().getSystemService(Context.VIBRATOR_SERVICE);
         if (vib == null || !vib.hasVibrator()) return;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            try {
-                vib.vibrate(android.os.VibrationEffect.createOneShot(milliseconds, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
-            } catch (IllegalArgumentException e) {
-                vib.vibrate(android.os.VibrationEffect.createOneShot(50, 255));
-            }
-        } else {
-            vib.vibrate(milliseconds);
-        }
-    }
-
-    private void vibrateEffect(int effectId) {
-        if (!isHapticEnabled()) return;
-        android.os.Vibrator vib = (android.os.Vibrator) inputControlsView.getContext().getSystemService(Context.VIBRATOR_SERVICE);
-        if (vib == null || !vib.hasVibrator()) return;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            try {
-                vib.vibrate(android.os.VibrationEffect.createPredefined(effectId));
-            } catch (IllegalArgumentException e) {
-                vib.vibrate(android.os.VibrationEffect.createOneShot(50, 255));
-            }
-        } else {
-            vib.vibrate(50);
-        }
+        com.winlator.cmod.core.HapticUtils.perform(inputControlsView.getContext(), hapticType);
     }
 
     public void startLongPressTimer(int delay) {
@@ -1748,7 +1723,7 @@ public class ControlElement {
         longPressHandler.postDelayed(() -> {
             if (gestureTriggered) return;
             longPressTriggered = true;
-            vibrateEffect(android.os.VibrationEffect.EFFECT_HEAVY_CLICK);
+            vibrateHaptic(cachedButtonLongPressHaptic, 50);
             heldBindings = new ArrayList<>(longPressBindings);
             pressBindings(longPressBindings);
             inputControlsView.invalidate();
@@ -1799,7 +1774,7 @@ public class ControlElement {
                         if (longPressHandler == null) longPressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
                         longPressHandler.postDelayed(() -> {
                             longPressTriggered = true;
-                            vibrateEffect(android.os.VibrationEffect.EFFECT_TICK);
+                            vibrateHaptic(cachedButtonLongPressHaptic, 30);
                             heldBindings = new ArrayList<>(longPressBindings);
                             pressBindings(longPressBindings);
                             inputControlsView.invalidate();
@@ -1844,7 +1819,7 @@ public class ControlElement {
                         longPressHandler = null;
                     }
                     longPressTriggered = false;
-                    vibrate(10);
+                    vibrateHaptic(cachedButtonGestureHaptic, 10);
                     heldBindings = new ArrayList<>(gestureBindings);
                     pressBindings(gestureBindings);
                     inputControlsView.invalidate();

@@ -75,10 +75,12 @@ public class TouchscreenGestureSettingsDialog {
         NumberPicker npLongPress = view.findViewById(R.id.NPLongPressTimeout);
         NumberPicker npDoubleTap = view.findViewById(R.id.NPDoubleTapTimeout);
         NumberPicker npDragThreshold = view.findViewById(R.id.NPDragThreshold);
+        NumberPicker npSingleTapDelay = view.findViewById(R.id.NPSingleTapDelay);
 
         npLongPress.setValue(profile.getLongPressTimeout());
         npDoubleTap.setValue(profile.getDoubleTapTimeout());
         npDragThreshold.setValue(profile.getDragThreshold());
+        npSingleTapDelay.setValue(profile.getSingleTapDelay());
 
         LinearLayout llSingleFinger = view.findViewById(R.id.LLSingleFinger);
         addBindingSection(llSingleFinger, "single", "Single Tap", profile.getSingleTapAction(), R.string.single_tap_delay_help);
@@ -100,18 +102,19 @@ public class TouchscreenGestureSettingsDialog {
 
         builder.setPositiveButton("Save", (dialog, which) -> save(
                 spHoldMode,
-                npLongPress, npDoubleTap, npDragThreshold));
+                npLongPress, npDoubleTap, npDragThreshold, npSingleTapDelay));
         builder.setNegativeButton("Cancel", null);
 
         builder.create().show();
     }
 
     private void save(Spinner spHoldMode,
-                      NumberPicker npLongPress, NumberPicker npDoubleTap, NumberPicker npDragThreshold) {
+                      NumberPicker npLongPress, NumberPicker npDoubleTap, NumberPicker npDragThreshold, NumberPicker npSingleTapDelay) {
         profile.setSecondFingerMode((SecondFingerMode) spHoldMode.getSelectedItem());
         profile.setLongPressTimeout(npLongPress.getValue());
         profile.setDoubleTapTimeout(npDoubleTap.getValue());
         profile.setDragThreshold(npDragThreshold.getValue());
+        profile.setSingleTapDelay(npSingleTapDelay.getValue());
 
         profile.setSingleTapAction(bindingValues.getOrDefault("single", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setSingleTapDragAction(bindingValues.getOrDefault("single_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
