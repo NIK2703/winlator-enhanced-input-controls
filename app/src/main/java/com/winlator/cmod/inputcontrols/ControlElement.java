@@ -2248,7 +2248,7 @@ public class ControlElement {
                             active = false;
                             inputControlsView.invalidate();
                         }
-                    }, 120);
+                    }, 32);
                 }
                 else if (doubleTapTriggered) {
                     releaseHeldBindings();
