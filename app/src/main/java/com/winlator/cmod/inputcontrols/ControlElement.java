@@ -1929,6 +1929,7 @@ public class ControlElement {
     private void onDoubleTapTimeout() {
         if (!doubleTapWaiting) return;
         doubleTapWaiting = false;
+        cancelPendingLongPress();
         List<Binding> seq = bindings.get(0);
         heldBindings = new ArrayList<>(seq);
         pressBindings(seq);
@@ -1939,6 +1940,8 @@ public class ControlElement {
 
     private void cancelDoubleTap() {
         cancelPendingDoubleTap();
+        cancelPendingLongPress();
+        longPressTriggered = false;
         doubleTapWaiting = false;
         active = false;
         List<Binding> seq = bindings.get(0);
@@ -2234,6 +2237,8 @@ public class ControlElement {
                     active = false;
                 }
                 else if (hasDoubleTapBinding() && !doubleTapWaiting) {
+                    cancelPendingLongPress();
+                    longPressTriggered = false;
                     active = true;
                     startDoubleTapTimer();
                 }

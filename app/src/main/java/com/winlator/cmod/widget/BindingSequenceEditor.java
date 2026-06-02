@@ -87,6 +87,14 @@ public class BindingSequenceEditor {
                 if (!b.isModifier()) { hasNonModifier = true; break; }
             }
 
+            if (!hasNonModifier) {
+                boolean modsRemoved = false;
+                if (bindings.remove(Binding.MOD_CTRL)) modsRemoved = true;
+                if (bindings.remove(Binding.MOD_SHIFT)) modsRemoved = true;
+                if (bindings.remove(Binding.MOD_ALT)) modsRemoved = true;
+                if (modsRemoved && onChanged != null) onChanged.run();
+            }
+
             llMods.setVisibility(hasNonModifier ? View.VISIBLE : View.GONE);
             if (!hasNonModifier) return;
 
