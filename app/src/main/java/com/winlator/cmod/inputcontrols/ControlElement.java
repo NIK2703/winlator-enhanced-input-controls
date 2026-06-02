@@ -2239,7 +2239,9 @@ public class ControlElement {
                 else if (hasDoubleTapBinding() && !doubleTapWaiting) {
                     cancelPendingLongPress();
                     longPressTriggered = false;
-                    active = true;
+                    List<Binding> primarySeq = bindings.get(0);
+                    boolean hasSingleTap = primarySeq != null && !primarySeq.isEmpty() && primarySeq.get(0) != Binding.NONE;
+                    if (hasSingleTap) active = true;
                     startDoubleTapTimer();
                 }
                 else if (hasLongPressBinding()) {

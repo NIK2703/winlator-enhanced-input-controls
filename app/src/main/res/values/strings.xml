@@ -637,7 +637,6 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="single_tap_delay_help"><![CDATA[When <b>Double Tap</b> or <b>Double Tap Drag</b> actions are assigned, single tap response is delayed by the Double Tap Timeout.]]></string>
     <string name="long_press_drag_help"><![CDATA[When <b>Long Press Drag</b> action is assigned, long press fires after releasing the finger instead of immediately after the Long Press Timeout.]]></string>
     <string name="binding_delay_help">Adds a delay (ms) between each binding in a sequence.</string>
-    <string name="button_double_tap_help">Tap the button twice quickly to trigger the assigned bindings. The delay between taps is set by the Button Double Tap Delay.</string>
 
     <!-- Icon Pack Manager -->
     <string name="icon_pack_manager">Icon Pack Manager</string>
