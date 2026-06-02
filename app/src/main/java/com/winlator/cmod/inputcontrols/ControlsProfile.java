@@ -59,6 +59,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private int gestureThreshold = 20;
     private int doubleTapDistance = 50;
     private int singleTapDelay;
+    private int buttonDoubleTapTimeout = 100;
     private float strokeWidth = 0.15f;
     private int fillAlphaInactive = 0;
     private TouchActivationMode touchActivationMode = TouchActivationMode.LOCK;
@@ -317,6 +318,14 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setLongPressDelay(int longPressDelay) {
         ensureGestureSettingsLoaded();
         this.longPressDelay = longPressDelay;
+    }
+
+    public int getButtonDoubleTapTimeout() {
+        return buttonDoubleTapTimeout;
+    }
+
+    public void setButtonDoubleTapTimeout(int timeout) {
+        this.buttonDoubleTapTimeout = clamp(timeout, 50, 300);
     }
 
     public int getButtonLongPressHaptic() {
@@ -587,6 +596,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (data.has("cursorSpeed")) cursorSpeed = (float)data.getDouble("cursorSpeed");
             if (data.has("bindingDelay")) bindingDelay = data.getInt("bindingDelay");
             if (data.has("longPressDelay")) longPressDelay = data.getInt("longPressDelay");
+            if (data.has("buttonDoubleTapTimeout")) buttonDoubleTapTimeout = clamp(data.getInt("buttonDoubleTapTimeout"), 50, 300);
             if (data.has("buttonLongPressHaptic")) buttonLongPressHaptic = clamp(data.getInt("buttonLongPressHaptic"), 0, 5);
             if (data.has("buttonGestureHaptic")) buttonGestureHaptic = clamp(data.getInt("buttonGestureHaptic"), 0, 5);
             if (data.has("gestureLongPressHaptic")) gestureLongPressHaptic = clamp(data.getInt("gestureLongPressHaptic"), 0, 5);
@@ -771,6 +781,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
             if (bindingDelay > 0) data.put("bindingDelay", bindingDelay);
             data.put("longPressDelay", longPressDelay);
+            data.put("buttonDoubleTapTimeout", buttonDoubleTapTimeout);
             if (buttonLongPressHaptic != 1) data.put("buttonLongPressHaptic", buttonLongPressHaptic);
             if (buttonGestureHaptic != 5) data.put("buttonGestureHaptic", buttonGestureHaptic);
             if (gestureLongPressHaptic != 3) data.put("gestureLongPressHaptic", gestureLongPressHaptic);
@@ -1026,6 +1037,15 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                         gList.add(Binding.fromString(gArray.getString(k)));
                     }
                     element.setGestureBindings(gList);
+                }
+
+                if (elementJSONObject.has("doubleTapBindings")) {
+                    JSONArray dtArray = elementJSONObject.getJSONArray("doubleTapBindings");
+                    List<Binding> dtList = new ArrayList<>();
+                    for (int k = 0; k < dtArray.length(); k++) {
+                        dtList.add(Binding.fromString(dtArray.getString(k)));
+                    }
+                    element.setDoubleTapBindings(dtList);
                 }
 
                 if (!virtualGamepad && hasGamepadBinding) virtualGamepad = true;

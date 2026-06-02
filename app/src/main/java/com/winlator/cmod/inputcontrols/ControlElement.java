@@ -141,6 +141,13 @@ public class ControlElement {
     private boolean longPressTriggered;
     private List<Binding> gestureBindings = new ArrayList<>();
     private boolean gestureTriggered;
+    private List<Binding> doubleTapBindings = new ArrayList<>();
+    private boolean doubleTapTriggered;
+    private boolean doubleTapWaiting;
+    private float doubleTapScale = 1.0f;
+    private float doubleTapDownX;
+    private float doubleTapDownY;
+    private android.os.Handler doubleTapHandler;
 
     private float gestureDownX;
 
@@ -442,6 +449,31 @@ public class ControlElement {
         return true;
     }
 
+    public List<Binding> getDoubleTapBindings() {
+        return doubleTapBindings;
+    }
+
+    public void setDoubleTapBindings(List<Binding> bindings) {
+        doubleTapBindings.clear();
+        doubleTapBindings.addAll(bindings);
+    }
+
+    public void addDoubleTapBinding(Binding binding) {
+        doubleTapBindings.add(binding);
+    }
+
+    public void removeDoubleTapBinding(int index) {
+        if (index >= 0 && index < doubleTapBindings.size()) {
+            doubleTapBindings.remove(index);
+        }
+    }
+
+    public boolean hasDoubleTapBinding() {
+        if (doubleTapBindings == null || doubleTapBindings.isEmpty()) return false;
+        if (doubleTapBindings.size() == 1 && doubleTapBindings.get(0) == Binding.NONE) return false;
+        return true;
+    }
+
     public void setGestureDownPosition(float x, float y) {
         gestureDownX = x;
         gestureDownY = y;
@@ -453,6 +485,10 @@ public class ControlElement {
 
     public boolean isLongPressTriggered() {
         return longPressTriggered;
+    }
+
+    public boolean isDoubleTapTriggered() {
+        return doubleTapTriggered;
     }
 
     public float getScale() {
@@ -1114,6 +1150,7 @@ public class ControlElement {
         Rect box = getBoundingBox();
         if (box.width() <= 0 || box.height() <= 0) return;
         if (selected && !(toggleSwitch && type == Type.BUTTON)) { draw(canvas); return; }
+
         int pad = strokePad();
         int snappingSize = inputControlsView.getSnappingSize();
         Paint paint = inputControlsView.getPaint();
@@ -1121,83 +1158,91 @@ public class ControlElement {
         int secondaryColor = inputControlsView.getSecondaryColor();
         int colorAlpha = Color.alpha(primaryColor);
         int inactiveAlpha = colorAlpha * fillAlphaInactive() / 255;
-        if (type == Type.D_PAD) {
-            ensureDPadCaches(snappingSize);
-            if (dpadPetalStroke == null) { draw(canvas); return; }
-            float cx = box.centerX();
-            float cy = box.centerY();
-            float strokeWidth = snappingSize * strokeWidthMultiplier();
-            boolean engagedDpad = isEngaged();
-            int fillActive = colorAlpha;
-            int fillInactive = inactiveAlpha;
-            paint.setStyle(Paint.Style.FILL);
-            for (int i = 0; i < 4; i++) {
-                canvas.save();
-                canvas.rotate(i * 90, cx, cy);
-                if (engagedDpad && states[i]) {
-                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillActive));
-                    canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, paint);
-                } else {
-                    canvas.drawBitmap(dpadPetalStroke, box.left - pad, box.top - pad, null);
-                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillInactive));
-                    canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, paint);
-                }
-                canvas.restore();
-            }
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(strokeWidth);
-            paint.setColor(primaryColor);
-            return;
+
+        boolean scaled = false;
+        if (type == Type.BUTTON && doubleTapScale > 1.0f) {
+            canvas.save();
+            canvas.scale(doubleTapScale, doubleTapScale, box.centerX(), box.centerY());
+            scaled = true;
         }
-
-        boolean engaged = isEngaged();
-
-        // 1. Engaged: BUTTON/TRACKPAD — fill cache replaces normal rendering
-        if (engaged && (type == Type.BUTTON || type == Type.TRACKPAD)) {
-            int savedColor = paint.getColor();
-            Paint.Style savedStyle = paint.getStyle();
-            float savedStrokeWidth = paint.getStrokeWidth();
-            ensureFillCache();
-            if (cacheFill != null) {
-                int alpha = colorAlpha;
-                paint.setColor(ColorUtils.setAlphaComponent(primaryColor, alpha));
+        try {
+            if (type == Type.D_PAD) {
+                ensureDPadCaches(snappingSize);
+                if (dpadPetalStroke == null) { draw(canvas); return; }
+                float cx = box.centerX();
+                float cy = box.centerY();
+                float strokeWidth = snappingSize * strokeWidthMultiplier();
+                boolean engagedDpad = isEngaged();
+                int fillActive = colorAlpha;
+                int fillInactive = inactiveAlpha;
                 paint.setStyle(Paint.Style.FILL);
-                canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, paint);
+                for (int i = 0; i < 4; i++) {
+                    canvas.save();
+                    canvas.rotate(i * 90, cx, cy);
+                    if (engagedDpad && states[i]) {
+                        paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillActive));
+                        canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, paint);
+                    } else {
+                        canvas.drawBitmap(dpadPetalStroke, box.left - pad, box.top - pad, null);
+                        paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillInactive));
+                        canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, paint);
+                    }
+                    canvas.restore();
+                }
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(strokeWidth);
+                paint.setColor(primaryColor);
+                return;
             }
-            paint.setStyle(savedStyle);
-            paint.setColor(savedColor);
-            paint.setStrokeWidth(savedStrokeWidth);
-            return;
-        }
 
-        // 2. Fill under shape (non-engaged, non-BUTTON) — subtle background wash
-        if (type != Type.TRACKPAD && type != Type.STICK && type != Type.BUTTON) {
-            int targetAlpha = fillAlphaInactive();
-            if (targetAlpha > 0) {
+            boolean engaged = isEngaged();
+
+            // 1. Engaged: BUTTON/TRACKPAD — fill cache replaces normal rendering
+            if (engaged && (type == Type.BUTTON || type == Type.TRACKPAD)) {
+                int savedColor = paint.getColor();
+                Paint.Style savedStyle = paint.getStyle();
+                float savedStrokeWidth = paint.getStrokeWidth();
                 ensureFillCache();
                 if (cacheFill != null) {
-                    int savedColor = paint.getColor();
-                    Paint.Style savedStyle = paint.getStyle();
-                    float savedStrokeWidth = paint.getStrokeWidth();
-                    int fillAlpha = colorAlpha * targetAlpha / 255;
-                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillAlpha));
+                    int alpha = colorAlpha;
+                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, alpha));
                     paint.setStyle(Paint.Style.FILL);
                     canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, paint);
-                    paint.setStyle(savedStyle);
-                    paint.setColor(savedColor);
-                    paint.setStrokeWidth(savedStrokeWidth);
+                }
+                paint.setStyle(savedStyle);
+                paint.setColor(savedColor);
+                paint.setStrokeWidth(savedStrokeWidth);
+                return;
+            }
+
+            // 2. Fill under shape (non-engaged, non-BUTTON) — subtle background wash
+            if (type != Type.TRACKPAD && type != Type.STICK && type != Type.BUTTON) {
+                int targetAlpha = fillAlphaInactive();
+                if (targetAlpha > 0) {
+                    ensureFillCache();
+                    if (cacheFill != null) {
+                        int savedColor = paint.getColor();
+                        Paint.Style savedStyle = paint.getStyle();
+                        float savedStrokeWidth = paint.getStrokeWidth();
+                        int fillAlpha = colorAlpha * targetAlpha / 255;
+                        paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillAlpha));
+                        paint.setStyle(Paint.Style.FILL);
+                        canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, paint);
+                        paint.setStyle(savedStyle);
+                        paint.setColor(savedColor);
+                        paint.setStrokeWidth(savedStrokeWidth);
+                    }
                 }
             }
-        }
 
-        // 3. Combined layer (shape + text/icon, overlay opacity baked in)
-        ensureCombinedCache();
-        if (cacheCombined != null)
-            canvas.drawBitmap(cacheCombined, box.left - pad, box.top - pad, null);
-        else {
-            draw(canvas);
-            return;
-        }
+            // 3. Combined layer (shape + text/icon, overlay opacity baked in)
+            ensureCombinedCache();
+            if (cacheCombined != null)
+                canvas.drawBitmap(cacheCombined, box.left - pad, box.top - pad, null);
+            else {
+                draw(canvas);
+                return;
+            }
 
         // 4. Dynamic content
         if (type == Type.STICK || type == Type.RANGE_BUTTON) {
@@ -1316,6 +1361,10 @@ public class ControlElement {
                 }
             }
         }
+        }
+        finally {
+            if (scaled) canvas.restore();
+        }
     }
 
     public void draw(Canvas canvas) {
@@ -1339,6 +1388,11 @@ public class ControlElement {
             case BUTTON: {
                 float cx = boundingBox.centerX();
                 float cy = boundingBox.centerY();
+
+                if (doubleTapScale > 1.0f && !buildingCache) {
+                    canvas.save();
+                    canvas.scale(doubleTapScale, doubleTapScale, cx, cy);
+                }
 
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(fillColor);
@@ -1366,6 +1420,10 @@ public class ControlElement {
                     paint.setStyle(Paint.Style.FILL);
                     paint.setColor(primaryColor);
                     canvas.drawText(text, x, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
+                }
+
+                if (doubleTapScale > 1.0f && !buildingCache) {
+                    canvas.restore();
                 }
                 break;
             }
@@ -1695,6 +1753,14 @@ public class ControlElement {
                 elementJSONObject.put("gestureBindings", gArray);
             }
 
+            if (hasDoubleTapBinding()) {
+                JSONArray dtArray = new JSONArray();
+                for (Binding b : doubleTapBindings) {
+                    if (b != null && b != Binding.NONE) dtArray.put(b.name());
+                }
+                elementJSONObject.put("doubleTapBindings", dtArray);
+            }
+
             if (type == Type.RANGE_BUTTON && range != null) {
                 elementJSONObject.put("range", range.name());
                 if (orientation != 0) elementJSONObject.put("orientation", orientation);
@@ -1826,6 +1892,75 @@ public class ControlElement {
         }
     }
 
+    private void startLongPressTimer() {
+        longPressTriggered = false;
+        ControlsProfile localProfile = inputControlsView.getProfile();
+        int delay = localProfile != null ? localProfile.getLongPressDelay() : 0;
+        if (delay > 0) {
+            if (longPressHandler == null) longPressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+            longPressHandler.postDelayed(() -> {
+                longPressTriggered = true;
+                cancelPendingDoubleTap();
+                doubleTapWaiting = false;
+                vibrateHaptic(cachedButtonLongPressHaptic, 30);
+                heldBindings = new ArrayList<>(longPressBindings);
+                pressBindings(longPressBindings);
+                inputControlsView.invalidate();
+            }, delay);
+        }
+    }
+
+    public void cancelPendingDoubleTap() {
+        if (doubleTapHandler != null) {
+            doubleTapHandler.removeCallbacksAndMessages(null);
+            doubleTapHandler = null;
+        }
+    }
+
+    private void startDoubleTapTimer() {
+        ControlsProfile p = inputControlsView.getProfile();
+        int delay = p != null ? p.getButtonDoubleTapTimeout() : 150;
+        if (doubleTapHandler == null) doubleTapHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        doubleTapHandler.removeCallbacksAndMessages(null);
+        doubleTapHandler.postDelayed(this::onDoubleTapTimeout, delay);
+        doubleTapWaiting = true;
+    }
+
+    private void onDoubleTapTimeout() {
+        if (!doubleTapWaiting) return;
+        doubleTapWaiting = false;
+        List<Binding> seq = bindings.get(0);
+        heldBindings = new ArrayList<>(seq);
+        pressBindings(seq);
+        releaseHeldBindings();
+        active = false;
+        inputControlsView.invalidate();
+    }
+
+    private void cancelDoubleTap() {
+        cancelPendingDoubleTap();
+        doubleTapWaiting = false;
+        active = false;
+        List<Binding> seq = bindings.get(0);
+        heldBindings = new ArrayList<>(seq);
+        pressBindings(seq);
+        releaseHeldBindings();
+        inputControlsView.invalidate();
+    }
+
+    private void handleDoubleTapConfirmed() {
+        doubleTapWaiting = false;
+        cancelPendingDoubleTap();
+        cancelPendingLongPress();
+        longPressTriggered = false;
+        gestureTriggered = false;
+        doubleTapTriggered = true;
+        doubleTapScale = 1.5f;
+        heldBindings = new ArrayList<>(doubleTapBindings);
+        pressBindings(doubleTapBindings);
+        inputControlsView.invalidate();
+    }
+
     public boolean handleTouchDown(int pointerId, float x, float y) {
         if (currentPointerId == -1 && containsPoint(x, y)) {
             currentPointerId = pointerId;
@@ -1835,20 +1970,20 @@ public class ControlElement {
                 if (isKeepButtonPressedAfterMinTime()) touchTime = System.currentTimeMillis();
                 if (toggleSwitch && selected) {                    releaseHeldBindings();
                 }
-                else if (hasLongPressBinding() && !toggleSwitch) {
-                    longPressTriggered = false;
-                    ControlsProfile localProfile = inputControlsView.getProfile();
-                    int delay = localProfile != null ? localProfile.getLongPressDelay() : 0;
-                    if (delay > 0) {
-                        if (longPressHandler == null) longPressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-                        longPressHandler.postDelayed(() -> {
-                            longPressTriggered = true;
-                            vibrateHaptic(cachedButtonLongPressHaptic, 30);
-                            heldBindings = new ArrayList<>(longPressBindings);
-                            pressBindings(longPressBindings);
-                            inputControlsView.invalidate();
-                        }, delay);
+                else if (hasDoubleTapBinding()) {
+                    doubleTapDownX = x;
+                    doubleTapDownY = y;
+                    if (doubleTapWaiting) {
+                        handleDoubleTapConfirmed();
                     }
+                    else {
+                        if (hasLongPressBinding() && !toggleSwitch) {
+                            startLongPressTimer();
+                        }
+                    }
+                }
+                else if (hasLongPressBinding() && !toggleSwitch) {
+                    startLongPressTimer();
                 }
                 else {
                     heldBindings = bindings.get(0);
@@ -1875,7 +2010,7 @@ public class ControlElement {
 
     public boolean handleTouchMove(int pointerId, float x, float y) {
         if (pointerId == currentPointerId) {
-            if (type == Type.BUTTON && hasGestureBinding() && !gestureTriggered && !longPressTriggered) {
+            if (type == Type.BUTTON && hasGestureBinding() && !gestureTriggered && !longPressTriggered && !doubleTapTriggered) {
                 float dx = x - gestureDownX;
                 float dy = y - gestureDownY;
                 ControlsProfile p = inputControlsView.getProfile();
@@ -1888,6 +2023,7 @@ public class ControlElement {
                         longPressHandler = null;
                     }
                     longPressTriggered = false;
+                    cancelPendingDoubleTap();
                     vibrateHaptic(cachedButtonGestureHaptic, 10);
                     heldBindings = new ArrayList<>(gestureBindings);
                     pressBindings(gestureBindings);
@@ -1899,6 +2035,9 @@ public class ControlElement {
                 longPressHandler.removeCallbacksAndMessages(null);
                 longPressHandler = null;
                 longPressTriggered = false;
+            }
+            if (type == Type.BUTTON && !containsPoint(x, y) && !gestureTriggered && !longPressTriggered && doubleTapWaiting) {
+                cancelDoubleTap();
             }
             if (type == Type.D_PAD || type == Type.STICK || type == Type.TRACKPAD) {
             float deltaX, deltaY;
@@ -2087,6 +2226,16 @@ public class ControlElement {
                 else if (gestureTriggered) {
                     releaseHeldBindings();
                     gestureTriggered = false;
+                }
+                else if (doubleTapTriggered) {
+                    releaseHeldBindings();
+                    doubleTapScale = 1.0f;
+                    doubleTapTriggered = false;
+                    active = false;
+                }
+                else if (hasDoubleTapBinding() && !doubleTapWaiting) {
+                    active = true;
+                    startDoubleTapTimer();
                 }
                 else if (hasLongPressBinding()) {
                     if (longPressHandler != null) longPressHandler.removeCallbacksAndMessages(null);
