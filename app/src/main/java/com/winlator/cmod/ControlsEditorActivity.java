@@ -391,7 +391,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
 
     private void loadDoubleTapBindingSection(final ControlElement element, LinearLayout container) {
         List<Binding> seq = new ArrayList<>(element.getDoubleTapBindings());
-        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Double Tap", 0, seq, () -> {
+        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Double Tap", R.string.button_double_tap_help, seq, () -> {
             element.setDoubleTapBindings(seq);
             profile.save();
             inputControlsView.invalidate();
