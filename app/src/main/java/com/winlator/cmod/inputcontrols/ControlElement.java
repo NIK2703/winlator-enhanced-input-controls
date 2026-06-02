@@ -1160,14 +1160,9 @@ public class ControlElement {
         int inactiveAlpha = colorAlpha * fillAlphaInactive() / 255;
 
         boolean scaled = false;
-        float actionScale = 1.0f;
-        if (type == Type.BUTTON) {
-            if (doubleTapScale > 1.0f) actionScale = doubleTapScale;
-            else if (gestureTriggered) actionScale = 1.2f;
-        }
-        if (actionScale > 1.0f) {
+        if (type == Type.BUTTON && doubleTapScale > 1.0f) {
             canvas.save();
-            canvas.scale(actionScale, actionScale, box.centerX(), box.centerY());
+            canvas.scale(doubleTapScale, doubleTapScale, box.centerX(), box.centerY());
             scaled = true;
         }
         try {
@@ -2247,6 +2242,13 @@ public class ControlElement {
                 else if (gestureTriggered) {
                     releaseHeldBindings();
                     gestureTriggered = false;
+                    active = true;
+                    inputControlsView.postDelayed(() -> {
+                        if (!doubleTapWaiting) {
+                            active = false;
+                            inputControlsView.invalidate();
+                        }
+                    }, 120);
                 }
                 else if (doubleTapTriggered) {
                     releaseHeldBindings();
