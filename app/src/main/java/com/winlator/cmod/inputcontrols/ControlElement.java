@@ -110,6 +110,7 @@ public class ControlElement {
     private short y;
     private boolean selected = false;
     private boolean toggleSwitch = false;
+    private boolean passthroughTouch;
     private int currentPointerId = -1;
     private final Rect boundingBox = new Rect();
     private boolean[] states = new boolean[4];
@@ -328,6 +329,14 @@ public class ControlElement {
 
     public void setToggleSwitch(boolean toggleSwitch) {
         this.toggleSwitch = toggleSwitch;
+    }
+
+    public boolean isPassthroughTouch() {
+        return passthroughTouch;
+    }
+
+    public void setPassthroughTouch(boolean passthroughTouch) {
+        this.passthroughTouch = passthroughTouch;
     }
 
     public Binding getBindingAt(int index) {
@@ -1746,6 +1755,7 @@ public class ControlElement {
             elementJSONObject.put("x", (float)x / inputControlsView.getMaxWidth());
             elementJSONObject.put("y", (float)y / inputControlsView.getMaxHeight());
             elementJSONObject.put("toggleSwitch", toggleSwitch);
+            if (passthroughTouch) elementJSONObject.put("passthroughTouch", true);
             elementJSONObject.put("text", text);
             elementJSONObject.put("iconId", iconId);
             if (hasCustomIcon()) elementJSONObject.put("customIconData", customIconData);
@@ -2043,8 +2053,8 @@ public class ControlElement {
                     vibrateHaptic(cachedButtonGestureHaptic, 10);
                     heldBindings = new ArrayList<>(gestureBindings);
                     pressBindings(gestureBindings);
-                    inputControlsView.invalidate();
-                    return true;
+                inputControlsView.invalidate();
+                return !passthroughTouch;
                 }
             }
             if (type == Type.BUTTON && hasLongPressBinding() && !longPressTriggered && longPressHandler != null && !containsPoint(x, y)) {
@@ -2231,7 +2241,7 @@ public class ControlElement {
                     selected = !selected;
                     if (selected) {
                         currentPointerId = -1;
-                        return true;
+                        return !passthroughTouch;
                     }
                 }
 
@@ -2299,7 +2309,7 @@ public class ControlElement {
                 if (currentPosition != null) currentPosition = null;
             }
             currentPointerId = -1;
-            return true;
+            return passthroughTouch ? false : true;
         }
         return false;
     }

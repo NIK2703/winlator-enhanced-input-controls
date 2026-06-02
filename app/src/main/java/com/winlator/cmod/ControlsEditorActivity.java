@@ -127,6 +127,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             ControlElement.Shape shape = element.getShape();
             view.findViewById(R.id.LLShape).setVisibility(View.GONE);
             view.findViewById(R.id.CBToggleSwitch).setVisibility(View.GONE);
+            view.findViewById(R.id.CBPassthroughTouch).setVisibility(View.GONE);
             view.findViewById(R.id.LLCustomTextIcon).setVisibility(View.GONE);
             view.findViewById(R.id.LLRangeOptions).setVisibility(View.GONE);
             view.findViewById(R.id.LLRectDimensions).setVisibility(View.GONE);
@@ -135,6 +136,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             if (type == ControlElement.Type.BUTTON) {
                 view.findViewById(R.id.LLShape).setVisibility(View.VISIBLE);
                 view.findViewById(R.id.CBToggleSwitch).setVisibility(View.VISIBLE);
+                view.findViewById(R.id.CBPassthroughTouch).setVisibility(View.VISIBLE);
                 view.findViewById(R.id.LLCustomTextIcon).setVisibility(View.VISIBLE);
                 if (shape == ControlElement.Shape.RECT) {
                     view.findViewById(R.id.LLRectDimensions).setVisibility(View.VISIBLE);
@@ -265,6 +267,13 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         cbToggleSwitch.setChecked(element.isToggleSwitch());
         cbToggleSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             element.setToggleSwitch(isChecked);
+            profile.save();
+        });
+
+        CheckBox cbPassthrough = view.findViewById(R.id.CBPassthroughTouch);
+        cbPassthrough.setChecked(element.isPassthroughTouch());
+        cbPassthrough.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            element.setPassthroughTouch(isChecked);
             profile.save();
         });
 

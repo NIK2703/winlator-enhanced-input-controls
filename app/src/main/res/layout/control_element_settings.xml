@@ -293,6 +293,12 @@
             android:layout_height="wrap_content"
             android:text="@string/toggle_switch" />
 
+        <CheckBox
+            android:id="@+id/CBPassthroughTouch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Pass touch to touchpad/touchscreen" />
+
         <LinearLayout
             android:id="@+id/LLCustomTextIcon"
             android:layout_width="match_parent"

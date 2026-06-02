@@ -990,6 +990,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 if (elementJSONObject.has("cornerRadius")) element.setCornerRadius((float)elementJSONObject.getDouble("cornerRadius"));
                 if (elementJSONObject.has("dpadCornerRadius")) element.setDpadCornerRadius((float)elementJSONObject.getDouble("dpadCornerRadius"));
                 element.setToggleSwitch(elementJSONObject.getBoolean("toggleSwitch"));
+                if (elementJSONObject.has("passthroughTouch")) element.setPassthroughTouch(elementJSONObject.getBoolean("passthroughTouch"));
                 element.setX((int)(elementJSONObject.getDouble("x") * inputControlsView.getMaxWidth()));
                 element.setY((int)(elementJSONObject.getDouble("y") * inputControlsView.getMaxHeight()));
                 element.setScale((float)elementJSONObject.getDouble("scale"));
