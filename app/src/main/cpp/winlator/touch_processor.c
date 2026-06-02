@@ -242,6 +242,11 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
         if (time_ms - e->gesture_last_tap_time >= (uint64_t)g_state.cfg.double_tap_timeout_ms) {
             e->double_tap_waiting = false;
             e->gesture_double_tap_first_up = false;
+            // Java: on double-tap timeout, fire primary as single tap (press + release)
+            if (e->bindings[0].type != BINDING_NONE) {
+                press_binding(&result, &e->bindings[0], false);
+                release_binding(&result, &e->bindings[0]);
+            }
         }
     }
 
