@@ -51,6 +51,11 @@ public class StringUtils {
         return formatBytes(bytes, true);
     }
 
+    public static String clearReservedChars(String name) {
+        if (name == null || name.isEmpty()) return "";
+        return name.replaceAll("[\\\\/:*?\"<>\\|]+", "");
+    }
+
     public static String formatBytes(long bytes, boolean withSuffix) {
         if (bytes <= 0) return "0 bytes";
         final String[] units = new String[]{"bytes", "KB", "MB", "GB", "TB"};

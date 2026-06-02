@@ -16,6 +16,7 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.Xfermode;
 import android.os.SystemClock;
+import android.util.Base64;
 
 import androidx.core.graphics.ColorUtils;
 import com.winlator.cmod.core.CubicBezierInterpolator;
@@ -131,6 +132,8 @@ public class ControlElement {
     private String cacheCombinedKey = "";
     private String text = "";
     private byte iconId;
+    private String customIconData = "";
+    private Bitmap customIcon;
     private String cachedDisplayText;
     private boolean displayTextDirty = true;
     private List<Binding> heldBindings;
@@ -209,6 +212,8 @@ public class ControlElement {
 
         text = "";
         iconId = 0;
+        customIconData = "";
+        customIcon = null;
         range = null;
         boundingBoxNeedsUpdate = true;
         refreshProfileCache();
@@ -508,6 +513,46 @@ public class ControlElement {
         invalidateElementCache();
     }
 
+    public boolean hasCustomIcon() {
+        return customIconData != null && !customIconData.isEmpty();
+    }
+
+    public String getCustomIconData() {
+        return customIconData;
+    }
+
+    public void setCustomIconData(String customIconData) {
+        String oldFillKey = visualKey(LAYER_FILL);
+        String oldCombinedKey = visualKey(LAYER_COMBINED);
+        String oldDiskFillKey = diskKey(LAYER_FILL);
+        String oldDiskCombinedKey = diskKey(LAYER_COMBINED);
+        this.customIconData = customIconData != null ? customIconData : "";
+        customIcon = null;
+        invalidateElementCache();
+        sharedPool.remove(oldFillKey);
+        sharedPool.remove(oldCombinedKey);
+        if (inputControlsView != null) {
+            File dir = cacheDir();
+            for (String key : new String[]{oldDiskCombinedKey, oldDiskFillKey}) {
+                File f = new File(dir, key + ".png");
+                if (f.exists()) f.delete();
+            }
+        }
+    }
+
+    public Bitmap getCustomIcon() {
+        if (customIcon == null && hasCustomIcon()) {
+            try {
+                byte[] data = Base64.decode(customIconData, Base64.DEFAULT);
+                customIcon = BitmapFactory.decodeByteArray(data, 0, data.length);
+            }
+            catch (IllegalArgumentException e) {
+                customIconData = "";
+            }
+        }
+        return customIcon;
+    }
+
     public Rect getBoundingBox() {
         if (boundingBoxNeedsUpdate) computeBoundingBox();
         return boundingBox;
@@ -712,15 +757,19 @@ public class ControlElement {
         String prefix = layer == LAYER_FILL ? "f_" : "c_";
         String raw = pid + "|" + type.ordinal() + "|" + shape.ordinal() + "|" + elementWidth + "|" + elementHeight
             + "|" + cornerRadius + "|" + scale;
-        if (layer == LAYER_FILL || layer == LAYER_COMBINED) raw += "|" + getDisplayText() + "|" + iconId;
+        if (layer == LAYER_FILL || layer == LAYER_COMBINED) {
+            raw += "|" + getDisplayText() + "|" + iconId;
+            if (hasCustomIcon()) raw += "|" + customIconData;
+        }
         return pid + "_" + prefix + md5(raw);
     }
 
     private String visualKey(int layer) {
         String base = type.ordinal() + "_" + shape.ordinal() + "_" + elementWidth + "_" + elementHeight + "_" + cornerRadius + "_" + scale;
+        String customSuffix = hasCustomIcon() ? "_" + customIconData.hashCode() : "";
         switch (layer) {
-            case 0: return base + "_" + getDisplayText() + "_" + iconId + "_fill";
-            case 1: return base + "_" + getDisplayText() + "_" + iconId + "_combined";
+            case 0: return base + "_" + getDisplayText() + "_" + iconId + customSuffix + "_fill";
+            case 1: return base + "_" + getDisplayText() + "_" + iconId + customSuffix + "_combined";
             default: return base;
         }
     }
@@ -867,7 +916,17 @@ public class ControlElement {
                     // Punch out text/icon as transparent stencil
                     float cx = box.centerX();
                     float cy = box.centerY();
-                    if (iconId > 0) {
+                    Bitmap customIconBitmap = getCustomIcon();
+                    if (customIconBitmap != null) {
+                        int margin = (int)(snappingSize * (shape == Shape.CIRCLE ? 2.0f : 1.0f) * scale);
+                        int halfSize = (int)((Math.min(box.width(), box.height()) - margin) * 0.5f);
+                        drawIconSrcRect.set(0, 0, customIconBitmap.getWidth(), customIconBitmap.getHeight());
+                        drawIconDstRect.set((int)(cx - halfSize), (int)(cy - halfSize), (int)(cx + halfSize), (int)(cy + halfSize));
+                        paint.setXfermode(XFERMODE_DST_OUT);
+                        c.drawBitmap(customIconBitmap, drawIconSrcRect, drawIconDstRect, paint);
+                        paint.setXfermode(null);
+                    }
+                    else if (iconId > 0) {
                         Bitmap icon = inputControlsView.getIcon((byte)iconId);
                         if (icon != null) {
                             int margin = (int)(snappingSize * (shape == Shape.CIRCLE ? 2.0f : 1.0f) * scale);
@@ -1289,7 +1348,15 @@ public class ControlElement {
                 paint.setStrokeWidth(strokeWidth);
                 drawButtonShape(canvas, boundingBox, snappingSize, paint);
 
-                if (iconId > 0) {
+                Bitmap customIconBitmap = getCustomIcon();
+                if (customIconBitmap != null) {
+                    int margin = (int)(snappingSize * 1.5f * scale);
+                    int halfSize = (int)((Math.min(boundingBox.width(), boundingBox.height()) - margin) * 0.5f);
+                    drawIconSrcRect.set(0, 0, customIconBitmap.getWidth(), customIconBitmap.getHeight());
+                    drawIconDstRect.set((int)(cx - halfSize), (int)(cy - halfSize), (int)(cx + halfSize), (int)(cy + halfSize));
+                    canvas.drawBitmap(customIconBitmap, drawIconSrcRect, drawIconDstRect, paint);
+                }
+                else if (iconId > 0) {
                     drawIcon(canvas, cx, cy, boundingBox.width(), boundingBox.height(), iconId);
                 }
                 else {
@@ -1609,6 +1676,7 @@ public class ControlElement {
             elementJSONObject.put("toggleSwitch", toggleSwitch);
             elementJSONObject.put("text", text);
             elementJSONObject.put("iconId", iconId);
+            if (hasCustomIcon()) elementJSONObject.put("customIconData", customIconData);
 
             if (hasLongPressBinding()) {
                 JSONArray lpArray = new JSONArray();

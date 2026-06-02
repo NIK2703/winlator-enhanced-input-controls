@@ -353,6 +353,15 @@
             android:layout_marginTop="8dp"
             android:text="Touchpad Gestures" />
 
+        <Button
+            style="@style/ButtonPositive"
+            android:id="@+id/BTIconPackManager"
+            android:layout_width="240dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:text="@string/icon_pack_manager" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

@@ -107,7 +107,17 @@
             android:screenOrientation="sensor"
             android:exported="false" />
 
+        <activity
+            android:name="com.winlator.cmod.IconPackManagerActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:screenOrientation="portrait" />
 
+        <activity
+            android:name="com.winlator.cmod.IconPackDetailsActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:screenOrientation="portrait" />
 
         <receiver
             android:name=".ShortcutBroadcastReceiver"

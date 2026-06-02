@@ -496,6 +496,10 @@ public class InputControlsFragment extends Fragment {
             }
         });
 
+        view.findViewById(R.id.BTIconPackManager).setOnClickListener((v) -> {
+            startActivity(new Intent(context, IconPackManagerActivity.class));
+        });
+
         return view;
     }
 

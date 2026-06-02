@@ -1,7 +1,9 @@
 package com.winlator.cmod;
 
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -29,6 +31,7 @@ import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
+import com.winlator.cmod.inputcontrols.IconPackManager;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.core.AppUtils;
@@ -37,6 +40,7 @@ import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.widget.NumberPicker;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -46,6 +50,7 @@ import java.util.List;
 public class ControlsEditorActivity extends AppCompatActivity implements View.OnClickListener {
     private InputControlsView inputControlsView;
     private ControlsProfile profile;
+    private IconPackManager iconPackManager;
 
     @Override
     public void onCreate(Bundle bundle) {
@@ -63,6 +68,8 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
 
         FrameLayout container = findViewById(R.id.FLContainer);
         container.addView(inputControlsView, 0);
+
+        iconPackManager = new IconPackManager(this);
 
         container.findViewById(R.id.BTAddElement).setOnClickListener(this);
         container.findViewById(R.id.BTRemoveElement).setOnClickListener(this);
@@ -264,7 +271,8 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         final EditText etCustomText = view.findViewById(R.id.ETCustomText);
         etCustomText.setText(element.getText());
         final LinearLayout llIconList = view.findViewById(R.id.LLIconList);
-        loadIcons(llIconList, element.getIconId());
+        final String[] editingCustomIconData = {element.getCustomIconData()};
+        loadIcons(llIconList, element.getIconId(), editingCustomIconData);
 
         updateLayout.run();
 
@@ -272,16 +280,21 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         popupWindow.setOnDismissListener(() -> {
             String text = etCustomText.getText().toString().trim();
             byte iconId = 0;
+            String customIconData = editingCustomIconData[0];
             for (int i = 0; i < llIconList.getChildCount(); i++) {
                 View child = llIconList.getChildAt(i);
                 if (child.isSelected()) {
-                    iconId = (byte)child.getTag();
+                    Object tag = child.getTag();
+                    if (tag instanceof Integer) {
+                        iconId = (byte)((Integer)tag & 0xFF);
+                    }
                     break;
                 }
             }
 
             element.setText(text);
             element.setIconId(iconId);
+            element.setCustomIconData(customIconData);
             profile.save();
             inputControlsView.invalidate();
         });
@@ -429,7 +442,15 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         });
     }
 
-    private void loadIcons(final LinearLayout parent, byte selectedId) {
+    private void loadIcons(final LinearLayout parent, byte selectedId, final String[] customIconDataRef) {
+        parent.removeAllViews();
+
+        int size = (int)UnitUtils.dpToPx(40);
+        int margin = (int)UnitUtils.dpToPx(2);
+        int padding = (int)UnitUtils.dpToPx(4);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
+        params.setMargins(margin, 0, margin, 0);
+
         byte[] iconIds = new byte[0];
         try {
             String[] filenames = getAssets().list("inputcontrols/icons/");
@@ -439,25 +460,25 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             }
         }
         catch (IOException e) {}
-
         Arrays.sort(iconIds);
 
-        int size = (int)UnitUtils.dpToPx(40);
-        int margin = (int)UnitUtils.dpToPx(2);
-        int padding = (int)UnitUtils.dpToPx(4);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
-        params.setMargins(margin, 0, margin, 0);
+        final boolean userHasCustomIcon = customIconDataRef[0] != null && !customIconDataRef[0].isEmpty();
+        boolean selectedIsCustom = userHasCustomIcon;
+        boolean builtinSelected = false;
 
         for (final byte id : iconIds) {
             ImageView imageView = new ImageView(this);
             imageView.setLayoutParams(params);
             imageView.setPadding(padding, padding, padding, padding);
             imageView.setBackgroundResource(R.drawable.icon_background);
-            imageView.setTag(id);
-            imageView.setSelected(id == selectedId);
+            imageView.setTag((int)id);
+            boolean isSelected = id == selectedId && !userHasCustomIcon;
+            imageView.setSelected(isSelected);
+            if (isSelected) builtinSelected = true;
             imageView.setOnClickListener((v) -> {
                 for (int i = 0; i < parent.getChildCount(); i++) parent.getChildAt(i).setSelected(false);
                 imageView.setSelected(true);
+                customIconDataRef[0] = "";
             });
 
             try (InputStream is = getAssets().open("inputcontrols/icons/"+id+".png")) {
@@ -466,6 +487,49 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             catch (IOException e) {}
 
             parent.addView(imageView);
+        }
+
+        ArrayList<IconPackManager.StoredIconPack> activePacks = iconPackManager.getActivePacks();
+        for (final IconPackManager.StoredIconPack pack : activePacks) {
+            for (final IconPackManager.PackIcon packIcon : pack.icons) {
+                ImageView imageView = new ImageView(this);
+                imageView.setLayoutParams(params);
+                imageView.setPadding(padding, padding, padding, padding);
+                imageView.setBackgroundResource(R.drawable.icon_background);
+                imageView.setTag(null);
+                imageView.setOnClickListener((v) -> {
+                    for (int i = 0; i < parent.getChildCount(); i++) parent.getChildAt(i).setSelected(false);
+                    imageView.setSelected(true);
+                    byte[] bytes = packIcon.readBytes();
+                    if (bytes != null) {
+                        customIconDataRef[0] = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+                    }
+                });
+
+                if (!builtinSelected && !selectedIsCustom) {
+                    selectedIsCustom = false;
+                }
+                if (selectedIsCustom && userHasCustomIcon) {
+                    byte[] bytes = packIcon.readBytes();
+                    if (bytes != null) {
+                        String packIconB64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+                        if (packIconB64.equals(customIconDataRef[0])) {
+                            imageView.setSelected(true);
+                            selectedIsCustom = false;
+                        }
+                    }
+                }
+
+                byte[] bytes = packIcon.readBytes();
+                if (bytes != null) {
+                    imageView.setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.length));
+                }
+                else {
+                    imageView.setImageResource(R.drawable.icon_image_picker);
+                }
+
+                parent.addView(imageView);
+            }
         }
     }
 

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/menu_item_import_icon_pack"
+        android:title="@string/import_icon_pack" />
+    <item
+        android:id="@+id/menu_item_create_icon_pack"
+        android:title="@string/create_icon_pack" />
+    <item
+        android:id="@+id/menu_item_select_icon_pack"
+        android:title="@string/select_icon_pack" />
+    <item
+        android:id="@+id/menu_item_export_icon_pack"
+        android:title="@string/export_icon_pack" />
+    <item
+        android:id="@+id/menu_item_remove_icon_pack"
+        android:title="@string/remove_icon_pack" />
+</menu>

@@ -358,6 +358,7 @@ public class InputControlsView extends View {
             element.setScale(selectedElement.getScale());
             element.setText(selectedElement.getText());
             element.setIconId(selectedElement.getIconId());
+            element.setCustomIconData(selectedElement.getCustomIconData());
             if (selectedElement.getRange() != null) element.setRange(selectedElement.getRange());
             element.setOrientation(selectedElement.getOrientation());
             element.setElementWidth(selectedElement.getElementWidth());
