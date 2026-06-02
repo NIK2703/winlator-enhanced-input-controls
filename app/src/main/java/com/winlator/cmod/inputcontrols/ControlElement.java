@@ -1199,20 +1199,33 @@ public class ControlElement {
 
             // 1. Engaged: BUTTON/TRACKPAD — fill cache replaces normal rendering
             if (engaged && (type == Type.BUTTON || type == Type.TRACKPAD)) {
-                int savedColor = paint.getColor();
-                Paint.Style savedStyle = paint.getStyle();
-                float savedStrokeWidth = paint.getStrokeWidth();
-                ensureFillCache();
-                if (cacheFill != null) {
-                    int alpha = colorAlpha;
-                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, alpha));
-                    paint.setStyle(Paint.Style.FILL);
-                    canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, paint);
+                boolean hasPrimaryTap = false;
+                List<Binding> primarySeq = bindings.get(0);
+                if (primarySeq != null) {
+                    for (Binding b : primarySeq) {
+                        if (b != null && b != Binding.NONE) { hasPrimaryTap = true; break; }
+                    }
                 }
-                paint.setStyle(savedStyle);
-                paint.setColor(savedColor);
-                paint.setStrokeWidth(savedStrokeWidth);
-                return;
+                boolean hasActiveAction = longPressTriggered || gestureTriggered || doubleTapTriggered;
+                if (!hasPrimaryTap && !hasActiveAction && !active) {
+                    // skip fill cache, fall through to normal rendering
+                }
+                else {
+                    int savedColor = paint.getColor();
+                    Paint.Style savedStyle = paint.getStyle();
+                    float savedStrokeWidth = paint.getStrokeWidth();
+                    ensureFillCache();
+                    if (cacheFill != null) {
+                        int alpha = colorAlpha;
+                        paint.setColor(ColorUtils.setAlphaComponent(primaryColor, alpha));
+                        paint.setStyle(Paint.Style.FILL);
+                        canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, paint);
+                    }
+                    paint.setStyle(savedStyle);
+                    paint.setColor(savedColor);
+                    paint.setStrokeWidth(savedStrokeWidth);
+                    return;
+                }
             }
 
             // 2. Fill under shape (non-engaged, non-BUTTON) — subtle background wash
