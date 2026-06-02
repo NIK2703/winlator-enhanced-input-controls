@@ -2243,12 +2243,14 @@ public class ControlElement {
                     releaseHeldBindings();
                     gestureTriggered = false;
                     active = true;
-                    inputControlsView.postDelayed(() -> {
-                        if (!doubleTapWaiting) {
-                            active = false;
-                            inputControlsView.invalidate();
-                        }
-                    }, 32);
+                    inputControlsView.postOnAnimation(() ->
+                        inputControlsView.postOnAnimation(() -> {
+                            if (!doubleTapWaiting) {
+                                active = false;
+                                inputControlsView.invalidate();
+                            }
+                        })
+                    );
                 }
                 else if (doubleTapTriggered) {
                     releaseHeldBindings();
