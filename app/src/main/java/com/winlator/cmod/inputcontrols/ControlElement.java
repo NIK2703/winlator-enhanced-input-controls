@@ -1160,9 +1160,14 @@ public class ControlElement {
         int inactiveAlpha = colorAlpha * fillAlphaInactive() / 255;
 
         boolean scaled = false;
-        if (type == Type.BUTTON && doubleTapScale > 1.0f) {
+        float actionScale = 1.0f;
+        if (type == Type.BUTTON) {
+            if (doubleTapScale > 1.0f) actionScale = doubleTapScale;
+            else if (gestureTriggered) actionScale = 1.2f;
+        }
+        if (actionScale > 1.0f) {
             canvas.save();
-            canvas.scale(doubleTapScale, doubleTapScale, box.centerX(), box.centerY());
+            canvas.scale(actionScale, actionScale, box.centerX(), box.centerY());
             scaled = true;
         }
         try {
