@@ -687,7 +687,15 @@ public class InputControlsView extends View {
                     touchpadView.setPointerButtonLeftEnabled(true);
 
                     boolean handled = handleDownByMode(pointerId, x, y, actMode);
-                    if (!handled) touchpadView.onTouchEvent(event);
+                    if (!handled) {
+                        for (ControlElement element : profile.getElements()) {
+                            if (element.isPassthroughTouch() && element.containsPoint(x, y)) {
+                                touchpadView.setPassthroughActive(true);
+                                break;
+                            }
+                        }
+                        touchpadView.onTouchEvent(event);
+                    }
                     break;
                 }
                 case MotionEvent.ACTION_MOVE: {
@@ -702,6 +710,7 @@ public class InputControlsView extends View {
                         if (element.handleTouchUp(pointerId)) handled = true;
                     }
                     if (!handled) touchpadView.onTouchEvent(event);
+                    touchpadView.setPassthroughActive(false);
                     break;
                 }
             }
@@ -736,19 +745,26 @@ public class InputControlsView extends View {
                 ControlElement btn = findButtonAt(x, y);
                 if (btn != null) {
                     btn.setGestureDownPosition(x, y);
-                    ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
-                    if (tracked == null) {
-                        tracked = new ArrayList<>();
-                        trackedButtons.put(pointerId, tracked);
+                    if (!btn.isPassthroughTouch()) {
+                        ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
+                        if (tracked == null) {
+                            tracked = new ArrayList<>();
+                            trackedButtons.put(pointerId, tracked);
+                        }
+                        if (!tracked.contains(btn)) {
+                            btn.handleTouchDown(pointerId, x, y);
+                            tracked.add(btn);
+                        }
                     }
-                    if (!tracked.contains(btn)) {
+                    else {
                         btn.handleTouchDown(pointerId, x, y);
-                        tracked.add(btn);
                     }
                     if (actMode == TouchActivationMode.HOVER) {
                         hoveredButtons.put(pointerId, btn);
                     }
-                    handled = true;
+                    if (!btn.isPassthroughTouch()) {
+                        handled = true;
+                    }
                 }
                 break;
             }
@@ -778,7 +794,9 @@ public class InputControlsView extends View {
                             tracked.add(btn);
                             if (tracked.size() == 2) tracked.get(0).cancelPendingLongPress();
                         }
-                        h = true;
+                        if (!tracked.get(0).isPassthroughTouch()) {
+                            h = true;
+                        }
                     }
                     if (!h) touchpadView.onTouchEvent(event);
                 }
@@ -809,7 +827,9 @@ public class InputControlsView extends View {
                                 hoveredButtons.remove(pid);
                             }
                         }
-                        h = true;
+                        if (!tracked.get(0).isPassthroughTouch()) {
+                            h = true;
+                        }
                     }
                     if (!h) touchpadView.onTouchEvent(event);
                 }

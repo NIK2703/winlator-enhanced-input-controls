@@ -111,6 +111,7 @@ public class ControlElement {
     private boolean selected = false;
     private boolean toggleSwitch = false;
     private boolean passthroughTouch;
+    private float opacity = -1f;
     private int currentPointerId = -1;
     private final Rect boundingBox = new Rect();
     private boolean[] states = new boolean[4];
@@ -337,6 +338,24 @@ public class ControlElement {
 
     public void setPassthroughTouch(boolean passthroughTouch) {
         this.passthroughTouch = passthroughTouch;
+    }
+
+    public float getOpacity() {
+        return opacity;
+    }
+
+    public void setOpacity(float opacity) {
+        this.opacity = Math.max(opacity, 0.1f);
+        invalidateElementCachesKeepDisk();
+    }
+
+    public float getEffectiveOpacity() {
+        return opacity >= 0 ? opacity : inputControlsView.getOverlayOpacity();
+    }
+
+    public int getEffectiveAlphaInt() {
+        if (buildingCache) return 255;
+        return (int)(getEffectiveOpacity() * 255);
     }
 
     public Binding getBindingAt(int index) {
@@ -748,9 +767,6 @@ public class ControlElement {
     }
 
     public static void clearSharedPool() {
-        for (Bitmap bmp : sharedPool.values()) {
-            if (bmp != null && !bmp.isRecycled()) bmp.recycle();
-        }
         sharedPool.clear();
     }
 
@@ -810,7 +826,8 @@ public class ControlElement {
     }
 
     private String visualKey(int layer) {
-        String base = type.ordinal() + "_" + shape.ordinal() + "_" + elementWidth + "_" + elementHeight + "_" + cornerRadius + "_" + scale;
+        float effOp = getEffectiveOpacity();
+        String base = type.ordinal() + "_" + shape.ordinal() + "_" + elementWidth + "_" + elementHeight + "_" + cornerRadius + "_" + scale + "_" + (int)(effOp * 255);
         String customSuffix = hasCustomIcon() ? "_" + customIconData.hashCode() : "";
         switch (layer) {
             case 0: return base + "_" + getDisplayText() + "_" + iconId + customSuffix + "_fill";
@@ -889,7 +906,7 @@ public class ControlElement {
                 cacheCombined = null;
             }
             if (cacheCombined != null) {
-                cacheCombined = applyOpacity(cacheCombined, inputControlsView.getOverlayOpacity());
+                cacheCombined = applyOpacity(cacheCombined, getEffectiveOpacity());
             }
         }
         if (cacheCombined == null) {
@@ -921,7 +938,7 @@ public class ControlElement {
             states[2] = savedStates[2];
             states[3] = savedStates[3];
             saveToDisk(cacheCombinedKey, cacheCombined);
-            cacheCombined = applyOpacity(cacheCombined, inputControlsView.getOverlayOpacity());
+            cacheCombined = applyOpacity(cacheCombined, getEffectiveOpacity());
             sharedPool.put(vKey, cacheCombined);
         }
         cacheCombinedDirty = false;
@@ -1118,7 +1135,7 @@ public class ControlElement {
             dpadPetalStroke = null;
         }
         if (dpadPetalStroke != null) {
-            dpadPetalStroke = applyOpacity(dpadPetalStroke, inputControlsView.getOverlayOpacity());
+            dpadPetalStroke = applyOpacity(dpadPetalStroke, getEffectiveOpacity());
         }
         if (dpadPetalStroke == null) {
             dpadPetalStroke = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
@@ -1131,7 +1148,7 @@ public class ControlElement {
             buildUpPetal(box, snappingSize, petalPath);
             c.drawPath(petalPath, paint);
             saveToDisk(strokeKey, dpadPetalStroke);
-            dpadPetalStroke = applyOpacity(dpadPetalStroke, inputControlsView.getOverlayOpacity());
+            dpadPetalStroke = applyOpacity(dpadPetalStroke, getEffectiveOpacity());
         }
         dpadPetalFill = loadFromDisk(fillKey);
         if (dpadPetalFill != null && (dpadPetalFill.getWidth() != w || dpadPetalFill.getHeight() != h)) {
@@ -1163,9 +1180,10 @@ public class ControlElement {
         int pad = strokePad();
         int snappingSize = inputControlsView.getSnappingSize();
         Paint paint = inputControlsView.getPaint();
-        int primaryColor = inputControlsView.getPrimaryColor();
-        int secondaryColor = inputControlsView.getSecondaryColor();
-        int colorAlpha = Color.alpha(primaryColor);
+        int elementAlpha = getEffectiveAlphaInt();
+        int primaryColor = Color.argb(elementAlpha, 255, 255, 255);
+        int secondaryColor = Color.argb(elementAlpha, 2, 119, 189);
+        int colorAlpha = elementAlpha;
         int inactiveAlpha = colorAlpha * fillAlphaInactive() / 255;
 
         boolean scaled = false;
@@ -1392,9 +1410,10 @@ public class ControlElement {
     public void draw(Canvas canvas) {
         int snappingSize = inputControlsView.getSnappingSize();
         Paint paint = inputControlsView.getPaint();
-        int primaryColor = inputControlsView.getPrimaryColor();
-        int secondaryColor = inputControlsView.getSecondaryColor();
-        int colorAlpha = Color.alpha(primaryColor);
+        int elementAlpha = getEffectiveAlphaInt();
+        int primaryColor = Color.argb(elementAlpha, 255, 255, 255);
+        int secondaryColor = Color.argb(elementAlpha, 2, 119, 189);
+        int colorAlpha = elementAlpha;
         int inactiveFillAlpha = colorAlpha * fillAlphaInactive() / 255;
 
         paint.setColor(selected ? secondaryColor : primaryColor);
@@ -1756,6 +1775,7 @@ public class ControlElement {
             elementJSONObject.put("y", (float)y / inputControlsView.getMaxHeight());
             elementJSONObject.put("toggleSwitch", toggleSwitch);
             if (passthroughTouch) elementJSONObject.put("passthroughTouch", true);
+            if (opacity >= 0) elementJSONObject.put("opacity", opacity);
             elementJSONObject.put("text", text);
             elementJSONObject.put("iconId", iconId);
             if (hasCustomIcon()) elementJSONObject.put("customIconData", customIconData);
@@ -2016,7 +2036,7 @@ public class ControlElement {
                     pressBindings(bindings.get(0));
                 }
                 inputControlsView.invalidate();
-                return true;
+                return !passthroughTouch;
             }
             else if (type == Type.RANGE_BUTTON) {
                 scroller.handleTouchDown(x, y);
@@ -2224,7 +2244,7 @@ public class ControlElement {
                 scroller.handleTouchMove(x, y);
                 return true;
             }
-            return true;
+            return !passthroughTouch;
         }
         return false;
     }

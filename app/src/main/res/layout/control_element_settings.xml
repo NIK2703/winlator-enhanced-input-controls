@@ -176,6 +176,30 @@
             android:max="150" />
 
         <LinearLayout
+            android:id="@+id/LLOpacity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/opacity"/>
+
+            <TextView
+                android:id="@+id/TVOpacity"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/SBOpacity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100" />
+
+        <LinearLayout
             android:id="@+id/LLRangeOptions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

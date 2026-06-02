@@ -32,6 +32,7 @@ public class GestureActionExecutor {
 
     public void executeActions(List<Binding> actions) {
         if (actions == null) return;
+        if (inputControlsView.getTouchpadView().isPassthroughActive()) return;
         int size = actions.size();
         for (int i = 0; i < size; i++) {
             Binding b = actions.get(i);
@@ -64,6 +65,7 @@ public class GestureActionExecutor {
 
     public void executeActionsAndHold(List<Binding> actions) {
         if (actions == null) return;
+        if (inputControlsView.getTouchpadView().isPassthroughActive()) return;
         heldActions.clear();
         heldModifiers.clear();
         int size = actions.size();
@@ -91,6 +93,12 @@ public class GestureActionExecutor {
     }
 
     public void releaseHeldAction() {
+        if (inputControlsView.getTouchpadView().isPassthroughActive()) {
+            heldActions.clear();
+            heldModifiers.clear();
+            isActionHeld = false;
+            return;
+        }
         if (isActionHeld) {
             for (Binding b : heldActions) {
                 inputControlsView.handleInputEvent(b, false, 0);

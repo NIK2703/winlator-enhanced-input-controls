@@ -26,7 +26,9 @@
     <string name="toggle_fullscreen">Toggle Fullscreen</string>
     <string name="exit">Exit</string>
     <string name="no_control_element_selected">No control element selected</string>
+    <string name="default_">Default</string>
     <string name="scale">Scale</string>
+    <string name="opacity">Opacity</string>
     <string name="shape">Shape</string>
     <string name="type">Type</string>
     <string name="binding">Binding</string>

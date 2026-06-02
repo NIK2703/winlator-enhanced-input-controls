@@ -195,6 +195,39 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         });
         sbScale.setProgress((int)(element.getScale() * 100));
 
+        final TextView tvOpacity = view.findViewById(R.id.TVOpacity);
+        SeekBar sbOpacity = view.findViewById(R.id.SBOpacity);
+        final float profileOpacity = inputControlsView.getOverlayOpacity();
+        final Runnable updateOpacityLabel = () -> {
+            float elemOpacity = element.getOpacity();
+            if (elemOpacity < 0) {
+                tvOpacity.setText(getString(R.string.default_) + " (" + Math.round(profileOpacity * 100) + "%)");
+                sbOpacity.setProgress(Math.round(profileOpacity * 100));
+            }
+            else {
+                tvOpacity.setText(Math.round(elemOpacity * 100) + "%");
+                sbOpacity.setProgress(Math.round(elemOpacity * 100));
+            }
+        };
+        updateOpacityLabel.run();
+        sbOpacity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    if (progress < 10) {
+                        progress = 10;
+                        seekBar.setProgress(10);
+                    }
+                    element.setOpacity(progress / 100.0f);
+                    profile.save();
+                    inputControlsView.invalidate();
+                    updateOpacityLabel.run();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
         final TextView tvWidth = view.findViewById(R.id.TVWidth);
         SeekBar sbWidth = view.findViewById(R.id.SBWidth);
         sbWidth.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

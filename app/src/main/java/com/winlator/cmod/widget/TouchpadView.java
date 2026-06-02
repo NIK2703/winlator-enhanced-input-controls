@@ -61,6 +61,7 @@ public class TouchpadView extends View {
     private InputControlsView inputControlsView;
     private ControlsProfile currentProfile;
     private boolean isTouchscreenMode = false;
+    private boolean passthroughActive = false;
     private int lastTransformedX;
     private int lastTransformedY;
 
@@ -133,6 +134,14 @@ public class TouchpadView extends View {
 
     public InputMode getCurrentInputMode() {
         return currentProfile != null ? currentProfile.getInputMode() : InputMode.ABSOLUTE;
+    }
+
+    public boolean isPassthroughActive() {
+        return passthroughActive;
+    }
+
+    public void setPassthroughActive(boolean active) {
+        this.passthroughActive = active;
     }
 
     public void movePointer(float screenX, float screenY) {
