@@ -1639,6 +1639,7 @@ public class ControlElement {
     private void drawIcon(Canvas canvas, float cx, float cy, float width, float height, int iconId) {
         Paint paint = inputControlsView.getPaint();
         Bitmap icon = inputControlsView.getIcon((byte)iconId);
+        if (icon == null) return;
         paint.setColorFilter(inputControlsView.getColorFilter());
         int margin = (int)(inputControlsView.getSnappingSize() * (shape == Shape.CIRCLE ? 2.0f : 1.0f) * scale);
         int halfSize = (int)((Math.min(width, height) - margin) * 0.5f);
