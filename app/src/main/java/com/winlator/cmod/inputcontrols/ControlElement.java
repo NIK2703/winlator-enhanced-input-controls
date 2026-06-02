@@ -1869,6 +1869,38 @@ public class ControlElement {
         heldBindings = null;
     }
 
+    public void setVisualActive(boolean engaged) {
+        setVisualActive(engaged, -1, -1);
+    }
+
+    public void setVisualActive(boolean engaged, float touchX, float touchY) {
+        if (type == Type.D_PAD && engaged) {
+            int snapSize = inputControlsView.getSnappingSize();
+            float dx = touchX - x;
+            float dy = touchY - y;
+            float radius = snapSize * 7 * scale;
+            float dist = (float)Math.sqrt(dx*dx + dy*dy);
+            if (dist > radius) {
+                dx = dx / dist * radius;
+                dy = dy / dist * radius;
+            }
+            float nx = Math.max(-1f, Math.min(1f, dx / radius));
+            float ny = Math.max(-1f, Math.min(1f, dy / radius));
+            states[0] = ny <= -DPAD_DEAD_ZONE;
+            states[1] = nx >= DPAD_DEAD_ZONE;
+            states[2] = ny >= DPAD_DEAD_ZONE;
+            states[3] = nx <= -DPAD_DEAD_ZONE;
+        } else if (type == Type.D_PAD) {
+            Arrays.fill(states, false);
+        }
+        if (engaged != active) {
+            active = engaged;
+            inputControlsView.invalidate();
+        } else if (engaged && type == Type.D_PAD) {
+            inputControlsView.invalidate();
+        }
+    }
+
     public void activate() {
         if (bindings.isEmpty() || bindings.get(0).isEmpty()) return;
         active = true;

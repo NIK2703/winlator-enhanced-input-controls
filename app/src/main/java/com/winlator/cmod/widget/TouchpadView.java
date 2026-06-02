@@ -19,6 +19,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.inputcontrols.MouseMode;
+import com.winlator.cmod.inputcontrols.NativeTouchProcessor;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.renderer.ViewTransformation;
@@ -62,6 +63,7 @@ public class TouchpadView extends View {
     private ControlsProfile currentProfile;
     private boolean isTouchscreenMode = false;
     private boolean passthroughActive = false;
+    private NativeTouchProcessor nativeTouchProcessor;
     private int lastTransformedX;
     private int lastTransformedY;
 
@@ -212,6 +214,45 @@ public class TouchpadView extends View {
         if (!mouseEnabled) return true;
 
         resetTouchscreenTimeout();
+
+        // Route through native processor when active
+        if (nativeTouchProcessor != null) {
+            int action = event.getActionMasked();
+            int actionIndex = event.getActionIndex();
+            int pointerId = event.getPointerId(actionIndex);
+
+            switch (action) {
+                case MotionEvent.ACTION_DOWN:
+                case MotionEvent.ACTION_POINTER_DOWN: {
+                    float x = event.getX(actionIndex);
+                    float y = event.getY(actionIndex);
+                    nativeTouchProcessor.onFingerDown(pointerId, x, y);
+                    break;
+                }
+                case MotionEvent.ACTION_MOVE: {
+                    for (int i = 0; i < event.getPointerCount(); i++) {
+                        int pid = event.getPointerId(i);
+                        int idx = event.findPointerIndex(pid);
+                        if (idx >= 0) {
+                            nativeTouchProcessor.onFingerMove(pid, event.getX(idx), event.getY(idx));
+                        }
+                    }
+                    break;
+                }
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_POINTER_UP: {
+                    float x = event.getX(actionIndex);
+                    float y = event.getY(actionIndex);
+                    nativeTouchProcessor.onFingerUp(pointerId, x, y);
+                    break;
+                }
+                case MotionEvent.ACTION_CANCEL: {
+                    nativeTouchProcessor.reset();
+                    break;
+                }
+            }
+            return true;
+        }
 
         int toolType = event.getToolType(0);
 
@@ -791,6 +832,14 @@ public class TouchpadView extends View {
         if (touchpadGestureHandler != null) {
             touchpadGestureHandler.setInputControlsView(iv);
         }
+    }
+
+    public void setNativeTouchProcessor(NativeTouchProcessor p) {
+        this.nativeTouchProcessor = p;
+    }
+
+    public float getResolutionScale() {
+        return resolutionScale;
     }
 
     public void setProfile(ControlsProfile profile) {

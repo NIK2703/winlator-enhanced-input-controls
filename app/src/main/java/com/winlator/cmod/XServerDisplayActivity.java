@@ -19,6 +19,8 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+
+import java.util.List;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -75,6 +77,9 @@ import com.winlator.cmod.core.WineThemeManager;
 import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
+import com.winlator.cmod.inputcontrols.NativeTouchProcessor;
+import com.winlator.cmod.inputcontrols.TouchActivationMode;
+import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
@@ -125,6 +130,7 @@ import java.util.regex.Pattern;
 import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 
 public class XServerDisplayActivity extends AppCompatActivity {
+    private static final String TAG = "XServerDisplay";
     public static String NOTIFICATION_CHANNEL_ID = "Winlator";
     public static int NOTIFICATION_ID = -1;
     private static XServerDisplayActivity activeInstance;
@@ -146,6 +152,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private XServerView xServerView;
     private InputControlsView inputControlsView;
     private TouchpadView touchpadView;
+    private NativeTouchProcessor nativeTouchProcessor;
     private XEnvironment environment;
     private DrawerLayout drawerLayout;
     private ContainerManager containerManager;
@@ -190,6 +197,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean isMouseDisabled = false;
     private Handler handler;
     private Handler timeoutHandler = new Handler(Looper.getMainLooper());
+    private Runnable nativeTickRunnable;
     private Runnable hideControlsRunnable;
     private boolean isDarkMode;
     private GuestProgramLauncherComponent guestProgramLauncherComponent;
@@ -920,6 +928,19 @@ if (enableLogs) {
         inputControlsView.setVisibility(View.GONE);
         rootView.addView(inputControlsView);
 
+        if (preferences.getBoolean("native_touch_processor", false)) {
+            nativeTouchProcessor = new NativeTouchProcessor();
+            if (nativeTouchProcessor.isLoaded()) {
+                nativeTouchProcessor.setXServer(xServer);
+                nativeTouchProcessor.setInputControlsView(inputControlsView);
+                touchpadView.setNativeTouchProcessor(nativeTouchProcessor);
+                inputControlsView.setNativeTouchProcessor(nativeTouchProcessor);
+                nativeTouchProcessor.start();
+            } else {
+                nativeTouchProcessor = null;
+            }
+        }
+
         startTouchscreenTimeout();
         boolean isTimeoutEnabled = preferences.getBoolean("touchscreen_timeout_enabled", false);
         if (isTimeoutEnabled) startTouchscreenTimeout();
@@ -1555,6 +1576,54 @@ private void applySidebarSettings() {
         xServer.setInputMode(profile.getInputMode());
         xServer.getInputDeviceManager().setInputMode(profile.getInputMode());
 
+        // Initialize native touch processor
+        if (nativeTouchProcessor != null && nativeTouchProcessor.isLoaded()) {
+            // Build and apply config (early — before view is laid out)
+            NativeTouchProcessor.NativeConfig nativeConfig =
+                NativeTouchProcessor.buildNativeConfig(profile, xServer.screenInfo.width, xServer.screenInfo.height);
+            nativeTouchProcessor.init(nativeConfig);
+
+            // Start tick timer early (for long-press / double-tap timeouts)
+            if (nativeTickRunnable == null) {
+                nativeTickRunnable = () -> {
+                    if (nativeTouchProcessor != null) {
+                        nativeTouchProcessor.tick();
+                        if (handler != null) {
+                            handler.postDelayed(nativeTickRunnable, 50);
+                        }
+                    }
+                };
+            }
+            handler.removeCallbacks(nativeTickRunnable);
+            handler.postDelayed(nativeTickRunnable, 50);
+
+            // Defer element loading & param setting until view is laid out (needs dimensions)
+            inputControlsView.post(() -> {
+                int viewWidth = inputControlsView.getWidth();
+                int snapSize = viewWidth > 0 ? viewWidth / 100 :
+                               xServer.screenInfo.width / 100;
+                if (snapSize <= 0) snapSize = 10;
+                inputControlsView.setSnappingSize(snapSize);
+
+                if (!profile.isElementsLoaded()) {
+                    profile.loadElements(inputControlsView);
+                }
+
+                List<ControlElement> elements = profile.getElements();
+                Log.d(TAG, "showInputControls (post): elements=" + (elements != null ? elements.size() : "null") + " snapSize=" + snapSize);
+                if (elements != null && !elements.isEmpty()) {
+                    TouchActivationMode actMode = profile.getTouchActivationMode();
+                    NativeTouchProcessor.NativeElement[] nativeElements =
+                        NativeTouchProcessor.buildNativeElements(elements, actMode);
+                    nativeTouchProcessor.setElements(nativeElements);
+                }
+
+                nativeTouchProcessor.setSnappingSize(snapSize);
+                nativeTouchProcessor.setResolutionScale(touchpadView.getResolutionScale());
+                nativeTouchProcessor.setSimTouchScreen(touchpadView.isSimTouchScreen());
+            });
+        }
+
         inputControlsView.invalidate();
         winHandler.sendGamepadState();
     }
@@ -1563,6 +1632,14 @@ private void applySidebarSettings() {
         inputControlsView.setShowTouchscreenControls(true);
         inputControlsView.setVisibility(View.GONE);
         inputControlsView.setProfile(null);
+
+        // Stop native tick timer
+        if (nativeTickRunnable != null && handler != null) {
+            handler.removeCallbacks(nativeTickRunnable);
+        }
+        if (nativeTouchProcessor != null) {
+            nativeTouchProcessor.reset();
+        }
 
         touchpadView.clearProfile();
         touchpadView.setSensitivity(globalCursorSpeed);

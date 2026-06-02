@@ -1,0 +1,310 @@
+#include "touch_processor_internal.h"
+
+bool point_in_element(float px, float py, const TouchElement* e) {
+    float hs = g_state.snapping_size;
+    float cx = e->x;
+    float cy = e->y;
+    float hw = e->w * hs * 0.5f * e->scale;
+    float hh = e->h * hs * 0.5f * e->scale;
+    bool hit = px >= cx - hw && px <= cx + hw && py >= cy - hh && py <= cy + hh;
+    LOGD("point_in_element: (%.0f,%.0f) vs elem@(%d,%d c=%.0f,%.0f hw=%.0f hh=%.0f hs=%.0f) -> %s",
+         px, py, e->x, e->y, cx, cy, hw, hh, hs, hit ? "HIT" : "miss");
+    return hit;
+}
+
+TouchElement* hit_test_element(float x, float y) {
+    for (int i = g_state.element_count - 1; i >= 0; i--)
+        if (point_in_element(x, y, &g_state.elements[i]))
+            return &g_state.elements[i];
+    return NULL;
+}
+
+int detect_swipe_dir(float dx, float dy, float threshold) {
+    if (fabsf(dx) < threshold && fabsf(dy) < threshold) return -1;
+    if (fabsf(dx) > fabsf(dy)) return dx > 0 ? 3 : 2;
+    return dy > 0 ? 1 : 0;
+}
+
+void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    e->current_ptr_id = ptr_id;
+    e->down_x = x;
+    e->down_y = y;
+    e->down_time_ms = time_ms;
+    e->engaged = true;
+    e->gesture_swipe_triggered = false;
+    e->gesture_long_press_triggered = false;
+    e->gesture_swipe_direction = -1;
+    e->long_press_arm = false;
+    LOGD("handle_element_down: type=%d ptr=%d (%.0f,%.0f) bind[0].type=%d", e->type, ptr_id, x, y, e->bindings[0].type);
+
+    if (e->type == ELEM_BUTTON) {
+        e->gesture_double_tap_first_up = false;
+        e->long_press_arm = true;
+
+        // Check double-tap waiting (uses element-specific double-tap bindings)
+        if (e->double_tap_waiting) {
+            float dx = fabsf(x - e->gesture_tap_up_x);
+            float dy = fabsf(y - e->gesture_tap_up_y);
+            if (dx <= g_state.cfg.double_tap_distance_px && dy <= g_state.cfg.double_tap_distance_px) {
+                e->double_tap_waiting = false;
+                e->gesture_double_tap_first_up = false;
+                // Fire element-specific double-tap bindings
+                for (int k = 0; k < e->element_double_tap_count; k++)
+                    press_binding(result, &e->element_double_tap[k], false);
+                // Release primary directional binding if held
+                if (e->bindings[0].type != BINDING_NONE)
+                    release_binding(result, &e->bindings[0]);
+                return;
+            } else {
+                e->double_tap_waiting = false;
+            }
+        }
+
+        // Toggle switch: on second press, toggle selected state
+        if (e->toggle_switch && e->selected) {
+            e->selected = false;
+            if (e->bindings[0].type != BINDING_NONE)
+                release_binding(result, &e->bindings[0]);
+            return;
+        }
+
+        // Execute primary binding (single tap on down)
+        if (e->bindings[0].type != BINDING_NONE)
+            press_binding(result, &e->bindings[0], true);
+
+    } else if (e->type == ELEM_STICK) {
+        e->stick_center_x = x;
+        e->stick_center_y = y;
+    } else if (e->type == ELEM_TRACKPAD) {
+        e->trackpad_last_x = x;
+        e->trackpad_last_y = y;
+        e->trackpad_last_time = time_ms;
+    } else if (e->type == ELEM_DPAD) {
+        float _hw = e->w * g_state.snapping_size * 0.5f * e->scale;
+        float _hh = e->h * g_state.snapping_size * 0.5f * e->scale;
+        LOGD("handle_element_down dpad: touch=(%.0f,%.0f) center=(%d,%d) bbox=[%.0f-%.0f,%.0f-%.0f] hs=%.1f",
+             x, y, e->x, e->y, e->x - _hw, e->x + _hw, e->y - _hh, e->y + _hh, g_state.snapping_size);
+        for (int i = 0; i < 4; i++) e->petal_active[i] = false;
+    }
+}
+
+void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    if (e->type == ELEM_BUTTON) {
+        float dx = x - e->down_x;
+        float dy = y - e->down_y;
+        float threshold = g_state.cfg.drag_threshold_px > 0 ? g_state.cfg.drag_threshold_px : 20;
+
+        if (!e->gesture_swipe_triggered) {
+            float swipe_threshold = (g_state.cfg.gesture_threshold_px > 0) ?
+                (float)g_state.cfg.gesture_threshold_px : threshold;
+            int dir = detect_swipe_dir(dx, dy, swipe_threshold);
+            if (dir >= 0 && dir < 3 && (dir + 1) < 4 && e->bindings[dir + 1].type != BINDING_NONE) {
+                e->gesture_swipe_triggered = true;
+                e->gesture_swipe_direction = dir;
+                e->long_press_arm = false;
+                e->gesture_long_press_triggered = false;
+                e->double_tap_waiting = false;
+
+                // Release primary binding
+                if (e->bindings[0].type != BINDING_NONE)
+                    release_binding(result, &e->bindings[0]);
+
+                // Press swipe binding (use element_gesture if available, fallback to directional)
+                if (e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE) {
+                    for (int k = 0; k < e->element_gesture_count; k++)
+                        press_binding(result, &e->element_gesture[k], k == 0);
+                } else {
+                    press_binding(result, &e->bindings[dir + 1], true);
+                }
+                return;
+            }
+        }
+
+        // Cancel long-press if finger leaves button
+        if (e->long_press_arm && !point_in_element(x, y, e)) {
+            e->long_press_arm = false;
+        }
+    } else if (e->type == ELEM_STICK) {
+        float radius = e->w * g_state.snapping_size * 0.5f * e->scale;
+        float dx = x - e->x;
+        float dy = y - e->y;
+        float dist = sqrtf(dx*dx + dy*dy);
+        if (dist > radius) { dx = dx / dist * radius; dy = dy / dist * radius; }
+        float nx = dx / radius;
+        float ny = dy / radius;
+
+        if (e->bindings[0].type != BINDING_NONE) {
+            // Gamepad stick
+            float mag = sqrtf(nx*nx + ny*ny);
+            if (mag > STICK_DEAD_ZONE) {
+                e->stick_value_x = (nx / mag) * fminf((mag - STICK_DEAD_ZONE) / (1.0f - STICK_DEAD_ZONE) * STICK_SENSITIVITY, 1.0f);
+                e->stick_value_y = (ny / mag) * fminf((mag - STICK_DEAD_ZONE) / (1.0f - STICK_DEAD_ZONE) * STICK_SENSITIVITY, 1.0f);
+                int mx = (int)(e->stick_value_x * 50);
+                int my = (int)(e->stick_value_y * 50);
+                if (mx != 0 || my != 0) add_action(result, ACT_MOUSE_EVENT, 0, mx, my);
+            }
+        } else {
+            // Keyboard directions
+            bool up = ny <= -STICK_DEAD_ZONE;
+            bool right = nx >= STICK_DEAD_ZONE;
+            bool down = ny >= STICK_DEAD_ZONE;
+            bool left = nx <= -STICK_DEAD_ZONE;
+            const TouchBinding* dirs[] = {&e->bindings[0], &e->bindings[1], &e->bindings[2], &e->bindings[3]};
+            bool states[] = {up, right, down, left};
+            for (int i = 0; i < 4; i++) {
+                if (states[i] && dirs[i]->type != BINDING_NONE)
+                    press_binding(result, dirs[i], true);
+            }
+        }
+    } else if (e->type == ELEM_TRACKPAD) {
+        float dx = x - e->trackpad_last_x;
+        float dy = y - e->trackpad_last_y;
+        uint64_t dt = time_ms - e->trackpad_last_time;
+        if (dt > 0) {
+            float speed = sqrtf(dx*dx + dy*dy) / dt * 1000.0f;
+            if (speed < TRACKPAD_MIN_SPEED) { dx *= speed / TRACKPAD_MIN_SPEED; dy *= speed / TRACKPAD_MIN_SPEED; }
+            if (speed > TRACKPAD_MAX_SPEED) { float s = TRACKPAD_MAX_SPEED / speed; dx *= s; dy *= s; }
+            add_action(result, ACT_POINTER_MOVE_DELTA, (int)dx, (int)dy, 0);
+        }
+        e->trackpad_last_x = x;
+        e->trackpad_last_y = y;
+        e->trackpad_last_time = time_ms;
+    } else if (e->type == ELEM_DPAD) {
+        float dx = x - e->x;
+        float dy = y - e->y;
+        float hw = e->w * g_state.snapping_size * 0.5f * e->scale;
+        float hh = e->h * g_state.snapping_size * 0.5f * e->scale;
+        float nx = dx / hw;
+        float ny = dy / hh;
+
+        bool up = ny <= -DPAD_DEAD_ZONE;
+        bool right = nx >= DPAD_DEAD_ZONE;
+        bool down = ny >= DPAD_DEAD_ZONE;
+        bool left = nx <= -DPAD_DEAD_ZONE;
+
+        // Bounding box for debug
+        float bbox_left = e->x - hw;
+        float bbox_right = e->x + hw;
+        float bbox_top = e->y - hh;
+        float bbox_bot = e->y + hh;
+        bool inside = x >= bbox_left && x <= bbox_right && y >= bbox_top && y <= bbox_bot;
+        if (inside) {
+            LOGD("elem_move dpad: (%.0f,%.0f) center=(%d,%d) bbox=[%.0f-%.0f,%.0f-%.0f] nx=%.2f ny=%.2f up=%d right=%d down=%d left=%d",
+                 x, y, e->x, e->y, bbox_left, bbox_right, bbox_top, bbox_bot, nx, ny, up, right, down, left);
+        } else {
+            LOGD("elem_move dpad: OUTSIDE bbox (%.0f,%.0f) center=(%d,%d) bbox=[%.0f-%.0f,%.0f-%.0f] nx=%.2f ny=%.2f up=%d right=%d down=%d left=%d",
+                 x, y, e->x, e->y, bbox_left, bbox_right, bbox_top, bbox_bot, nx, ny, up, right, down, left);
+        }
+
+        int active_count = 0;
+        for (int i = 0; i < 4; i++) {
+            bool active = i == 0 ? up : (i == 1 ? right : (i == 2 ? down : left));
+            if (active) active_count++;
+            if (active != e->petal_active[i]) {
+                e->petal_active[i] = active;
+                LOGD("  petal[%d] %s -> %s (bind.type=%d)",
+                     i, active ? "off->on" : "on->off", active ? "PRESS" : "RELEASE", e->bindings[i].type);
+                if (active && e->bindings[i].type != BINDING_NONE)
+                    press_binding(result, &e->bindings[i], true);
+                else if (!active && e->bindings[i].type != BINDING_NONE)
+                    release_binding(result, &e->bindings[i]);
+            }
+        }
+        if (active_count == 0) {
+            LOGD("  dpad: NO active petals (deadzone?)");
+        }
+    }
+}
+
+void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    (void)x; (void)y;
+
+    if (e->type == ELEM_BUTTON) {
+        if (e->gesture_long_press_triggered) {
+            for (int k = e->element_long_press_count - 1; k >= 0; k--) {
+                if (e->element_long_press[k].type != BINDING_NONE)
+                    release_binding(result, &e->element_long_press[k]);
+            }
+            if (e->bindings[0].type != BINDING_NONE)
+                release_binding(result, &e->bindings[0]);
+            e->gesture_long_press_triggered = false;
+        } else if (e->gesture_swipe_triggered) {
+            if (e->element_gesture_count > 0) {
+                for (int k = e->element_gesture_count - 1; k >= 0; k--) {
+                    if (e->element_gesture[k].type != BINDING_NONE)
+                        release_binding(result, &e->element_gesture[k]);
+                }
+            } else {
+                int dir = e->gesture_swipe_direction;
+                int slot = dir + 1;
+                if (slot >= 0 && slot < 4 && e->bindings[slot].type != BINDING_NONE)
+                    release_binding(result, &e->bindings[slot]);
+            }
+            e->gesture_swipe_triggered = false;
+        } else if (e->toggle_switch && e->bindings[0].type != BINDING_NONE) {
+            e->selected = true;
+        } else {
+            if (e->gesture_double_tap_first_up) {
+                uint64_t elapsed = time_ms - e->gesture_last_tap_time;
+                int dt_timeout = g_state.cfg.double_tap_timeout_ms > 0 ? g_state.cfg.double_tap_timeout_ms : 150;
+                if (elapsed < (uint64_t)dt_timeout && e->element_double_tap_count > 0) {
+                    if (e->bindings[0].type != BINDING_NONE)
+                        release_binding(result, &e->bindings[0]);
+                    for (int k = 0; k < e->element_double_tap_count; k++)
+                        press_binding(result, &e->element_double_tap[k], false);
+                } else {
+                    if (e->bindings[0].type != BINDING_NONE)
+                        release_binding(result, &e->bindings[0]);
+                }
+                e->gesture_double_tap_first_up = false;
+            } else {
+                bool has_dt = e->element_double_tap_count > 0 && e->element_double_tap[0].type != BINDING_NONE;
+                if (has_dt) {
+                    e->gesture_double_tap_first_up = true;
+                    e->gesture_last_tap_time = time_ms;
+                    e->gesture_tap_up_x = x;
+                    e->gesture_tap_up_y = y;
+                    e->double_tap_waiting = true;
+                } else {
+                    if (e->bindings[0].type != BINDING_NONE)
+                        release_binding(result, &e->bindings[0]);
+                }
+            }
+        }
+        e->engaged = false;
+        e->current_ptr_id = -1;
+
+    } else if (e->type == ELEM_STICK) {
+        e->stick_value_x = 0;
+        e->stick_value_y = 0;
+        for (int i = 0; i < 4; i++) {
+            if (e->bindings[i].type != BINDING_NONE)
+                press_binding(result, &e->bindings[i], false);
+        }
+        e->engaged = false;
+        e->current_ptr_id = -1;
+    } else if (e->type == ELEM_TRACKPAD) {
+        for (int i = 0; i < 4; i++) {
+            if (e->bindings[i].type != BINDING_NONE)
+                press_binding(result, &e->bindings[i], false);
+        }
+        e->engaged = false;
+        e->current_ptr_id = -1;
+    } else if (e->type == ELEM_DPAD) {
+        for (int i = 0; i < 4; i++) {
+            e->petal_active[i] = false;
+            if (e->bindings[i].type != BINDING_NONE)
+                press_binding(result, &e->bindings[i], false);
+        }
+        e->engaged = false;
+        e->current_ptr_id = -1;
+    }
+}
+
+bool finger_has_engaged_element(int ptr_id) {
+    for (int i = 0; i < g_state.element_count; i++) {
+        if (g_state.elements[i].engaged && g_state.elements[i].current_ptr_id == ptr_id)
+            return true;
+    }
+    return false;
+}

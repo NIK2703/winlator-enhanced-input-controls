@@ -36,6 +36,7 @@ import com.winlator.cmod.inputcontrols.MouseMode;
 import com.winlator.cmod.inputcontrols.TouchActivationMode;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
+import com.winlator.cmod.inputcontrols.NativeTouchProcessor;
 import com.winlator.cmod.inputcontrols.ExternalControllerBinding;
 import com.winlator.cmod.inputcontrols.GamepadState;
 import com.winlator.cmod.math.Mathf;
@@ -47,6 +48,8 @@ import com.winlator.cmod.xserver.XServer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -70,6 +73,8 @@ public class InputControlsView extends View {
     private float cacheAlphaOverride = -1;
     private TouchpadView touchpadView;
     private XServer xServer;
+    private NativeTouchProcessor nativeTouchProcessor;
+    private final HashMap<Integer, ControlElement> nativeEngagedElements = new HashMap<>();
     private final Bitmap[] icons = new Bitmap[40];
     private Timer mouseMoveTimer;
     private final PointF mouseMoveOffset = new PointF();
@@ -202,6 +207,10 @@ public class InputControlsView extends View {
 
     public int getSnappingSize() {
         return snappingSize;
+    }
+
+    public void setSnappingSize(int size) {
+        this.snappingSize = size;
     }
 
     @Override
@@ -482,13 +491,53 @@ public class InputControlsView extends View {
         this.touchpadView = touchpadView;
     }
 
+    public void setNativeTouchProcessor(NativeTouchProcessor p) {
+        this.nativeTouchProcessor = p;
+    }
+
+    private void activateElementsAt(float x, float y) {
+        if (profile == null) return;
+        for (ControlElement element : profile.getElements()) {
+            element.setVisualActive(element.containsPoint(x, y), x, y);
+        }
+    }
+
+    private ControlElement hitTestElement(float x, float y) {
+        List<ControlElement> elements = profile.getElements();
+        for (int i = elements.size() - 1; i >= 0; i--) {
+            ControlElement elem = elements.get(i);
+            if (elem.containsPoint(x, y)) return elem;
+        }
+        return null;
+    }
+
+    private void updateVisualForPointer(int pointerId, float x, float y) {
+        if (profile == null) return;
+        ControlElement engagedElem = nativeEngagedElements.get(pointerId);
+        for (ControlElement element : profile.getElements()) {
+            if (element == engagedElem) {
+                element.setVisualActive(true, x, y);
+            } else if (element.containsPoint(x, y)) {
+                element.setVisualActive(true, x, y);
+            } else if (!nativeEngagedElements.containsValue(element)) {
+                element.setVisualActive(false);
+            }
+        }
+    }
+
+    private void deactivateAllElements() {
+        if (profile == null) return;
+        for (ControlElement element : profile.getElements()) {
+            element.setVisualActive(false);
+        }
+    }
+
     public XServer getXServer() {
         return xServer;
     }
 
     public void setXServer(XServer xServer) {
         this.xServer = xServer;
-        createMouseMoveTimer();
     }
 
     public int getMaxWidth() {
@@ -497,8 +546,7 @@ public class InputControlsView extends View {
 
     @Override
     protected void onDetachedFromWindow() {
-        if (mouseMoveTimer != null)
-            mouseMoveTimer.cancel();
+        stopMouseMove();
         super.onDetachedFromWindow();
     }
 
@@ -507,24 +555,39 @@ public class InputControlsView extends View {
     }
 
     private void createMouseMoveTimer() {
-        WinHandler winHandler = xServer.getWinHandler();
-        if (mouseMoveTimer == null && profile != null) {
-            final float cursorSpeed = profile.getCursorSpeed();
-            mouseMoveTimer = new Timer();
-            mouseMoveTimer.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    if (mouseMoveOffset.x != 0 || mouseMoveOffset.y != 0) {// Only move if there's an offsete if there's an offset
-                        if (inputMode == InputMode.RELATIVE)
-                            winHandler.mouseEvent(MouseEventFlags.MOVE, (int) (mouseMoveOffset.x * cursorSpeed * 10), (int) (mouseMoveOffset.y * cursorSpeed * 10), 0);
-                        else
-                            xServer.injectPointerMoveDelta(
-                                (int) (mouseMoveOffset.x * cursorSpeed * 10),
-                                (int) (mouseMoveOffset.y * cursorSpeed * 10)
-                        );
-                    }
+        if (mouseMoveTimer != null) return;
+        WinHandler winHandler = xServer != null ? xServer.getWinHandler() : null;
+        if (winHandler == null) return;
+        final float cursorSpeed = profile != null ? profile.getCursorSpeed() : 1.0f;
+        mouseMoveTimer = new Timer();
+        mouseMoveTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                if (mouseMoveOffset.x != 0 || mouseMoveOffset.y != 0) {
+                    if (inputMode == InputMode.RELATIVE)
+                        winHandler.mouseEvent(MouseEventFlags.MOVE, (int) (mouseMoveOffset.x * cursorSpeed * 10), (int) (mouseMoveOffset.y * cursorSpeed * 10), 0);
+                    else
+                        xServer.injectPointerMoveDelta(
+                            (int) (mouseMoveOffset.x * cursorSpeed * 10),
+                            (int) (mouseMoveOffset.y * cursorSpeed * 10)
+                    );
                 }
-            }, 0, 1000 / 60); // 60 FPS
+            }
+        }, 0, 1000 / 60);
+    }
+
+    public void startMouseMove(int dx, int dy, boolean hold) {
+        mouseMoveOffset.x = dx;
+        mouseMoveOffset.y = dy;
+        createMouseMoveTimer();
+    }
+
+    public void stopMouseMove() {
+        mouseMoveOffset.x = 0;
+        mouseMoveOffset.y = 0;
+        if (mouseMoveTimer != null) {
+            mouseMoveTimer.cancel();
+            mouseMoveTimer = null;
         }
     }
 
@@ -634,6 +697,62 @@ public class InputControlsView extends View {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         resetTouchscreenTimeout();
+
+        // Route through native processor when active
+        if (nativeTouchProcessor != null && !editMode) {
+            int action = event.getActionMasked();
+            int actionIndex = event.getActionIndex();
+            int pointerId = event.getPointerId(actionIndex);
+            switch (action) {
+                case MotionEvent.ACTION_DOWN:
+                case MotionEvent.ACTION_POINTER_DOWN: {
+                    float x = event.getX(actionIndex);
+                    float y = event.getY(actionIndex);
+                    nativeTouchProcessor.onFingerDown(pointerId, x, y);
+                    if (profile != null) {
+                        ControlElement hit = hitTestElement(x, y);
+                        if (hit != null) nativeEngagedElements.put(pointerId, hit);
+                        updateVisualForPointer(pointerId, x, y);
+                    }
+                    return true;
+                }
+                case MotionEvent.ACTION_MOVE: {
+                    for (int i = 0; i < event.getPointerCount(); i++) {
+                        int pid = event.getPointerId(i);
+                        int idx = event.findPointerIndex(pid);
+                        if (idx >= 0) {
+                            nativeTouchProcessor.onFingerMove(pid, event.getX(idx), event.getY(idx));
+                        }
+                    }
+                    if (profile != null) {
+                        for (int i = 0; i < event.getPointerCount(); i++) {
+                            int pid = event.getPointerId(i);
+                            int idx = event.findPointerIndex(pid);
+                            if (idx >= 0) updateVisualForPointer(pid, event.getX(idx), event.getY(idx));
+                        }
+                    }
+                    return true;
+                }
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_POINTER_UP: {
+                    float x = event.getX(actionIndex);
+                    float y = event.getY(actionIndex);
+                    nativeTouchProcessor.onFingerUp(pointerId, x, y);
+                    if (profile != null) {
+                        ControlElement released = nativeEngagedElements.remove(pointerId);
+                        if (released != null) released.setVisualActive(false);
+                    }
+                    return true;
+                }
+                case MotionEvent.ACTION_CANCEL: {
+                    nativeTouchProcessor.reset();
+                    nativeEngagedElements.clear();
+                    if (profile != null) deactivateAllElements();
+                    return true;
+                }
+            }
+            return true;
+        }
 
         if (editMode && readyToDraw) {
             switch (event.getAction()) {

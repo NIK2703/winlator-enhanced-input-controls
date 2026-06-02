@@ -517,6 +517,13 @@
                             android:layout_gravity="left|center"
                             android:text="@string/share_android_clipboard" />
 
+                        <CheckBox
+                            android:id="@+id/CBNativeTouch"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Native Touch Processing (experimental)" />
+
                         <View style="@style/FieldSeparator" />
 
                         <TextView

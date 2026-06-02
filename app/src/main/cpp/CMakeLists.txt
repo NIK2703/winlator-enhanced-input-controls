@@ -37,6 +37,24 @@ target_link_libraries(winlator
         adrenotools
 )
 
+add_library(touch_processor SHARED
+        winlator/touch_processor.c
+        winlator/touch_processor_actions.c
+        winlator/touch_processor_element_shared.c
+        winlator/touch_processor_button.c
+        winlator/touch_processor_dpad.c
+        winlator/touch_processor_stick.c
+        winlator/touch_processor_trackpad.c
+        winlator/touch_processor_gesture.c
+        winlator/touch_processor_modes.c
+        winlator/touch_processor_jni.cpp
+)
+
+target_compile_options(touch_processor PRIVATE -Wall -Wextra)
+set_source_files_properties(winlator/touch_processor.c PROPERTIES COMPILE_OPTIONS "-std=c11")
+set_source_files_properties(winlator/touch_processor_jni.cpp PROPERTIES COMPILE_OPTIONS "-std=c++17")
+target_link_libraries(touch_processor log android)
+
 add_library(fakeinput SHARED
         winlator/fakeinput.cpp
 )
