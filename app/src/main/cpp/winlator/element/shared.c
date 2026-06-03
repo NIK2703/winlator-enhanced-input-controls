@@ -28,7 +28,7 @@ bool point_in_element(float px, float py, const TouchElement* e) {
         case ELEM_RANGE_BUTTON:
             hw = hs * ((e->range_binding_count * 4) / 2) * e->scale;
             hh = hs * 2.0f * e->scale;
-            if (e->range_orientation == 1) { float t = hw; hw = hh; hh = t; }
+            if (e->range_orientation == 1) SWAP_F(hw, hh);
             break;
         default:
             hw = e->w * hs * 0.5f * e->scale;
@@ -56,18 +56,22 @@ float cubic_bezier_interpolate(float x, float cpx1, float cpy1) {
     if (abs_x <= 0.0001f) return 0.0f;
     if (abs_x >= 1.0f) return x > 0 ? 1.0f : -1.0f;
 
-    // Binary search for t where B_x(t) ≈ abs_x (16 iterations for ~6e-6 precision)
     float lo = 0.0f, hi = 1.0f;
     for (int i = 0; i < 16; i++) {
         float mid = (lo + hi) * 0.5f;
         float omt = 1.0f - mid;
-        float bx = 3.0f * omt * omt * mid * cpx1 + 3.0f * omt * mid * mid * 0.45f + mid * mid * mid;
+        float m2 = mid * mid;
+        float m3 = m2 * mid;
+        float omt2 = omt * omt;
+        float bx = 3.0f * omt2 * mid * cpx1 + 3.0f * omt * m2 * 0.45f + m3;
         if (bx < abs_x) lo = mid;
         else hi = mid;
     }
     float t = (lo + hi) * 0.5f;
     float omt = 1.0f - t;
-    float by = 3.0f * omt * omt * t * cpy1 + 3.0f * omt * t * t * 0.95f + t * t * t;
+    float t2 = t * t;
+    float t3 = t2 * t;
+    float by = 3.0f * omt * omt * t * cpy1 + 3.0f * omt * t2 * 0.95f + t3;
     return x > 0 ? by : -by;
 }
 
@@ -79,6 +83,28 @@ int detect_swipe_dir(float dx, float dy, float threshold) {
 
 bool is_mouse_move_binding(const TouchBinding* b) {
     return b->type >= BINDING_MOUSE_MOVE_LEFT && b->type <= BINDING_MOUSE_MOVE_DOWN;
+}
+
+void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, TouchActionResult* result) {
+    bool raw_up = ny <= -dead_zone;
+    bool raw_right = nx >= dead_zone;
+    bool raw_down = ny >= dead_zone;
+    bool raw_left = nx <= -dead_zone;
+    bool states[4] = {raw_up, raw_right, raw_down, raw_left};
+    for (int i = 0; i < 4; i++) {
+        const TouchBinding* b = &e->bindings[i];
+        if (b->type == BINDING_NONE) continue;
+        bool active;
+        if (is_mouse_move_binding(b))
+            active = states[i] || states[(i + 2) % 4];
+        else
+            active = states[i];
+        if (active != e->petal_active[i]) {
+            e->petal_active[i] = active;
+            if (active) press_binding(result, b, true);
+            else release_binding(result, b);
+        }
+    }
 }
 
 bool finger_has_engaged_element(int ptr_id) {

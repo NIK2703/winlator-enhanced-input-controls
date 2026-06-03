@@ -22,9 +22,7 @@ void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, 
     dx *= g_state.cfg.xform_scale_x;
     dy *= g_state.cfg.xform_scale_y;
 
-    bool is_gamepad = e->bindings[0].type >= BINDING_GAMEPAD_BASE && e->bindings[0].type < BINDING_GAMEPAD_BASE + 24;
-
-    if (is_gamepad) {
+    if (is_gamepad_binding(&e->bindings[0])) {
         // Java: TRACKPAD_ACCELERATION_THRESHOLD=4, STICK_SENSITIVITY=2.0f
         float value_x = dx, value_y = dy;
         if (fabsf(value_x) > TP_ACCEL_THRESHOLD)
@@ -43,9 +41,7 @@ void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, 
         float interp_x = cubic_bezier_interpolate(nx, 0.075f, 0.95f);
         float interp_y = cubic_bezier_interpolate(ny, 0.075f, 0.95f);
 
-        int bt = e->bindings[0].type - BINDING_GAMEPAD_BASE;
-        int is_left = 1;
-        if (bt >= 16 && bt <= 19) is_left = 0; // GAMEPAD_RIGHT_THUMB = ordinals 16-19
+        int is_left = !is_right_stick_binding(e);
         add_action(result, ACT_GAMEPAD_AXIS, is_left, (int)(interp_x * 32767), (int)(interp_y * 32767));
 
         e->trackpad_vel_x = interp_x;
@@ -108,12 +104,8 @@ void element_trackpad_up(TouchElement* e, float x, float y, uint64_t time_ms, To
                 release_binding(result, &e->bindings[i]);
         }
     }
-    // Java ControlElement.handleTouchUp: zero gamepad axes on finger-up for stick/trackpad
-    if (e->bindings[0].type >= BINDING_GAMEPAD_BASE && e->bindings[0].type < BINDING_GAMEPAD_BASE + 24) {
-        int bt = e->bindings[0].type - BINDING_GAMEPAD_BASE;
-        int is_left = 1;
-        if (bt >= 16 && bt <= 19) is_left = 0;
-        add_action(result, ACT_GAMEPAD_AXIS, is_left, 0, 0);
+    if (is_gamepad_binding(&e->bindings[0])) {
+        add_action(result, ACT_GAMEPAD_AXIS, !is_right_stick_binding(e), 0, 0);
     }
     e->engaged = false;
     e->current_ptr_id = -1;

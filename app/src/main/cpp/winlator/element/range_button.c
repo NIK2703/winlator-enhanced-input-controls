@@ -2,16 +2,24 @@
 
 #define RANGE_SCROLL_THRESHOLD 10
 
+static void range_compute_sizes(TouchElement* e, float* out_cw, float* out_ch, float* out_element_size) {
+    float hs = g_state.snapping_size;
+    *out_cw = hs * (e->range_binding_count * 2) * e->scale;
+    *out_ch = hs * 2.0f * e->scale;
+    if (e->range_orientation == 1) SWAP_F(*out_cw, *out_ch);
+    *out_element_size = (e->range_orientation == 0 ? *out_cw * 2.0f : *out_ch * 2.0f) / (float)e->range_binding_count;
+}
+
 int range_keycode(int ordinal, int index) {
     static const int alphabet[26] = {38,56,54,40,26,41,42,43,31,44,45,46,58,57,32,33,24,27,39,28,30,55,25,52,29,53};
     static const int number[10]  = {10,11,12,13,14,15,16,17,18,19};
     static const int function[12]= {67,68,69,70,71,72,73,74,75,76,95,96};
     static const int numpad[10]  = {87,88,89,83,84,85,79,80,81,90};
     switch (ordinal) {
-        case 0: if (index >= 0 && index < 26) return alphabet[index]; break;
-        case 1: if (index >= 0 && index < 10) return number[index]; break;
-        case 2: if (index >= 0 && index < 12) return function[index]; break;
-        case 3: if (index >= 0 && index < 10) return numpad[index]; break;
+        case 0: if (index >= 0 && index < 26) return alphabet[index];
+        case 1: if (index >= 0 && index < 10) return number[index];
+        case 2: if (index >= 0 && index < 12) return function[index];
+        case 3: if (index >= 0 && index < 10) return numpad[index];
     }
     return 0;
 }
@@ -25,13 +33,10 @@ void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, ui
     e->range_tap_release_time = 0;
     e->range_last_position = e->range_orientation == 0 ? x : y;
 
-    float hs = g_state.snapping_size;
-    float cw = hs * (e->range_binding_count * 2) * e->scale;
-    float ch = hs * 2.0f * e->scale;
-    if (e->range_orientation == 1) { float t = cw; cw = ch; ch = t; }
+    float cw, ch, element_size;
+    range_compute_sizes(e, &cw, &ch, &element_size);
     float left = e->x - cw;
     float top  = e->y - ch;
-    float element_size = (e->range_orientation == 0 ? cw * 2.0f : ch * 2.0f) / (float)e->range_binding_count;
 
     float offset = e->range_orientation == 0 ? x - left - e->range_current_offset : y - top - e->range_current_offset;
     int index = (int)floorf(offset / element_size);
@@ -54,11 +59,8 @@ void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_
     }
 
     if (e->range_scrolling) {
-        float hs = g_state.snapping_size;
-        float cw = hs * (e->range_binding_count * 2) * e->scale;
-        float ch = hs * 2.0f * e->scale;
-        if (e->range_orientation == 1) { float t = cw; cw = ch; ch = t; }
-        float element_size = (e->range_orientation == 0 ? cw * 2.0f : ch * 2.0f) / (float)e->range_binding_count;
+        float cw, ch, element_size;
+        range_compute_sizes(e, &cw, &ch, &element_size);
         float scroll_size = element_size * (float)e->range_max;
 
         e->range_current_offset += delta;

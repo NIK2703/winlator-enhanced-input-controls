@@ -44,7 +44,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result);
 void on_drag_start(TouchFinger* f);
 bool gesture_is_within_tap_distance(float x, float y);
 void gesture_cancel_double_tap_wait(TouchActionResult* result);
-void check_start_drag(TouchFinger* f, float dx, float dy, uint64_t time_ms, TouchActionResult* result);
+void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* result);
 void handle_tap_up(TouchFinger* f, TouchActionResult* result);
 
 #endif // TOUCH_PROCESSOR_GESTURE_TYPES_H

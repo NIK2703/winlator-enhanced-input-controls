@@ -1,7 +1,8 @@
 #include "../touch_processor_internal.h"
 
-void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* result) {
-    uint64_t _now = now_ms();
+#define DELAYED_RELEASE_MS 30
+
+void handle_touchpad_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     g_state.main_ptr_id = f->ptr_id;
 
     // Check passthrough + disable pointer left if ANY element has MOUSE_LEFT binding
@@ -19,7 +20,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
         bool found_lock = false;
         for (int i = 0; i < g_state.element_count; i++) {
             if (point_in_element(x, y, &g_state.elements[i]) && g_state.elements[i].activation_mode == ACTIVATION_LOCK) {
-                handle_element_down(&g_state.elements[i], f->ptr_id, x, y, _now, result);
+                handle_element_down(&g_state.elements[i], f->ptr_id, x, y, time_ms, result);
                 found_lock = true;
             }
         }
@@ -35,7 +36,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
         TouchElement* e = &g_state.elements[i];
         if (e->type != ELEM_BUTTON && point_in_element(x, y, e)) {
             
-            handle_element_down(e, f->ptr_id, x, y, _now, result);
+            handle_element_down(e, f->ptr_id, x, y, time_ms, result);
             if (e->current_ptr_id == f->ptr_id) {
                 handled = true;
             }
@@ -55,7 +56,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
             if (!already) {
                 // Java: handleTouchDown called for both passthrough and non-passthrough
                 // handle_element_down now guards current_ptr_id >= 0 (matches Java handleTouchDown)
-                handle_element_down(btn, f->ptr_id, x, y, _now, result);
+                handle_element_down(btn, f->ptr_id, x, y, time_ms, result);
                 // Java: !isPassthroughTouch() → add to tracked only if engagement succeeded
                 if (btn->current_ptr_id == f->ptr_id && !btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER) {
                     tb->element_indices[tb->count++] = (int)(btn - g_state.elements);
@@ -70,7 +71,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
             }
         } else {
             // Non-TRACK/HOVER button at point: still process (matching Java handleTouchDown for buttons)
-            handle_element_down(btn, f->ptr_id, x, y, _now, result);
+            handle_element_down(btn, f->ptr_id, x, y, time_ms, result);
             if (!btn->passthrough_touch) {
                 handled = true;
                 
@@ -98,7 +99,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
         if (nf == 1) {
             // First finger: always schedule delayed press
             g_state.sim_continue_click = true;
-            g_state.sim_click_press_time = _now + CLICK_DELAY_MS;
+            g_state.sim_click_press_time = time_ms + CLICK_DELAY_MS;
             g_state.sim_click_ptr_id = f->ptr_id;
             g_state.last_touch_x = (int)x;
             g_state.last_touch_y = (int)y;
@@ -110,7 +111,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
                     first = &g_state.fingers[i]; break;
                 }
             }
-            if (first && (_now - first->down_time_ms) >= CLICK_DELAY_MS) {
+            if (first && (time_ms - first->down_time_ms) >= CLICK_DELAY_MS) {
                 g_state.sim_continue_click = true;
             } else {
                 g_state.sim_continue_click = false;
@@ -220,13 +221,13 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
         float dx = x - f->down_x;
         float dy = y - f->down_y;
 
-        if (f->state == GESTURE_STATE_DRAGGING) {
-        } else {
-            check_start_drag(f, dx, dy, time_ms, result);
+        if (f->state != GESTURE_STATE_DRAGGING) {
+            check_start_drag(f, dx, dy, result);
         }
     }
 
-    if (active_finger_count() == 2 && !g_state.sim_touch_screen) {
+    int afc = active_finger_count();
+    if (afc == 2 && !g_state.sim_touch_screen) {
         TouchFinger* f2 = NULL;
         for (int i = 0; i < MAX_FINGERS; i++) {
             if (g_state.fingers[i].active && g_state.fingers[i].ptr_id != f->ptr_id) { f2 = &g_state.fingers[i]; break; }
@@ -257,7 +258,7 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
         }
     }
 
-    if (!g_state.scrolling && active_finger_count() <= 2) {
+    if (!g_state.scrolling && afc <= 2) {
         if (g_state.sim_touch_screen) {
             // Java TouchpadView.handleFingerMove: suppress click if finger moved during delay
             if (f->travel_x > MAX_TAP_TRAVEL || f->travel_y > MAX_TAP_TRAVEL)
@@ -280,13 +281,13 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
 
             if (g_state.cfg.cursor_acceleration_factor > 0.0f &&
                 g_state.cfg.cursor_acceleration_threshold > 0) {
-                if (fabsf(dx) > g_state.cfg.cursor_acceleration_threshold) {
-                    float sign = dx > 0 ? 1.0f : -1.0f;
-                    dx = fabsf(dx) * g_state.cfg.cursor_acceleration_factor * sign;
+                float adx = fabsf(dx);
+                if (adx > g_state.cfg.cursor_acceleration_threshold) {
+                    dx = adx * g_state.cfg.cursor_acceleration_factor * (dx > 0 ? 1.0f : -1.0f);
                 }
-                if (fabsf(dy) > g_state.cfg.cursor_acceleration_threshold) {
-                    float sign = dy > 0 ? 1.0f : -1.0f;
-                    dy = fabsf(dy) * g_state.cfg.cursor_acceleration_factor * sign;
+                float ady = fabsf(dy);
+                if (ady > g_state.cfg.cursor_acceleration_threshold) {
+                    dy = ady * g_state.cfg.cursor_acceleration_factor * (dy > 0 ? 1.0f : -1.0f);
                 }
             }
             if (dx != 0 || dy != 0) {
@@ -325,9 +326,6 @@ void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touc
                 }
             }
             had_tracked = true;
-        } else {
-            // Java: tracked.size() == 1 → just clear list, handleTouchUp via outer loop
-            
         }
         memset(tb, 0, sizeof(TrackedButtons));
     }
@@ -386,12 +384,12 @@ void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touc
 
     // Java TouchpadView.releasePointerButtonLeft/Right uses 30ms postDelayed
     if (g_state.finger_pointer_left == f->ptr_id) {
-        g_state.pending_left_release_time = time_ms + 30;
+        g_state.pending_left_release_time = time_ms + DELAYED_RELEASE_MS;
         g_state.pending_left_release_ptr_id = f->ptr_id;
         g_state.finger_pointer_left = -1;
     }
     if (g_state.finger_pointer_right == f->ptr_id) {
-        g_state.pending_right_release_time = time_ms + 30;
+        g_state.pending_right_release_time = time_ms + DELAYED_RELEASE_MS;
         g_state.pending_right_release_ptr_id = f->ptr_id;
         g_state.finger_pointer_right = -1;
     }

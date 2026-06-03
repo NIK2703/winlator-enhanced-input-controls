@@ -39,8 +39,7 @@ void gesture_cancel_double_tap_wait(TouchActionResult* result) {
     }
 }
 
-void check_start_drag(TouchFinger* f, float dx, float dy, uint64_t time_ms, TouchActionResult* result) {
-    (void)time_ms;
+void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* result) {
     if (f->state != GESTURE_STATE_TAP_WAITING && f->state != GESTURE_STATE_LONG_PRESSING) return;
     if (fabsf(dx) <= g_state.cfg.drag_threshold_px && fabsf(dy) <= g_state.cfg.drag_threshold_px) return;
 

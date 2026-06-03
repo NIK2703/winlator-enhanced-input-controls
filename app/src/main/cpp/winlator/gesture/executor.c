@@ -1,5 +1,13 @@
 #include "../touch_processor_internal.h"
 
+#define MAX_HELD_ACTIONS 16
+
+static inline void delay_ms(int ms) {
+    if (ms <= 0) return;
+    struct timespec ts = {0, ms * 1000000};
+    nanosleep(&ts, NULL);
+}
+
 static int pointer_button_idx(const TouchBinding* b);
 
 void add_action(TouchActionResult* r, ActionType type, int a0, int a1, int a2) {
@@ -76,7 +84,7 @@ void hold_actions(TouchActionResult* result, const TouchBinding* actions, int co
         if (b->type == BINDING_NONE) continue;
         if (is_modifier_binding(b)) {
             add_action(result, ACT_KEY_PRESS, b->keycode, 0, 0);
-            if (g_state.gesture_held_count < (int)(sizeof(g_state.gesture_held_actions)/sizeof(g_state.gesture_held_actions[0])))
+            if (g_state.gesture_held_count < MAX_HELD_ACTIONS)
                 g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
         }
     }
@@ -86,26 +94,24 @@ void hold_actions(TouchActionResult* result, const TouchBinding* actions, int co
         if (b->type == BINDING_NONE) continue;
         if (is_modifier_binding(b)) continue;
         if (b->type == BINDING_MOUSE_SCROLL_UP || b->type == BINDING_MOUSE_SCROLL_DOWN) continue;
-        if (b->type >= BINDING_MOUSE_MOVE_LEFT && b->type <= BINDING_MOUSE_MOVE_DOWN) continue;
+        if (is_mouse_move_binding(b)) continue;
         if (is_keyboard_binding(b)) {
             add_action(result, ACT_KEY_PRESS, b->keycode, 0, 0);
-            if (g_state.gesture_held_count < (int)(sizeof(g_state.gesture_held_actions)/sizeof(g_state.gesture_held_actions[0])))
+            if (g_state.gesture_held_count < MAX_HELD_ACTIONS)
                 g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
         } else if (b->type >= BINDING_MOUSE_LEFT && b->type <= BINDING_MOUSE_BUTTON5) {
             add_action(result, ACT_POINTER_BUTTON_PRESS, pointer_button_idx(b), 0, 0);
-            if (g_state.gesture_held_count < (int)(sizeof(g_state.gesture_held_actions)/sizeof(g_state.gesture_held_actions[0])))
+            if (g_state.gesture_held_count < MAX_HELD_ACTIONS)
                 g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
         } else if (is_gamepad_binding(b)) {
             int btn = b->type - BINDING_GAMEPAD_BASE;
             add_action(result, ACT_GAMEPAD_STATE, btn, 1, 0);
-            if (g_state.gesture_held_count < (int)(sizeof(g_state.gesture_held_actions)/sizeof(g_state.gesture_held_actions[0])))
+            if (g_state.gesture_held_count < MAX_HELD_ACTIONS)
                 g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
         }
         // Java: bindingDelay sleep between items
-        if (binding_delay > 0 && i < count - 1) {
-            struct timespec ts = {0, binding_delay * 1000000};
-            nanosleep(&ts, NULL);
-        }
+        if (i < count - 1)
+            delay_ms(binding_delay);
     }
     g_state.gesture_is_action_held = true;
 }
@@ -131,37 +137,27 @@ void execute_actions(TouchActionResult* result, const TouchBinding* actions, int
         if (b->type == BINDING_NONE) continue;
         if (is_modifier_binding(b)) continue;
         if (b->type == BINDING_MOUSE_SCROLL_UP || b->type == BINDING_MOUSE_SCROLL_DOWN) continue;
-        if (b->type >= BINDING_MOUSE_MOVE_LEFT && b->type <= BINDING_MOUSE_MOVE_DOWN) continue;
+        if (is_mouse_move_binding(b)) continue;
 
         if (is_gamepad_binding(b)) {
             int btn_idx = b->type - BINDING_GAMEPAD_BASE;
             add_action(result, ACT_GAMEPAD_STATE, btn_idx, 1, 0);
-            if (binding_delay > 0) {
-                struct timespec ts = {0, binding_delay * 1000000};
-                nanosleep(&ts, NULL);
-            }
+            delay_ms(binding_delay);
             add_action(result, ACT_GAMEPAD_STATE, btn_idx, 0, 0);
         } else if (is_keyboard_binding(b)) {
             add_action(result, ACT_KEY_PRESS, b->keycode, 0, 0);
-            if (binding_delay > 0) {
-                struct timespec ts = {0, binding_delay * 1000000};
-                nanosleep(&ts, NULL);
-            }
+            delay_ms(binding_delay);
             add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0);
         } else if (b->type >= BINDING_MOUSE_LEFT && b->type <= BINDING_MOUSE_BUTTON5) {
             int btn = pointer_button_idx(b);
             add_action(result, ACT_POINTER_BUTTON_PRESS, btn, 0, 0);
-            if (binding_delay > 0) {
-                struct timespec ts = {0, binding_delay * 1000000};
-                nanosleep(&ts, NULL);
-            }
+            delay_ms(binding_delay);
             add_action(result, ACT_POINTER_BUTTON_RELEASE, btn, 0, 0);
         }
-        if (binding_delay > 0 && i < count - 1) {
-            struct timespec ts = {0, binding_delay * 1000000};
-            nanosleep(&ts, NULL);
-        }
+        if (i < count - 1)
+            delay_ms(binding_delay);
     }
+
     // Release modifier keyboard bindings last in reverse order (matches Java: toKeyboardBinding → release)
     for (int i = count - 1; i >= 0; i--) {
         const TouchBinding* b = &actions[i];
@@ -194,7 +190,7 @@ void release_binding(TouchActionResult* result, const TouchBinding* b) {
     } else if (b->type >= BINDING_MOUSE_LEFT && b->type <= BINDING_MOUSE_BUTTON5) {
         add_action(result, ACT_POINTER_BUTTON_RELEASE, pointer_button_idx(b), 0, 0);
     } else if (b->type == BINDING_MOUSE_SCROLL_UP || b->type == BINDING_MOUSE_SCROLL_DOWN) {
-    } else if (b->type >= BINDING_MOUSE_MOVE_LEFT && b->type <= BINDING_MOUSE_MOVE_DOWN) {
+    } else if (is_mouse_move_binding(b)) {
         add_action(result, ACT_STOP_MOUSE_MOVE, 0, 0, 0);
     }
 }
@@ -217,7 +213,7 @@ void press_binding(TouchActionResult* result, const TouchBinding* b, bool hold) 
         add_action(result, ACT_SCROLL, -1, 0, 0);
     } else if (b->type == BINDING_MOUSE_SCROLL_DOWN) {
         add_action(result, ACT_SCROLL, 1, 0, 0);
-    } else if (b->type >= BINDING_MOUSE_MOVE_LEFT && b->type <= BINDING_MOUSE_MOVE_DOWN) {
+    } else if (is_mouse_move_binding(b)) {
         int dx = 0, dy = 0;
         if (b->type == BINDING_MOUSE_MOVE_LEFT) dx = -1;
         else if (b->type == BINDING_MOUSE_MOVE_RIGHT) dx = 1;

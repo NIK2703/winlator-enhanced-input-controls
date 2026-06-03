@@ -241,11 +241,9 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
                     main_finger->pending_resume_action[i] = g_state.gesture_held_actions[i];
                     main_finger->pending_resume_action_count++;
                 }
-                release_held_actions(result);
             }
-        } else {
-            release_held_actions(result);
         }
+        release_held_actions(result);
 
         touchpad_finger_down(f, result);
     }
@@ -357,7 +355,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
         float dx = x - f->down_x;
         float dy = y - f->down_y;
         
-        check_start_drag(f, dx, dy, time_ms, result);
+        check_start_drag(f, dx, dy, result);
     }
 
     g_state.ptr_x = x;

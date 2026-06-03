@@ -18,9 +18,7 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
     float nx = dx / radius;
     float ny = dy / radius;
 
-    bool is_gamepad = e->bindings[0].type >= BINDING_GAMEPAD_BASE && e->bindings[0].type < BINDING_GAMEPAD_BASE + 24;
-
-    if (is_gamepad) {
+    if (is_gamepad_binding(&e->bindings[0])) {
         // Gamepad stick: Java-compatible dead zone — magnitude > STICK_DEAD_ZONE guard,
         // then max(0, mag-0.01f) * STICK_SENSITIVITY
         float mag = fminf(dist / radius, 1.0f);
@@ -32,35 +30,10 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
         }
         e->stick_value_x = axis_x;
         e->stick_value_y = axis_y;
-        // Determine left vs right thumb from first binding
-        int is_left = 1;
-        int bt = e->bindings[0].type - BINDING_GAMEPAD_BASE;
-        if (bt >= 16 && bt <= 19) is_left = 0; // GAMEPAD_RIGHT_THUMB = ordinals 16-19
+        int is_left = !is_right_stick_binding(e);
         add_action(result, ACT_GAMEPAD_AXIS, is_left, (int)(axis_x * 32767), (int)(axis_y * 32767));
     } else {
-        // Per-binding directional mode (matches Java handleTouchMove non-gamepad branch)
-        bool raw_up = ny <= -STICK_DEAD_ZONE;
-        bool raw_right = nx >= STICK_DEAD_ZONE;
-        bool raw_down = ny >= STICK_DEAD_ZONE;
-        bool raw_left = nx <= -STICK_DEAD_ZONE;
-        bool states[4] = {raw_up, raw_right, raw_down, raw_left};
-        for (int i = 0; i < 4; i++) {
-            const TouchBinding* b = &e->bindings[i];
-            if (b->type == BINDING_NONE) continue;
-            bool active;
-            if (is_mouse_move_binding(b))
-                active = states[i] || states[(i + 2) % 4]; // bidirectional: up||down, right||left
-            else
-                active = states[i];
-            if (active != e->petal_active[i]) {
-                e->petal_active[i] = active;
-                if (active) {
-                    press_binding(result, b, true);
-                } else {
-                    release_binding(result, b);
-                }
-            }
-        }
+        element_set_petals(e, nx, ny, STICK_DEAD_ZONE, result);
     }
 }
 
@@ -75,12 +48,8 @@ void element_stick_up(TouchElement* e, float x, float y, uint64_t time_ms, Touch
                 release_binding(result, &e->bindings[i]);
         }
     }
-    // Java handleTouchUp: zero axis values on finger-up (gamepad only)
-    if (e->bindings[0].type >= BINDING_GAMEPAD_BASE && e->bindings[0].type < BINDING_GAMEPAD_BASE + 24) {
-        int bt = e->bindings[0].type - BINDING_GAMEPAD_BASE;
-        int is_left = 1;
-        if (bt >= 16 && bt <= 19) is_left = 0;
-        add_action(result, ACT_GAMEPAD_AXIS, is_left, 0, 0);
+    if (is_gamepad_binding(&e->bindings[0])) {
+        add_action(result, ACT_GAMEPAD_AXIS, !is_right_stick_binding(e), 0, 0);
     }
     e->engaged = false;
     e->current_ptr_id = -1;

@@ -80,7 +80,7 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     touch_finger_cache_bs(f);
 
     switch (g_state.cfg.touch_mode) {
-        case TOUCH_MODE_TOUCHPAD: handle_touchpad_down(f, x, y, &result); break;
+        case TOUCH_MODE_TOUCHPAD: handle_touchpad_down(f, x, y, time_ms, &result); break;
         case TOUCH_MODE_TOUCHSCREEN: handle_touchscreen_down(f, x, y, time_ms, &result); break;
         default: break;
     }

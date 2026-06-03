@@ -6,6 +6,9 @@
 
 static jclass g_result_class = NULL;
 static jmethodID g_result_ctor;
+static jfieldID g_count_field;
+static jfieldID g_types_field;
+static jfieldID g_intArgs_field;
 
 // Helper: read a TouchBinding binding list from a Java int[] array.
 // The Java array stores [type0, keycode0, type1, keycode1, ...].
@@ -38,13 +41,16 @@ static jobject to_java_result(JNIEnv* env, const TouchActionResult* r) {
         g_result_class = (jclass)env->NewGlobalRef(
             env->FindClass("com/winlator/cmod/inputcontrols/NativeTouchProcessor$TouchActionResult"));
         g_result_ctor = env->GetMethodID(g_result_class, "<init>", "()V");
+        g_count_field = env->GetFieldID(g_result_class, "count", "I");
+        g_types_field = env->GetFieldID(g_result_class, "types", "[I");
+        g_intArgs_field = env->GetFieldID(g_result_class, "intArgs", "[I");
     }
 
     jintArray types = env->NewIntArray(r->count);
     jintArray intArgs = env->NewIntArray(r->count * 3);
 
-    jint* typeBuf = new jint[r->count];
-    jint* argBuf = new jint[r->count * 3];
+    jint typeBuf[32];
+    jint argBuf[32 * 3];
 
     for (int i = 0; i < r->count; i++) {
         typeBuf[i] = (jint)r->actions[i].type;
@@ -122,17 +128,13 @@ static jobject to_java_result(JNIEnv* env, const TouchActionResult* r) {
     env->SetIntArrayRegion(types, 0, r->count, typeBuf);
     env->SetIntArrayRegion(intArgs, 0, r->count * 3, argBuf);
 
-    delete[] typeBuf;
-    delete[] argBuf;
+
 
     jobject result = env->NewObject(g_result_class, g_result_ctor);
-    jfieldID countField = env->GetFieldID(g_result_class, "count", "I");
-    jfieldID typesField = env->GetFieldID(g_result_class, "types", "[I");
-    jfieldID intArgsField = env->GetFieldID(g_result_class, "intArgs", "[I");
 
-    env->SetIntField(result, countField, (jint)r->count);
-    env->SetObjectField(result, typesField, types);
-    env->SetObjectField(result, intArgsField, intArgs);
+    env->SetIntField(result, g_count_field, (jint)r->count);
+    env->SetObjectField(result, g_types_field, types);
+    env->SetObjectField(result, g_intArgs_field, intArgs);
 
     return result;
 }
@@ -276,9 +278,7 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeSetElements(
                 int typeVal = bt[j];
                 int keycodeVal = bt[j + 1];
                 elems[i].bindings[slot].type = (BindingType)typeVal;
-                if (typeVal >= BINDING_KEYBOARD_FIRST && typeVal <= BINDING_KEYBOARD_LAST) {
-                    elems[i].bindings[slot].keycode = keycodeVal;
-                } else if (typeVal != BINDING_NONE) {
+                if (typeVal != BINDING_NONE) {
                     elems[i].bindings[slot].keycode = keycodeVal;
                 }
             }
@@ -369,8 +369,7 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeGetElementState(
     JNIEnv* env, jclass clazz, jint elemIndex, jfloatArray outXY) {
     float sx, sy;
     bool engaged;
-    int ptrId;
-    if (!touch_processor_get_element_state(elemIndex, &sx, &sy, &engaged, &ptrId))
+    if (!touch_processor_get_element_state(elemIndex, &sx, &sy, &engaged, NULL))
         return JNI_FALSE;
     if (outXY && env->GetArrayLength(outXY) >= 2) {
         jfloat vals[2] = { sx, sy };

@@ -10,14 +10,11 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
         return;
     }
 
-    e->long_press_arm = true;
-
     if (e->double_tap_waiting) {
         // Second tap confirmed — hold all double-tap bindings (Java pressBindings)
         e->double_tap_waiting = false;
         e->gesture_double_tap_triggered = true;
         e->gesture_swipe_triggered = false; // Java handleDoubleTapConfirmed: gestureTriggered = false
-        e->long_press_arm = false;
         for (int k = 0; k < e->element_double_tap_count; k++)
             press_binding(result, &e->element_double_tap[k], true);
         return;
@@ -32,6 +29,7 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     }
 
     // Java: hasLongPressBinding() && !toggleSwitch -> startLongPressTimer (no primary press)
+    e->long_press_arm = has_lp && !e->toggle_switch;
     if (has_lp && !e->toggle_switch) {
         return;
     }
@@ -46,16 +44,16 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
     float dx = x - e->down_x;
     float dy = y - e->down_y;
 
-    // Java: cancelDoubleTap when finger leaves bounds during double-tap waiting
-    // Java cancelDoubleTap fires primary binding as a tap (press + release)
-    if (e->double_tap_waiting && !e->gesture_swipe_triggered
-        && !e->gesture_long_press_triggered && !e->gesture_double_tap_triggered
-        && !point_in_element(x, y, e)) {
-        e->double_tap_waiting = false;
-        e->long_press_arm = false; // Java cancelPendingLongPress
-        if (e->bindings[0].type != BINDING_NONE) {
-            press_binding(result, &e->bindings[0], false);
-            release_binding(result, &e->bindings[0]);
+    if (e->double_tap_waiting) {
+        if (!e->gesture_swipe_triggered
+            && !e->gesture_long_press_triggered && !e->gesture_double_tap_triggered
+            && !point_in_element(x, y, e)) {
+            e->double_tap_waiting = false;
+            e->long_press_arm = false;
+            if (e->bindings[0].type != BINDING_NONE) {
+                press_binding(result, &e->bindings[0], false);
+                release_binding(result, &e->bindings[0]);
+            }
         }
     }
 
