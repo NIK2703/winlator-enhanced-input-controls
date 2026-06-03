@@ -54,9 +54,9 @@ void check_start_drag(TouchFinger* f, float dx, float dy, uint64_t time_ms, Touc
         if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
             // Java TouchscreenGestureHandler.resolveDragAction for LONG_PRESSING:
             //   longPressDrag → longPress → null (no drag)
-            if (has_active_long_press_drag(fb)) {
+            if (f->cached_has_active_long_press_drag) {
                 drag_binding = fb->long_press_drag; drag_count = fb->long_press_drag_count;
-            } else if (has_active_long_press(fb)) {
+            } else if (f->cached_has_active_long_press) {
                 drag_binding = fb->long_press; drag_count = fb->long_press_count;
             } else {
                 return;
@@ -64,9 +64,9 @@ void check_start_drag(TouchFinger* f, float dx, float dy, uint64_t time_ms, Touc
         } else {
             // Java GestureHandler.resolveDragAction for touchpad LONG_PRESSING (non-second-finger):
             //   longPressDrag -> null (no drag), drag does NOT start
-            if (has_active_long_press_drag(fb)) {
+            if (f->cached_has_active_long_press_drag) {
                 drag_binding = fb->long_press_drag; drag_count = fb->long_press_drag_count;
-            } else if (f->is_second_finger && has_active_single_tap_drag(fb)) {
+            } else if (f->is_second_finger && f->cached_has_active_single_tap_drag) {
                 drag_binding = fb->single_tap_drag; drag_count = fb->single_tap_drag_count;
             } else {
                 return;
@@ -96,16 +96,16 @@ void check_start_drag(TouchFinger* f, float dx, float dy, uint64_t time_ms, Touc
             drag_binding = g_state.cfg.tp_double_tap_drag; drag_count = g_state.cfg.tp_double_tap_drag_count;
         }
         g_state.gesture_post_double_tap_drag = false;
-    } else if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN && has_active_single_tap_drag(fb)) {
+    } else if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN && f->cached_has_active_single_tap_drag) {
         // TouchscreenGestureHandler.resolveDragAction allows singleTapDrag for main finger
         drag_binding = fb->single_tap_drag; drag_count = fb->single_tap_drag_count;
     } else if (f->is_second_finger) {
         // Java GestureHandler.resolveDragAction: secondFingerActive -> singleTapDrag -> longPressDrag -> doubleTapDrag -> null
-        if (has_active_single_tap_drag(fb)) {
+        if (f->cached_has_active_single_tap_drag) {
             drag_binding = fb->single_tap_drag; drag_count = fb->single_tap_drag_count;
-        } else if (has_active_long_press_drag(fb)) {
+        } else if (f->cached_has_active_long_press_drag) {
             drag_binding = fb->long_press_drag; drag_count = fb->long_press_drag_count;
-        } else if (has_active_double_tap_drag(fb)) {
+        } else if (f->cached_has_active_double_tap_drag) {
             drag_binding = fb->double_tap_drag; drag_count = fb->double_tap_drag_count;
         } else {
             return;
@@ -262,7 +262,7 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result) {
         
         g_state.gesture_double_tap_consumed = false;
         if (!g_state.gesture_is_action_held) {
-            if (!has_active_single_tap_drag(fb)) hold_actions(result, fb->single_tap, fb->single_tap_count);
+            if (!f->cached_has_active_single_tap_drag) hold_actions(result, fb->single_tap, fb->single_tap_count);
             else execute_actions(result, fb->single_tap, fb->single_tap_count);
         }
         f->state = GESTURE_STATE_IDLE;
@@ -270,7 +270,7 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result) {
     }
 
     // Java handleTapUp normal path: first tap up — set up double-tap waiting
-    bool has_dt = has_active_double_tap(fb);
+    bool has_dt = f->cached_has_active_double_tap;
     if (has_dt) {
         
         g_state.gesture_deferred_tap_count = 0;
@@ -295,10 +295,10 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result) {
     } else {
         
         if (!g_state.gesture_is_action_held) {
-            if (!has_active_single_tap_drag(fb)) hold_actions(result, fb->single_tap, fb->single_tap_count);
+            if (!f->cached_has_active_single_tap_drag) hold_actions(result, fb->single_tap, fb->single_tap_count);
             else execute_actions(result, fb->single_tap, fb->single_tap_count);
         }
-        if (has_active_double_tap_drag(fb)) {
+        if (f->cached_has_active_double_tap_drag) {
             
             g_state.gesture_double_tap_waiting = true;
             g_state.gesture_double_tap_start_time = now_ms();

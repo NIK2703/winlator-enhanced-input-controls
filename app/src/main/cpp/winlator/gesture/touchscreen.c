@@ -3,8 +3,13 @@
 void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     // Java TouchscreenGestureHandler.handlePointerDown: InputControlsView.findAt(x, y) iterates REVERSE
     TouchElement* elem = NULL;
+    g_state.passthrough_active = false;
     for (int i = g_state.element_count - 1; i >= 0; i--) {
-        if (point_in_element(x, y, &g_state.elements[i])) { elem = &g_state.elements[i]; break; }
+        if (point_in_element(x, y, &g_state.elements[i])) {
+            elem = &g_state.elements[i];
+            if (elem->passthrough_touch) g_state.passthrough_active = true;
+            break;
+        }
     }
     if (elem) {
         

@@ -26,7 +26,7 @@ void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, ui
     e->range_last_position = e->range_orientation == 0 ? x : y;
 
     float hs = g_state.snapping_size;
-    float cw = hs * ((e->range_binding_count * 4) / 2) * e->scale;
+    float cw = hs * (e->range_binding_count * 2) * e->scale;
     float ch = hs * 2.0f * e->scale;
     if (e->range_orientation == 1) { float t = cw; cw = ch; ch = t; }
     float left = e->x - cw;
@@ -35,7 +35,7 @@ void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, ui
 
     float offset = e->range_orientation == 0 ? x - left - e->range_current_offset : y - top - e->range_current_offset;
     int index = (int)floorf(offset / element_size);
-    index %= e->range_max;
+    if (e->range_max > 0) index %= e->range_max;
     if (index < 0) index += e->range_max;
 
     e->range_index = index;
@@ -55,7 +55,7 @@ void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_
 
     if (e->range_scrolling) {
         float hs = g_state.snapping_size;
-        float cw = hs * ((e->range_binding_count * 4) / 2) * e->scale;
+        float cw = hs * (e->range_binding_count * 2) * e->scale;
         float ch = hs * 2.0f * e->scale;
         if (e->range_orientation == 1) { float t = cw; cw = ch; ch = t; }
         float element_size = (e->range_orientation == 0 ? cw * 2.0f : ch * 2.0f) / (float)e->range_binding_count;
@@ -71,9 +71,10 @@ void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_
 void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     (void)x; (void)y;
 
+    int kc = range_keycode(e->range_ordinal, e->range_index);
+
     if (e->range_hold_pressed) {
         // Hold press was already sent by tick — just release
-        int kc = range_keycode(e->range_ordinal, e->range_index);
         if (kc > 0)
             add_action(result, ACT_KEY_RELEASE, kc, 0, 0);
         e->range_scrolling = false;
@@ -89,7 +90,6 @@ void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms
 
     uint64_t duration = time_ms - e->down_time_ms;
     bool is_tap = duration < RANGE_TAP_TIMEOUT_MS && !e->range_scrolling;
-    int kc = range_keycode(e->range_ordinal, e->range_index);
 
     
 

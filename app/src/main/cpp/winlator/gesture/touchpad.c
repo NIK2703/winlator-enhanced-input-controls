@@ -1,12 +1,17 @@
 #include "../touch_processor_internal.h"
 
 void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* result) {
+    uint64_t _now = now_ms();
     g_state.main_ptr_id = f->ptr_id;
 
-    // Java InputControlsView.handleDownByMode: disable pointer left if ANY element has MOUSE_LEFT binding
+    // Check passthrough + disable pointer left if ANY element has MOUSE_LEFT binding
+    g_state.passthrough_active = false;
     for (int i = 0; i < g_state.element_count; i++) {
-        if (g_state.elements[i].bindings[0].type == BINDING_MOUSE_LEFT)
+        TouchElement* pe = &g_state.elements[i];
+        if (pe->bindings[0].type == BINDING_MOUSE_LEFT)
             g_state.pointer_left_enabled = false;
+        if (point_in_element(x, y, pe) && pe->passthrough_touch)
+            g_state.passthrough_active = true;
     }
 
     // Java handleDownByMode(LOCK): iterate ALL elements, dispatch to EVERY lock element at point
@@ -14,7 +19,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
         bool found_lock = false;
         for (int i = 0; i < g_state.element_count; i++) {
             if (point_in_element(x, y, &g_state.elements[i]) && g_state.elements[i].activation_mode == ACTIVATION_LOCK) {
-                handle_element_down(&g_state.elements[i], f->ptr_id, x, y, now_ms(), result);
+                handle_element_down(&g_state.elements[i], f->ptr_id, x, y, _now, result);
                 found_lock = true;
             }
         }
@@ -30,7 +35,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
         TouchElement* e = &g_state.elements[i];
         if (e->type != ELEM_BUTTON && point_in_element(x, y, e)) {
             
-            handle_element_down(e, f->ptr_id, x, y, now_ms(), result);
+            handle_element_down(e, f->ptr_id, x, y, _now, result);
             if (e->current_ptr_id == f->ptr_id) {
                 handled = true;
             }
@@ -50,7 +55,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
             if (!already) {
                 // Java: handleTouchDown called for both passthrough and non-passthrough
                 // handle_element_down now guards current_ptr_id >= 0 (matches Java handleTouchDown)
-                handle_element_down(btn, f->ptr_id, x, y, now_ms(), result);
+                handle_element_down(btn, f->ptr_id, x, y, _now, result);
                 // Java: !isPassthroughTouch() → add to tracked only if engagement succeeded
                 if (btn->current_ptr_id == f->ptr_id && !btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER) {
                     tb->element_indices[tb->count++] = (int)(btn - g_state.elements);
@@ -65,7 +70,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
             }
         } else {
             // Non-TRACK/HOVER button at point: still process (matching Java handleTouchDown for buttons)
-            handle_element_down(btn, f->ptr_id, x, y, now_ms(), result);
+            handle_element_down(btn, f->ptr_id, x, y, _now, result);
             if (!btn->passthrough_touch) {
                 handled = true;
                 
@@ -93,7 +98,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
         if (nf == 1) {
             // First finger: always schedule delayed press
             g_state.sim_continue_click = true;
-            g_state.sim_click_press_time = now_ms() + CLICK_DELAY_MS;
+            g_state.sim_click_press_time = _now + CLICK_DELAY_MS;
             g_state.sim_click_ptr_id = f->ptr_id;
             g_state.last_touch_x = (int)x;
             g_state.last_touch_y = (int)y;
@@ -105,7 +110,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* r
                     first = &g_state.fingers[i]; break;
                 }
             }
-            if (first && (now_ms() - first->down_time_ms) >= CLICK_DELAY_MS) {
+            if (first && (_now - first->down_time_ms) >= CLICK_DELAY_MS) {
                 g_state.sim_continue_click = true;
             } else {
                 g_state.sim_continue_click = false;

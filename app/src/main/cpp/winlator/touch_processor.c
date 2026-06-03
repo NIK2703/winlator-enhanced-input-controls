@@ -84,11 +84,6 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
         COPY_FINGER_BINDINGS(fb, &g_state.cfg, tp)
     touch_finger_cache_bs(f);
 
-    // Check passthrough
-    g_state.passthrough_active = false;
-    TouchElement* elem = hit_test_element(x, y);
-    if (elem && elem->passthrough_touch) g_state.passthrough_active = true;
-
     switch (g_state.cfg.touch_mode) {
         case TOUCH_MODE_TOUCHPAD: handle_touchpad_down(f, x, y, &result); break;
         case TOUCH_MODE_TOUCHSCREEN: handle_touchscreen_down(f, x, y, time_ms, &result); break;
@@ -156,70 +151,63 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
     // Gesture-level timeouts (long-press, double-tap, single-tap-hold, second-finger double-tap)
     gesture_tick(time_ms, &result);
 
-    // Element long-press timeout (requires finger down)
+    // Single merged element loop: long-press, range hold, range deferred release, double-tap timeout
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
-        if (e->type != ELEM_BUTTON || e->current_ptr_id < 0) continue;
-        if (!e->long_press_arm || e->gesture_long_press_triggered) continue;
-        bool has_lp = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
-        if (!has_lp) continue;
+        int kc;
 
-        if (time_ms - e->down_time_ms >= (uint64_t)g_state.cfg.long_press_delay_ms) {
-            e->gesture_long_press_triggered = true;
-            e->long_press_arm = false;
-            // Java startLongPressTimer: cancelPendingDoubleTap + doubleTapWaiting = false
-            e->double_tap_waiting = false;
-            for (int k = 0; k < e->element_long_press_count; k++)
-                press_binding(&result, &e->element_long_press[k], true);
-            if (e->button_long_press_haptic > 0)
-                add_action(&result, ACT_HAPTIC, e->button_long_press_haptic, 0, 0);
-        }
-    }
-
-    // Range button hold timer — mirrors Java RangeScroller tapRunnable (200ms press on hold)
-    for (int i = 0; i < g_state.element_count; i++) {
-        TouchElement* e = &g_state.elements[i];
-        if (e->type != ELEM_RANGE_BUTTON || e->current_ptr_id < 0) continue;
-        if (e->range_hold_pressed || e->range_scrolling || !e->range_has_binding) continue;
-        if (time_ms - e->down_time_ms >= RANGE_TAP_TIMEOUT_MS) {
-            int kc = range_keycode(e->range_ordinal, e->range_index);
-            if (kc > 0) {
-                add_action(&result, ACT_KEY_PRESS, kc, 0, 0);
-                e->range_hold_pressed = true;
+        // Element long-press timeout (requires finger down, ELEM_BUTTON only)
+        if (e->type == ELEM_BUTTON && e->current_ptr_id >= 0
+            && e->long_press_arm && !e->gesture_long_press_triggered
+            && e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE)
+        {
+            if (time_ms - e->down_time_ms >= (uint64_t)g_state.cfg.long_press_delay_ms) {
+                e->gesture_long_press_triggered = true;
+                e->long_press_arm = false;
+                e->double_tap_waiting = false;
+                for (int k = 0; k < e->element_long_press_count; k++)
+                    press_binding(&result, &e->element_long_press[k], true);
+                if (e->button_long_press_haptic > 0)
+                    add_action(&result, ACT_HAPTIC, e->button_long_press_haptic, 0, 0);
             }
         }
-    }
 
-    // Range button deferred tap release — mirrors Java postDelayed(release, 30ms)
-    for (int i = 0; i < g_state.element_count; i++) {
-        TouchElement* e = &g_state.elements[i];
+        // Element double-tap timeout (works even after finger lift)
+        if (e->type == ELEM_BUTTON && e->double_tap_waiting) {
+            int dt_ms = g_state.cfg.button_double_tap_timeout_ms > 0
+                ? g_state.cfg.button_double_tap_timeout_ms
+                : g_state.cfg.double_tap_timeout_ms;
+            if (time_ms - e->gesture_last_tap_time >= (uint64_t)dt_ms) {
+                e->double_tap_waiting = false;
+                if (e->bindings[0].type != BINDING_NONE) {
+                    press_binding(&result, &e->bindings[0], false);
+                    release_binding(&result, &e->bindings[0]);
+                }
+            }
+        }
+
+        // Range button (both hold timer and deferred release in one pass)
         if (e->type != ELEM_RANGE_BUTTON) continue;
-        if (!e->range_pending_tap_release) continue;
-        if (time_ms >= e->range_tap_release_time) {
-            int kc = range_keycode(e->range_ordinal, e->range_index);
+        kc = range_keycode(e->range_ordinal, e->range_index);
+
+        // Range button hold timer
+        if (e->current_ptr_id >= 0 && !e->range_hold_pressed && !e->range_scrolling && e->range_has_binding) {
+            if (time_ms - e->down_time_ms >= RANGE_TAP_TIMEOUT_MS) {
+                if (kc > 0) {
+                    add_action(&result, ACT_KEY_PRESS, kc, 0, 0);
+                    e->range_hold_pressed = true;
+                }
+            }
+        }
+
+        // Range button deferred tap release
+        if (e->range_pending_tap_release && time_ms >= e->range_tap_release_time) {
             if (kc > 0)
                 add_action(&result, ACT_KEY_RELEASE, kc, 0, 0);
             e->range_pending_tap_release = false;
             e->range_scrolling = false;
             e->range_has_binding = false;
             e->range_hold_pressed = false;
-        }
-    }
-
-    // Element double-tap timeout (works even after finger lift — matches Java Handler postDelayed)
-    for (int i = 0; i < g_state.element_count; i++) {
-        TouchElement* e = &g_state.elements[i];
-        if (e->type != ELEM_BUTTON) continue;
-        if (!e->double_tap_waiting) continue;
-        int dt_ms = g_state.cfg.button_double_tap_timeout_ms > 0 ? g_state.cfg.button_double_tap_timeout_ms : g_state.cfg.double_tap_timeout_ms;
-        if (time_ms - e->gesture_last_tap_time >= (uint64_t)dt_ms) {
-            e->double_tap_waiting = false;
-            
-            // Java ControlElement.onDoubleTapTimeout: fire primary as single tap
-            if (e->bindings[0].type != BINDING_NONE) {
-                press_binding(&result, &e->bindings[0], false);
-                release_binding(&result, &e->bindings[0]);
-            }
         }
     }
 

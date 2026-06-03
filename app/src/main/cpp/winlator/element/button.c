@@ -104,8 +104,6 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
             e->current_ptr_id = -1;
             return;
         }
-        e->engaged = false;
-        e->current_ptr_id = -1;
     }
 
     if (e->gesture_long_press_triggered) {

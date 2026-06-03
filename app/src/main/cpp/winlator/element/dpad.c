@@ -35,8 +35,7 @@ static void dpad_set_petals(TouchElement* e, float nx, float ny, TouchActionResu
     }
 }
 
-void element_dpad_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
-    (void)ptr_id; (void)time_ms;
+static void dpad_update(TouchElement* e, float x, float y, TouchActionResult* result) {
     float radius = g_state.snapping_size * 7.0f * e->scale;
     float dx = x - e->x;
     float dy = y - e->y;
@@ -45,14 +44,14 @@ void element_dpad_down(TouchElement* e, int ptr_id, float x, float y, uint64_t t
     dpad_set_petals(e, nx, ny, result);
 }
 
+void element_dpad_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    (void)ptr_id; (void)time_ms;
+    dpad_update(e, x, y, result);
+}
+
 void element_dpad_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     (void)time_ms;
-    float radius = g_state.snapping_size * 7.0f * e->scale;
-    float dx = x - e->x;
-    float dy = y - e->y;
-    float nx, ny;
-    dpad_normalize(dx, dy, radius, &nx, &ny);
-    dpad_set_petals(e, nx, ny, result);
+    dpad_update(e, x, y, result);
 }
 
 void element_dpad_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {

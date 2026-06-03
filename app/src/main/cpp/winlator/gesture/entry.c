@@ -62,8 +62,8 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result) {
 
         if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN
             && !g_state.gesture_is_action_held) {
-            if (has_active_single_tap(&f->bindings) && !has_active_single_tap_drag(&f->bindings)) {
-                bool has_dt = has_active_double_tap(&f->bindings) || has_active_double_tap_drag(&f->bindings);
+            if (f->cached_has_active_single_tap && !f->cached_has_active_single_tap_drag) {
+                bool has_dt = f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag;
                 if (has_dt) {
                     
                     g_state.gesture_deferred_tap_count = 0;
@@ -166,8 +166,8 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result) {
         if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD && f->second_double_tap_waiting) {
             f->second_double_tap_waiting = false;
             f->second_tap_fallback_count = 0;
-            if (has_active_double_tap(&f->bindings)) {
-                if (has_active_double_tap_drag(&f->bindings)) {
+            if (f->cached_has_active_double_tap) {
+                if (f->cached_has_active_double_tap_drag) {
                     f->pending_second_double_count = 0;
                     for (int _i = 0; _i < f->bindings.double_tap_count && _i < 8; _i++)
                         f->pending_second_double[_i] = f->bindings.double_tap[_i];
@@ -188,8 +188,8 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result) {
         f->single_tap_hold_timer = 0;
 
         if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN && !g_state.gesture_is_action_held) {
-            if (has_active_single_tap(&f->bindings) && !has_active_single_tap_drag(&f->bindings)) {
-                bool has_dt = has_active_double_tap(&f->bindings) || has_active_double_tap_drag(&f->bindings);
+            if (f->cached_has_active_single_tap && !f->cached_has_active_single_tap_drag) {
+                bool has_dt = f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag;
                 if (has_dt) {
                     // Second finger: use per-finger state, don't overwrite first-finger
                     // globals g_state.gesture_deferred_tap[] / g_state.gesture_pending_double[]
@@ -211,7 +211,7 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result) {
             f->second_double_tap_waiting = false;
             f->second_tap_fallback_count = 0;
             f->pending_second_double_count = 0;
-        } else if (f->second_tap_fallback_count > 0 && has_active_double_tap(&f->bindings)) {
+        } else if (f->second_tap_fallback_count > 0 && f->cached_has_active_double_tap) {
             f->second_double_tap_waiting = true;
             f->second_tap_fallback_time = now_ms();
         } else if (f->second_tap_fallback_count > 0) {
@@ -233,7 +233,7 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result) {
         g_state.gesture_second_ptr_id = -1;
         g_state.gesture_post_double_tap_drag = false;
 
-        if (f->state == GESTURE_STATE_LONG_PRESSING && has_active_long_press(&f->bindings) && !can_hold_long_press(&f->bindings)) {
+        if (f->state == GESTURE_STATE_LONG_PRESSING && f->cached_has_active_long_press && !f->cached_can_hold_long_press) {
             execute_actions(result, f->bindings.long_press, f->bindings.long_press_count);
         }
 
@@ -264,11 +264,11 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result) {
             handle_tap_up(f, result); release_held_actions(result); g_state.gesture_main_ptr_id = -1; f->active = false;
             break;
         }
-        case GESTURE_STATE_LONG_PRESSING: release_held_actions(result); if (has_active_long_press(&f->bindings) && !can_hold_long_press(&f->bindings)) execute_actions(result, f->bindings.long_press, f->bindings.long_press_count); g_state.gesture_post_double_tap_drag = false; g_state.gesture_second_active = false; g_state.gesture_deferred_tap_count = 0; g_state.gesture_pending_double_count = 0; g_state.gesture_pending_deferred_double_count = 0; g_state.gesture_main_ptr_id = -1; f->active = false; break;
+        case GESTURE_STATE_LONG_PRESSING: release_held_actions(result); if (f->cached_has_active_long_press && !f->cached_can_hold_long_press) execute_actions(result, f->bindings.long_press, f->bindings.long_press_count); g_state.gesture_post_double_tap_drag = false; g_state.gesture_second_active = false; g_state.gesture_deferred_tap_count = 0; g_state.gesture_pending_double_count = 0; g_state.gesture_pending_deferred_double_count = 0; g_state.gesture_main_ptr_id = -1; f->active = false; break;
         case GESTURE_STATE_DRAGGING: release_held_actions(result); g_state.gesture_post_double_tap_drag = false; g_state.gesture_second_active = false; g_state.gesture_deferred_tap_count = 0; g_state.gesture_pending_double_count = 0; g_state.gesture_pending_deferred_double_count = 0; g_state.gesture_main_ptr_id = -1; f->active = false; break;
         case GESTURE_STATE_DOUBLE_TAP_WAITING: {
             if (!g_state.gesture_is_action_held) {
-                if (!has_active_single_tap_drag(&f->bindings)) {
+                if (!f->cached_has_active_single_tap_drag) {
                     hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
                     release_held_actions(result);
                 } else {
