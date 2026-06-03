@@ -187,19 +187,25 @@ void element_trackpad_down(TouchElement* e, int ptr_id, float x, float y, uint64
 void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
 void element_trackpad_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
 
-// Gesture
-void touchpad_finger_down(TouchFinger* f, TouchActionResult* result);
-void touchpad_handle_tap_up(TouchFinger* f, TouchActionResult* result);
-void touchpad_finger_up(TouchFinger* f, TouchActionResult* result);
+// Gesture — base (maps to GestureHandler.java)
 void on_drag_start(TouchFinger* f);
+bool gesture_is_within_tap_distance(float x, float y);
+void gesture_cancel_double_tap_wait(TouchActionResult* result);
 void check_start_drag(TouchFinger* f, float dx, float dy, uint64_t time_ms, TouchActionResult* result);
+void touchpad_handle_tap_up(TouchFinger* f, TouchActionResult* result);
 
-// Modes
-void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* result);
-void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
+// Gesture — entry points (touch_processor_gesture.c)
+void touchpad_finger_down(TouchFinger* f, TouchActionResult* result);
+void touchpad_finger_up(TouchFinger* f, TouchActionResult* result);
+
+// Touchscreen mode handler (maps to TouchscreenGestureHandler.java)
 void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
 void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
 void handle_touchscreen_up(TouchFinger* f, float x, float y, TouchActionResult* result);
+
+// Touchpad mode handler (maps to TouchpadGestureHandler.java)
+void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* result);
+void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
 
 #endif // TOUCH_PROCESSOR_INTERNAL_H

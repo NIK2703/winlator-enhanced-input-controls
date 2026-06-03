@@ -46,7 +46,9 @@ add_library(touch_processor SHARED
         winlator/touch_processor_stick.c
         winlator/touch_processor_trackpad.c
         winlator/touch_processor_gesture.c
-        winlator/touch_processor_modes.c
+        winlator/touch_processor_gesture_base.c
+        winlator/touch_processor_touchscreen.c
+        winlator/touch_processor_touchpad.c
         winlator/touch_processor_jni.cpp
 )
 
