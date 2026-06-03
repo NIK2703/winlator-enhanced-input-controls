@@ -160,7 +160,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
                      && (!g_state.long_tap_mode
                          || (!f->cached_has_active_single_tap_drag && (f->travel_x > 0 || f->travel_y > 0))))
             ) {
-                if (time_ms - f->down_time_ms >= (uint64_t)g_state.cfg.long_press_timeout_ms) {
+                if (time_ms - f->down_time_ms >= g_state.cfg.long_press_timeout_ms) {
                     g_state.gesture_handler_active = false;
                     f->second_tap_fallback_count = 0;
                     memset(f->second_tap_fallback, 0, sizeof(f->second_tap_fallback));
@@ -176,7 +176,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
 
             // Single-tap hold timer — mirrors GestureHandler.singleTapHoldRunnable
             if (f->single_tap_hold_delay_ms > 0
-                && time_ms - f->single_tap_hold_timer >= (uint64_t)f->single_tap_hold_delay_ms) {
+                && time_ms - f->single_tap_hold_timer >= f->single_tap_hold_delay_ms) {
                 f->single_tap_hold_delay_ms = 0;
                 if (!g_state.gesture_is_action_held) {
                     hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
@@ -186,7 +186,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
 
         // Second-finger double-tap timeout — mirrors TouchpadGestureHandler.onSecondFingerDoubleTapTimer()
         if (f->second_double_tap_waiting
-            && time_ms - f->second_tap_fallback_time >= (uint64_t)g_state.cfg.double_tap_timeout_ms) {
+            && time_ms - f->second_tap_fallback_time >= g_state.cfg.double_tap_timeout_ms) {
             f->second_double_tap_waiting = false;
             if (f->second_tap_fallback_count > 0) {
                 execute_actions(result, f->second_tap_fallback, f->second_tap_fallback_count);
@@ -198,7 +198,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
 
     // Gesture double-tap timeout (global, not per-finger) — mirrors GestureHandler.onDoubleTapTimer()
     if (g_state.gesture_double_tap_waiting &&
-        time_ms - g_state.gesture_double_tap_start_time >= (uint64_t)g_state.cfg.double_tap_timeout_ms) {
+        time_ms - g_state.gesture_double_tap_start_time >= g_state.cfg.double_tap_timeout_ms) {
         g_state.gesture_double_tap_waiting = false;
         if (g_state.gesture_deferred_tap_count > 0) {
             execute_actions(result, g_state.gesture_deferred_tap, g_state.gesture_deferred_tap_count);

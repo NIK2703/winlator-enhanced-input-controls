@@ -35,13 +35,13 @@ void release_held_actions(TouchActionResult* result) {
     // Pass 1: release non-keyboard bindings first (forward order)
     for (int i = 0; i < g_state.gesture_held_count; i++) {
         const TouchBinding* b = &g_state.gesture_held_actions[i];
-        if (!(b->type >= BINDING_KEYBOARD_FIRST && b->type <= BINDING_KEYBOARD_LAST))
+        if (!is_keyboard_binding(b))
             release_binding(result, b);
     }
     // Pass 2: release keyboard bindings in forward order (mirrors Java releaseHeldAction)
     for (int i = 0; i < g_state.gesture_held_count; i++) {
         const TouchBinding* b = &g_state.gesture_held_actions[i];
-        if (b->type >= BINDING_KEYBOARD_FIRST && b->type <= BINDING_KEYBOARD_LAST)
+        if (is_keyboard_binding(b))
             release_binding(result, b);
     }
     g_state.gesture_held_count = 0;
@@ -51,7 +51,7 @@ void release_held_actions(TouchActionResult* result) {
 bool is_modifier_binding(const TouchBinding* b) {
     // Java Binding.isModifier(): only MOD_CTRL(→KEY_CTRL_L=0x25), MOD_SHIFT(→KEY_SHIFT_L=0x32), MOD_ALT(→KEY_ALT_L=0x40)
     // Right-hand variants (KEY_CTRL_R=0x69, KEY_SHIFT_R=0x3E, KEY_ALT_R=0x6C) are concrete keys, NOT modifiers
-    if (b->type >= BINDING_KEYBOARD_FIRST && b->type <= BINDING_KEYBOARD_LAST) {
+    if (is_keyboard_binding(b)) {
         int kc = b->keycode;
         return kc == 0x25 || kc == 0x32 || kc == 0x40;
     }
@@ -76,7 +76,7 @@ void hold_actions(TouchActionResult* result, const TouchBinding* actions, int co
         if (b->type == BINDING_NONE) continue;
         if (is_modifier_binding(b)) {
             add_action(result, ACT_KEY_PRESS, b->keycode, 0, 0);
-            if (g_state.gesture_held_count < 16)
+            if (g_state.gesture_held_count < (int)(sizeof(g_state.gesture_held_actions)/sizeof(g_state.gesture_held_actions[0])))
                 g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
         }
     }
@@ -87,18 +87,18 @@ void hold_actions(TouchActionResult* result, const TouchBinding* actions, int co
         if (is_modifier_binding(b)) continue;
         if (b->type == BINDING_MOUSE_SCROLL_UP || b->type == BINDING_MOUSE_SCROLL_DOWN) continue;
         if (b->type >= BINDING_MOUSE_MOVE_LEFT && b->type <= BINDING_MOUSE_MOVE_DOWN) continue;
-        if (b->type >= BINDING_KEYBOARD_FIRST && b->type <= BINDING_KEYBOARD_LAST) {
+        if (is_keyboard_binding(b)) {
             add_action(result, ACT_KEY_PRESS, b->keycode, 0, 0);
-            if (g_state.gesture_held_count < 16)
+            if (g_state.gesture_held_count < (int)(sizeof(g_state.gesture_held_actions)/sizeof(g_state.gesture_held_actions[0])))
                 g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
         } else if (b->type >= BINDING_MOUSE_LEFT && b->type <= BINDING_MOUSE_BUTTON5) {
             add_action(result, ACT_POINTER_BUTTON_PRESS, pointer_button_idx(b), 0, 0);
-            if (g_state.gesture_held_count < 16)
+            if (g_state.gesture_held_count < (int)(sizeof(g_state.gesture_held_actions)/sizeof(g_state.gesture_held_actions[0])))
                 g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
-        } else if (b->type >= BINDING_GAMEPAD_BASE && b->type < BINDING_GAMEPAD_BASE + 24) {
+        } else if (is_gamepad_binding(b)) {
             int btn = b->type - BINDING_GAMEPAD_BASE;
             add_action(result, ACT_GAMEPAD_STATE, btn, 1, 0);
-            if (g_state.gesture_held_count < 16)
+            if (g_state.gesture_held_count < (int)(sizeof(g_state.gesture_held_actions)/sizeof(g_state.gesture_held_actions[0])))
                 g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
         }
         // Java: bindingDelay sleep between items
@@ -133,7 +133,7 @@ void execute_actions(TouchActionResult* result, const TouchBinding* actions, int
         if (b->type == BINDING_MOUSE_SCROLL_UP || b->type == BINDING_MOUSE_SCROLL_DOWN) continue;
         if (b->type >= BINDING_MOUSE_MOVE_LEFT && b->type <= BINDING_MOUSE_MOVE_DOWN) continue;
 
-        if (b->type >= BINDING_GAMEPAD_BASE && b->type < BINDING_GAMEPAD_BASE + 24) {
+        if (is_gamepad_binding(b)) {
             int btn_idx = b->type - BINDING_GAMEPAD_BASE;
             add_action(result, ACT_GAMEPAD_STATE, btn_idx, 1, 0);
             if (binding_delay > 0) {
@@ -141,7 +141,7 @@ void execute_actions(TouchActionResult* result, const TouchBinding* actions, int
                 nanosleep(&ts, NULL);
             }
             add_action(result, ACT_GAMEPAD_STATE, btn_idx, 0, 0);
-        } else if (b->type >= BINDING_KEYBOARD_FIRST && b->type <= BINDING_KEYBOARD_LAST) {
+        } else if (is_keyboard_binding(b)) {
             add_action(result, ACT_KEY_PRESS, b->keycode, 0, 0);
             if (binding_delay > 0) {
                 struct timespec ts = {0, binding_delay * 1000000};
@@ -187,9 +187,9 @@ static int pointer_button_idx(const TouchBinding* b) {
 void release_binding(TouchActionResult* result, const TouchBinding* b) {
     if (b->type == BINDING_NONE) return;
     
-    if (b->type >= BINDING_GAMEPAD_BASE && b->type < BINDING_GAMEPAD_BASE + 24) {
+    if (is_gamepad_binding(b)) {
         add_action(result, ACT_GAMEPAD_STATE, b->type - BINDING_GAMEPAD_BASE, 0, 0);
-    } else if (b->type >= BINDING_KEYBOARD_FIRST && b->type <= BINDING_KEYBOARD_LAST) {
+    } else if (is_keyboard_binding(b)) {
         add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0);
     } else if (b->type >= BINDING_MOUSE_LEFT && b->type <= BINDING_MOUSE_BUTTON5) {
         add_action(result, ACT_POINTER_BUTTON_RELEASE, pointer_button_idx(b), 0, 0);
@@ -202,11 +202,11 @@ void release_binding(TouchActionResult* result, const TouchBinding* b) {
 void press_binding(TouchActionResult* result, const TouchBinding* b, bool hold) {
     if (b->type == BINDING_NONE) return;
     
-    if (b->type >= BINDING_GAMEPAD_BASE && b->type < BINDING_GAMEPAD_BASE + 24) {
+    if (is_gamepad_binding(b)) {
         int btn_idx = b->type - BINDING_GAMEPAD_BASE;
         add_action(result, ACT_GAMEPAD_STATE, btn_idx, 1, 0);
         if (!hold) add_action(result, ACT_GAMEPAD_STATE, btn_idx, 0, 0);
-    } else if (b->type >= BINDING_KEYBOARD_FIRST && b->type <= BINDING_KEYBOARD_LAST) {
+    } else if (is_keyboard_binding(b)) {
         add_action(result, ACT_KEY_PRESS, b->keycode, 0, 0);
         if (!hold) add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0);
     } else if (b->type >= BINDING_MOUSE_LEFT && b->type <= BINDING_MOUSE_BUTTON5) {

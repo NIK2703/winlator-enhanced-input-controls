@@ -205,6 +205,14 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result) {
         }
     }
 }
+static inline void cleanup_main_finger(void) {
+    g_state.gesture_post_double_tap_drag = false;
+    g_state.gesture_second_active = false;
+    g_state.gesture_deferred_tap_count = 0;
+    g_state.gesture_pending_double_count = 0;
+    g_state.gesture_pending_deferred_double_count = 0;
+    g_state.gesture_main_ptr_id = -1;
+}
 void touchpad_finger_up(TouchFinger* f, TouchActionResult* result) {
     if (f->is_second_finger) {
         if (g_state.gesture_is_action_held) {
@@ -254,18 +262,28 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result) {
                 && !(f->travel_x < MAX_TAP_TRAVEL && f->travel_y < MAX_TAP_TRAVEL && (now_ms() - f->down_time_ms) < TAP_MAX_TIME_MS)) {
                 release_held_actions(result);
                 g_state.gesture_double_tap_waiting = false;
-                g_state.gesture_deferred_tap_count = 0;
-                g_state.gesture_pending_double_count = 0;
-                g_state.gesture_pending_deferred_double_count = 0;
-                g_state.gesture_main_ptr_id = -1;
+                cleanup_main_finger();
                 f->active = false;
                 break;
             }
-            handle_tap_up(f, result); release_held_actions(result); g_state.gesture_main_ptr_id = -1; f->active = false;
+            handle_tap_up(f, result);
+            release_held_actions(result);
+            g_state.gesture_main_ptr_id = -1;
+            f->active = false;
             break;
         }
-        case GESTURE_STATE_LONG_PRESSING: release_held_actions(result); if (f->cached_has_active_long_press && !f->cached_can_hold_long_press) execute_actions(result, f->bindings.long_press, f->bindings.long_press_count); g_state.gesture_post_double_tap_drag = false; g_state.gesture_second_active = false; g_state.gesture_deferred_tap_count = 0; g_state.gesture_pending_double_count = 0; g_state.gesture_pending_deferred_double_count = 0; g_state.gesture_main_ptr_id = -1; f->active = false; break;
-        case GESTURE_STATE_DRAGGING: release_held_actions(result); g_state.gesture_post_double_tap_drag = false; g_state.gesture_second_active = false; g_state.gesture_deferred_tap_count = 0; g_state.gesture_pending_double_count = 0; g_state.gesture_pending_deferred_double_count = 0; g_state.gesture_main_ptr_id = -1; f->active = false; break;
+        case GESTURE_STATE_LONG_PRESSING:
+            release_held_actions(result);
+            if (f->cached_has_active_long_press && !f->cached_can_hold_long_press)
+                execute_actions(result, f->bindings.long_press, f->bindings.long_press_count);
+            cleanup_main_finger();
+            f->active = false;
+            break;
+        case GESTURE_STATE_DRAGGING:
+            release_held_actions(result);
+            cleanup_main_finger();
+            f->active = false;
+            break;
         case GESTURE_STATE_DOUBLE_TAP_WAITING: {
             if (!g_state.gesture_is_action_held) {
                 if (!f->cached_has_active_single_tap_drag) {
@@ -276,12 +294,7 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result) {
                 }
             }
             g_state.gesture_double_tap_waiting = false;
-            g_state.gesture_deferred_tap_count = 0;
-            g_state.gesture_pending_double_count = 0;
-            g_state.gesture_pending_deferred_double_count = 0;
-            g_state.gesture_post_double_tap_drag = false;
-            g_state.gesture_second_active = false;
-            g_state.gesture_main_ptr_id = -1;
+            cleanup_main_finger();
             f->active = false;
             break;
         }

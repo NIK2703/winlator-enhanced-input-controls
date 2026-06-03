@@ -165,6 +165,14 @@ static inline bool has_active_double_tap_drag(const FingerBindings* fb) { return
 static inline bool can_hold_long_press(const FingerBindings* fb) { return gesture_build_binding_set(fb).can_hold_long_press; }
 static inline bool has_long_press_timer(const FingerBindings* fb) { return gesture_build_binding_set(fb).has_long_press_timer; }
 
+#define BINDING_GAMEPAD_COUNT 24
+static inline bool is_keyboard_binding(const TouchBinding* b) {
+    return b->type >= BINDING_KEYBOARD_FIRST && b->type <= BINDING_KEYBOARD_LAST;
+}
+static inline bool is_gamepad_binding(const TouchBinding* b) {
+    return b->type >= BINDING_GAMEPAD_BASE && b->type < BINDING_GAMEPAD_BASE + BINDING_GAMEPAD_COUNT;
+}
+
 // --- Internal function declarations ---
 
 // Actions
@@ -183,6 +191,7 @@ void touch_finger_cache_bs(TouchFinger* f);
 int detect_swipe_dir(float dx, float dy, float threshold);
 bool is_mouse_move_binding(const TouchBinding* b);
 float cubic_bezier_interpolate(float x, float cpx1, float cpy1);
+void release_element_bindings(TouchElement* e, TouchActionResult* result);
 bool finger_has_engaged_element(int ptr_id);
 
 // Element dispatchers
@@ -226,7 +235,7 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result);
 // Touchscreen mode handler (maps to TouchscreenGestureHandler.java)
 void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
 void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void handle_touchscreen_up(TouchFinger* f, float x, float y, TouchActionResult* result);
+void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
 
 // Touchpad mode handler (maps to TouchpadGestureHandler.java)
 void handle_touchpad_down(TouchFinger* f, float x, float y, TouchActionResult* result);

@@ -174,17 +174,18 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
                     }
 
                     // Java HOVER mode: hover transitions — prev.deactivate(), curr.activate()
+                    // Release prev if moving to different target (button or empty)
                     if (first->activation_mode == ACTIVATION_HOVER) {
                         int hovered = g_state.hovered_element_per_ptr[pi];
                         TouchElement* prev = (hovered >= 0 && hovered < g_state.element_count) ? &g_state.elements[hovered] : NULL;
                         TouchElement* curr = hit_test_element(x, y);
+                        if (prev && prev->current_ptr_id == f->ptr_id && (!curr || curr != prev))
+                            handle_element_up(prev, x, y, time_ms, result);
                         if (curr && curr->type == ELEM_BUTTON && curr != prev) {
-                            if (prev && prev->current_ptr_id == f->ptr_id)
-                                handle_element_up(prev, x, y, time_ms, result);
+                            if (curr->current_ptr_id == -1)
+                                handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
                             g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
                         } else if (!curr || curr->type != ELEM_BUTTON) {
-                            if (prev && prev->current_ptr_id == f->ptr_id)
-                                handle_element_up(prev, x, y, time_ms, result);
                             g_state.hovered_element_per_ptr[pi] = -1;
                         }
                     }
@@ -261,7 +262,7 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
             // Java TouchpadView.handleFingerMove: suppress click if finger moved during delay
             if (f->travel_x > MAX_TAP_TRAVEL || f->travel_y > MAX_TAP_TRAVEL)
                 g_state.sim_continue_click = false;
-            uint64_t elapsed = now_ms() - f->down_time_ms;
+            uint64_t elapsed = time_ms - f->down_time_ms;
             if (elapsed > CLICK_DELAY_MS)
                 add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
         } else {
@@ -319,31 +320,7 @@ void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touc
                     if (e->current_ptr_id == f->ptr_id) {
                         // Java deactivate(): cancelPendingLongPress + releaseHeldBindings
                         // Release primary binding (pressed by activate/handle_element_down)
-                        if (e->bindings[0].type != BINDING_NONE)
-                            release_binding(result, &e->bindings[0]);
-                        if (e->gesture_swipe_triggered) {
-                            for (int k = e->element_gesture_count - 1; k >= 0; k--)
-                                if (e->element_gesture[k].type != BINDING_NONE)
-                                    release_binding(result, &e->element_gesture[k]);
-                        }
-                        if (e->gesture_long_press_triggered) {
-                            for (int k = e->element_long_press_count - 1; k >= 0; k--)
-                                if (e->element_long_press[k].type != BINDING_NONE)
-                                    release_binding(result, &e->element_long_press[k]);
-                        }
-                        if (e->gesture_double_tap_triggered) {
-                            for (int k = e->element_double_tap_count - 1; k >= 0; k--)
-                                if (e->element_double_tap[k].type != BINDING_NONE)
-                                    release_binding(result, &e->element_double_tap[k]);
-                        }
-                        // Java cancelPendingLongPress: clear all gesture state
-                        e->long_press_arm = false;
-                        e->gesture_long_press_triggered = false;
-                        e->gesture_swipe_triggered = false;
-                        e->gesture_double_tap_triggered = false;
-                        e->double_tap_waiting = false;
-                        e->current_ptr_id = -1;
-                        e->engaged = false;
+                        release_element_bindings(e, result);
                     }
                 }
             }
@@ -381,13 +358,13 @@ void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touc
     if (!g_state.gesture_handler_active) {
         // Java TouchpadView.handleFingerUp: finger.isTap() checks travel AND time (MAX_TAP_MILLISECONDS=200)
         bool is_tap = f->travel_x < MAX_TAP_TRAVEL && f->travel_y < MAX_TAP_TRAVEL
-            && (now_ms() - f->down_time_ms) < TAP_MAX_TIME_MS;
+            && (time_ms - f->down_time_ms) < TAP_MAX_TIME_MS;
         if (is_tap) {
             int nf = active_finger_count();
             if (nf == 1) {
                 if (g_state.sim_touch_screen) {
                     // Java: delayed release 50ms after finger-up (clickDelay Runnable)
-                    g_state.sim_click_release_time = now_ms() + CLICK_DELAY_MS;
+                    g_state.sim_click_release_time = time_ms + CLICK_DELAY_MS;
                 } else {
                     add_action(result, ACT_POINTER_BUTTON_PRESS, 0, 0, 0);
                 }
@@ -409,12 +386,12 @@ void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touc
 
     // Java TouchpadView.releasePointerButtonLeft/Right uses 30ms postDelayed
     if (g_state.finger_pointer_left == f->ptr_id) {
-        g_state.pending_left_release_time = now_ms() + 30;
+        g_state.pending_left_release_time = time_ms + 30;
         g_state.pending_left_release_ptr_id = f->ptr_id;
         g_state.finger_pointer_left = -1;
     }
     if (g_state.finger_pointer_right == f->ptr_id) {
-        g_state.pending_right_release_time = now_ms() + 30;
+        g_state.pending_right_release_time = time_ms + 30;
         g_state.pending_right_release_ptr_id = f->ptr_id;
         g_state.finger_pointer_right = -1;
     }

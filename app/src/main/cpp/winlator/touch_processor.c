@@ -14,14 +14,9 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     g_state.long_tap_mode = (config->second_finger_mode == SECOND_FINGER_LONG_TAP);
     g_state.pointer_left_enabled = true;
     g_state.pointer_right_enabled = true;
-    g_state.pending_left_release_time = 0;
     g_state.pending_left_release_ptr_id = -1;
-    g_state.pending_right_release_time = 0;
     g_state.pending_right_release_ptr_id = -1;
-    g_state.sim_click_press_time = 0;
-    g_state.sim_continue_click = false;
     g_state.sim_click_ptr_id = -1;
-    g_state.sim_click_release_time = 0;
     for (int i = 0; i < MAX_FINGERS; i++) g_state.hovered_element_per_ptr[i] = -1;
     if (g_state.cfg.cursor_acceleration_threshold <= 0) g_state.cfg.cursor_acceleration_threshold = 6;
     if (g_state.cfg.cursor_acceleration_factor <= 0.0f) g_state.cfg.cursor_acceleration_factor = 1.25f;
@@ -116,7 +111,7 @@ TouchActionResult touch_processor_on_finger_up(int ptr_id, float x, float y, uin
     f->x = x; f->y = y;
     switch (g_state.cfg.touch_mode) {
         case TOUCH_MODE_TOUCHPAD: handle_touchpad_up(f, x, y, time_ms, &result); break;
-        case TOUCH_MODE_TOUCHSCREEN: handle_touchscreen_up(f, x, y, &result); break;
+        case TOUCH_MODE_TOUCHSCREEN: handle_touchscreen_up(f, x, y, time_ms, &result); break;
         default: break;
     }
     f->active = false;
@@ -154,14 +149,13 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
     // Single merged element loop: long-press, range hold, range deferred release, double-tap timeout
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
-        int kc;
 
         // Element long-press timeout (requires finger down, ELEM_BUTTON only)
         if (e->type == ELEM_BUTTON && e->current_ptr_id >= 0
             && e->long_press_arm && !e->gesture_long_press_triggered
             && e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE)
         {
-            if (time_ms - e->down_time_ms >= (uint64_t)g_state.cfg.long_press_delay_ms) {
+            if (time_ms - e->down_time_ms >= g_state.cfg.long_press_delay_ms) {
                 e->gesture_long_press_triggered = true;
                 e->long_press_arm = false;
                 e->double_tap_waiting = false;
@@ -177,7 +171,7 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
             int dt_ms = g_state.cfg.button_double_tap_timeout_ms > 0
                 ? g_state.cfg.button_double_tap_timeout_ms
                 : g_state.cfg.double_tap_timeout_ms;
-            if (time_ms - e->gesture_last_tap_time >= (uint64_t)dt_ms) {
+            if (time_ms - e->gesture_last_tap_time >= dt_ms) {
                 e->double_tap_waiting = false;
                 if (e->bindings[0].type != BINDING_NONE) {
                     press_binding(&result, &e->bindings[0], false);
@@ -188,7 +182,7 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
 
         // Range button (both hold timer and deferred release in one pass)
         if (e->type != ELEM_RANGE_BUTTON) continue;
-        kc = range_keycode(e->range_ordinal, e->range_index);
+        int kc = range_keycode(e->range_ordinal, e->range_index);
 
         // Range button hold timer
         if (e->current_ptr_id >= 0 && !e->range_hold_pressed && !e->range_scrolling && e->range_has_binding) {

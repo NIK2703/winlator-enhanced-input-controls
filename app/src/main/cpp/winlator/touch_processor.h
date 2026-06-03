@@ -9,7 +9,6 @@ extern "C" {
 #endif
 
 #define MAX_FINGERS 8
-#define MAX_BINDINGS_PER_ACTION 12
 #define MAX_ELEMENTS 128
 #define MAX_PETALS 4
 #define STICK_DEAD_ZONE 0.15f

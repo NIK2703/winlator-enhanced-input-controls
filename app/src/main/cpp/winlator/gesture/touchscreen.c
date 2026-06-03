@@ -2,29 +2,60 @@
 
 void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     // Java TouchscreenGestureHandler.handlePointerDown: InputControlsView.findAt(x, y) iterates REVERSE
-    TouchElement* elem = NULL;
     g_state.passthrough_active = false;
     for (int i = g_state.element_count - 1; i >= 0; i--) {
         if (point_in_element(x, y, &g_state.elements[i])) {
-            elem = &g_state.elements[i];
-            if (elem->passthrough_touch) g_state.passthrough_active = true;
+            if (g_state.elements[i].passthrough_touch) g_state.passthrough_active = true;
             break;
         }
     }
-    if (elem) {
-        
-        handle_element_down(elem, f->ptr_id, x, y, time_ms, result);
-        if (elem->current_ptr_id == f->ptr_id && !elem->passthrough_touch) {
-            
-            // NOTE: gesture_main_ptr_id is NOT set here — Java's gesture handler
-            // only sets mainPointerId for events that fall through to it, NOT for
-            // element-consumed touches. This ensures a second finger at an empty
-            // spot enters the main gesture path, not the second-finger path.
-            return;
+
+    // LOCK mode: dispatch to ALL lock elements at point (matches Java handleDownByMode)
+    {
+        bool found_lock = false;
+        for (int i = 0; i < g_state.element_count; i++) {
+            if (point_in_element(x, y, &g_state.elements[i]) && g_state.elements[i].activation_mode == ACTIVATION_LOCK) {
+                handle_element_down(&g_state.elements[i], f->ptr_id, x, y, time_ms, result);
+                found_lock = true;
+            }
         }
-    } else {
-        
+        if (found_lock) return;
     }
+
+    // TRACK/HOVER: process non-BUTTON elements first (matches Java handleDownByMode)
+    bool handled = false;
+    for (int i = 0; i < g_state.element_count; i++) {
+        TouchElement* e = &g_state.elements[i];
+        if (e->type != ELEM_BUTTON && point_in_element(x, y, e)) {
+            handle_element_down(e, f->ptr_id, x, y, time_ms, result);
+            if (e->current_ptr_id == f->ptr_id) handled = true;
+        }
+    }
+
+    // TRACK/HOVER: then process button at point
+    TouchElement* btn = hit_test_element(x, y);
+    if (btn && btn->type == ELEM_BUTTON) {
+        if (btn->activation_mode == ACTIVATION_TRACK || btn->activation_mode == ACTIVATION_HOVER) {
+            TrackedButtons* tb = &g_state.tracked[f->ptr_id % MAX_FINGERS];
+            bool already = false;
+            for (int j = 0; j < tb->count; j++) {
+                if (tb->element_indices[j] == (int)(btn - g_state.elements)) { already = true; break; }
+            }
+            if (!already) {
+                handle_element_down(btn, f->ptr_id, x, y, time_ms, result);
+                if (btn->current_ptr_id == f->ptr_id && !btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER)
+                    tb->element_indices[tb->count++] = (int)(btn - g_state.elements);
+            }
+            if (btn->activation_mode == ACTIVATION_HOVER)
+                g_state.hovered_element_per_ptr[f->ptr_id % MAX_FINGERS] = (int)(btn - g_state.elements);
+            if (!btn->passthrough_touch) handled = true;
+        } else {
+            handle_element_down(btn, f->ptr_id, x, y, time_ms, result);
+            if (!btn->passthrough_touch) handled = true;
+        }
+    }
+
+    if (handled) return;
 
     // Java TouchscreenGestureHandler.handlePointerDown resets at the very top:
     //   postDoubleTapDrag = false;
@@ -231,10 +262,70 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
             had_element_move = true;
         }
     }
+
+    // TRACK/HOVER: tracked button processing runs every move (matches Java handleMoveByMode)
+    {
+        int pi = f->ptr_id % MAX_FINGERS;
+        TrackedButtons* tb = &g_state.tracked[pi];
+        if (tb->count > 0) {
+            int first_idx = tb->element_indices[0];
+            if (first_idx >= 0 && first_idx < g_state.element_count) {
+                TouchElement* first = &g_state.elements[first_idx];
+                if (first->type == ELEM_BUTTON) {
+                    TouchElement* new_btn = hit_test_element(x, y);
+                    if (new_btn && new_btn->type == ELEM_BUTTON) {
+                        bool already = false;
+                        for (int j = 0; j < tb->count; j++) {
+                            if (tb->element_indices[j] == (int)(new_btn - g_state.elements)) { already = true; break; }
+                        }
+                        if (!already) {
+                            if (new_btn->current_ptr_id == -1)
+                                handle_element_down(new_btn, f->ptr_id, x, y, time_ms, result);
+                            if (new_btn->current_ptr_id == f->ptr_id && !new_btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER) {
+                                if (tb->count == 1) first->long_press_arm = false;
+                                tb->element_indices[tb->count++] = (int)(new_btn - g_state.elements);
+                            }
+                        }
+                    }
+
+                    // HOVER mode: hover transitions — prev.deactivate(), curr.activate()
+                    if (first->activation_mode == ACTIVATION_HOVER) {
+                        int hovered = g_state.hovered_element_per_ptr[pi];
+                        TouchElement* prev = (hovered >= 0 && hovered < g_state.element_count) ? &g_state.elements[hovered] : NULL;
+                        TouchElement* curr = hit_test_element(x, y);
+                        if (prev && prev->current_ptr_id == f->ptr_id && (!curr || curr != prev))
+                            handle_element_up(prev, x, y, time_ms, result);
+                        if (curr && curr->type == ELEM_BUTTON && curr != prev) {
+                            if (curr->current_ptr_id == -1)
+                                handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
+                            g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
+                        } else if (!curr || curr->type != ELEM_BUTTON) {
+                            g_state.hovered_element_per_ptr[pi] = -1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if (had_element_move) {
         f->last_x = x;
         f->last_y = y;
         return;
+    }
+
+    // Java handleMoveByMode: !passthrough check on first tracked → skip gesture
+    {
+        TrackedButtons* tb = &g_state.tracked[f->ptr_id % MAX_FINGERS];
+        if (tb->count > 0) {
+            int first_idx = tb->element_indices[0];
+            if (first_idx >= 0 && first_idx < g_state.element_count) {
+                TouchElement* first = &g_state.elements[first_idx];
+                if (first->type == ELEM_BUTTON && !first->passthrough_touch) {
+                    return;
+                }
+            }
+        }
     }
 
     // Legacy path: check hit_test for elements not found via engaged iteration
@@ -276,21 +367,42 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
     f->last_y = y;
 }
 
-void handle_touchscreen_up(TouchFinger* f, float x, float y, TouchActionResult* result) {
+void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    // Java handleUpByMode: process tracked buttons FIRST (matches Java order)
+    int pi = f->ptr_id % MAX_FINGERS;
+    TrackedButtons* tb = &g_state.tracked[pi];
+    bool had_tracked = false;
+    if (tb->count > 0) {
+        if (tb->count > 1) {
+            for (int j = 0; j < tb->count; j++) {
+                int idx = tb->element_indices[j];
+                if (idx >= 0 && idx < g_state.element_count) {
+                    TouchElement* e = &g_state.elements[idx];
+                    if (e->current_ptr_id == f->ptr_id) {
+                        release_element_bindings(e, result);
+                    }
+                }
+            }
+            had_tracked = true;
+        }
+        memset(tb, 0, sizeof(TrackedButtons));
+    }
+    g_state.hovered_element_per_ptr[pi] = -1;
+
     // Java onTouchEvent ACTION_UP: for (ControlElement element : profile.getElements()) element.handleTouchUp(pointerId)
     // Match: iterate ALL elements, release EVERY one with matching ptr_id (no break)
     bool had_element = false;
     for (int i = 0; i < g_state.element_count; i++) {
         if (g_state.elements[i].current_ptr_id == f->ptr_id) {
             
-            handle_element_up(&g_state.elements[i], x, y, now_ms(), result);
+            handle_element_up(&g_state.elements[i], x, y, time_ms, result);
             // Java: passthrough handleTouchUp returns false — does NOT consume the touch
             if (!g_state.elements[i].passthrough_touch) {
                 had_element = true;
             }
         }
     }
-    if (had_element) {
+    if (had_tracked || had_element) {
         f->active = false;
         return;
     }

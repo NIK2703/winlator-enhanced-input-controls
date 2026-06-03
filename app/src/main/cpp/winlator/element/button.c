@@ -89,7 +89,6 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
 }
 
 void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
-    (void)x; (void)y;
     // Java ControlElement.handleTouchUp: debounce for non-toggle L3/R3 bindings
     // isKeepButtonPressedAfterMinTime() = !toggleSwitch && (binding == GAMEPAD_BUTTON_L3 || GAMEPAD_BUTTON_R3)
     if (!e->toggle_switch) {
