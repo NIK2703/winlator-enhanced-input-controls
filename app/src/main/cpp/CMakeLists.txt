@@ -39,17 +39,19 @@ target_link_libraries(winlator
 
 add_library(touch_processor SHARED
         winlator/touch_processor.c
-        winlator/touch_processor_actions.c
-        winlator/touch_processor_element_shared.c
-        winlator/touch_processor_button.c
-        winlator/touch_processor_dpad.c
-        winlator/touch_processor_stick.c
-        winlator/touch_processor_trackpad.c
-        winlator/touch_processor_gesture.c
-        winlator/touch_processor_gesture_base.c
-        winlator/touch_processor_touchscreen.c
-        winlator/touch_processor_touchpad.c
         winlator/touch_processor_jni.cpp
+        winlator/gesture/types.h
+        winlator/gesture/base.c
+        winlator/gesture/touchscreen.c
+        winlator/gesture/touchpad.c
+        winlator/gesture/executor.c
+        winlator/gesture/entry.c
+        winlator/element/shared.c
+        winlator/element/button.c
+        winlator/element/dpad.c
+        winlator/element/stick.c
+        winlator/element/trackpad.c
+        winlator/element/range_button.c
 )
 
 target_compile_options(touch_processor PRIVATE -Wall -Wextra)

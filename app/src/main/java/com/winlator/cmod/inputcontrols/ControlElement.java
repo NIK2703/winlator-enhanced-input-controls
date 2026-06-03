@@ -1870,6 +1870,7 @@ public class ControlElement {
     }
 
     public void setVisualActive(boolean engaged) {
+        if (!engaged && currentPosition != null) currentPosition = null;
         setVisualActive(engaged, -1, -1);
     }
 

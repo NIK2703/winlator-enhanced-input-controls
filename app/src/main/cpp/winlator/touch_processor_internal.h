@@ -2,26 +2,19 @@
 #define TOUCH_PROCESSOR_INTERNAL_H
 
 #include "touch_processor.h"
+#include "gesture/types.h"
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
-#include <android/log.h>
-
-#define LOG_TAG "TouchProcessor"
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-
 #define MAX_TRACKED_PER_POINTER 8
 #define TWO_FINGER_SCROLL_DIST 350
 #define SCROLL_ACCUM_THRESHOLD 100
 #define CLICK_DELAY_MS 50
 #define MAX_TAP_TRAVEL 10
+#define RANGE_TAP_TIMEOUT_MS 200
 #define TAP_MAX_TIME_MS 200
 #define MAX_SCROLL_FINGER_DIST 350
-#define CURSOR_ACCEL 1.25f
-#define CURSOR_ACCEL_THRESHOLD 6
 #define MOUSE_WHEEL_DELTA 120
 
 typedef struct {
@@ -74,7 +67,9 @@ typedef struct {
     // simTouchScreen
     bool sim_touch_screen;
     int last_touch_x, last_touch_y;
-    bool continue_click;
+
+    // Deferred second-finger tap flag (for touchscreen — survives finger deactivation, matches Java deferredSecondFingerTap)
+    bool gesture_deferred_second_finger_tap;
 
     // Double-tap tracking (global, survives finger deactivation)
     float gesture_last_tap_up_x, gesture_last_tap_up_y;
@@ -90,6 +85,19 @@ typedef struct {
     // Snapping size for element layout
     float snapping_size;
     float resolution_scale;
+
+    // Delayed action mechanism (matching Java postDelayed)
+    // 30ms delayed pointer button release (TouchpadView.releasePointerButtonLeft/Right)
+    uint64_t pending_left_release_time;
+    int pending_left_release_ptr_id;
+    uint64_t pending_right_release_time;
+    int pending_right_release_ptr_id;
+
+    // simTouchScreen delayed click (50ms CLICK_DELAYED_TIME)
+    uint64_t sim_click_press_time;
+    bool sim_continue_click;
+    int sim_click_ptr_id;
+    uint64_t sim_click_release_time;
 
     // Mouse move timer state
     int last_mouse_move_dx;
@@ -126,27 +134,15 @@ static inline int active_finger_count(void) {
     return n;
 }
 
-static inline bool has_active_double_tap(const FingerBindings* fb) { return fb->double_tap_count > 0; }
-static inline bool has_active_long_press(const FingerBindings* fb) { return fb->long_press_count > 0; }
-static inline bool has_active_single_tap(const FingerBindings* fb) { return fb->single_tap_count > 0; }
-static inline bool has_active_single_tap_drag(const FingerBindings* fb) { return fb->single_tap_drag_count > 0; }
-static inline bool has_active_long_press_drag(const FingerBindings* fb) { return fb->long_press_drag_count > 0; }
-static inline bool has_active_double_tap_drag(const FingerBindings* fb) { return fb->double_tap_drag_count > 0; }
-
-static inline bool can_hold_long_press(const FingerBindings* fb) {
-    if (!has_active_long_press(fb) || has_active_long_press_drag(fb) || has_active_single_tap_drag(fb))
-        return false;
-    for (int i = 0; i < fb->long_press_count; i++) {
-        int t = fb->long_press[i].type;
-        if (t == BINDING_MOUSE_SCROLL_UP || t == BINDING_MOUSE_SCROLL_DOWN) return false;
-        if (t >= BINDING_MOUSE_MOVE_LEFT && t <= BINDING_MOUSE_MOVE_DOWN) return false;
-    }
-    return true;
-}
-
-static inline bool has_long_press_timer(const FingerBindings* fb) {
-    return has_active_long_press(fb) || has_active_long_press_drag(fb);
-}
+// Legacy convenience wrappers (kept for backward compat — now delegate to GestureBindingSet)
+static inline bool has_active_double_tap(const FingerBindings* fb) { return gesture_build_binding_set(fb).has_active_double_tap; }
+static inline bool has_active_long_press(const FingerBindings* fb) { return gesture_build_binding_set(fb).has_active_long_press; }
+static inline bool has_active_single_tap(const FingerBindings* fb) { return gesture_build_binding_set(fb).has_active_single_tap; }
+static inline bool has_active_single_tap_drag(const FingerBindings* fb) { return gesture_build_binding_set(fb).has_active_single_tap_drag; }
+static inline bool has_active_long_press_drag(const FingerBindings* fb) { return gesture_build_binding_set(fb).has_active_long_press_drag; }
+static inline bool has_active_double_tap_drag(const FingerBindings* fb) { return gesture_build_binding_set(fb).has_active_double_tap_drag; }
+static inline bool can_hold_long_press(const FingerBindings* fb) { return gesture_build_binding_set(fb).can_hold_long_press; }
+static inline bool has_long_press_timer(const FingerBindings* fb) { return gesture_build_binding_set(fb).has_long_press_timer; }
 
 // --- Internal function declarations ---
 
@@ -163,6 +159,8 @@ void press_binding(TouchActionResult* result, const TouchBinding* b, bool hold);
 bool point_in_element(float px, float py, const TouchElement* e);
 TouchElement* hit_test_element(float x, float y);
 int detect_swipe_dir(float dx, float dy, float threshold);
+bool is_mouse_move_binding(const TouchBinding* b);
+float cubic_bezier_interpolate(float x, float cpx1, float cpy1);
 bool finger_has_engaged_element(int ptr_id);
 
 // Element dispatchers
@@ -187,12 +185,17 @@ void element_trackpad_down(TouchElement* e, int ptr_id, float x, float y, uint64
 void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
 void element_trackpad_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
 
+void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
+int range_keycode(int ordinal, int index);
+
 // Gesture — base (maps to GestureHandler.java)
 void on_drag_start(TouchFinger* f);
 bool gesture_is_within_tap_distance(float x, float y);
 void gesture_cancel_double_tap_wait(TouchActionResult* result);
 void check_start_drag(TouchFinger* f, float dx, float dy, uint64_t time_ms, TouchActionResult* result);
-void touchpad_handle_tap_up(TouchFinger* f, TouchActionResult* result);
+void handle_tap_up(TouchFinger* f, TouchActionResult* result);
 
 // Gesture — entry points (touch_processor_gesture.c)
 void touchpad_finger_down(TouchFinger* f, TouchActionResult* result);

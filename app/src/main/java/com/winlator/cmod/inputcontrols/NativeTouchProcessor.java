@@ -34,6 +34,7 @@ public class NativeTouchProcessor {
         public static final int ACT_START_MOUSE_MOVE = 11;
         public static final int ACT_STOP_MOUSE_MOVE = 12;
         public static final int ACT_GAMEPAD_STATE = 13;
+        public static final int ACT_GAMEPAD_AXIS = 14;
 
         public int count;
         public int[] types;
@@ -46,16 +47,20 @@ public class NativeTouchProcessor {
         public int secondFingerMode;
         public int longPressTimeoutMs;
         public int doubleTapTimeoutMs;
+        public int buttonDoubleTapTimeoutMs;
         public int singleTapDelayMs;
         public int dragThresholdPx;
         public int doubleTapDistancePx;
         public int bindingDelayMs;
+        public int longPressDelayMs;
         public int cursorSpeed;
         public int screenW;
         public int screenH;
         public int gestureLongPressHaptic;
         public boolean hapticEnabled;
         public int gestureThresholdPx;
+        public float xformScaleX = 1.0f;
+        public float xformScaleY = 1.0f;
         public int cursorAccelerationThreshold;
         public float cursorAccelerationFactor;
 
@@ -105,6 +110,14 @@ public class NativeTouchProcessor {
         public int[] elementDoubleTap;   // [type0, keycode0, ...]
         public boolean toggleSwitch;
         public float opacity;
+        public int buttonLongPressHaptic = 1;
+        public int buttonGestureHaptic = 1;
+
+        // Range button fields
+        public int rangeOrdinal;
+        public int rangeMax;
+        public int bindingCount;
+        public int orientation;
     }
 
     private XServer xServer;
@@ -137,6 +150,8 @@ public class NativeTouchProcessor {
     private static native void nativeSetSnappingSize(float size);
     private static native void nativeSetResolutionScale(float scale);
     private static native void nativeSetSimTouchScreen(boolean enabled);
+    private static native void nativeSetXformScale(float scaleX, float scaleY);
+    private static native boolean nativeGetElementState(int elemIndex, float[] outXY);
 
     public void init(NativeConfig config) {
         if (!loaded) return;
@@ -161,6 +176,20 @@ public class NativeTouchProcessor {
     public void setSimTouchScreen(boolean enabled) {
         if (!loaded) return;
         nativeSetSimTouchScreen(enabled);
+    }
+
+    public void setXformScale(float scaleX, float scaleY) {
+        if (!loaded) return;
+        nativeSetXformScale(scaleX, scaleY);
+    }
+
+    /**
+     * Query element runtime state from C for visual feedback.
+     * @return true if the element is currently engaged (touched), false if out of range or not engaged
+     */
+    public boolean getElementState(int elemIndex, float[] outXY) {
+        if (!loaded) return false;
+        return nativeGetElementState(elemIndex, outXY);
     }
 
     /**
@@ -189,9 +218,11 @@ public class NativeTouchProcessor {
             c.dragThresholdPx = profile.getDragThreshold();
             c.cursorSpeed = (int)(profile.getCursorSpeed() * 100);
         }
+        c.buttonDoubleTapTimeoutMs = profile.getButtonDoubleTapTimeout();
         c.singleTapDelayMs = profile.getSingleTapDelay();
         c.doubleTapDistancePx = profile.getDoubleTapDistance();
         c.bindingDelayMs = profile.getBindingDelay();
+        c.longPressDelayMs = profile.getLongPressDelay();
         c.screenW = screenW;
         c.screenH = screenH;
         c.gestureLongPressHaptic = profile.getGestureLongPressHaptic();
@@ -235,8 +266,13 @@ public class NativeTouchProcessor {
      * Build a NativeElement[] from a list of ControlElements and a global activation mode.
      */
     public static NativeElement[] buildNativeElements(List<ControlElement> elements, TouchActivationMode activationMode) {
+        return buildNativeElements(elements, activationMode, null);
+    }
+
+    public static NativeElement[] buildNativeElements(List<ControlElement> elements, TouchActivationMode activationMode, ControlsProfile profile) {
         if (elements == null) return null;
         NativeElement[] arr = new NativeElement[elements.size()];
+        ControlsProfile p = profile;
         for (int i = 0; i < elements.size(); i++) {
             ControlElement ce = elements.get(i);
             NativeElement ne = new NativeElement();
@@ -252,6 +288,18 @@ public class NativeTouchProcessor {
             ne.activationMode = activationMode != null ? activationMode.ordinal() : 0;
             ne.toggleSwitch = ce.isToggleSwitch();
             ne.opacity = ce.getEffectiveOpacity();
+
+            // Per-element haptic settings from profile
+            ne.buttonLongPressHaptic = p != null ? p.getButtonLongPressHaptic() : 1;
+            ne.buttonGestureHaptic = p != null ? p.getButtonGestureHaptic() : 1;
+
+            // Range button fields
+            if (ce.getType() == ControlElement.Type.RANGE_BUTTON) {
+                ne.rangeOrdinal = ce.getRange().ordinal();
+                ne.rangeMax = ce.getRange().max;
+                ne.bindingCount = ce.getBindingCount();
+                ne.orientation = ce.getOrientation();
+            }
 
             // Element-specific gesture bindings
             ne.elementLongPress = bindingListToEncoded(ce.getLongPressBindings());
@@ -288,6 +336,14 @@ public class NativeTouchProcessor {
                     typeVal = 10;
                 } else if (b == Binding.MOUSE_MOVE_DOWN) {
                     typeVal = 11;
+                } else if (b.isModifier()) {
+                    Binding kb = b.toKeyboardBinding();
+                    if (kb != null) {
+                        typeVal = BINDING_KEYBOARD_FIRST + kb.keycode.id;
+                        keycodeVal = kb.keycode.id;
+                    } else {
+                        typeVal = 0;
+                    }
                 } else if (b.isKeyboard()) {
                     // Keyboard key: encode as BINDING_KEYBOARD_FIRST + X11 keycode
                     typeVal = BINDING_KEYBOARD_FIRST + b.keycode.id;
@@ -481,6 +537,23 @@ public class NativeTouchProcessor {
                             state.setPressed(a0, true);
                         } else {
                             state.setPressed(a0, false);
+                        }
+                        xServer.getWinHandler().sendGamepadState();
+                    }
+                    break;
+                }
+                case TouchActionResult.ACT_GAMEPAD_AXIS: {
+                    if (inputControlsView != null && inputControlsView.getProfile() != null && xServer.getWinHandler() != null) {
+                        GamepadState state = inputControlsView.getProfile().getGamepadState();
+                        boolean isLeft = a0 != 0;
+                        float axisX = a1 / 32767.0f;
+                        float axisY = a2 / 32767.0f;
+                        if (isLeft) {
+                            state.thumbLX = axisX;
+                            state.thumbLY = axisY;
+                        } else {
+                            state.thumbRX = axisX;
+                            state.thumbRY = axisY;
                         }
                         xServer.getWinHandler().sendGamepadState();
                     }

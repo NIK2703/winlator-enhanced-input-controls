@@ -1,5 +1,6 @@
 #include <jni.h>
 #include "touch_processor.h"
+#include "touch_processor_internal.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -105,6 +106,11 @@ static jobject to_java_result(JNIEnv* env, const TouchActionResult* r) {
                 argBuf[i * 3 + 1] = r->actions[i].key.is_down ? 1 : 0;
                 argBuf[i * 3 + 2] = 0;
                 break;
+            case ACT_GAMEPAD_AXIS:
+                argBuf[i * 3] = r->actions[i].gamepad_axis.is_left;
+                argBuf[i * 3 + 1] = r->actions[i].gamepad_axis.axis_x;
+                argBuf[i * 3 + 2] = r->actions[i].gamepad_axis.axis_y;
+                break;
             default:
                 argBuf[i * 3] = 0;
                 argBuf[i * 3 + 1] = 0;
@@ -145,16 +151,22 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeInit(
     c.second_finger_mode = (SecondFingerMode)env->GetIntField(config, env->GetFieldID(configClass, "secondFingerMode", "I"));
     c.long_press_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "longPressTimeoutMs", "I"));
     c.double_tap_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "doubleTapTimeoutMs", "I"));
+    c.button_double_tap_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "buttonDoubleTapTimeoutMs", "I"));
     c.single_tap_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "singleTapDelayMs", "I"));
     c.drag_threshold_px = env->GetIntField(config, env->GetFieldID(configClass, "dragThresholdPx", "I"));
     c.double_tap_distance_px = env->GetIntField(config, env->GetFieldID(configClass, "doubleTapDistancePx", "I"));
     c.binding_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "bindingDelayMs", "I"));
+    c.long_press_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "longPressDelayMs", "I"));
     c.cursor_speed = env->GetIntField(config, env->GetFieldID(configClass, "cursorSpeed", "I"));
     c.gesture_threshold_px = env->GetIntField(config, env->GetFieldID(configClass, "gestureThresholdPx", "I"));
     c.cursor_acceleration_threshold = env->GetIntField(config, env->GetFieldID(configClass, "cursorAccelerationThreshold", "I"));
     c.cursor_acceleration_factor = env->GetFloatField(config, env->GetFieldID(configClass, "cursorAccelerationFactor", "F"));
     c.screen_w = env->GetIntField(config, env->GetFieldID(configClass, "screenW", "I"));
     c.screen_h = env->GetIntField(config, env->GetFieldID(configClass, "screenH", "I"));
+    c.xform_scale_x = env->GetFloatField(config, env->GetFieldID(configClass, "xformScaleX", "F"));
+    if (c.xform_scale_x <= 0.0f) c.xform_scale_x = 1.0f;
+    c.xform_scale_y = env->GetFloatField(config, env->GetFieldID(configClass, "xformScaleY", "F"));
+    if (c.xform_scale_y <= 0.0f) c.xform_scale_y = 1.0f;
     c.gesture_long_press_haptic = env->GetIntField(config, env->GetFieldID(configClass, "gestureLongPressHaptic", "I"));
     c.haptic_enabled = env->GetBooleanField(config, env->GetFieldID(configClass, "hapticEnabled", "Z"));
 
@@ -185,6 +197,13 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeInit(
     READ_GESTURE_LIST(env, config, configClass, "tpSingleTapDrag2nd", c.tp_single_drag_2nd, c.tp_single_drag_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tpLongPressDrag2nd",  c.tp_long_drag_2nd,   c.tp_long_drag_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tpDoubleTapDrag2nd",  c.tp_double_drag_2nd, c.tp_double_drag_2nd_count);
+
+    
+    
+    
+    
+
+    // Touchscreen gesture bindings logged above via READ_GESTURE_LIST
 
     touch_processor_init(&c);
 }
@@ -218,6 +237,23 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeSetElements(
         elems[i].activation_mode = (ActivationMode)env->GetIntField(je, env->GetFieldID(elemClass, "activationMode", "I"));
         elems[i].toggle_switch = env->GetBooleanField(je, env->GetFieldID(elemClass, "toggleSwitch", "Z"));
         elems[i].opacity = env->GetFloatField(je, env->GetFieldID(elemClass, "opacity", "F"));
+
+        // Range button fields
+        jfieldID range_ord_id = env->GetFieldID(elemClass, "rangeOrdinal", "I");
+        elems[i].range_ordinal = range_ord_id ? env->GetIntField(je, range_ord_id) : 0;
+        jfieldID range_max_id = env->GetFieldID(elemClass, "rangeMax", "I");
+        elems[i].range_max = range_max_id ? env->GetIntField(je, range_max_id) : 26;
+        jfieldID range_bc_id = env->GetFieldID(elemClass, "bindingCount", "I");
+        elems[i].range_binding_count = range_bc_id ? env->GetIntField(je, range_bc_id) : 4;
+        jfieldID range_orient_id = env->GetFieldID(elemClass, "orientation", "I");
+        elems[i].range_orientation = range_orient_id ? env->GetIntField(je, range_orient_id) : 0;
+
+        // Read per-element haptic settings (added at end of NativeElement for backward compat)
+        // Default to 1 (HAPTIC_TICK) if fields don't exist
+        jfieldID lp_haptic_id = env->GetFieldID(elemClass, "buttonLongPressHaptic", "I");
+        elems[i].button_long_press_haptic = lp_haptic_id ? env->GetIntField(je, lp_haptic_id) : 1;
+        jfieldID g_haptic_id = env->GetFieldID(elemClass, "buttonGestureHaptic", "I");
+        elems[i].button_gesture_haptic = g_haptic_id ? env->GetIntField(je, g_haptic_id) : 1;
 
         // Read element-specific gesture bindings
         elems[i].element_long_press_count = read_binding_list(env,
@@ -320,6 +356,27 @@ JNIEXPORT jboolean JNICALL
 Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeIsPassthroughActive(
     JNIEnv* env, jclass clazz) {
     return touch_processor_is_passthrough_active() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeSetXformScale(
+    JNIEnv* env, jclass clazz, jfloat scaleX, jfloat scaleY) {
+    touch_processor_set_xform_scale(scaleX, scaleY);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeGetElementState(
+    JNIEnv* env, jclass clazz, jint elemIndex, jfloatArray outXY) {
+    float sx, sy;
+    bool engaged;
+    int ptrId;
+    if (!touch_processor_get_element_state(elemIndex, &sx, &sy, &engaged, &ptrId))
+        return JNI_FALSE;
+    if (outXY && env->GetArrayLength(outXY) >= 2) {
+        jfloat vals[2] = { sx, sy };
+        env->SetFloatArrayRegion(outXY, 0, 2, vals);
+    }
+    return engaged ? JNI_TRUE : JNI_FALSE;
 }
 
 } // extern "C"

@@ -1,4 +1,4 @@
-#include "touch_processor_internal.h"
+#include "../touch_processor_internal.h"
 
 bool point_in_element(float px, float py, const TouchElement* e) {
     float hs = g_state.snapping_size;
@@ -25,6 +25,11 @@ bool point_in_element(float px, float py, const TouchElement* e) {
                 hh = e->h * hs * 0.5f * e->scale;
             }
             break;
+        case ELEM_RANGE_BUTTON:
+            hw = hs * ((e->range_binding_count * 4) / 2) * e->scale;
+            hh = hs * 2.0f * e->scale;
+            if (e->range_orientation == 1) { float t = hw; hw = hh; hh = t; }
+            break;
         default:
             hw = e->w * hs * 0.5f * e->scale;
             hh = e->h * hs * 0.5f * e->scale;
@@ -32,8 +37,7 @@ bool point_in_element(float px, float py, const TouchElement* e) {
     }
 
     bool hit = px >= cx - hw && px <= cx + hw && py >= cy - hh && py <= cy + hh;
-    LOGD("point_in_element: (%.0f,%.0f) vs elem@(%d,%d type=%d c=%.0f,%.0f hw=%.0f hh=%.0f hs=%.0f) -> %s",
-         px, py, e->x, e->y, e->type, cx, cy, hw, hh, hs, hit ? "HIT" : "miss");
+    
     return hit;
 }
 
@@ -44,10 +48,37 @@ TouchElement* hit_test_element(float x, float y) {
     return NULL;
 }
 
+// Cubic bezier interpolation: given input x in [0,1] and control points (0,0), (cpx1,cpy1), (0.45,0.95), (1,1),
+// find t where B_x(t) ≈ |x|, then return B_y(t) preserving sign.
+// Control points match Java's CubicBezierInterpolator.set(0.075f, 0.95f, 0.45f, 0.95f).
+float cubic_bezier_interpolate(float x, float cpx1, float cpy1) {
+    float abs_x = fabsf(x);
+    if (abs_x <= 0.0001f) return 0.0f;
+    if (abs_x >= 1.0f) return x > 0 ? 1.0f : -1.0f;
+
+    // Binary search for t where B_x(t) ≈ abs_x (16 iterations for ~6e-6 precision)
+    float lo = 0.0f, hi = 1.0f;
+    for (int i = 0; i < 16; i++) {
+        float mid = (lo + hi) * 0.5f;
+        float omt = 1.0f - mid;
+        float bx = 3.0f * omt * omt * mid * cpx1 + 3.0f * omt * mid * mid * 0.45f + mid * mid * mid;
+        if (bx < abs_x) lo = mid;
+        else hi = mid;
+    }
+    float t = (lo + hi) * 0.5f;
+    float omt = 1.0f - t;
+    float by = 3.0f * omt * omt * t * cpy1 + 3.0f * omt * t * t * 0.95f + t * t * t;
+    return x > 0 ? by : -by;
+}
+
 int detect_swipe_dir(float dx, float dy, float threshold) {
     if (fabsf(dx) < threshold && fabsf(dy) < threshold) return -1;
     if (fabsf(dx) > fabsf(dy)) return dx > 0 ? 3 : 2;
     return dy > 0 ? 1 : 0;
+}
+
+bool is_mouse_move_binding(const TouchBinding* b) {
+    return b->type >= BINDING_MOUSE_MOVE_LEFT && b->type <= BINDING_MOUSE_MOVE_DOWN;
 }
 
 bool finger_has_engaged_element(int ptr_id) {
@@ -59,6 +90,12 @@ bool finger_has_engaged_element(int ptr_id) {
 }
 
 void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    // Java ControlElement.handleTouchDown: if (currentPointerId == -1 && containsPoint(x, y))
+    // containsPoint is checked by the caller; guard already-engaged elements here.
+    if (e->current_ptr_id >= 0) {
+        
+        return;
+    }
     e->current_ptr_id = ptr_id;
     e->down_x = x;
     e->down_y = y;
@@ -66,15 +103,17 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     e->engaged = true;
     e->gesture_swipe_triggered = false;
     e->gesture_long_press_triggered = false;
+    e->gesture_double_tap_triggered = false;
     e->gesture_swipe_direction = -1;
     e->long_press_arm = false;
-    LOGD("handle_element_down: type=%d ptr=%d (%.0f,%.0f) bind[0].type=%d", e->type, ptr_id, x, y, e->bindings[0].type);
+    
 
     switch (e->type) {
         case ELEM_BUTTON: element_button_down(e, ptr_id, x, y, time_ms, result); break;
         case ELEM_DPAD: element_dpad_down(e, ptr_id, x, y, time_ms, result); break;
         case ELEM_STICK: element_stick_down(e, ptr_id, x, y, time_ms, result); break;
         case ELEM_TRACKPAD: element_trackpad_down(e, ptr_id, x, y, time_ms, result); break;
+        case ELEM_RANGE_BUTTON: element_range_button_down(e, ptr_id, x, y, time_ms, result); break;
         default: break;
     }
 }
@@ -85,6 +124,7 @@ void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, To
         case ELEM_DPAD: element_dpad_move(e, x, y, time_ms, result); break;
         case ELEM_STICK: element_stick_move(e, x, y, time_ms, result); break;
         case ELEM_TRACKPAD: element_trackpad_move(e, x, y, time_ms, result); break;
+        case ELEM_RANGE_BUTTON: element_range_button_move(e, x, y, time_ms, result); break;
         default: break;
     }
 }
@@ -95,6 +135,7 @@ void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
         case ELEM_DPAD: element_dpad_up(e, x, y, time_ms, result); break;
         case ELEM_STICK: element_stick_up(e, x, y, time_ms, result); break;
         case ELEM_TRACKPAD: element_trackpad_up(e, x, y, time_ms, result); break;
+        case ELEM_RANGE_BUTTON: element_range_button_up(e, x, y, time_ms, result); break;
         default: break;
     }
 }

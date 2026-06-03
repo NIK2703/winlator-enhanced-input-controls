@@ -521,6 +521,24 @@ public class InputControlsView extends View {
                 element.setVisualActive(true, x, y);
             } else if (!nativeEngagedElements.containsValue(element)) {
                 element.setVisualActive(false);
+                continue;
+            } else {
+                continue;
+            }
+            if (element.getType() == ControlElement.Type.STICK) {
+                android.graphics.PointF pos = element.getCurrentPosition();
+                float halfSize = snappingSize * 6.0f;
+                float dx = x - element.getX();
+                float dy = y - element.getY();
+                float distSq = dx * dx + dy * dy;
+                if (distSq > halfSize * halfSize) {
+                    float dist = (float)Math.sqrt(distSq);
+                    dx = dx / dist * halfSize;
+                    dy = dy / dist * halfSize;
+                }
+                pos.x = element.getX() + dx;
+                pos.y = element.getY() + dy;
+                invalidate();
             }
         }
     }

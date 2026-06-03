@@ -122,6 +122,19 @@ public class TouchpadView extends View {
             XForm.scale(xform, invAspect, invAspect);
         } else
             XForm.makeScale(xform, (float) innerWidth / outerWidth, (float) innerHeight / outerHeight);
+
+        // Update native processor xform scale for trackpad delta computation
+        if (nativeTouchProcessor != null) {
+            float scaleX, scaleY;
+            if (!xServer.getRenderer().isFullscreen()) {
+                scaleX = invAspect;
+                scaleY = invAspect;
+            } else {
+                scaleX = (float) innerWidth / outerWidth;
+                scaleY = (float) innerHeight / outerHeight;
+            }
+            nativeTouchProcessor.setXformScale(scaleX, scaleY);
+        }
     }
 
     public void updateVisibleRelativeCursor(int x, int y) {

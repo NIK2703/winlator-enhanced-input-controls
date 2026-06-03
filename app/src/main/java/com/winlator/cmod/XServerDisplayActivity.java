@@ -1581,6 +1581,22 @@ private void applySidebarSettings() {
             // Build and apply config (early — before view is laid out)
             NativeTouchProcessor.NativeConfig nativeConfig =
                 NativeTouchProcessor.buildNativeConfig(profile, xServer.screenInfo.width, xServer.screenInfo.height);
+            // Set xform scale so trackpad deltas map view-pixels to Wine-screen-pixels
+            {
+                int outerW = AppUtils.getScreenWidth();
+                int outerH = AppUtils.getScreenHeight();
+                int innerW = xServer.screenInfo.width;
+                int innerH = xServer.screenInfo.height;
+                boolean fullscreen = xServer.getRenderer() != null && xServer.getRenderer().isFullscreen();
+                if (!fullscreen) {
+                    float aspect = Math.min((float)outerW / innerW, (float)outerH / innerH);
+                    nativeConfig.xformScaleX = 1.0f / aspect;
+                    nativeConfig.xformScaleY = 1.0f / aspect;
+                } else {
+                    nativeConfig.xformScaleX = (float)innerW / outerW;
+                    nativeConfig.xformScaleY = (float)innerH / outerH;
+                }
+            }
             nativeTouchProcessor.init(nativeConfig);
 
             // Start tick timer early (for long-press / double-tap timeouts)
@@ -1614,7 +1630,7 @@ private void applySidebarSettings() {
                 if (elements != null && !elements.isEmpty()) {
                     TouchActivationMode actMode = profile.getTouchActivationMode();
                     NativeTouchProcessor.NativeElement[] nativeElements =
-                        NativeTouchProcessor.buildNativeElements(elements, actMode);
+                        NativeTouchProcessor.buildNativeElements(elements, actMode, profile);
                     nativeTouchProcessor.setElements(nativeElements);
                 }
 

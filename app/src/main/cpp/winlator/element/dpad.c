@@ -1,4 +1,4 @@
-#include "touch_processor_internal.h"
+#include "../touch_processor_internal.h"
 
 static void dpad_normalize(float dx, float dy, float radius, float* out_nx, float* out_ny) {
     float dist = sqrtf(dx*dx + dy*dy);
@@ -11,17 +11,26 @@ static void dpad_normalize(float dx, float dy, float radius, float* out_nx, floa
 }
 
 static void dpad_set_petals(TouchElement* e, float nx, float ny, TouchActionResult* result) {
-    bool up = ny <= -DPAD_DEAD_ZONE;
-    bool right = nx >= DPAD_DEAD_ZONE;
-    bool down = ny >= DPAD_DEAD_ZONE;
-    bool left = nx <= -DPAD_DEAD_ZONE;
+    bool raw_up = ny <= -DPAD_DEAD_ZONE;
+    bool raw_right = nx >= DPAD_DEAD_ZONE;
+    bool raw_down = ny >= DPAD_DEAD_ZONE;
+    bool raw_left = nx <= -DPAD_DEAD_ZONE;
+    bool states[4] = {raw_up, raw_right, raw_down, raw_left};
     for (int i = 0; i < 4; i++) {
-        bool active = (i == 0) ? up : ((i == 1) ? right : ((i == 2) ? down : left));
+        const TouchBinding* b = &e->bindings[i];
+        if (b->type == BINDING_NONE) continue;
+        bool active;
+        if (is_mouse_move_binding(b))
+            active = states[i] || states[(i + 2) % 4]; // bidirectional: up||down, left||right
+        else
+            active = states[i];
         if (active != e->petal_active[i]) {
             e->petal_active[i] = active;
-            LOGD("  petal[%d] %s (bind.type=%d)", i, active ? "PRESS" : "RELEASE", e->bindings[i].type);
-            if (e->bindings[i].type != BINDING_NONE)
-                press_binding(result, &e->bindings[i], active);
+            if (active) {
+                press_binding(result, b, true);
+            } else {
+                release_binding(result, b);
+            }
         }
     }
 }
@@ -33,8 +42,6 @@ void element_dpad_down(TouchElement* e, int ptr_id, float x, float y, uint64_t t
     float dy = y - e->y;
     float nx, ny;
     dpad_normalize(dx, dy, radius, &nx, &ny);
-    LOGD("element_dpad_down: touch=(%.0f,%.0f) center=(%d,%d) radius=%.0f nx=%.2f ny=%.2f",
-         x, y, e->x, e->y, radius, nx, ny);
     dpad_set_petals(e, nx, ny, result);
 }
 
@@ -45,20 +52,17 @@ void element_dpad_move(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     float dy = y - e->y;
     float nx, ny;
     dpad_normalize(dx, dy, radius, &nx, &ny);
-
-    bool inside = (dx*dx + dy*dy) <= radius*radius;
-    LOGD("elem_move dpad: (%.0f,%.0f) center=(%d,%d) radius=%.0f nx=%.2f ny=%.2f %s",
-         x, y, e->x, e->y, radius, nx, ny, inside ? "INSIDE" : "OUTSIDE");
-
     dpad_set_petals(e, nx, ny, result);
 }
 
 void element_dpad_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     (void)x; (void)y; (void)time_ms;
     for (int i = 0; i < 4; i++) {
-        e->petal_active[i] = false;
-        if (e->bindings[i].type != BINDING_NONE)
-            press_binding(result, &e->bindings[i], false);
+        if (e->petal_active[i]) {
+            e->petal_active[i] = false;
+            if (e->bindings[i].type != BINDING_NONE)
+                release_binding(result, &e->bindings[i]);
+        }
     }
     e->engaged = false;
     e->current_ptr_id = -1;

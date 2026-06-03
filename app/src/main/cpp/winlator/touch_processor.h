@@ -91,7 +91,19 @@ typedef struct {
     uint64_t trackpad_last_time;
 
     // Range button
-    int range_index;        // current position in range
+    int range_index;        // current pressed index (cached at touch down)
+    int range_ordinal;      // 0=ALPHABET, 1=NUMBER, 2=FUNCTION, 3=NUMPAD
+    int range_max;          // max index values (26/10/12/10)
+    int range_binding_count;// visible slots
+    int range_orientation;  // 0=horizontal, 1=vertical
+    float range_scroll_offset;   // persistent scroll position (for visual)
+    float range_current_offset;  // accumulated scroll delta
+    float range_last_position;   // last touch position along scroll axis
+    bool range_scrolling;        // currently in scroll mode
+    bool range_has_binding;      // whether a valid binding was captured
+    bool range_hold_pressed;     // whether hold-mode key press was already sent by tick
+    bool range_pending_tap_release;  // deferred tap-key release (30ms after press, matching Java postDelayed)
+    uint64_t range_tap_release_time; // time_ms when deferred release should fire
 
     // Pointer id for this element (which finger is touching it)
     int current_ptr_id;
@@ -105,9 +117,13 @@ typedef struct {
     bool toggle_switch;
     bool selected;           // runtime toggle state
 
+    // Per-element haptic settings (from Java ControlElement.cachedButtonLongPressHaptic / gestureHaptic)
+    int button_long_press_haptic;
+    int button_gesture_haptic;
+
     // Gesture state per-element
     bool gesture_long_press_triggered;
-    bool gesture_double_tap_first_up;
+    bool gesture_double_tap_triggered;
     uint64_t gesture_last_tap_time;
     float gesture_tap_up_x, gesture_tap_up_y;
     int gesture_swipe_direction; // -1 none, 0 up, 1 down, 2 left, 3 right
@@ -198,7 +214,6 @@ typedef struct {
     // Second-finger resume (touchscreen)
     TouchBinding pending_resume_action[8];
     int pending_resume_action_count;
-    bool deferred_second_finger_tap;
     int original_ptr_id;            // finger identity for double-tap continuity
     bool double_tap_original_id_set;
 
@@ -234,17 +249,23 @@ typedef struct {
     // Gesture timing
     int long_press_timeout_ms;
     int double_tap_timeout_ms;
+    int button_double_tap_timeout_ms; // element button double-tap timeout (separate from gesture)
     int single_tap_delay_ms;
     int drag_threshold_px;
     int gesture_threshold_px;      // separate threshold for element swipe detection
     int double_tap_distance_px;
     int binding_delay_ms;
+    int long_press_delay_ms;
     int cursor_speed;
     int cursor_acceleration_threshold;  // delta above which acceleration applies
     float cursor_acceleration_factor;   // multiplier (e.g. 1.25f)
 
     // For touchpad absolute mode
     int screen_w, screen_h;
+
+    // Xform scale (maps view-pixels to Wine-screen-pixels, for trackpad delta)
+    float xform_scale_x;
+    float xform_scale_y;
 
     // Haptic
     int gesture_long_press_haptic;
@@ -292,7 +313,8 @@ typedef enum {
     ACT_SET_CURSOR_SPEED,
     ACT_START_MOUSE_MOVE,
     ACT_STOP_MOUSE_MOVE,
-    ACT_GAMEPAD_STATE        // a0=button_index, a1=is_down
+    ACT_GAMEPAD_STATE,       // a0=button_index, a1=is_down
+    ACT_GAMEPAD_AXIS         // a0=is_left (0=left,1=right), a1=axis_x, a2=axis_y
 } ActionType;
 
 typedef struct {
@@ -307,6 +329,7 @@ typedef struct {
         struct { int effect; } haptic;
         struct { int speed; } cursor_speed;
         struct { int dx, dy; int hold; } mouse_move;
+        struct { int is_left; int axis_x; int axis_y; } gamepad_axis;
     };
 } TouchAction;
 
@@ -335,6 +358,9 @@ void touch_processor_set_resolution_scale(float scale);
 // Enable/disable simulated touch screen mode
 void touch_processor_set_sim_touch_screen(bool enabled);
 
+// Set xform scale for trackpad delta computation (view-pixels to Wine-screen-pixels)
+void touch_processor_set_xform_scale(float scale_x, float scale_y);
+
 // --- Touch event input ---
 // All events return a result struct with actions to execute.
 
@@ -361,6 +387,10 @@ bool touch_processor_is_passthrough_active(void);
 
 // Get pointer position for touchscreen mode
 void touch_processor_get_pointer_pos(int* x, int* y);
+
+// Get element runtime state for visual feedback (stick_value_x/y, engaged, ptr_id)
+// Returns false if elemIndex is out of range
+bool touch_processor_get_element_state(int elemIndex, float* out_stick_x, float* out_stick_y, bool* out_engaged, int* out_ptr_id);
 
 // Cleanup
 void touch_processor_destroy(void);
