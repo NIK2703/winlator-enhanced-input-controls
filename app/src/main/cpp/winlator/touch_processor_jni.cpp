@@ -317,29 +317,114 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeSetSimTouchScree
 
 JNIEXPORT jobject JNICALL
 Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeOnFingerDown(
-    JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y, jlong timeMs) {
+    JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y, jlong timeMs,
+    jfloatArray outPositions, jbyteArray outActive) {
     TouchActionResult r = touch_processor_on_finger_down(ptrId, x, y, (uint64_t)timeMs);
+    // Fill visual state output arrays in the same call
+    if (outPositions != NULL && outActive != NULL) {
+        jfloat* pos = env->GetFloatArrayElements(outPositions, NULL);
+        jbyte* act = env->GetByteArrayElements(outActive, NULL);
+        int count = g_state.element_count;
+        int maxPos = env->GetArrayLength(outPositions) / 2;
+        int maxAct = env->GetArrayLength(outActive) / 5;
+        int limit = count < maxPos ? (count < maxAct ? count : maxAct) : (maxPos < maxAct ? maxPos : maxAct);
+        for (int i = 0; i < limit; i++) {
+            pos[i * 2] = g_state.elements[i].visual_x;
+            pos[i * 2 + 1] = g_state.elements[i].visual_y;
+            int base = i * 5;
+            act[base] = g_state.elements[i].visual_active ? 1 : 0;
+            act[base + 1] = g_state.elements[i].petal_active[0] ? 1 : 0;
+            act[base + 2] = g_state.elements[i].petal_active[1] ? 1 : 0;
+            act[base + 3] = g_state.elements[i].petal_active[2] ? 1 : 0;
+            act[base + 4] = g_state.elements[i].petal_active[3] ? 1 : 0;
+        }
+        env->ReleaseFloatArrayElements(outPositions, pos, 0);
+        env->ReleaseByteArrayElements(outActive, act, 0);
+    }
     return to_java_result(env, &r);
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeOnFingerMove(
-    JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y, jlong timeMs) {
+    JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y, jlong timeMs,
+    jfloatArray outPositions, jbyteArray outActive) {
     TouchActionResult r = touch_processor_on_finger_move(ptrId, x, y, (uint64_t)timeMs);
+    if (outPositions != NULL && outActive != NULL) {
+        jfloat* pos = env->GetFloatArrayElements(outPositions, NULL);
+        jbyte* act = env->GetByteArrayElements(outActive, NULL);
+        int count = g_state.element_count;
+        int maxPos = env->GetArrayLength(outPositions) / 2;
+        int maxAct = env->GetArrayLength(outActive) / 5;
+        int limit = count < maxPos ? (count < maxAct ? count : maxAct) : (maxPos < maxAct ? maxPos : maxAct);
+        for (int i = 0; i < limit; i++) {
+            pos[i * 2] = g_state.elements[i].visual_x;
+            pos[i * 2 + 1] = g_state.elements[i].visual_y;
+            int base = i * 5;
+            act[base] = g_state.elements[i].visual_active ? 1 : 0;
+            act[base + 1] = g_state.elements[i].petal_active[0] ? 1 : 0;
+            act[base + 2] = g_state.elements[i].petal_active[1] ? 1 : 0;
+            act[base + 3] = g_state.elements[i].petal_active[2] ? 1 : 0;
+            act[base + 4] = g_state.elements[i].petal_active[3] ? 1 : 0;
+        }
+        env->ReleaseFloatArrayElements(outPositions, pos, 0);
+        env->ReleaseByteArrayElements(outActive, act, 0);
+    }
     return to_java_result(env, &r);
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeOnFingerUp(
-    JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y, jlong timeMs) {
+    JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y, jlong timeMs,
+    jfloatArray outPositions, jbyteArray outActive) {
     TouchActionResult r = touch_processor_on_finger_up(ptrId, x, y, (uint64_t)timeMs);
+    if (outPositions != NULL && outActive != NULL) {
+        jfloat* pos = env->GetFloatArrayElements(outPositions, NULL);
+        jbyte* act = env->GetByteArrayElements(outActive, NULL);
+        int count = g_state.element_count;
+        int maxPos = env->GetArrayLength(outPositions) / 2;
+        int maxAct = env->GetArrayLength(outActive) / 5;
+        int limit = count < maxPos ? (count < maxAct ? count : maxAct) : (maxPos < maxAct ? maxPos : maxAct);
+        for (int i = 0; i < limit; i++) {
+            pos[i * 2] = g_state.elements[i].visual_x;
+            pos[i * 2 + 1] = g_state.elements[i].visual_y;
+            int base = i * 5;
+            act[base] = g_state.elements[i].visual_active ? 1 : 0;
+            act[base + 1] = g_state.elements[i].petal_active[0] ? 1 : 0;
+            act[base + 2] = g_state.elements[i].petal_active[1] ? 1 : 0;
+            act[base + 3] = g_state.elements[i].petal_active[2] ? 1 : 0;
+            act[base + 4] = g_state.elements[i].petal_active[3] ? 1 : 0;
+        }
+        env->ReleaseFloatArrayElements(outPositions, pos, 0);
+        env->ReleaseByteArrayElements(outActive, act, 0);
+    }
     return to_java_result(env, &r);
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeTick(
-    JNIEnv* env, jclass clazz, jlong timeMs) {
+    JNIEnv* env, jclass clazz, jlong timeMs,
+    jfloatArray outPositions, jbyteArray outActive) {
     TouchActionResult r = touch_processor_tick((uint64_t)timeMs);
+    if (outPositions != NULL && outActive != NULL) {
+        jfloat* pos = env->GetFloatArrayElements(outPositions, NULL);
+        jbyte* act = env->GetByteArrayElements(outActive, NULL);
+        int count = g_state.element_count;
+        int maxPos = env->GetArrayLength(outPositions) / 2;
+        int maxAct = env->GetArrayLength(outActive) / 5;
+        int limit = count < maxPos ? (count < maxAct ? count : maxAct) : (maxPos < maxAct ? maxPos : maxAct);
+        for (int i = 0; i < limit; i++) {
+            pos[i * 2] = g_state.elements[i].visual_x;
+            pos[i * 2 + 1] = g_state.elements[i].visual_y;
+            int base = i * 5;
+            act[base] = g_state.elements[i].visual_active ? 1 : 0;
+            act[base + 1] = g_state.elements[i].petal_active[0] ? 1 : 0;
+            act[base + 2] = g_state.elements[i].petal_active[1] ? 1 : 0;
+            act[base + 3] = g_state.elements[i].petal_active[2] ? 1 : 0;
+            act[base + 4] = g_state.elements[i].petal_active[3] ? 1 : 0;
+        }
+        env->ReleaseFloatArrayElements(outPositions, pos, 0);
+        env->ReleaseByteArrayElements(outActive, act, 0);
+    }
     return to_java_result(env, &r);
 }
 
@@ -373,6 +458,41 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeGetElementState(
         env->SetFloatArrayRegion(outXY, 0, 2, vals);
     }
     return engaged ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeHandleDownByMode(
+    JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y, jlong timeMs)
+{
+    return touch_processor_handle_down_by_mode(ptrId, x, y, (uint64_t)timeMs) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeHandleUpByMode(
+    JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y, jlong timeMs)
+{
+    return touch_processor_handle_up_by_mode(ptrId, x, y, (uint64_t)timeMs) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeHandleMoveByMode(
+    JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y, jlong timeMs)
+{
+    touch_processor_handle_move_by_mode(ptrId, x, y, (uint64_t)timeMs);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeTrackedCount(
+    JNIEnv* env, jclass clazz, jint ptrId)
+{
+    return (jint)touch_processor_tracked_count(ptrId);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeHoveredIndex(
+    JNIEnv* env, jclass clazz, jint ptrId)
+{
+    return (jint)touch_processor_hovered_index(ptrId);
 }
 
 } // extern "C"

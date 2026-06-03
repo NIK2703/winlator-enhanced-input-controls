@@ -103,6 +103,10 @@ typedef struct {
     float gesture_tap_up_x, gesture_tap_up_y;
     int gesture_swipe_direction;
     bool gesture_swipe_triggered;
+
+    bool visual_active;
+    float visual_x;
+    float visual_y;
 } TouchElement;
 
 // --- Gesture handler types ---
@@ -371,6 +375,31 @@ void touch_processor_get_pointer_pos(int* x, int* y);
 // Get element runtime state for visual feedback (stick_value_x/y, engaged, ptr_id)
 // Returns false if elemIndex is out of range
 bool touch_processor_get_element_state(int elemIndex, float* out_stick_x, float* out_stick_y, bool* out_engaged, int* out_ptr_id);
+
+// --- Activation API ---
+
+// Query element visual state (x, y, active flag)
+bool touch_processor_get_element_visual(int elemIndex, float* out_x, float* out_y, bool* out_active);
+
+// Batch sync visual states: returns number of elements written
+int touch_processor_sync_visual_states(float* out_positions, uint8_t* out_active, int max_count);
+
+// Activate all elements at a given point (visual feedback)
+void touch_processor_activate_at(float x, float y);
+
+// Deactivate all elements (visual feedback)
+void touch_processor_deactivate_all(void);
+
+// Handle touch by activation mode (Java-compatible fallback path)
+bool touch_processor_handle_down_by_mode(int ptr_id, float x, float y, uint64_t time_ms);
+bool touch_processor_handle_up_by_mode(int ptr_id, float x, float y, uint64_t time_ms);
+void touch_processor_handle_move_by_mode(int ptr_id, float x, float y, uint64_t time_ms);
+
+// Get tracked button count for pointer
+int touch_processor_tracked_count(int ptr_id);
+
+// Get hovered element index for pointer
+int touch_processor_hovered_index(int ptr_id);
 
 // Cleanup
 void touch_processor_destroy(void);

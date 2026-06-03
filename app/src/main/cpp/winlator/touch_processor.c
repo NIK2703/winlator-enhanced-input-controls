@@ -1,4 +1,5 @@
 #include "touch_processor_internal.h"
+#include "touch_processor_activation.h"
 
 TouchProcessorState g_state;
 
@@ -257,7 +258,13 @@ void touch_processor_reset(void) {
     g_state.pending_right_release_ptr_id = -1;
     g_state.sim_click_ptr_id = -1;
     for (int i = 0; i < MAX_FINGERS; i++) g_state.hovered_element_per_ptr[i] = -1;
-    for (int i = 0; i < g_state.element_count; i++) g_state.elements[i].current_ptr_id = -1;
+    for (int i = 0; i < g_state.element_count; i++) {
+        g_state.elements[i].current_ptr_id = -1;
+        g_state.elements[i].visual_active = false;
+        g_state.elements[i].visual_x = g_state.elements[i].x;
+        g_state.elements[i].visual_y = g_state.elements[i].y;
+    }
+    activation_reset();
 }
 
 bool touch_processor_is_passthrough_active(void) { return g_state.passthrough_active; }
@@ -275,4 +282,44 @@ bool touch_processor_get_element_state(int elemIndex, float* out_stick_x, float*
 
 void touch_processor_destroy(void) {
     memset(&g_state, 0, sizeof(g_state));
+}
+
+bool touch_processor_get_element_visual(int elemIndex, float* out_x, float* out_y, bool* out_active) {
+    return activation_get_element_visual(elemIndex, out_x, out_y, out_active);
+}
+
+int touch_processor_sync_visual_states(float* out_positions, uint8_t* out_active, int max_count) {
+    return activation_get_visual_states(out_positions, out_active, max_count);
+}
+
+void touch_processor_activate_at(float x, float y) {
+    activation_activate_at(x, y);
+}
+
+void touch_processor_deactivate_all(void) {
+    activation_deactivate_all();
+}
+
+bool touch_processor_handle_down_by_mode(int ptr_id, float x, float y, uint64_t time_ms) {
+    TouchActionResult result = {0};
+    bool handled = activation_handle_down(ptr_id, x, y, time_ms, &result);
+    return handled;
+}
+
+bool touch_processor_handle_up_by_mode(int ptr_id, float x, float y, uint64_t time_ms) {
+    TouchActionResult result = {0};
+    return activation_handle_up(ptr_id, x, y, time_ms, &result);
+}
+
+void touch_processor_handle_move_by_mode(int ptr_id, float x, float y, uint64_t time_ms) {
+    TouchActionResult result = {0};
+    activation_handle_move(ptr_id, x, y, time_ms, &result);
+}
+
+int touch_processor_tracked_count(int ptr_id) {
+    return activation_tracked_count(ptr_id);
+}
+
+int touch_processor_hovered_index(int ptr_id) {
+    return activation_hovered_for_ptr(ptr_id);
 }

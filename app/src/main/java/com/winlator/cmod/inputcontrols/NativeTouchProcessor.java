@@ -141,10 +141,10 @@ public class NativeTouchProcessor {
     // Native methods
     private static native void nativeInit(NativeConfig config);
     private static native void nativeSetElements(NativeElement[] elements);
-    private static native TouchActionResult nativeOnFingerDown(int ptrId, float x, float y, long timeMs);
-    private static native TouchActionResult nativeOnFingerMove(int ptrId, float x, float y, long timeMs);
-    private static native TouchActionResult nativeOnFingerUp(int ptrId, float x, float y, long timeMs);
-    private static native TouchActionResult nativeTick(long timeMs);
+    private static native TouchActionResult nativeOnFingerDown(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
+    private static native TouchActionResult nativeOnFingerMove(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
+    private static native TouchActionResult nativeOnFingerUp(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
+    private static native TouchActionResult nativeTick(long timeMs, float[] outPositions, byte[] outActive);
     private static native void nativeReset();
     private static native boolean nativeIsPassthroughActive();
     private static native void nativeSetSnappingSize(float size);
@@ -152,6 +152,12 @@ public class NativeTouchProcessor {
     private static native void nativeSetSimTouchScreen(boolean enabled);
     private static native void nativeSetXformScale(float scaleX, float scaleY);
     private static native boolean nativeGetElementState(int elemIndex, float[] outXY);
+
+    private static native boolean nativeHandleDownByMode(int ptrId, float x, float y, long timeMs);
+    private static native boolean nativeHandleUpByMode(int ptrId, float x, float y, long timeMs);
+    private static native void nativeHandleMoveByMode(int ptrId, float x, float y, long timeMs);
+    private static native int nativeTrackedCount(int ptrId);
+    private static native int nativeHoveredIndex(int ptrId);
 
     public void init(NativeConfig config) {
         if (!loaded) return;
@@ -183,13 +189,29 @@ public class NativeTouchProcessor {
         nativeSetXformScale(scaleX, scaleY);
     }
 
-    /**
-     * Query element runtime state from C for visual feedback.
-     * @return true if the element is currently engaged (touched), false if out of range or not engaged
-     */
-    public boolean getElementState(int elemIndex, float[] outXY) {
+    public boolean handleDownByMode(int ptrId, float x, float y) {
         if (!loaded) return false;
-        return nativeGetElementState(elemIndex, outXY);
+        return nativeHandleDownByMode(ptrId, x, y, SystemClock.uptimeMillis());
+    }
+
+    public boolean handleUpByMode(int ptrId, float x, float y) {
+        if (!loaded) return false;
+        return nativeHandleUpByMode(ptrId, x, y, SystemClock.uptimeMillis());
+    }
+
+    public void handleMoveByMode(int ptrId, float x, float y) {
+        if (!loaded) return;
+        nativeHandleMoveByMode(ptrId, x, y, SystemClock.uptimeMillis());
+    }
+
+    public int getTrackedCount(int ptrId) {
+        if (!loaded) return 0;
+        return nativeTrackedCount(ptrId);
+    }
+
+    public int getHoveredIndex(int ptrId) {
+        if (!loaded) return -1;
+        return nativeHoveredIndex(ptrId);
     }
 
     /**
@@ -417,28 +439,56 @@ public class NativeTouchProcessor {
     public void onFingerDown(int ptrId, float x, float y) {
         if (!loaded || !running) return;
         long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeOnFingerDown(ptrId, x, y, t);
+        TouchActionResult r = nativeOnFingerDown(ptrId, x, y, t, null, null);
+        executeResult(r);
+    }
+
+    public void onFingerDown(int ptrId, float x, float y, float[] outPositions, byte[] outActive) {
+        if (!loaded || !running) return;
+        long t = SystemClock.uptimeMillis();
+        TouchActionResult r = nativeOnFingerDown(ptrId, x, y, t, outPositions, outActive);
         executeResult(r);
     }
 
     public void onFingerMove(int ptrId, float x, float y) {
         if (!loaded || !running) return;
         long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeOnFingerMove(ptrId, x, y, t);
+        TouchActionResult r = nativeOnFingerMove(ptrId, x, y, t, null, null);
+        executeResult(r);
+    }
+
+    public void onFingerMove(int ptrId, float x, float y, float[] outPositions, byte[] outActive) {
+        if (!loaded || !running) return;
+        long t = SystemClock.uptimeMillis();
+        TouchActionResult r = nativeOnFingerMove(ptrId, x, y, t, outPositions, outActive);
         executeResult(r);
     }
 
     public void onFingerUp(int ptrId, float x, float y) {
         if (!loaded || !running) return;
         long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeOnFingerUp(ptrId, x, y, t);
+        TouchActionResult r = nativeOnFingerUp(ptrId, x, y, t, null, null);
+        executeResult(r);
+    }
+
+    public void onFingerUp(int ptrId, float x, float y, float[] outPositions, byte[] outActive) {
+        if (!loaded || !running) return;
+        long t = SystemClock.uptimeMillis();
+        TouchActionResult r = nativeOnFingerUp(ptrId, x, y, t, outPositions, outActive);
         executeResult(r);
     }
 
     public void tick() {
         if (!loaded || !running) return;
         long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeTick(t);
+        TouchActionResult r = nativeTick(t, null, null);
+        executeResult(r);
+    }
+
+    public void tick(float[] outPositions, byte[] outActive) {
+        if (!loaded || !running) return;
+        long t = SystemClock.uptimeMillis();
+        TouchActionResult r = nativeTick(t, outPositions, outActive);
         executeResult(r);
     }
 

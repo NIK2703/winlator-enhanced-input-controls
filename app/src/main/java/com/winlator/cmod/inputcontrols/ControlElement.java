@@ -1879,6 +1879,47 @@ public class ControlElement {
         setVisualActive(engaged, -1, -1);
     }
 
+    public void setVisualState(boolean active, float posX, float posY) {
+        this.active = active;
+        if (type == Type.D_PAD && active) {
+            int snapSize = inputControlsView.getSnappingSize();
+            float dx = posX - x;
+            float dy = posY - y;
+            float radius = snapSize * 7 * scale;
+            float dist = (float)Math.sqrt(dx*dx + dy*dy);
+            if (dist > radius) {
+                dx = dx / dist * radius;
+                dy = dy / dist * radius;
+            }
+            float nx = Math.max(-1f, Math.min(1f, dx / radius));
+            float ny = Math.max(-1f, Math.min(1f, dy / radius));
+            states[0] = ny <= -DPAD_DEAD_ZONE;
+            states[1] = nx >= DPAD_DEAD_ZONE;
+            states[2] = ny >= DPAD_DEAD_ZONE;
+            states[3] = nx <= -DPAD_DEAD_ZONE;
+        }
+        if (currentPosition == null) currentPosition = new android.graphics.PointF();
+        currentPosition.set(posX, posY);
+    }
+
+    /**
+     * Ultra-fast visual state sync from C — skips DPAD recomputation.
+     * Petal states are pre-computed in C and passed directly.
+     */
+    public void syncVisualState(boolean active, float posX, float posY,
+                         boolean petalUp, boolean petalRight,
+                         boolean petalDown, boolean petalLeft) {
+        this.active = active;
+        if (type == Type.D_PAD) {
+            states[0] = petalUp;
+            states[1] = petalRight;
+            states[2] = petalDown;
+            states[3] = petalLeft;
+        }
+        if (currentPosition == null) currentPosition = new android.graphics.PointF();
+        currentPosition.set(posX, posY);
+    }
+
     public void setVisualActive(boolean engaged, float touchX, float touchY) {
         if (type == Type.D_PAD && engaged) {
             int snapSize = inputControlsView.getSnappingSize();

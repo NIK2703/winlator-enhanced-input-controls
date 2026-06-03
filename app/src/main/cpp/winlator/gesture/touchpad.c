@@ -166,6 +166,7 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
                                 } else {
                                     if (new_btn->bindings[0].type != BINDING_NONE)
                                         press_binding(result, &new_btn->bindings[0], true);
+                                    new_btn->visual_active = true;
                                 }
                             }
                             // Add to tracked list for finger-up release
@@ -191,6 +192,7 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
                                 // Java activate(): press primary binding only (no gesture pointer)
                                 if (curr->bindings[0].type != BINDING_NONE)
                                     press_binding(result, &curr->bindings[0], true);
+                                curr->visual_active = true;
                             }
                             g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
                         } else if (!curr || curr->type != ELEM_BUTTON) {

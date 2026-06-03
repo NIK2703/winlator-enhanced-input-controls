@@ -74,7 +74,8 @@ public class InputControlsView extends View {
     private TouchpadView touchpadView;
     private XServer xServer;
     private NativeTouchProcessor nativeTouchProcessor;
-    private final HashMap<Integer, ControlElement> nativeEngagedElements = new HashMap<>();
+    private float[] visualPositions;
+    private byte[] visualActive;
     private final Bitmap[] icons = new Bitmap[40];
     private Timer mouseMoveTimer;
     private final PointF mouseMoveOffset = new PointF();
@@ -107,6 +108,7 @@ public class InputControlsView extends View {
     private final SparseArray<ControlElement> hoveredButtons = new SparseArray<>();
     private final SparseArray<ArrayList<ControlElement>> trackedButtons = new SparseArray<>();
     private final android.os.Handler dtVisualHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final java.util.HashSet<ControlElement> dtWaitingElements = new java.util.HashSet<>();
 
     private ControlElement findButtonAt(float x, float y) {
         for (ControlElement element : profile.getElements()) {
@@ -512,71 +514,24 @@ public class InputControlsView extends View {
         return null;
     }
 
-    private void updateVisualForPointer(int pointerId, float x, float y) {
+    private void applyVisualStates() {
         if (profile == null) return;
-        TouchActivationMode actMode = profile.getTouchActivationMode();
-        ControlElement engagedElem = nativeEngagedElements.get(pointerId);
-        ControlElement hitElem = hitTestElement(x, y);
-
-        for (ControlElement element : profile.getElements()) {
-            boolean isButton = element.getType() == ControlElement.Type.BUTTON;
-            boolean hit = element.containsPoint(x, y);
-
-            if (actMode == TouchActivationMode.LOCK) {
-                if (isButton) {
-                    element.setVisualActive(element == engagedElem, x, y);
-                } else if (hit) {
-                    element.setVisualActive(true, x, y);
-                } else if (!nativeEngagedElements.containsValue(element)) {
-                    element.setVisualActive(false);
-                }
-            } else if (actMode == TouchActivationMode.TRACK) {
-                if (element == hitElem && element != engagedElem && isButton) {
-                    ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
-                    if (tracked == null) { tracked = new ArrayList<>(); trackedButtons.put(pointerId, tracked); }
-                    if (!tracked.contains(element)) {
-                        tracked.add(element);
-                        element.setVisualActive(true, x, y);
-                    }
-                }
-                ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
-                boolean visualActive = (element == engagedElem) || (tracked != null && tracked.contains(element)) || (!isButton && hit);
-                element.setVisualActive(visualActive, x, y);
-            } else { // HOVER
-                if (isButton) {
-                    if (hit && element == hitElem) {
-                        ControlElement prev = hoveredButtons.get(pointerId);
-                        if (prev != null && prev != element) prev.setVisualActive(false, x, y);
-                        hoveredButtons.put(pointerId, element);
-                        nativeEngagedElements.put(pointerId, element);
-                        element.setVisualActive(true, x, y);
-                    } else if (!nativeEngagedElements.containsValue(element) && hoveredButtons.get(pointerId) != element) {
-                        element.setVisualActive(false, x, y);
-                    }
-                } else if (hit) {
-                    element.setVisualActive(true, x, y);
-                } else if (!nativeEngagedElements.containsValue(element)) {
-                    element.setVisualActive(false, x, y);
-                }
-            }
-
-            // Stick/trackpad position update (always for engaged element, even outside bounds)
-            if ((hit || element == engagedElem) && (element.getType() == ControlElement.Type.STICK || element.getType() == ControlElement.Type.TRACKPAD)) {
-                android.graphics.PointF pos = element.getCurrentPosition();
-                float halfSize = snappingSize * 6.0f * element.getScale();
-                float dx = x - element.getX();
-                float dy = y - element.getY();
-                float distSq = dx * dx + dy * dy;
-                if (distSq > halfSize * halfSize) {
-                    float dist = (float)Math.sqrt(distSq);
-                    dx = dx / dist * halfSize;
-                    dy = dy / dist * halfSize;
-                }
-                pos.x = element.getX() + dx;
-                pos.y = element.getY() + dy;
-                invalidate();
-            }
+        List<ControlElement> elements = profile.getElements();
+        int count = elements.size();
+        for (int i = 0; i < count && i * 5 + 4 < visualActive.length && i * 2 + 1 < visualPositions.length; i++) {
+            ControlElement e = elements.get(i);
+            int base = i * 5;
+            e.syncVisualState(
+                visualActive[base] != 0,
+                visualPositions[i * 2],
+                visualPositions[i * 2 + 1],
+                visualActive[base + 1] != 0,
+                visualActive[base + 2] != 0,
+                visualActive[base + 3] != 0,
+                visualActive[base + 4] != 0
+            );
         }
+        invalidate();
     }
 
     private void deactivateAllElements() {
@@ -590,10 +545,12 @@ public class InputControlsView extends View {
         element.setVisualActive(true);
         element.setDoubleTapScale(1.15f);
         element.setDoubleTapWaiting(true);
+        dtWaitingElements.add(element);
         dtVisualHandler.removeCallbacksAndMessages(null);
         dtVisualHandler.postDelayed(() -> {
             element.resetDoubleTapVisual();
             element.setDoubleTapWaiting(false);
+            dtWaitingElements.remove(element);
         }, timeoutMs);
     }
 
@@ -763,37 +720,24 @@ public class InputControlsView extends View {
     public boolean onTouchEvent(MotionEvent event) {
         resetTouchscreenTimeout();
 
-        // Route through native processor when active
+        // Route through native processor when active - single JNI call per event
         if (nativeTouchProcessor != null && !editMode) {
             int action = event.getActionMasked();
             int actionIndex = event.getActionIndex();
             int pointerId = event.getPointerId(actionIndex);
+            // Ensure visual state buffers are allocated
+            int elemCount = profile != null ? profile.getElements().size() : 0;
+            if (visualPositions == null || visualPositions.length < elemCount * 2 + 16) {
+                visualPositions = new float[elemCount * 2 + 16];
+                visualActive = new byte[elemCount * 5 + 32];
+            }
             switch (action) {
                 case MotionEvent.ACTION_DOWN:
                 case MotionEvent.ACTION_POINTER_DOWN: {
                     float x = event.getX(actionIndex);
                     float y = event.getY(actionIndex);
-                    nativeTouchProcessor.onFingerDown(pointerId, x, y);
-                    if (profile != null) {
-                        TouchActivationMode actMode = profile.getTouchActivationMode();
-                        ControlElement hit = hitTestElement(x, y);
-                        if (hit != null) {
-                            nativeEngagedElements.put(pointerId, hit);
-                            if (hit.hasDoubleTapBinding() && hit.isDoubleTapWaiting()) {
-                                hit.setDoubleTapScale(1.5f);
-                                hit.setDoubleTapWaiting(false);
-                                dtVisualHandler.removeCallbacksAndMessages(null);
-                            }
-                            if (actMode == TouchActivationMode.TRACK) {
-                                ArrayList<ControlElement> tracked = new ArrayList<>();
-                                tracked.add(hit);
-                                trackedButtons.put(pointerId, tracked);
-                            } else if (actMode == TouchActivationMode.HOVER) {
-                                hoveredButtons.put(pointerId, hit);
-                            }
-                        }
-                        updateVisualForPointer(pointerId, x, y);
-                    }
+                    nativeTouchProcessor.onFingerDown(pointerId, x, y, visualPositions, visualActive);
+                    applyVisualStates();
                     return true;
                 }
                 case MotionEvent.ACTION_MOVE: {
@@ -801,63 +745,24 @@ public class InputControlsView extends View {
                         int pid = event.getPointerId(i);
                         int idx = event.findPointerIndex(pid);
                         if (idx >= 0) {
-                            nativeTouchProcessor.onFingerMove(pid, event.getX(idx), event.getY(idx));
+                            nativeTouchProcessor.onFingerMove(pid, event.getX(idx), event.getY(idx), visualPositions, visualActive);
                         }
                     }
-                    if (profile != null) {
-                        for (int i = 0; i < event.getPointerCount(); i++) {
-                            int pid = event.getPointerId(i);
-                            int idx = event.findPointerIndex(pid);
-                            if (idx >= 0) updateVisualForPointer(pid, event.getX(idx), event.getY(idx));
-                        }
-                    }
+                    applyVisualStates();
                     return true;
                 }
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_POINTER_UP: {
                     float x = event.getX(actionIndex);
                     float y = event.getY(actionIndex);
-                    nativeTouchProcessor.onFingerUp(pointerId, x, y);
-                    if (profile != null) {
-                        TouchActivationMode actMode = profile.getTouchActivationMode();
-                        ControlElement released = nativeEngagedElements.get(pointerId);
-
-                        if (released != null && released.getType() == ControlElement.Type.BUTTON &&
-                            released.hasDoubleTapBinding() && !released.isDoubleTapWaiting()) {
-                            startDoubleTapWaitVisual(released, profile.getButtonDoubleTapTimeout());
-                        } else {
-                            if (actMode == TouchActivationMode.TRACK) {
-                                ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
-                                if (tracked != null) {
-                                    for (ControlElement te : tracked) {
-                                        if (!te.isToggleSwitch() || !te.isSelected()) te.setVisualActive(false);
-                                    }
-                                }
-                                trackedButtons.remove(pointerId);
-                            }
-                            if (actMode == TouchActivationMode.HOVER) {
-                                ControlElement prev = hoveredButtons.get(pointerId);
-                                if (prev != null) prev.setVisualActive(false);
-                                hoveredButtons.remove(pointerId);
-                            }
-                            if (released != null) {
-                                if (actMode == TouchActivationMode.LOCK || actMode == TouchActivationMode.HOVER) {
-                                    released.setVisualActive(false);
-                                } else if (!released.isToggleSwitch() || !released.isSelected()) {
-                                    released.setVisualActive(false);
-                                }
-                            }
-                        }
-                        nativeEngagedElements.remove(pointerId);
-                    }
+                    nativeTouchProcessor.onFingerUp(pointerId, x, y, visualPositions, visualActive);
+                    applyVisualStates();
                     return true;
                 }
                 case MotionEvent.ACTION_CANCEL: {
                     nativeTouchProcessor.reset();
-                    nativeEngagedElements.clear();
-                    trackedButtons.clear();
-                    hoveredButtons.clear();
                     dtVisualHandler.removeCallbacksAndMessages(null);
+                    dtWaitingElements.clear();
                     if (profile != null) deactivateAllElements();
                     return true;
                 }

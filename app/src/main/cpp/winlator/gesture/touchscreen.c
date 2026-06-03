@@ -283,6 +283,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                                 } else {
                                     if (new_btn->bindings[0].type != BINDING_NONE)
                                         press_binding(result, &new_btn->bindings[0], true);
+                                    new_btn->visual_active = true;
                                 }
                             }
                             if (!new_btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER) {
@@ -297,12 +298,13 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                         int hovered = g_state.hovered_element_per_ptr[pi];
                         TouchElement* prev = (hovered >= 0 && hovered < g_state.element_count) ? &g_state.elements[hovered] : NULL;
                         TouchElement* curr = hit_test_element(x, y);
-                        if (prev && prev->current_ptr_id == f->ptr_id && (!curr || curr != prev))
-                            handle_element_up(prev, x, y, time_ms, result);
+                        if (prev && (!curr || curr != prev))
+                            release_element_bindings(prev, result);
                         if (curr && curr->type == ELEM_BUTTON && curr != prev) {
                             if (curr->current_ptr_id == -1) {
                                 if (curr->bindings[0].type != BINDING_NONE)
                                     press_binding(result, &curr->bindings[0], true);
+                                curr->visual_active = true;
                             }
                             g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
                         } else if (!curr || curr->type != ELEM_BUTTON) {
@@ -408,6 +410,7 @@ void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, T
                     e->double_tap_waiting = false;
                     e->current_ptr_id = -1;
                     e->engaged = false;
+                    e->visual_active = false;
                 }
             }
             had_tracked = true;

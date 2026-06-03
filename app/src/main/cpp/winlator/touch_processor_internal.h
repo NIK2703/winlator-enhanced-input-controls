@@ -243,4 +243,10 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, uint64_t time_ms, To
 void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
 void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
 
+// --- Activation internal helpers ---
+bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
+bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void activation_reset(void);
+
 #endif // TOUCH_PROCESSOR_INTERNAL_H

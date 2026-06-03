@@ -155,6 +155,9 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     e->down_y = y;
     e->down_time_ms = time_ms;
     e->engaged = true;
+    e->visual_active = true;
+    e->visual_x = x;
+    e->visual_y = y;
     e->gesture_swipe_triggered = false;
     e->gesture_long_press_triggered = false;
     e->gesture_double_tap_triggered = false;
@@ -204,6 +207,7 @@ void release_element_bindings(TouchElement* e, TouchActionResult* result) {
     e->double_tap_waiting = false;
     e->current_ptr_id = -1;
     e->engaged = false;
+    e->visual_active = false;
 }
 
 void touch_finger_cache_bs(TouchFinger* f) {

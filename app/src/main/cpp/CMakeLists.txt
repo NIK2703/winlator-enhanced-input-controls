@@ -40,6 +40,7 @@ target_link_libraries(winlator
 add_library(touch_processor SHARED
         winlator/touch_processor.c
         winlator/touch_processor_jni.cpp
+        winlator/touch_processor_activation.c
         winlator/gesture/types.h
         winlator/gesture/base.c
         winlator/gesture/touchscreen.c

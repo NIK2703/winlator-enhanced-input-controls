@@ -72,6 +72,9 @@ void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_
 
 void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     (void)x; (void)y;
+    e->visual_active = false;
+    e->engaged = false;
+    e->current_ptr_id = -1;
 
     int kc = range_keycode(e->range_ordinal, e->range_index);
 

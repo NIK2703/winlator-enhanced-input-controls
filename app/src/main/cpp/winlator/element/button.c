@@ -152,4 +152,5 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
 
     e->engaged = false;
     e->current_ptr_id = -1;
+    e->visual_active = false;
 }

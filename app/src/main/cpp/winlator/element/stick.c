@@ -15,6 +15,8 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
     float dy = y - e->y;
     float dist = sqrtf(dx*dx + dy*dy);
     if (dist > radius) { dx = dx / dist * radius; dy = dy / dist * radius; }
+    e->visual_x = e->x + dx;
+    e->visual_y = e->y + dy;
     float nx = dx / radius;
     float ny = dy / radius;
 
@@ -39,6 +41,8 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
 
 void element_stick_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     (void)x; (void)y; (void)time_ms;
+    e->visual_x = e->x;
+    e->visual_y = e->y;
     e->stick_value_x = 0;
     e->stick_value_y = 0;
     for (int i = 0; i < 4; i++) {
@@ -53,4 +57,5 @@ void element_stick_up(TouchElement* e, float x, float y, uint64_t time_ms, Touch
     }
     e->engaged = false;
     e->current_ptr_id = -1;
+    e->visual_active = false;
 }
