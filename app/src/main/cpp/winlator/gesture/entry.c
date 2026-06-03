@@ -1,6 +1,6 @@
 #include "../touch_processor_internal.h"
 
-void touchpad_finger_down(TouchFinger* f, TouchActionResult* result) {
+void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) {
     
     if (g_state.gesture_main_ptr_id < 0) {
         f->is_second_finger = false;
@@ -73,10 +73,10 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result) {
                     for (int i = 0; i < f->bindings.double_tap_count && i < 8; i++)
                         g_state.gesture_pending_double[g_state.gesture_pending_double_count++] = f->bindings.double_tap[i];
                     f->single_tap_hold_delay_ms = g_state.cfg.double_tap_timeout_ms;
-                    f->single_tap_hold_timer = now_ms();
+                    f->single_tap_hold_timer = time_ms;
                 } else if (g_state.cfg.single_tap_delay_ms > 0) {
                     f->single_tap_hold_delay_ms = g_state.cfg.single_tap_delay_ms;
-                    f->single_tap_hold_timer = now_ms();
+                    f->single_tap_hold_timer = time_ms;
                 } else {
                     hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
                 }
@@ -178,7 +178,7 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result) {
                 }
             }
             // Java: resetLongPressTimer() — clear and repost long-press timer
-            f->down_time_ms = now_ms();
+            f->down_time_ms = time_ms;
             if (f->bindings.single_tap_count > 0 || f->bindings.long_press_count > 0 || f->bindings.double_tap_count > 0
                 || f->bindings.single_tap_drag_count > 0 || f->bindings.long_press_drag_count > 0 || f->bindings.double_tap_drag_count > 0)
                 g_state.gesture_handler_active = true;
@@ -194,10 +194,10 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result) {
                     // Second finger: use per-finger state, don't overwrite first-finger
                     // globals g_state.gesture_deferred_tap[] / g_state.gesture_pending_double[]
                     f->single_tap_hold_delay_ms = g_state.cfg.double_tap_timeout_ms;
-                    f->single_tap_hold_timer = now_ms();
+                    f->single_tap_hold_timer = time_ms;
                 } else if (g_state.cfg.single_tap_delay_ms > 0) {
                     f->single_tap_hold_delay_ms = g_state.cfg.single_tap_delay_ms;
-                    f->single_tap_hold_timer = now_ms();
+                    f->single_tap_hold_timer = time_ms;
                 } else {
                     hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
                 }
@@ -213,7 +213,7 @@ static inline void cleanup_main_finger(void) {
     g_state.gesture_pending_deferred_double_count = 0;
     g_state.gesture_main_ptr_id = -1;
 }
-void touchpad_finger_up(TouchFinger* f, TouchActionResult* result) {
+void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) {
     if (f->is_second_finger) {
         if (g_state.gesture_is_action_held) {
             f->second_double_tap_waiting = false;
@@ -221,7 +221,7 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result) {
             f->pending_second_double_count = 0;
         } else if (f->second_tap_fallback_count > 0 && f->cached_has_active_double_tap) {
             f->second_double_tap_waiting = true;
-            f->second_tap_fallback_time = now_ms();
+            f->second_tap_fallback_time = time_ms;
         } else if (f->second_tap_fallback_count > 0) {
             execute_actions(result, f->second_tap_fallback, f->second_tap_fallback_count);
             f->second_tap_fallback_count = 0;
@@ -259,14 +259,14 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result) {
     switch (f->state) {
         case GESTURE_STATE_TAP_WAITING: {
             if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD
-                && !(f->travel_x < MAX_TAP_TRAVEL && f->travel_y < MAX_TAP_TRAVEL && (now_ms() - f->down_time_ms) < TAP_MAX_TIME_MS)) {
+                && !(f->travel_x < MAX_TAP_TRAVEL && f->travel_y < MAX_TAP_TRAVEL && (time_ms - f->down_time_ms) < TAP_MAX_TIME_MS)) {
                 release_held_actions(result);
                 g_state.gesture_double_tap_waiting = false;
                 cleanup_main_finger();
                 f->active = false;
                 break;
             }
-            handle_tap_up(f, result);
+            handle_tap_up(f, result, time_ms);
             release_held_actions(result);
             g_state.gesture_main_ptr_id = -1;
             f->active = false;

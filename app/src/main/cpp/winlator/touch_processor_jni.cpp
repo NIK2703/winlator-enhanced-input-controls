@@ -234,11 +234,9 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeSetElements(
         elems[i].w = env->GetFloatField(je, env->GetFieldID(elemClass, "w", "F"));
         elems[i].h = env->GetFloatField(je, env->GetFieldID(elemClass, "h", "F"));
         elems[i].scale = env->GetFloatField(je, env->GetFieldID(elemClass, "scale", "F"));
-        elems[i].corner_radius = env->GetFloatField(je, env->GetFieldID(elemClass, "cornerRadius", "F"));
         elems[i].passthrough_touch = env->GetBooleanField(je, env->GetFieldID(elemClass, "passthroughTouch", "Z"));
         elems[i].activation_mode = (ActivationMode)env->GetIntField(je, env->GetFieldID(elemClass, "activationMode", "I"));
         elems[i].toggle_switch = env->GetBooleanField(je, env->GetFieldID(elemClass, "toggleSwitch", "Z"));
-        elems[i].opacity = env->GetFloatField(je, env->GetFieldID(elemClass, "opacity", "F"));
 
         // Range button fields
         jfieldID range_ord_id = env->GetFieldID(elemClass, "rangeOrdinal", "I");
@@ -291,7 +289,6 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeSetElements(
 
         elems[i].current_ptr_id = -1;
         elems[i].engaged = false;
-        elems[i].num_petals = 4;
         for (int p = 0; p < MAX_PETALS; p++) elems[i].petal_active[p] = false;
 
         env->DeleteLocalRef(je);

@@ -106,6 +106,7 @@ public class InputControlsView extends View {
 
     private final SparseArray<ControlElement> hoveredButtons = new SparseArray<>();
     private final SparseArray<ArrayList<ControlElement>> trackedButtons = new SparseArray<>();
+    private final android.os.Handler dtVisualHandler = new android.os.Handler(android.os.Looper.getMainLooper());
 
     private ControlElement findButtonAt(float x, float y) {
         for (ControlElement element : profile.getElements()) {
@@ -559,10 +560,10 @@ public class InputControlsView extends View {
                 }
             }
 
-            // Stick/trackpad position update
-            if (hit && (element.getType() == ControlElement.Type.STICK || element.getType() == ControlElement.Type.TRACKPAD)) {
+            // Stick/trackpad position update (always for engaged element, even outside bounds)
+            if ((hit || element == engagedElem) && (element.getType() == ControlElement.Type.STICK || element.getType() == ControlElement.Type.TRACKPAD)) {
                 android.graphics.PointF pos = element.getCurrentPosition();
-                float halfSize = snappingSize * 6.0f;
+                float halfSize = snappingSize * 6.0f * element.getScale();
                 float dx = x - element.getX();
                 float dy = y - element.getY();
                 float distSq = dx * dx + dy * dy;
@@ -583,6 +584,17 @@ public class InputControlsView extends View {
         for (ControlElement element : profile.getElements()) {
             element.setVisualActive(false);
         }
+    }
+
+    private void startDoubleTapWaitVisual(ControlElement element, int timeoutMs) {
+        element.setVisualActive(true);
+        element.setDoubleTapScale(1.15f);
+        element.setDoubleTapWaiting(true);
+        dtVisualHandler.removeCallbacksAndMessages(null);
+        dtVisualHandler.postDelayed(() -> {
+            element.resetDoubleTapVisual();
+            element.setDoubleTapWaiting(false);
+        }, timeoutMs);
     }
 
     public XServer getXServer() {
@@ -767,6 +779,11 @@ public class InputControlsView extends View {
                         ControlElement hit = hitTestElement(x, y);
                         if (hit != null) {
                             nativeEngagedElements.put(pointerId, hit);
+                            if (hit.hasDoubleTapBinding() && hit.isDoubleTapWaiting()) {
+                                hit.setDoubleTapScale(1.5f);
+                                hit.setDoubleTapWaiting(false);
+                                dtVisualHandler.removeCallbacksAndMessages(null);
+                            }
                             if (actMode == TouchActivationMode.TRACK) {
                                 ArrayList<ControlElement> tracked = new ArrayList<>();
                                 tracked.add(hit);
@@ -803,26 +820,32 @@ public class InputControlsView extends View {
                     nativeTouchProcessor.onFingerUp(pointerId, x, y);
                     if (profile != null) {
                         TouchActivationMode actMode = profile.getTouchActivationMode();
-                        if (actMode == TouchActivationMode.TRACK) {
-                            ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
-                            if (tracked != null) {
-                                for (ControlElement te : tracked) {
-                                    if (!te.isToggleSwitch() || !te.isSelected()) te.setVisualActive(false);
-                                }
-                            }
-                            trackedButtons.remove(pointerId);
-                        }
-                        if (actMode == TouchActivationMode.HOVER) {
-                            ControlElement prev = hoveredButtons.get(pointerId);
-                            if (prev != null) prev.setVisualActive(false);
-                            hoveredButtons.remove(pointerId);
-                        }
                         ControlElement released = nativeEngagedElements.get(pointerId);
-                        if (released != null) {
-                            if (actMode == TouchActivationMode.LOCK || actMode == TouchActivationMode.HOVER) {
-                                released.setVisualActive(false);
-                            } else if (!released.isToggleSwitch() || !released.isSelected()) {
-                                released.setVisualActive(false);
+
+                        if (released != null && released.getType() == ControlElement.Type.BUTTON &&
+                            released.hasDoubleTapBinding() && !released.isDoubleTapWaiting()) {
+                            startDoubleTapWaitVisual(released, profile.getButtonDoubleTapTimeout());
+                        } else {
+                            if (actMode == TouchActivationMode.TRACK) {
+                                ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
+                                if (tracked != null) {
+                                    for (ControlElement te : tracked) {
+                                        if (!te.isToggleSwitch() || !te.isSelected()) te.setVisualActive(false);
+                                    }
+                                }
+                                trackedButtons.remove(pointerId);
+                            }
+                            if (actMode == TouchActivationMode.HOVER) {
+                                ControlElement prev = hoveredButtons.get(pointerId);
+                                if (prev != null) prev.setVisualActive(false);
+                                hoveredButtons.remove(pointerId);
+                            }
+                            if (released != null) {
+                                if (actMode == TouchActivationMode.LOCK || actMode == TouchActivationMode.HOVER) {
+                                    released.setVisualActive(false);
+                                } else if (!released.isToggleSwitch() || !released.isSelected()) {
+                                    released.setVisualActive(false);
+                                }
                             }
                         }
                         nativeEngagedElements.remove(pointerId);
@@ -834,6 +857,7 @@ public class InputControlsView extends View {
                     nativeEngagedElements.clear();
                     trackedButtons.clear();
                     hoveredButtons.clear();
+                    dtVisualHandler.removeCallbacksAndMessages(null);
                     if (profile != null) deactivateAllElements();
                     return true;
                 }

@@ -8,7 +8,6 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     g_state.main_ptr_id = -1;
     g_state.gesture_main_ptr_id = -1;
     g_state.gesture_second_ptr_id = -1;
-    g_state.second_double_tap_ptr_id = -1;
     g_state.finger_pointer_left = -1;
     g_state.finger_pointer_right = -1;
     g_state.long_tap_mode = (config->second_finger_mode == SECOND_FINGER_LONG_TAP);
@@ -22,12 +21,13 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     if (g_state.cfg.cursor_acceleration_factor <= 0.0f) g_state.cfg.cursor_acceleration_factor = 1.25f;
     if (g_state.cfg.xform_scale_x <= 0.0f) g_state.cfg.xform_scale_x = 1.0f;
     if (g_state.cfg.xform_scale_y <= 0.0f) g_state.cfg.xform_scale_y = 1.0f;
-    
+    g_state.cfg.bindings_generation = 1;
 }
 
 void touch_processor_update_config(const TouchProcessorConfig* config) {
     memcpy(&g_state.cfg, config, sizeof(TouchProcessorConfig));
     g_state.long_tap_mode = (config->second_finger_mode == SECOND_FINGER_LONG_TAP);
+    g_state.cfg.bindings_generation++;
 }
 
 void touch_processor_set_elements(const TouchElement* elements, int count) {
@@ -73,10 +73,13 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
 
     // Copy all 12 FingerBindings lists from config
     FingerBindings* fb = &f->bindings;
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN)
-        COPY_FINGER_BINDINGS(fb, &g_state.cfg, ts)
-    else
-        COPY_FINGER_BINDINGS(fb, &g_state.cfg, tp)
+    if (f->bindings_generation != g_state.cfg.bindings_generation) {
+        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN)
+            COPY_FINGER_BINDINGS(fb, &g_state.cfg, ts)
+        else
+            COPY_FINGER_BINDINGS(fb, &g_state.cfg, tp)
+        f->bindings_generation = g_state.cfg.bindings_generation;
+    }
     touch_finger_cache_bs(f);
 
     switch (g_state.cfg.touch_mode) {
@@ -130,8 +133,6 @@ void touch_processor_on_finger_cancel(int ptr_id) {
     f->held_actions_count = 0;
     f->deferred_tap_count = 0;
     f->pending_double_count = 0;
-    f->drag_binding_count = 0;
-    f->dragging = false;
     f->double_tap_waiting = false;
     f->second_double_tap_waiting = false;
     f->pending_resume_action_count = 0;
@@ -244,54 +245,19 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
 }
 
 void touch_processor_reset(void) {
-    memset(g_state.fingers, 0, sizeof(g_state.fingers));
-    g_state.finger_count = 0;
+    int saved_element_count = g_state.element_count;
+    memset(&g_state, 0, sizeof(g_state));
+    g_state.element_count = saved_element_count;
     g_state.main_ptr_id = -1;
     g_state.gesture_main_ptr_id = -1;
     g_state.gesture_second_ptr_id = -1;
-    g_state.gesture_handler_active = false;
-    g_state.gesture_second_active = false;
-    g_state.gesture_is_action_held = false;
-    g_state.gesture_held_count = 0;
-    g_state.gesture_deferred_tap_count = 0;
-    g_state.gesture_pending_double_count = 0;
-    g_state.gesture_pending_deferred_double_count = 0;
-    g_state.gesture_post_double_tap_drag = false;
-    g_state.gesture_double_tap_consumed = false;
-    g_state.gesture_double_tap_waiting = false;
-    g_state.gesture_double_tap_start_time = 0;
-    g_state.gesture_deferred_second_finger_tap = false;
-    g_state.second_double_tap_ptr_id = -1;
-    g_state.scroll_accum_y = 0;
-    g_state.passthrough_active = false;
     g_state.finger_pointer_left = -1;
     g_state.finger_pointer_right = -1;
-    memset(g_state.tracked, 0, sizeof(g_state.tracked));
-    for (int i = 0; i < MAX_FINGERS; i++) g_state.hovered_element_per_ptr[i] = -1;
-
-    for (int i = 0; i < g_state.element_count; i++) {
-        g_state.elements[i].current_ptr_id = -1;
-        g_state.elements[i].engaged = false;
-        g_state.elements[i].gesture_long_press_triggered = false;
-        g_state.elements[i].gesture_double_tap_triggered = false;
-        g_state.elements[i].gesture_swipe_triggered = false;
-        g_state.elements[i].double_tap_waiting = false;
-        g_state.elements[i].long_press_arm = false;
-        g_state.elements[i].range_hold_pressed = false;
-        g_state.elements[i].range_pending_tap_release = false;
-        g_state.elements[i].range_tap_release_time = 0;
-    }
-
-    g_state.last_mouse_move_action = 0;
-
-    g_state.pending_left_release_time = 0;
     g_state.pending_left_release_ptr_id = -1;
-    g_state.pending_right_release_time = 0;
     g_state.pending_right_release_ptr_id = -1;
-    g_state.sim_click_press_time = 0;
-    g_state.sim_continue_click = false;
     g_state.sim_click_ptr_id = -1;
-    g_state.sim_click_release_time = 0;
+    for (int i = 0; i < MAX_FINGERS; i++) g_state.hovered_element_per_ptr[i] = -1;
+    for (int i = 0; i < g_state.element_count; i++) g_state.elements[i].current_ptr_id = -1;
 }
 
 bool touch_processor_is_passthrough_active(void) { return g_state.passthrough_active; }

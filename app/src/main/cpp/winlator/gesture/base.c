@@ -217,7 +217,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
     }
 }
 
-void handle_tap_up(TouchFinger* f, TouchActionResult* result) {
+void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) {
     // Java GestureHandler.handleTapUp: sleep singleTapDelay before processing
     if (g_state.cfg.single_tap_delay_ms > 0) {
         struct timespec ts_delay;
@@ -287,7 +287,7 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result) {
         for (int i = 0; i < fb->double_tap_count && i < 8; i++)
             g_state.gesture_pending_deferred_double[g_state.gesture_pending_deferred_double_count++] = fb->double_tap[i];
         g_state.gesture_double_tap_waiting = true;
-        g_state.gesture_double_tap_start_time = now_ms();
+        g_state.gesture_double_tap_start_time = time_ms;
         g_state.gesture_last_tap_up_x = f->tap_up_x;
         g_state.gesture_last_tap_up_y = f->tap_up_y;
         f->state = GESTURE_STATE_DOUBLE_TAP_WAITING;
@@ -300,7 +300,7 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result) {
         if (f->cached_has_active_double_tap_drag) {
             
             g_state.gesture_double_tap_waiting = true;
-            g_state.gesture_double_tap_start_time = now_ms();
+            g_state.gesture_double_tap_start_time = time_ms;
             f->state = GESTURE_STATE_DOUBLE_TAP_WAITING;
         } else {
             f->state = GESTURE_STATE_IDLE;

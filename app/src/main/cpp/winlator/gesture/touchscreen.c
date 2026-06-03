@@ -146,7 +146,7 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
         g_state.ptr_x = x;
         g_state.ptr_y = y;
 
-        touchpad_finger_down(f, result);
+        touchpad_finger_down(f, result, time_ms);
     } else if (f->ptr_id != g_state.gesture_main_ptr_id) {
         if (g_state.long_tap_mode) {
             return;
@@ -245,7 +245,7 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
         }
         release_held_actions(result);
 
-        touchpad_finger_down(f, result);
+        touchpad_finger_down(f, result, time_ms);
     }
 }
 
@@ -277,9 +277,15 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                             if (tb->element_indices[j] == (int)(new_btn - g_state.elements)) { already = true; break; }
                         }
                         if (!already) {
-                            if (new_btn->current_ptr_id == -1)
-                                handle_element_down(new_btn, f->ptr_id, x, y, time_ms, result);
-                            if (new_btn->current_ptr_id == f->ptr_id && !new_btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER) {
+                            if (new_btn->current_ptr_id == -1) {
+                                if (tb->count == 0) {
+                                    handle_element_down(new_btn, f->ptr_id, x, y, time_ms, result);
+                                } else {
+                                    if (new_btn->bindings[0].type != BINDING_NONE)
+                                        press_binding(result, &new_btn->bindings[0], true);
+                                }
+                            }
+                            if (!new_btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER) {
                                 if (tb->count == 1) first->long_press_arm = false;
                                 tb->element_indices[tb->count++] = (int)(new_btn - g_state.elements);
                             }
@@ -294,8 +300,10 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                         if (prev && prev->current_ptr_id == f->ptr_id && (!curr || curr != prev))
                             handle_element_up(prev, x, y, time_ms, result);
                         if (curr && curr->type == ELEM_BUTTON && curr != prev) {
-                            if (curr->current_ptr_id == -1)
-                                handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
+                            if (curr->current_ptr_id == -1) {
+                                if (curr->bindings[0].type != BINDING_NONE)
+                                    press_binding(result, &curr->bindings[0], true);
+                            }
                             g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
                         } else if (!curr || curr->type != ELEM_BUTTON) {
                             g_state.hovered_element_per_ptr[pi] = -1;
@@ -376,9 +384,30 @@ void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, T
                 int idx = tb->element_indices[j];
                 if (idx >= 0 && idx < g_state.element_count) {
                     TouchElement* e = &g_state.elements[idx];
-                    if (e->current_ptr_id == f->ptr_id) {
-                        release_element_bindings(e, result);
+                    if (e->bindings[0].type != BINDING_NONE)
+                        release_binding(result, &e->bindings[0]);
+                    if (e->gesture_swipe_triggered) {
+                        for (int k = e->element_gesture_count - 1; k >= 0; k--)
+                            if (e->element_gesture[k].type != BINDING_NONE)
+                                release_binding(result, &e->element_gesture[k]);
                     }
+                    if (e->gesture_long_press_triggered) {
+                        for (int k = e->element_long_press_count - 1; k >= 0; k--)
+                            if (e->element_long_press[k].type != BINDING_NONE)
+                                release_binding(result, &e->element_long_press[k]);
+                    }
+                    if (e->gesture_double_tap_triggered) {
+                        for (int k = e->element_double_tap_count - 1; k >= 0; k--)
+                            if (e->element_double_tap[k].type != BINDING_NONE)
+                                release_binding(result, &e->element_double_tap[k]);
+                    }
+                    e->long_press_arm = false;
+                    e->gesture_long_press_triggered = false;
+                    e->gesture_swipe_triggered = false;
+                    e->gesture_double_tap_triggered = false;
+                    e->double_tap_waiting = false;
+                    e->current_ptr_id = -1;
+                    e->engaged = false;
                 }
             }
             had_tracked = true;
@@ -412,7 +441,7 @@ void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, T
         f->pending_resume_action_count = 0;
         f->double_tap_original_id_set = false;
 
-        touchpad_finger_up(f, result);
+        touchpad_finger_up(f, result, time_ms);
 
         // Java: always clears secondFingerActive when main finger lifts
         g_state.gesture_second_active = false;

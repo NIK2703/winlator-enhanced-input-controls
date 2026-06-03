@@ -124,7 +124,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, uint64_t time_ms, To
     if (g_state.gesture_main_ptr_id >= 0) {
         release_held_actions(result);
     }
-    touchpad_finger_down(f, result);
+    touchpad_finger_down(f, result, time_ms);
 }
 
 void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
@@ -158,18 +158,22 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
                             if (tb->element_indices[j] == (int)(new_btn - g_state.elements)) { already = true; break; }
                         }
                         if (!already) {
-                            // Java: handleTouchDown called for BOTH passthrough and non-passthrough new buttons at point
+                            // Java: first tracked button uses handleTouchDown (sets pointer for gesture);
+                            // subsequent tracked buttons use activate() — press primary binding only, no gesture
                             if (new_btn->current_ptr_id == -1) {
-                                handle_element_down(new_btn, f->ptr_id, x, y, time_ms, result);
+                                if (tb->count == 0) {
+                                    handle_element_down(new_btn, f->ptr_id, x, y, time_ms, result);
+                                } else {
+                                    if (new_btn->bindings[0].type != BINDING_NONE)
+                                        press_binding(result, &new_btn->bindings[0], true);
+                                }
                             }
-                            // Java: add to tracked only for non-passthrough, and only if engagement succeeded
-                            if (new_btn->current_ptr_id == f->ptr_id && !new_btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER) {
+                            // Add to tracked list for finger-up release
+                            if (!new_btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER) {
                                 if (tb->count == 1) {
-                                    // Java: tracked.size() == 2 → cancelPendingLongPress on first
                                     first->long_press_arm = false;
                                 }
                                 tb->element_indices[tb->count++] = (int)(new_btn - g_state.elements);
-                                
                             }
                         }
                     }
@@ -183,8 +187,11 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
                         if (prev && prev->current_ptr_id == f->ptr_id && (!curr || curr != prev))
                             handle_element_up(prev, x, y, time_ms, result);
                         if (curr && curr->type == ELEM_BUTTON && curr != prev) {
-                            if (curr->current_ptr_id == -1)
-                                handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
+                            if (curr->current_ptr_id == -1) {
+                                // Java activate(): press primary binding only (no gesture pointer)
+                                if (curr->bindings[0].type != BINDING_NONE)
+                                    press_binding(result, &curr->bindings[0], true);
+                            }
                             g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
                         } else if (!curr || curr->type != ELEM_BUTTON) {
                             g_state.hovered_element_per_ptr[pi] = -1;
@@ -312,20 +319,45 @@ void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touc
     bool had_tracked = false;
     if (tb->count > 0) {
         if (tb->count > 1) {
-            // Java: tracked.size() > 1 → deactivate each (skip full gesture processing)
+            // Java: tracked.size() > 1 → deactivate each (release bindings regardless of current_ptr_id)
             
             for (int j = 0; j < tb->count; j++) {
                 int idx = tb->element_indices[j];
                 if (idx >= 0 && idx < g_state.element_count) {
                     TouchElement* e = &g_state.elements[idx];
-                    if (e->current_ptr_id == f->ptr_id) {
-                        // Java deactivate(): cancelPendingLongPress + releaseHeldBindings
-                        // Release primary binding (pressed by activate/handle_element_down)
-                        release_element_bindings(e, result);
+                    // Java deactivate(): cancelPendingLongPress + releaseHeldBindings
+                    // Release primary binding (pressed by handle_element_down or activate)
+                    if (e->bindings[0].type != BINDING_NONE)
+                        release_binding(result, &e->bindings[0]);
+                    if (e->gesture_swipe_triggered) {
+                        for (int k = e->element_gesture_count - 1; k >= 0; k--)
+                            if (e->element_gesture[k].type != BINDING_NONE)
+                                release_binding(result, &e->element_gesture[k]);
                     }
+                    if (e->gesture_long_press_triggered) {
+                        for (int k = e->element_long_press_count - 1; k >= 0; k--)
+                            if (e->element_long_press[k].type != BINDING_NONE)
+                                release_binding(result, &e->element_long_press[k]);
+                    }
+                    if (e->gesture_double_tap_triggered) {
+                        for (int k = e->element_double_tap_count - 1; k >= 0; k--)
+                            if (e->element_double_tap[k].type != BINDING_NONE)
+                                release_binding(result, &e->element_double_tap[k]);
+                    }
+                    // Java cancelPendingLongPress: clear all gesture state
+                    e->long_press_arm = false;
+                    e->gesture_long_press_triggered = false;
+                    e->gesture_swipe_triggered = false;
+                    e->gesture_double_tap_triggered = false;
+                    e->double_tap_waiting = false;
+                    e->current_ptr_id = -1;
+                    e->engaged = false;
                 }
             }
             had_tracked = true;
+        } else {
+            // Java: tracked.size() == 1 → just clear list, handleTouchUp via outer loop
+            
         }
         memset(tb, 0, sizeof(TrackedButtons));
     }
@@ -380,7 +412,7 @@ void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touc
     }
 
     // Java: gesture handler processes finger-up BEFORE pointer button releases
-    touchpad_finger_up(f, result);
+    touchpad_finger_up(f, result, time_ms);
 
     // Java TouchpadView.releasePointerButtonLeft/Right uses 30ms postDelayed
     if (g_state.finger_pointer_left == f->ptr_id) {

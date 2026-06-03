@@ -54,9 +54,6 @@ typedef struct {
     bool gesture_is_action_held;
 
     bool second_double_tap_waiting;
-    int second_double_tap_ptr_id;
-    TouchBinding second_tap_fallback[8];
-    int second_tap_fallback_count;
 
     bool long_tap_mode;
 
@@ -99,10 +96,6 @@ typedef struct {
     int sim_click_ptr_id;
     uint64_t sim_click_release_time;
 
-    // Mouse move timer state
-    int last_mouse_move_dx;
-    int last_mouse_move_dy;
-    int last_mouse_move_action; // 0=none, 1=started
 } TouchProcessorState;
 
 extern TouchProcessorState g_state;
@@ -197,6 +190,7 @@ void touch_finger_cache_bs(TouchFinger* f);
 int detect_swipe_dir(float dx, float dy, float threshold);
 bool is_mouse_move_binding(const TouchBinding* b);
 float cubic_bezier_interpolate(float x, float cpx1, float cpy1);
+float cubic_bezier_interpolate_trackpad(float x);
 void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, TouchActionResult* result);
 void release_element_bindings(TouchElement* e, TouchActionResult* result);
 bool finger_has_engaged_element(int ptr_id);
@@ -233,11 +227,11 @@ void on_drag_start(TouchFinger* f);
 bool gesture_is_within_tap_distance(float x, float y);
 void gesture_cancel_double_tap_wait(TouchActionResult* result);
 void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* result);
-void handle_tap_up(TouchFinger* f, TouchActionResult* result);
+void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms);
 
 // Gesture — entry points (touch_processor_gesture.c)
-void touchpad_finger_down(TouchFinger* f, TouchActionResult* result);
-void touchpad_finger_up(TouchFinger* f, TouchActionResult* result);
+void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t time_ms);
+void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms);
 
 // Touchscreen mode handler (maps to TouchscreenGestureHandler.java)
 void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);

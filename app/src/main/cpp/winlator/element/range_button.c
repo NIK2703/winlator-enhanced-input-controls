@@ -2,7 +2,7 @@
 
 #define RANGE_SCROLL_THRESHOLD 10
 
-static void range_compute_sizes(TouchElement* e, float* out_cw, float* out_ch, float* out_element_size) {
+static void range_compute_sizes(const TouchElement* e, float* out_cw, float* out_ch, float* out_element_size) {
     float hs = g_state.snapping_size;
     *out_cw = hs * (e->range_binding_count * 2) * e->scale;
     *out_ch = hs * 2.0f * e->scale;

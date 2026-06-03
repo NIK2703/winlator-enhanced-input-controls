@@ -38,8 +38,8 @@ void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, 
 
         // Java CubicBezierInterpolator with control points (0.075, 0.95, 0.45, 0.95)
         // Use cubic bezier binary search for x -> y mapping
-        float interp_x = cubic_bezier_interpolate(nx, 0.075f, 0.95f);
-        float interp_y = cubic_bezier_interpolate(ny, 0.075f, 0.95f);
+        float interp_x = cubic_bezier_interpolate_trackpad(nx);
+        float interp_y = cubic_bezier_interpolate_trackpad(ny);
 
         int is_left = !is_right_stick_binding(e);
         add_action(result, ACT_GAMEPAD_AXIS, is_left, (int)(interp_x * 32767), (int)(interp_y * 32767));

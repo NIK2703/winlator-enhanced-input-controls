@@ -57,78 +57,52 @@ typedef enum {
 typedef struct {
     ElementType type;
     ElementShape shape;
-    int x, y;              // position (grid units)
-    float w, h;            // width/height (grid units)
+    int current_ptr_id;
+    uint64_t down_time_ms;
+    bool engaged;
+    bool double_tap_waiting;
+    bool long_press_arm;
+    bool gesture_long_press_triggered;
+    uint64_t gesture_last_tap_time;
+    int range_ordinal;
+    int range_index;
+    int element_long_press_count;
+    TouchBinding element_long_press[8];
+    TouchBinding bindings[4];
+
+    int x, y;
+    float w, h;
     float scale;
-    float corner_radius;
-    float opacity;
     bool passthrough_touch;
     ActivationMode activation_mode;
-
-    // Bindings per index
-    TouchBinding bindings[4];   // up to 4 binding slots
-
-    // Runtime state
-    int ptr_id;             // current touching pointer, -1 if none
     float down_x, down_y;
-    uint64_t down_time_ms;
-    bool toggle_active;     // for toggle-switch buttons
-    bool engaged;           // currently pressed/engaged
-
-    // D-Pad specific
-    int num_petals;
     bool petal_active[MAX_PETALS];
-    float dpad_center_x, dpad_center_y;
-
-    // Stick specific
-    float stick_center_x, stick_center_y;
     float stick_value_x, stick_value_y;
-
-    // Trackpad specific
     float trackpad_last_x, trackpad_last_y;
     float trackpad_vel_x, trackpad_vel_y;
     uint64_t trackpad_last_time;
-
-    // Range button
-    int range_index;        // current pressed index (cached at touch down)
-    int range_ordinal;      // 0=ALPHABET, 1=NUMBER, 2=FUNCTION, 3=NUMPAD
-    int range_max;          // max index values (26/10/12/10)
-    int range_binding_count;// visible slots
-    int range_orientation;  // 0=horizontal, 1=vertical
-    float range_scroll_offset;   // persistent scroll position (for visual)
-    float range_current_offset;  // accumulated scroll delta
-    float range_last_position;   // last touch position along scroll axis
-    bool range_scrolling;        // currently in scroll mode
-    bool range_has_binding;      // whether a valid binding was captured
-    bool range_hold_pressed;     // whether hold-mode key press was already sent by tick
-    bool range_pending_tap_release;  // deferred tap-key release (30ms after press, matching Java postDelayed)
-    uint64_t range_tap_release_time; // time_ms when deferred release should fire
-
-    // Pointer id for this element (which finger is touching it)
-    int current_ptr_id;
-
-    // Element-specific gesture bindings (separate from bindings[4] directional slots)
-    TouchBinding element_long_press[8];  int element_long_press_count;
-    TouchBinding element_gesture[8];     int element_gesture_count;
+    int range_max;
+    int range_binding_count;
+    int range_orientation;
+    float range_scroll_offset;
+    float range_current_offset;
+    float range_last_position;
+    bool range_scrolling;
+    bool range_has_binding;
+    bool range_hold_pressed;
+    bool range_pending_tap_release;
+    uint64_t range_tap_release_time;
+    TouchBinding element_gesture[8];  int element_gesture_count;
     TouchBinding element_double_tap[8];  int element_double_tap_count;
 
-    // Toggle switch
     bool toggle_switch;
-    bool selected;           // runtime toggle state
-
-    // Per-element haptic settings (from Java ControlElement.cachedButtonLongPressHaptic / gestureHaptic)
+    bool selected;
     int button_long_press_haptic;
     int button_gesture_haptic;
-
-    // Gesture state per-element
-    bool gesture_long_press_triggered;
     bool gesture_double_tap_triggered;
-    uint64_t gesture_last_tap_time;
     float gesture_tap_up_x, gesture_tap_up_y;
-    int gesture_swipe_direction; // -1 none, 0 up, 1 down, 2 left, 3 right
+    int gesture_swipe_direction;
     bool gesture_swipe_triggered;
-    bool double_tap_waiting;
-    bool long_press_arm;
 } TouchElement;
 
 // --- Gesture handler types ---
@@ -195,11 +169,7 @@ typedef struct {
     int deferred_tap_count;
     TouchBinding pending_double[8];
     int pending_double_count;
-    // Drag state
-    float drag_start_x, drag_start_y;
-    TouchBinding drag_binding[8];
-    int drag_binding_count;
-    bool dragging;
+    uint32_t bindings_generation;
 
     // Second-finger double-tap state (touchpad)
     bool second_double_tap_waiting;
@@ -308,6 +278,7 @@ typedef struct {
     TouchBinding tp_single_drag_2nd[8];  int tp_single_drag_2nd_count;
     TouchBinding tp_long_drag_2nd[8];    int tp_long_drag_2nd_count;
     TouchBinding tp_double_drag_2nd[8];  int tp_double_drag_2nd_count;
+    uint32_t bindings_generation;
 } TouchProcessorConfig;
 
 // --- Output actions ---

@@ -1,5 +1,29 @@
 #include "../touch_processor_internal.h"
 
+static void (*const element_down_handlers[])(TouchElement*, int, float, float, uint64_t, TouchActionResult*) = {
+    [ELEM_BUTTON] = element_button_down,
+    [ELEM_DPAD] = element_dpad_down,
+    [ELEM_STICK] = element_stick_down,
+    [ELEM_TRACKPAD] = element_trackpad_down,
+    [ELEM_RANGE_BUTTON] = element_range_button_down,
+};
+
+static void (*const element_move_handlers[])(TouchElement*, float, float, uint64_t, TouchActionResult*) = {
+    [ELEM_BUTTON] = element_button_move,
+    [ELEM_DPAD] = element_dpad_move,
+    [ELEM_STICK] = element_stick_move,
+    [ELEM_TRACKPAD] = element_trackpad_move,
+    [ELEM_RANGE_BUTTON] = element_range_button_move,
+};
+
+static void (*const element_up_handlers[])(TouchElement*, float, float, uint64_t, TouchActionResult*) = {
+    [ELEM_BUTTON] = element_button_up,
+    [ELEM_DPAD] = element_dpad_up,
+    [ELEM_STICK] = element_stick_up,
+    [ELEM_TRACKPAD] = element_trackpad_up,
+    [ELEM_RANGE_BUTTON] = element_range_button_up,
+};
+
 bool point_in_element(float px, float py, const TouchElement* e) {
     float hs = g_state.snapping_size;
     float cx = e->x;
@@ -75,6 +99,10 @@ float cubic_bezier_interpolate(float x, float cpx1, float cpy1) {
     return x > 0 ? by : -by;
 }
 
+float cubic_bezier_interpolate_trackpad(float x) {
+    return cubic_bezier_interpolate(x, 0.075f, 0.95f);
+}
+
 int detect_swipe_dir(float dx, float dy, float threshold) {
     if (fabsf(dx) < threshold && fabsf(dy) < threshold) return -1;
     if (fabsf(dx) > fabsf(dy)) return dx > 0 ? 3 : 2;
@@ -134,36 +162,21 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     e->long_press_arm = false;
     
 
-    switch (e->type) {
-        case ELEM_BUTTON: element_button_down(e, ptr_id, x, y, time_ms, result); break;
-        case ELEM_DPAD: element_dpad_down(e, ptr_id, x, y, time_ms, result); break;
-        case ELEM_STICK: element_stick_down(e, ptr_id, x, y, time_ms, result); break;
-        case ELEM_TRACKPAD: element_trackpad_down(e, ptr_id, x, y, time_ms, result); break;
-        case ELEM_RANGE_BUTTON: element_range_button_down(e, ptr_id, x, y, time_ms, result); break;
-        default: break;
-    }
+    int idx = e->type;
+    if (idx >= 0 && idx < (int)(sizeof(element_down_handlers)/sizeof(element_down_handlers[0])) && element_down_handlers[idx])
+        element_down_handlers[idx](e, ptr_id, x, y, time_ms, result);
 }
 
 void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
-    switch (e->type) {
-        case ELEM_BUTTON: element_button_move(e, x, y, time_ms, result); break;
-        case ELEM_DPAD: element_dpad_move(e, x, y, time_ms, result); break;
-        case ELEM_STICK: element_stick_move(e, x, y, time_ms, result); break;
-        case ELEM_TRACKPAD: element_trackpad_move(e, x, y, time_ms, result); break;
-        case ELEM_RANGE_BUTTON: element_range_button_move(e, x, y, time_ms, result); break;
-        default: break;
-    }
+    int idx = e->type;
+    if (idx >= 0 && idx < (int)(sizeof(element_move_handlers)/sizeof(element_move_handlers[0])) && element_move_handlers[idx])
+        element_move_handlers[idx](e, x, y, time_ms, result);
 }
 
 void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
-    switch (e->type) {
-        case ELEM_BUTTON: element_button_up(e, x, y, time_ms, result); break;
-        case ELEM_DPAD: element_dpad_up(e, x, y, time_ms, result); break;
-        case ELEM_STICK: element_stick_up(e, x, y, time_ms, result); break;
-        case ELEM_TRACKPAD: element_trackpad_up(e, x, y, time_ms, result); break;
-        case ELEM_RANGE_BUTTON: element_range_button_up(e, x, y, time_ms, result); break;
-        default: break;
-    }
+    int idx = e->type;
+    if (idx >= 0 && idx < (int)(sizeof(element_up_handlers)/sizeof(element_up_handlers[0])) && element_up_handlers[idx])
+        element_up_handlers[idx](e, x, y, time_ms, result);
 }
 
 void release_element_bindings(TouchElement* e, TouchActionResult* result) {
