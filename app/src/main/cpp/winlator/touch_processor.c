@@ -76,35 +76,13 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     f->travel_x = 0; f->travel_y = 0;
     f->is_tap = true;
 
-    // Copy all 12 FingerBindings lists from config (6 first-finger + 6 second-finger)
+    // Copy all 12 FingerBindings lists from config
     FingerBindings* fb = &f->bindings;
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
-        memcpy(fb->single_tap, g_state.cfg.ts_single_tap, sizeof(g_state.cfg.ts_single_tap)); fb->single_tap_count = g_state.cfg.ts_single_tap_count;
-        memcpy(fb->long_press, g_state.cfg.ts_long_press, sizeof(g_state.cfg.ts_long_press)); fb->long_press_count = g_state.cfg.ts_long_press_count;
-        memcpy(fb->double_tap, g_state.cfg.ts_double_tap, sizeof(g_state.cfg.ts_double_tap)); fb->double_tap_count = g_state.cfg.ts_double_tap_count;
-        memcpy(fb->single_tap_drag, g_state.cfg.ts_single_tap_drag, sizeof(g_state.cfg.ts_single_tap_drag)); fb->single_tap_drag_count = g_state.cfg.ts_single_tap_drag_count;
-        memcpy(fb->long_press_drag, g_state.cfg.ts_long_press_drag, sizeof(g_state.cfg.ts_long_press_drag)); fb->long_press_drag_count = g_state.cfg.ts_long_press_drag_count;
-        memcpy(fb->double_tap_drag, g_state.cfg.ts_double_tap_drag, sizeof(g_state.cfg.ts_double_tap_drag)); fb->double_tap_drag_count = g_state.cfg.ts_double_tap_drag_count;
-        memcpy(fb->single_tap_2nd, g_state.cfg.ts_single_2nd, sizeof(g_state.cfg.ts_single_2nd)); fb->single_tap_2nd_count = g_state.cfg.ts_single_2nd_count;
-        memcpy(fb->long_press_2nd, g_state.cfg.ts_long_2nd, sizeof(g_state.cfg.ts_long_2nd)); fb->long_press_2nd_count = g_state.cfg.ts_long_2nd_count;
-        memcpy(fb->double_tap_2nd, g_state.cfg.ts_double_2nd, sizeof(g_state.cfg.ts_double_2nd)); fb->double_tap_2nd_count = g_state.cfg.ts_double_2nd_count;
-        memcpy(fb->single_tap_drag_2nd, g_state.cfg.ts_single_drag_2nd, sizeof(g_state.cfg.ts_single_drag_2nd)); fb->single_tap_drag_2nd_count = g_state.cfg.ts_single_drag_2nd_count;
-        memcpy(fb->long_press_drag_2nd, g_state.cfg.ts_long_drag_2nd, sizeof(g_state.cfg.ts_long_drag_2nd)); fb->long_press_drag_2nd_count = g_state.cfg.ts_long_drag_2nd_count;
-        memcpy(fb->double_tap_drag_2nd, g_state.cfg.ts_double_drag_2nd, sizeof(g_state.cfg.ts_double_drag_2nd)); fb->double_tap_drag_2nd_count = g_state.cfg.ts_double_drag_2nd_count;
-    } else {
-        memcpy(fb->single_tap, g_state.cfg.tp_single_tap, sizeof(g_state.cfg.tp_single_tap)); fb->single_tap_count = g_state.cfg.tp_single_tap_count;
-        memcpy(fb->long_press, g_state.cfg.tp_long_press, sizeof(g_state.cfg.tp_long_press)); fb->long_press_count = g_state.cfg.tp_long_press_count;
-        memcpy(fb->double_tap, g_state.cfg.tp_double_tap, sizeof(g_state.cfg.tp_double_tap)); fb->double_tap_count = g_state.cfg.tp_double_tap_count;
-        memcpy(fb->single_tap_drag, g_state.cfg.tp_single_tap_drag, sizeof(g_state.cfg.tp_single_tap_drag)); fb->single_tap_drag_count = g_state.cfg.tp_single_tap_drag_count;
-        memcpy(fb->long_press_drag, g_state.cfg.tp_long_press_drag, sizeof(g_state.cfg.tp_long_press_drag)); fb->long_press_drag_count = g_state.cfg.tp_long_press_drag_count;
-        memcpy(fb->double_tap_drag, g_state.cfg.tp_double_tap_drag, sizeof(g_state.cfg.tp_double_tap_drag)); fb->double_tap_drag_count = g_state.cfg.tp_double_tap_drag_count;
-        memcpy(fb->single_tap_2nd, g_state.cfg.tp_single_2nd, sizeof(g_state.cfg.tp_single_2nd)); fb->single_tap_2nd_count = g_state.cfg.tp_single_2nd_count;
-        memcpy(fb->long_press_2nd, g_state.cfg.tp_long_2nd, sizeof(g_state.cfg.tp_long_2nd)); fb->long_press_2nd_count = g_state.cfg.tp_long_2nd_count;
-        memcpy(fb->double_tap_2nd, g_state.cfg.tp_double_2nd, sizeof(g_state.cfg.tp_double_2nd)); fb->double_tap_2nd_count = g_state.cfg.tp_double_2nd_count;
-        memcpy(fb->single_tap_drag_2nd, g_state.cfg.tp_single_drag_2nd, sizeof(g_state.cfg.tp_single_drag_2nd)); fb->single_tap_drag_2nd_count = g_state.cfg.tp_single_drag_2nd_count;
-        memcpy(fb->long_press_drag_2nd, g_state.cfg.tp_long_drag_2nd, sizeof(g_state.cfg.tp_long_drag_2nd)); fb->long_press_drag_2nd_count = g_state.cfg.tp_long_drag_2nd_count;
-        memcpy(fb->double_tap_drag_2nd, g_state.cfg.tp_double_drag_2nd, sizeof(g_state.cfg.tp_double_drag_2nd)); fb->double_tap_drag_2nd_count = g_state.cfg.tp_double_drag_2nd_count;
-    }
+    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN)
+        COPY_FINGER_BINDINGS(fb, &g_state.cfg, ts)
+    else
+        COPY_FINGER_BINDINGS(fb, &g_state.cfg, tp)
+    touch_finger_cache_bs(f);
 
     // Check passthrough
     g_state.passthrough_active = false;

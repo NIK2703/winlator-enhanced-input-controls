@@ -139,3 +139,16 @@ void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
         default: break;
     }
 }
+
+void touch_finger_cache_bs(TouchFinger* f) {
+    GestureBindingSet bs = gesture_build_binding_set(&f->bindings);
+    f->cached_has_active_single_tap = bs.has_active_single_tap;
+    f->cached_has_active_double_tap = bs.has_active_double_tap;
+    f->cached_has_active_long_press = bs.has_active_long_press;
+    f->cached_has_active_single_tap_drag = bs.has_active_single_tap_drag;
+    f->cached_has_active_long_press_drag = bs.has_active_long_press_drag;
+    f->cached_has_active_double_tap_drag = bs.has_active_double_tap_drag;
+    f->cached_can_hold_long_press = bs.can_hold_long_press;
+    f->cached_has_long_press_timer = bs.has_long_press_timer;
+}
+

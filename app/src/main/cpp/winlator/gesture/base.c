@@ -144,52 +144,59 @@ void check_start_drag(TouchFinger* f, float dx, float dy, uint64_t time_ms, Touc
 }
 
 void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
-    // Long-press timer — mirrors GestureHandler.onLongPressTimer()
+    // Single merged loop: long-press, single-tap-hold, second-finger double-tap
     for (int i = 0; i < MAX_FINGERS; i++) {
         TouchFinger* f = &g_state.fingers[i];
-        if (!f->active || f->state != GESTURE_STATE_TAP_WAITING) continue;
-        GestureBindingSet bs = gesture_build_binding_set(&f->bindings);
-        // Java: in longTapMode, TouchscreenGestureHandler posts timer unconditionally
-        bool is_ts_longtap_main = (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN
-            && g_state.long_tap_mode && f->ptr_id == g_state.gesture_main_ptr_id);
-        if (!bs.has_long_press_timer && !is_ts_longtap_main) continue;
-        // Java TouchscreenGestureHandler: long-press timer ONLY in longTapMode for main finger
-        // Java TouchpadGestureHandler: always posts long-press timer
-        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN
-            && f->ptr_id == g_state.gesture_main_ptr_id) {
-            if (!g_state.long_tap_mode) continue;
-            // Java: any main-finger move without single-tap-drag permanently cancels long-press
-            if (!bs.has_active_single_tap_drag && (f->travel_x > 0 || f->travel_y > 0)) continue;
-        }
+        if (!f->active) continue;
 
-        if (time_ms - f->down_time_ms >= (uint64_t)g_state.cfg.long_press_timeout_ms) {
-            g_state.gesture_handler_active = false;
-            f->second_tap_fallback_count = 0;
-            memset(f->second_tap_fallback, 0, sizeof(f->second_tap_fallback));
-            f->pending_second_double_count = 0;
-            memset(f->pending_second_double, 0, sizeof(f->pending_second_double));
-            if (bs.can_hold_long_press)
-                hold_actions(result, f->bindings.long_press, f->bindings.long_press_count);
-            f->state = GESTURE_STATE_LONG_PRESSING;
-            if (bs.has_long_press_timer && g_state.cfg.gesture_long_press_haptic > 0)
-                add_action(result, ACT_HAPTIC, g_state.cfg.gesture_long_press_haptic, 0, 0);
-        }
-    }
+        if (f->state == GESTURE_STATE_TAP_WAITING) {
+            // Long-press timer — mirrors GestureHandler.onLongPressTimer()
+            // Java: in longTapMode, TouchscreenGestureHandler posts timer unconditionally
+            bool is_ts_longtap_main = (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN
+                && g_state.long_tap_mode && f->ptr_id == g_state.gesture_main_ptr_id);
+            if ((f->cached_has_long_press_timer || is_ts_longtap_main)
+                && !(g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN
+                     && f->ptr_id == g_state.gesture_main_ptr_id
+                     && (!g_state.long_tap_mode
+                         || (!f->cached_has_active_single_tap_drag && (f->travel_x > 0 || f->travel_y > 0))))
+            ) {
+                if (time_ms - f->down_time_ms >= (uint64_t)g_state.cfg.long_press_timeout_ms) {
+                    g_state.gesture_handler_active = false;
+                    f->second_tap_fallback_count = 0;
+                    memset(f->second_tap_fallback, 0, sizeof(f->second_tap_fallback));
+                    f->pending_second_double_count = 0;
+                    memset(f->pending_second_double, 0, sizeof(f->pending_second_double));
+                    if (f->cached_can_hold_long_press)
+                        hold_actions(result, f->bindings.long_press, f->bindings.long_press_count);
+                    f->state = GESTURE_STATE_LONG_PRESSING;
+                    if (f->cached_has_long_press_timer && g_state.cfg.gesture_long_press_haptic > 0)
+                        add_action(result, ACT_HAPTIC, g_state.cfg.gesture_long_press_haptic, 0, 0);
+                }
+            }
 
-    // Single-tap hold timer — mirrors GestureHandler.singleTapHoldRunnable
-    for (int i = 0; i < MAX_FINGERS; i++) {
-        TouchFinger* f = &g_state.fingers[i];
-        if (!f->active || f->state != GESTURE_STATE_TAP_WAITING) continue;
-        if (f->single_tap_hold_delay_ms <= 0) continue;
-        if (time_ms - f->single_tap_hold_timer >= (uint64_t)f->single_tap_hold_delay_ms) {
-            f->single_tap_hold_delay_ms = 0;
-            if (!g_state.gesture_is_action_held) {
-                hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+            // Single-tap hold timer — mirrors GestureHandler.singleTapHoldRunnable
+            if (f->single_tap_hold_delay_ms > 0
+                && time_ms - f->single_tap_hold_timer >= (uint64_t)f->single_tap_hold_delay_ms) {
+                f->single_tap_hold_delay_ms = 0;
+                if (!g_state.gesture_is_action_held) {
+                    hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+                }
             }
         }
+
+        // Second-finger double-tap timeout — mirrors TouchpadGestureHandler.onSecondFingerDoubleTapTimer()
+        if (f->second_double_tap_waiting
+            && time_ms - f->second_tap_fallback_time >= (uint64_t)g_state.cfg.double_tap_timeout_ms) {
+            f->second_double_tap_waiting = false;
+            if (f->second_tap_fallback_count > 0) {
+                execute_actions(result, f->second_tap_fallback, f->second_tap_fallback_count);
+                f->second_tap_fallback_count = 0;
+            }
+            if (f->state != GESTURE_STATE_DRAGGING) f->state = GESTURE_STATE_IDLE;
+        }
     }
 
-    // Gesture double-tap timeout — mirrors GestureHandler.onDoubleTapTimer()
+    // Gesture double-tap timeout (global, not per-finger) — mirrors GestureHandler.onDoubleTapTimer()
     if (g_state.gesture_double_tap_waiting &&
         time_ms - g_state.gesture_double_tap_start_time >= (uint64_t)g_state.cfg.double_tap_timeout_ms) {
         g_state.gesture_double_tap_waiting = false;
@@ -199,7 +206,6 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
         }
         g_state.gesture_pending_deferred_double_count = 0;
 
-        // Mirror Java onDoubleTapTimer: transition main finger from DOUBLE_TAP_WAITING to IDLE
         if (g_state.gesture_main_ptr_id >= 0) {
             for (int _fi = 0; _fi < MAX_FINGERS; _fi++) {
                 TouchFinger* mf = &g_state.fingers[_fi];
@@ -208,20 +214,6 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
                     break;
                 }
             }
-        }
-    }
-
-    // Second-finger double-tap timeout — mirrors TouchpadGestureHandler.onSecondFingerDoubleTapTimer()
-    for (int i = 0; i < MAX_FINGERS; i++) {
-        TouchFinger* f = &g_state.fingers[i];
-        if (!f->active || !f->second_double_tap_waiting) continue;
-        if (time_ms - f->second_tap_fallback_time >= (uint64_t)g_state.cfg.double_tap_timeout_ms) {
-            f->second_double_tap_waiting = false;
-            if (f->second_tap_fallback_count > 0) {
-                execute_actions(result, f->second_tap_fallback, f->second_tap_fallback_count);
-                f->second_tap_fallback_count = 0;
-            }
-            if (f->state != GESTURE_STATE_DRAGGING) f->state = GESTURE_STATE_IDLE;
         }
     }
 }

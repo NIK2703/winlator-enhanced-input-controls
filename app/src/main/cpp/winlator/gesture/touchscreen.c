@@ -243,9 +243,8 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
 
     if (f->state >= GESTURE_STATE_TAP_WAITING) {
         if (f->ptr_id == g_state.gesture_main_ptr_id) {
-            GestureBindingSet bs = gesture_build_binding_set(&f->bindings);
             
-            if (!bs.has_active_single_tap_drag && bs.has_active_single_tap && !g_state.gesture_post_double_tap_drag) {
+            if (!f->cached_has_active_single_tap_drag && f->cached_has_active_single_tap && !g_state.gesture_post_double_tap_drag) {
                 // Java TouchscreenGestureHandler.handlePointerMove:
                 //   if !hasActiveSingleTapDrag: removeCallbacks(longPressRunnable); move pointer; return
                 // Long-press cancelled in gesture_tick by checking travel_x/y

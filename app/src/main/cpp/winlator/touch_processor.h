@@ -224,6 +224,16 @@ typedef struct {
     // Single-tap hold timer (touchscreen finger-down hold)
     int single_tap_hold_delay_ms;
     uint64_t single_tap_hold_timer;
+
+    // Cached GestureBindingSet fields (recomputed after bindings change, avoids rebuilding per call)
+    bool cached_has_active_single_tap;
+    bool cached_has_active_double_tap;
+    bool cached_has_active_long_press;
+    bool cached_has_active_single_tap_drag;
+    bool cached_has_active_long_press_drag;
+    bool cached_has_active_double_tap_drag;
+    bool cached_can_hold_long_press;
+    bool cached_has_long_press_timer;
 } TouchFinger;
 
 typedef enum {

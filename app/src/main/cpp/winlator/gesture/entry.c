@@ -115,6 +115,7 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result) {
             fb2->double_tap_drag_count = g_state.cfg.tp_double_drag_2nd_count;
             memcpy(fb2->double_tap_drag, g_state.cfg.tp_double_drag_2nd, sizeof(g_state.cfg.tp_double_drag_2nd));
         }
+        touch_finger_cache_bs(f);
 
         // Java TouchpadGestureHandler.onFingerDown: check global double-tap waiting for second finger
         if (g_state.gesture_double_tap_waiting) {

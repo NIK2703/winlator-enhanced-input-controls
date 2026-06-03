@@ -134,7 +134,28 @@ static inline int active_finger_count(void) {
     return n;
 }
 
-// Legacy convenience wrappers (kept for backward compat — now delegate to GestureBindingSet)
+// Macro to copy finger binding arrays from config (replaces 24 repetitive memcpy lines).
+// fb: FingerBindings* pointer, cfg: TouchProcessorConfig*, pfx: config prefix (ts or tp).
+#define COPY_SINGLE_BINDING(fb_, cfg_, fb_field_, cfg_field_) \
+    memcpy((fb_)->fb_field_, (cfg_)->cfg_field_, sizeof((cfg_)->cfg_field_)); \
+    (fb_)->fb_field_##_count = (cfg_)->cfg_field_##_count;
+
+#define COPY_FINGER_BINDINGS(fb_, cfg_, pfx_) { \
+    COPY_SINGLE_BINDING(fb_, cfg_, single_tap, pfx_##_single_tap); \
+    COPY_SINGLE_BINDING(fb_, cfg_, long_press, pfx_##_long_press); \
+    COPY_SINGLE_BINDING(fb_, cfg_, double_tap, pfx_##_double_tap); \
+    COPY_SINGLE_BINDING(fb_, cfg_, single_tap_drag, pfx_##_single_tap_drag); \
+    COPY_SINGLE_BINDING(fb_, cfg_, long_press_drag, pfx_##_long_press_drag); \
+    COPY_SINGLE_BINDING(fb_, cfg_, double_tap_drag, pfx_##_double_tap_drag); \
+    COPY_SINGLE_BINDING(fb_, cfg_, single_tap_2nd, pfx_##_single_2nd); \
+    COPY_SINGLE_BINDING(fb_, cfg_, long_press_2nd, pfx_##_long_2nd); \
+    COPY_SINGLE_BINDING(fb_, cfg_, double_tap_2nd, pfx_##_double_2nd); \
+    COPY_SINGLE_BINDING(fb_, cfg_, single_tap_drag_2nd, pfx_##_single_drag_2nd); \
+    COPY_SINGLE_BINDING(fb_, cfg_, long_press_drag_2nd, pfx_##_long_drag_2nd); \
+    COPY_SINGLE_BINDING(fb_, cfg_, double_tap_drag_2nd, pfx_##_double_drag_2nd); \
+}
+
+// Legacy convenience wrappers (kept for backward compat — delegate to GestureBindingSet)
 static inline bool has_active_double_tap(const FingerBindings* fb) { return gesture_build_binding_set(fb).has_active_double_tap; }
 static inline bool has_active_long_press(const FingerBindings* fb) { return gesture_build_binding_set(fb).has_active_long_press; }
 static inline bool has_active_single_tap(const FingerBindings* fb) { return gesture_build_binding_set(fb).has_active_single_tap; }
@@ -158,6 +179,7 @@ void press_binding(TouchActionResult* result, const TouchBinding* b, bool hold);
 // Element shared helpers
 bool point_in_element(float px, float py, const TouchElement* e);
 TouchElement* hit_test_element(float x, float y);
+void touch_finger_cache_bs(TouchFinger* f);
 int detect_swipe_dir(float dx, float dy, float threshold);
 bool is_mouse_move_binding(const TouchBinding* b);
 float cubic_bezier_interpolate(float x, float cpx1, float cpy1);
