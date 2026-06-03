@@ -1224,7 +1224,7 @@ public class ControlElement {
 
             boolean engaged = isEngaged();
 
-            // 1. Engaged: BUTTON/TRACKPAD — fill cache replaces normal rendering
+            // 1. Engaged: BUTTON/TRACKPAD — fill cache replaces normal rendering (stencil: icon/text on white bg)
             if (engaged && (type == Type.BUTTON || type == Type.TRACKPAD)) {
                 boolean hasPrimaryTap = false;
                 List<Binding> primarySeq = bindings.get(0);
@@ -1869,6 +1869,10 @@ public class ControlElement {
         heldBindings = null;
     }
 
+    public void setDoubleTapScale(float scale) {
+        doubleTapScale = scale;
+    }
+
     public void setVisualActive(boolean engaged) {
         if (!engaged && currentPosition != null) currentPosition = null;
         setVisualActive(engaged, -1, -1);
@@ -2010,6 +2014,7 @@ public class ControlElement {
         heldBindings = new ArrayList<>(seq);
         pressBindings(seq);
         releaseHeldBindings();
+        doubleTapScale = 1.0f;
         active = false;
         inputControlsView.invalidate();
     }
@@ -2019,6 +2024,7 @@ public class ControlElement {
         cancelPendingLongPress();
         longPressTriggered = false;
         doubleTapWaiting = false;
+        doubleTapScale = 1.0f;
         active = false;
         List<Binding> seq = bindings.get(0);
         heldBindings = new ArrayList<>(seq);
@@ -2324,9 +2330,8 @@ public class ControlElement {
                 else if (hasDoubleTapBinding() && !doubleTapWaiting) {
                     cancelPendingLongPress();
                     longPressTriggered = false;
-                    List<Binding> primarySeq = bindings.get(0);
-                    boolean hasSingleTap = primarySeq != null && !primarySeq.isEmpty() && primarySeq.get(0) != Binding.NONE;
-                    if (hasSingleTap) active = true;
+                    active = true;
+                    doubleTapScale = 1.15f;
                     startDoubleTapTimer();
                 }
                 else if (hasLongPressBinding()) {
