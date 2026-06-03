@@ -35,6 +35,13 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
     int n = count < MAX_ELEMENTS ? count : MAX_ELEMENTS;
     memcpy(g_state.elements, elements, n * sizeof(TouchElement));
     g_state.element_count = n;
+    for (int i = 0; i < n; i++) {
+        g_state.elements[i].visual_x = (float)g_state.elements[i].x;
+        g_state.elements[i].visual_y = (float)g_state.elements[i].y;
+        g_state.elements[i].visual_active = false;
+        g_state.elements[i].engaged = false;
+        g_state.elements[i].current_ptr_id = -1;
+    }
 }
 
 void touch_processor_set_snapping_size(float size) {
@@ -135,10 +142,11 @@ void touch_processor_on_finger_cancel(int ptr_id) {
     f->deferred_tap_count = 0;
     f->pending_double_count = 0;
     f->double_tap_waiting = false;
-    f->second_double_tap_waiting = false;
+    g_state.second_double_tap_waiting = false;
+    g_state.second_tap_fallback_time = 0;
     f->pending_resume_action_count = 0;
-    f->pending_second_double_count = 0;
-    f->second_tap_fallback_count = 0;
+    g_state.pending_second_double_count = 0;
+    g_state.second_tap_fallback_count = 0;
     f->single_tap_hold_delay_ms = 0;
 }
 
@@ -175,6 +183,7 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
                 : g_state.cfg.double_tap_timeout_ms;
             if (time_ms - e->gesture_last_tap_time >= dt_ms) {
                 e->double_tap_waiting = false;
+                e->visual_active = false; // Java: active=false on timeout
                 if (e->bindings[0].type != BINDING_NONE) {
                     press_binding(&result, &e->bindings[0], false);
                     release_binding(&result, &e->bindings[0]);

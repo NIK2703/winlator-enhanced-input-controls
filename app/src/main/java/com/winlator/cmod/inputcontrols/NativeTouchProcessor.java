@@ -150,6 +150,7 @@ public class NativeTouchProcessor {
     private static native void nativeSetSnappingSize(float size);
     private static native void nativeSetResolutionScale(float scale);
     private static native void nativeSetSimTouchScreen(boolean enabled);
+    private static native void nativeUpdateConfig(NativeConfig config);
     private static native void nativeSetXformScale(float scaleX, float scaleY);
     private static native boolean nativeGetElementState(int elemIndex, float[] outXY);
 
@@ -162,6 +163,11 @@ public class NativeTouchProcessor {
     public void init(NativeConfig config) {
         if (!loaded) return;
         nativeInit(config);
+    }
+
+    public void updateConfig(NativeConfig config) {
+        if (!loaded) return;
+        nativeUpdateConfig(config);
     }
 
     public void setElements(NativeElement[] elements) {
@@ -218,6 +224,10 @@ public class NativeTouchProcessor {
      * Build a NativeConfig from a ControlsProfile and screen dimensions.
      */
     public static NativeConfig buildNativeConfig(ControlsProfile profile, int screenW, int screenH) {
+        return buildNativeConfig(profile, screenW, screenH, 1.0f);
+    }
+
+    public static NativeConfig buildNativeConfig(ControlsProfile profile, int screenW, int screenH, float globalCursorSpeed) {
         NativeConfig c = new NativeConfig();
 
         // Derive touchMode from MouseMode
@@ -233,12 +243,12 @@ public class NativeTouchProcessor {
             c.longPressTimeoutMs = profile.getTouchpadLongPressTimeout();
             c.doubleTapTimeoutMs = profile.getTouchpadDoubleTapTimeout();
             c.dragThresholdPx = profile.getTouchpadDragThreshold();
-            c.cursorSpeed = (int)(profile.getTouchpadCursorSpeed() * 100);
+            c.cursorSpeed = (int)(profile.getTouchpadCursorSpeed() * globalCursorSpeed * 100);
         } else { // TOUCHSCREEN
             c.longPressTimeoutMs = profile.getLongPressTimeout();
             c.doubleTapTimeoutMs = profile.getDoubleTapTimeout();
             c.dragThresholdPx = profile.getDragThreshold();
-            c.cursorSpeed = (int)(profile.getCursorSpeed() * 100);
+            c.cursorSpeed = (int)(profile.getCursorSpeed() * globalCursorSpeed * 100);
         }
         c.buttonDoubleTapTimeoutMs = profile.getButtonDoubleTapTimeout();
         c.singleTapDelayMs = profile.getSingleTapDelay();

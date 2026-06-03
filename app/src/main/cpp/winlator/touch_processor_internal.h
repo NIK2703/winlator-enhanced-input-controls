@@ -53,7 +53,14 @@ typedef struct {
     int gesture_held_count;
     bool gesture_is_action_held;
 
+    // Second-finger double-tap state (global, survives finger deactivation between taps)
+    // Mirrors Java TouchpadGestureHandler secondFingerDoubleTapWaiting, pendingSecondTapAction, etc.
     bool second_double_tap_waiting;
+    TouchBinding second_tap_fallback[8];
+    int second_tap_fallback_count;
+    uint64_t second_tap_fallback_time;
+    TouchBinding pending_second_double[8];
+    int pending_second_double_count;
 
     bool long_tap_mode;
 

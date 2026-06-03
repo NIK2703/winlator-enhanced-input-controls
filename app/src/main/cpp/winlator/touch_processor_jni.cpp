@@ -325,12 +325,13 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeOnFingerDown(
         jfloat* pos = env->GetFloatArrayElements(outPositions, NULL);
         jbyte* act = env->GetByteArrayElements(outActive, NULL);
         int count = g_state.element_count;
-        int maxPos = env->GetArrayLength(outPositions) / 2;
+        int maxPos = env->GetArrayLength(outPositions) / 3;
         int maxAct = env->GetArrayLength(outActive) / 5;
         int limit = count < maxPos ? (count < maxAct ? count : maxAct) : (maxPos < maxAct ? maxPos : maxAct);
         for (int i = 0; i < limit; i++) {
-            pos[i * 2] = g_state.elements[i].visual_x;
-            pos[i * 2 + 1] = g_state.elements[i].visual_y;
+            pos[i * 3] = g_state.elements[i].visual_x;
+            pos[i * 3 + 1] = g_state.elements[i].visual_y;
+            pos[i * 3 + 2] = g_state.elements[i].range_scroll_offset;
             int base = i * 5;
             act[base] = g_state.elements[i].visual_active ? 1 : 0;
             act[base + 1] = g_state.elements[i].petal_active[0] ? 1 : 0;
@@ -353,12 +354,13 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeOnFingerMove(
         jfloat* pos = env->GetFloatArrayElements(outPositions, NULL);
         jbyte* act = env->GetByteArrayElements(outActive, NULL);
         int count = g_state.element_count;
-        int maxPos = env->GetArrayLength(outPositions) / 2;
+        int maxPos = env->GetArrayLength(outPositions) / 3;
         int maxAct = env->GetArrayLength(outActive) / 5;
         int limit = count < maxPos ? (count < maxAct ? count : maxAct) : (maxPos < maxAct ? maxPos : maxAct);
         for (int i = 0; i < limit; i++) {
-            pos[i * 2] = g_state.elements[i].visual_x;
-            pos[i * 2 + 1] = g_state.elements[i].visual_y;
+            pos[i * 3] = g_state.elements[i].visual_x;
+            pos[i * 3 + 1] = g_state.elements[i].visual_y;
+            pos[i * 3 + 2] = g_state.elements[i].range_scroll_offset;
             int base = i * 5;
             act[base] = g_state.elements[i].visual_active ? 1 : 0;
             act[base + 1] = g_state.elements[i].petal_active[0] ? 1 : 0;
@@ -381,12 +383,13 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeOnFingerUp(
         jfloat* pos = env->GetFloatArrayElements(outPositions, NULL);
         jbyte* act = env->GetByteArrayElements(outActive, NULL);
         int count = g_state.element_count;
-        int maxPos = env->GetArrayLength(outPositions) / 2;
+        int maxPos = env->GetArrayLength(outPositions) / 3;
         int maxAct = env->GetArrayLength(outActive) / 5;
         int limit = count < maxPos ? (count < maxAct ? count : maxAct) : (maxPos < maxAct ? maxPos : maxAct);
         for (int i = 0; i < limit; i++) {
-            pos[i * 2] = g_state.elements[i].visual_x;
-            pos[i * 2 + 1] = g_state.elements[i].visual_y;
+            pos[i * 3] = g_state.elements[i].visual_x;
+            pos[i * 3 + 1] = g_state.elements[i].visual_y;
+            pos[i * 3 + 2] = g_state.elements[i].range_scroll_offset;
             int base = i * 5;
             act[base] = g_state.elements[i].visual_active ? 1 : 0;
             act[base + 1] = g_state.elements[i].petal_active[0] ? 1 : 0;
@@ -409,12 +412,13 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeTick(
         jfloat* pos = env->GetFloatArrayElements(outPositions, NULL);
         jbyte* act = env->GetByteArrayElements(outActive, NULL);
         int count = g_state.element_count;
-        int maxPos = env->GetArrayLength(outPositions) / 2;
+        int maxPos = env->GetArrayLength(outPositions) / 3;
         int maxAct = env->GetArrayLength(outActive) / 5;
         int limit = count < maxPos ? (count < maxAct ? count : maxAct) : (maxPos < maxAct ? maxPos : maxAct);
         for (int i = 0; i < limit; i++) {
-            pos[i * 2] = g_state.elements[i].visual_x;
-            pos[i * 2 + 1] = g_state.elements[i].visual_y;
+            pos[i * 3] = g_state.elements[i].visual_x;
+            pos[i * 3 + 1] = g_state.elements[i].visual_y;
+            pos[i * 3 + 2] = g_state.elements[i].range_scroll_offset;
             int base = i * 5;
             act[base] = g_state.elements[i].visual_active ? 1 : 0;
             act[base + 1] = g_state.elements[i].petal_active[0] ? 1 : 0;
@@ -438,6 +442,66 @@ JNIEXPORT jboolean JNICALL
 Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeIsPassthroughActive(
     JNIEnv* env, jclass clazz) {
     return touch_processor_is_passthrough_active() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeUpdateConfig(
+    JNIEnv* env, jclass clazz, jobject config) {
+    TouchProcessorConfig c;
+    memset(&c, 0, sizeof(c));
+    // Re-read all fields from the Java NativeConfig (same as nativeInit)
+    jclass configClass = env->GetObjectClass(config);
+    c.touch_mode = (TouchMode)env->GetIntField(config, env->GetFieldID(configClass, "touchMode", "I"));
+    c.input_mode = (InputMode)env->GetIntField(config, env->GetFieldID(configClass, "inputMode", "I"));
+    c.second_finger_mode = (SecondFingerMode)env->GetIntField(config, env->GetFieldID(configClass, "secondFingerMode", "I"));
+    c.long_press_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "longPressTimeoutMs", "I"));
+    c.double_tap_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "doubleTapTimeoutMs", "I"));
+    c.button_double_tap_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "buttonDoubleTapTimeoutMs", "I"));
+    c.single_tap_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "singleTapDelayMs", "I"));
+    c.drag_threshold_px = env->GetIntField(config, env->GetFieldID(configClass, "dragThresholdPx", "I"));
+    c.double_tap_distance_px = env->GetIntField(config, env->GetFieldID(configClass, "doubleTapDistancePx", "I"));
+    c.binding_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "bindingDelayMs", "I"));
+    c.long_press_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "longPressDelayMs", "I"));
+    c.cursor_speed = env->GetIntField(config, env->GetFieldID(configClass, "cursorSpeed", "I"));
+    c.gesture_threshold_px = env->GetIntField(config, env->GetFieldID(configClass, "gestureThresholdPx", "I"));
+    c.cursor_acceleration_threshold = env->GetIntField(config, env->GetFieldID(configClass, "cursorAccelerationThreshold", "I"));
+    c.cursor_acceleration_factor = env->GetFloatField(config, env->GetFieldID(configClass, "cursorAccelerationFactor", "F"));
+    c.screen_w = env->GetIntField(config, env->GetFieldID(configClass, "screenW", "I"));
+    c.screen_h = env->GetIntField(config, env->GetFieldID(configClass, "screenH", "I"));
+    c.xform_scale_x = env->GetFloatField(config, env->GetFieldID(configClass, "xformScaleX", "F"));
+    if (c.xform_scale_x <= 0.0f) c.xform_scale_x = 1.0f;
+    c.xform_scale_y = env->GetFloatField(config, env->GetFieldID(configClass, "xformScaleY", "F"));
+    if (c.xform_scale_y <= 0.0f) c.xform_scale_y = 1.0f;
+    c.gesture_long_press_haptic = env->GetIntField(config, env->GetFieldID(configClass, "gestureLongPressHaptic", "I"));
+    c.haptic_enabled = env->GetBooleanField(config, env->GetFieldID(configClass, "hapticEnabled", "Z"));
+
+    READ_GESTURE_LIST(env, config, configClass, "tsSingleTap",      c.ts_single_tap,      c.ts_single_tap_count);
+    READ_GESTURE_LIST(env, config, configClass, "tsLongPress",      c.ts_long_press,      c.ts_long_press_count);
+    READ_GESTURE_LIST(env, config, configClass, "tsDoubleTap",      c.ts_double_tap,      c.ts_double_tap_count);
+    READ_GESTURE_LIST(env, config, configClass, "tsSingleTapDrag",  c.ts_single_tap_drag, c.ts_single_tap_drag_count);
+    READ_GESTURE_LIST(env, config, configClass, "tsLongPressDrag",  c.ts_long_press_drag, c.ts_long_press_drag_count);
+    READ_GESTURE_LIST(env, config, configClass, "tsDoubleTapDrag",  c.ts_double_tap_drag, c.ts_double_tap_drag_count);
+    READ_GESTURE_LIST(env, config, configClass, "tsSingleTap2nd",   c.ts_single_2nd,      c.ts_single_2nd_count);
+    READ_GESTURE_LIST(env, config, configClass, "tsLongPress2nd",   c.ts_long_2nd,        c.ts_long_2nd_count);
+    READ_GESTURE_LIST(env, config, configClass, "tsDoubleTap2nd",   c.ts_double_2nd,      c.ts_double_2nd_count);
+    READ_GESTURE_LIST(env, config, configClass, "tsSingleTapDrag2nd", c.ts_single_drag_2nd, c.ts_single_drag_2nd_count);
+    READ_GESTURE_LIST(env, config, configClass, "tsLongPressDrag2nd",  c.ts_long_drag_2nd,   c.ts_long_drag_2nd_count);
+    READ_GESTURE_LIST(env, config, configClass, "tsDoubleTapDrag2nd",  c.ts_double_drag_2nd, c.ts_double_drag_2nd_count);
+
+    READ_GESTURE_LIST(env, config, configClass, "tpSingleTap",      c.tp_single_tap,      c.tp_single_tap_count);
+    READ_GESTURE_LIST(env, config, configClass, "tpLongPress",      c.tp_long_press,      c.tp_long_press_count);
+    READ_GESTURE_LIST(env, config, configClass, "tpDoubleTap",      c.tp_double_tap,      c.tp_double_tap_count);
+    READ_GESTURE_LIST(env, config, configClass, "tpSingleTapDrag",  c.tp_single_tap_drag, c.tp_single_tap_drag_count);
+    READ_GESTURE_LIST(env, config, configClass, "tpLongPressDrag",  c.tp_long_press_drag, c.tp_long_press_drag_count);
+    READ_GESTURE_LIST(env, config, configClass, "tpDoubleTapDrag",  c.tp_double_tap_drag, c.tp_double_tap_drag_count);
+    READ_GESTURE_LIST(env, config, configClass, "tpSingleTap2nd",   c.tp_single_2nd,      c.tp_single_2nd_count);
+    READ_GESTURE_LIST(env, config, configClass, "tpLongPress2nd",   c.tp_long_2nd,        c.tp_long_2nd_count);
+    READ_GESTURE_LIST(env, config, configClass, "tpDoubleTap2nd",   c.tp_double_2nd,      c.tp_double_2nd_count);
+    READ_GESTURE_LIST(env, config, configClass, "tpSingleTapDrag2nd", c.tp_single_drag_2nd, c.tp_single_drag_2nd_count);
+    READ_GESTURE_LIST(env, config, configClass, "tpLongPressDrag2nd",  c.tp_long_drag_2nd,   c.tp_long_drag_2nd_count);
+    READ_GESTURE_LIST(env, config, configClass, "tpDoubleTapDrag2nd",  c.tp_double_drag_2nd, c.tp_double_drag_2nd_count);
+
+    touch_processor_update_config(&c);
 }
 
 JNIEXPORT void JNICALL

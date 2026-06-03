@@ -1908,7 +1908,8 @@ public class ControlElement {
      */
     public void syncVisualState(boolean active, float posX, float posY,
                          boolean petalUp, boolean petalRight,
-                         boolean petalDown, boolean petalLeft) {
+                         boolean petalDown, boolean petalLeft,
+                         float rangeScrollOffset) {
         this.active = active;
         if (type == Type.D_PAD) {
             states[0] = petalUp;
@@ -1918,6 +1919,9 @@ public class ControlElement {
         }
         if (currentPosition == null) currentPosition = new android.graphics.PointF();
         currentPosition.set(posX, posY);
+        if (type == Type.RANGE_BUTTON && scroller != null) {
+            scroller.updateVisualState(active, posX, posY, rangeScrollOffset);
+        }
     }
 
     public void setVisualActive(boolean engaged, float touchX, float touchY) {

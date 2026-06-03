@@ -171,6 +171,9 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
 }
 
 void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    e->visual_active = true;
+    e->visual_x = x;
+    e->visual_y = y;
     int idx = e->type;
     if (idx >= 0 && idx < (int)(sizeof(element_move_handlers)/sizeof(element_move_handlers[0])) && element_move_handlers[idx])
         element_move_handlers[idx](e, x, y, time_ms, result);

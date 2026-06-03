@@ -69,6 +69,39 @@ public class RangeScroller {
         return pressedIndex;
     }
 
+    public void updateVisualState(boolean isFingerDown, float x, float y, float cScrollOffset) {
+        if (isFingerDown) {
+            if (!isActionDown) {
+                isActionDown = true;
+                pressedIndex = getIndexByPosition(x, y);
+                scrolling = false;
+                currentOffset = 0;
+                scrollOffset = cScrollOffset;
+                lastPosition = element.getOrientation() == 0 ? x : y;
+                updateRangeIndex();
+            } else {
+                float position = element.getOrientation() == 0 ? x : y;
+                float deltaPosition = position - lastPosition;
+                if (Math.abs(deltaPosition) >= TouchpadView.MAX_TAP_TRAVEL_DISTANCE) {
+                    if (!scrolling) {
+                        scrolling = true;
+                        pressedIndex = -1;
+                    }
+                    currentOffset += deltaPosition;
+                    float scrollSize = getScrollSize();
+                    scrollOffset = -currentOffset % scrollSize;
+                    if (scrollOffset < 0) scrollOffset = scrollSize + scrollOffset;
+                    updateRangeIndex();
+                    lastPosition = position;
+                }
+            }
+        } else {
+            isActionDown = false;
+            pressedIndex = -1;
+            scrolling = false;
+        }
+    }
+
     public int getRangeIndexFrom() {
         updateRangeIndex();
         return rangeIndexFrom;

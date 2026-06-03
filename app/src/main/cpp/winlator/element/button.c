@@ -37,6 +37,8 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     // Java else: pressBindings(bindings.get(0))
     if (e->bindings[0].type != BINDING_NONE)
         press_binding(result, &e->bindings[0], true);
+    else if (!e->double_tap_waiting && !e->toggle_switch)
+        e->visual_active = false;
 }
 
 void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
@@ -83,6 +85,16 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
 
     if (e->long_press_arm && !point_in_element(x, y, e)) {
         e->long_press_arm = false;
+    }
+
+    // Suppress visual for NONE-binding buttons (no single-tap action) when no gesture is active.
+    // Matches element_button_down which sets visual_active = false for the same condition.
+    if (e->bindings[0].type == BINDING_NONE
+        && !e->toggle_switch
+        && !e->gesture_swipe_triggered
+        && !e->gesture_long_press_triggered
+        && !e->gesture_double_tap_triggered) {
+        e->visual_active = false;
     }
 }
 
@@ -131,11 +143,15 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
         if (has_dt && !e->double_tap_waiting) {
             // Java handleTouchUp: first tap-up with double-tap binding
             // cancelPendingLongPress() + startDoubleTapTimer()
+            // Keep visual_active true — Java keeps active=true while timer runs
             e->gesture_last_tap_time = time_ms;
             e->gesture_tap_up_x = x;
             e->gesture_tap_up_y = y;
             e->double_tap_waiting = true;
             e->long_press_arm = false; // Java cancelPendingLongPress
+            e->engaged = false;
+            e->current_ptr_id = -1;
+            return;
         } else {
             bool has_lp = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
             if (has_lp && !e->gesture_long_press_triggered) {

@@ -518,17 +518,18 @@ public class InputControlsView extends View {
         if (profile == null) return;
         List<ControlElement> elements = profile.getElements();
         int count = elements.size();
-        for (int i = 0; i < count && i * 5 + 4 < visualActive.length && i * 2 + 1 < visualPositions.length; i++) {
+        for (int i = 0; i < count && i * 5 + 4 < visualActive.length && i * 3 + 2 < visualPositions.length; i++) {
             ControlElement e = elements.get(i);
             int base = i * 5;
             e.syncVisualState(
                 visualActive[base] != 0,
-                visualPositions[i * 2],
-                visualPositions[i * 2 + 1],
+                visualPositions[i * 3],
+                visualPositions[i * 3 + 1],
                 visualActive[base + 1] != 0,
                 visualActive[base + 2] != 0,
                 visualActive[base + 3] != 0,
-                visualActive[base + 4] != 0
+                visualActive[base + 4] != 0,
+                visualPositions[i * 3 + 2]
             );
         }
         invalidate();
@@ -727,8 +728,8 @@ public class InputControlsView extends View {
             int pointerId = event.getPointerId(actionIndex);
             // Ensure visual state buffers are allocated
             int elemCount = profile != null ? profile.getElements().size() : 0;
-            if (visualPositions == null || visualPositions.length < elemCount * 2 + 16) {
-                visualPositions = new float[elemCount * 2 + 16];
+            if (visualPositions == null || visualPositions.length < elemCount * 3 + 16) {
+                visualPositions = new float[elemCount * 3 + 16];
                 visualActive = new byte[elemCount * 5 + 32];
             }
             switch (action) {

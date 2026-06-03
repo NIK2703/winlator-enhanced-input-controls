@@ -92,6 +92,7 @@ typedef struct {
     bool range_hold_pressed;
     bool range_pending_tap_release;
     uint64_t range_tap_release_time;
+    int range_initial_kc;
     TouchBinding element_gesture[8];  int element_gesture_count;
     TouchBinding element_double_tap[8];  int element_double_tap_count;
 
@@ -160,8 +161,6 @@ typedef struct {
     FingerBindings bindings;
     // For second-finger gesture handling
     bool is_second_finger;
-    uint64_t second_tap_time;
-    float second_down_x, second_down_y;
     // Held actions
     TouchBinding held_actions[16];
     int held_actions_count;
@@ -174,15 +173,6 @@ typedef struct {
     TouchBinding pending_double[8];
     int pending_double_count;
     uint32_t bindings_generation;
-
-    // Second-finger double-tap state (touchpad)
-    bool second_double_tap_waiting;
-    TouchBinding second_tap_fallback[8];
-    int second_tap_fallback_count;
-    uint64_t second_tap_fallback_time;
-    // Pending second-finger double-tap action for drag case (Java's pendingSecondDoubleTapAction)
-    TouchBinding pending_second_double[8];
-    int pending_second_double_count;
 
     // Second-finger resume (touchscreen)
     TouchBinding pending_resume_action[8];

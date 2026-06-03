@@ -45,6 +45,7 @@ void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, ui
 
     e->range_index = index;
     int kc = range_keycode(e->range_ordinal, index);
+    e->range_initial_kc = kc;
     
     if (kc > 0) e->range_has_binding = true;
 }
@@ -89,6 +90,12 @@ void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms
     }
 
     if (!e->range_has_binding) {
+        // Java RangeScroller.handleTouchUp: when not a tap (scroll or hold-timeout),
+        // sends handleInputEvent(binding, false) — release of the original touch-down binding.
+        // The binding was captured at touch-down time and is NOT cleared during scroll.
+        if (e->range_initial_kc > 0) {
+            add_action(result, ACT_KEY_RELEASE, e->range_initial_kc, 0, 0);
+        }
         e->range_scrolling = false;
         return;
     }

@@ -2,8 +2,8 @@
 
 void on_drag_start(TouchFinger* f) {
     f->single_tap_hold_delay_ms = 0;
-    f->second_tap_fallback_count = 0;
-    f->pending_second_double_count = 0;
+    g_state.second_tap_fallback_count = 0;
+    g_state.pending_second_double_count = 0;
     g_state.gesture_pending_deferred_double_count = 0;
     g_state.gesture_deferred_tap_count = 0;
     g_state.gesture_pending_double_count = 0;
@@ -53,22 +53,42 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
             // Java TouchscreenGestureHandler.resolveDragAction for LONG_PRESSING:
             //   longPressDrag → longPress → null (no drag)
-            if (f->cached_has_active_long_press_drag) {
-                drag_binding = fb->long_press_drag; drag_count = fb->long_press_drag_count;
-            } else if (f->cached_has_active_long_press) {
-                drag_binding = fb->long_press; drag_count = fb->long_press_count;
+            // Uses cur = secondFingerSet when secondFingerActive; C uses config-level 2nd bindings.
+            if (g_state.gesture_second_active) {
+                if (g_state.cfg.ts_long_drag_2nd_count > 0) {
+                    drag_binding = g_state.cfg.ts_long_drag_2nd; drag_count = g_state.cfg.ts_long_drag_2nd_count;
+                } else if (g_state.cfg.ts_long_2nd_count > 0) {
+                    drag_binding = g_state.cfg.ts_long_2nd; drag_count = g_state.cfg.ts_long_2nd_count;
+                } else {
+                    return;
+                }
             } else {
-                return;
+                if (f->cached_has_active_long_press_drag) {
+                    drag_binding = fb->long_press_drag; drag_count = fb->long_press_drag_count;
+                } else if (f->cached_has_active_long_press) {
+                    drag_binding = fb->long_press; drag_count = fb->long_press_count;
+                } else {
+                    return;
+                }
             }
         } else {
-            // Java GestureHandler.resolveDragAction for touchpad LONG_PRESSING (non-second-finger):
-            //   longPressDrag -> null (no drag), drag does NOT start
-            if (f->cached_has_active_long_press_drag) {
-                drag_binding = fb->long_press_drag; drag_count = fb->long_press_drag_count;
-            } else if (f->is_second_finger && f->cached_has_active_single_tap_drag) {
-                drag_binding = fb->single_tap_drag; drag_count = fb->single_tap_drag_count;
+            // Java GestureHandler.resolveDragAction for touchpad LONG_PRESSING:
+            //   secondFingerActive → longPressDrag (2nd) → singleTapDrag (2nd) → null
+            //   !secondFingerActive → longPressDrag (1st) → null
+            if (g_state.gesture_second_active) {
+                if (g_state.cfg.tp_long_drag_2nd_count > 0) {
+                    drag_binding = g_state.cfg.tp_long_drag_2nd; drag_count = g_state.cfg.tp_long_drag_2nd_count;
+                } else if (g_state.cfg.tp_single_drag_2nd_count > 0) {
+                    drag_binding = g_state.cfg.tp_single_drag_2nd; drag_count = g_state.cfg.tp_single_drag_2nd_count;
+                } else {
+                    return;
+                }
             } else {
-                return;
+                if (f->cached_has_active_long_press_drag) {
+                    drag_binding = fb->long_press_drag; drag_count = fb->long_press_drag_count;
+                } else {
+                    return;
+                }
             }
         }
     } else if (g_state.gesture_post_double_tap_drag) {
@@ -76,36 +96,70 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         // because the second finger (that confirmed double-tap) may have a different
         // binding set (ts_single_2nd etc.) that doesn't include double_tap_drag.
         if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
-            if (g_state.cfg.ts_double_tap_drag_count > 0) {
-                drag_binding = g_state.cfg.ts_double_tap_drag; drag_count = g_state.cfg.ts_double_tap_drag_count;
-            } else if (g_state.cfg.ts_double_tap_count > 0) {
-                drag_binding = g_state.cfg.ts_double_tap; drag_count = g_state.cfg.ts_double_tap_count;
-            } else if (g_state.cfg.ts_single_tap_count > 0) {
-                drag_binding = g_state.cfg.ts_single_tap; drag_count = g_state.cfg.ts_single_tap_count;
+            // Java TouchscreenGestureHandler.resolveDragAction:
+            //   postDoubleTapDrag → hasActiveDoubleTapDrag() ? activeDoubleTapDragAction() : fallback
+            //   Uses cur (switched to secondFingerSet when gesture_second_active)
+            if (g_state.gesture_second_active) {
+                if (g_state.cfg.ts_double_drag_2nd_count > 0) {
+                    drag_binding = g_state.cfg.ts_double_drag_2nd; drag_count = g_state.cfg.ts_double_drag_2nd_count;
+                } else if (g_state.cfg.ts_double_2nd_count > 0) {
+                    drag_binding = g_state.cfg.ts_double_2nd; drag_count = g_state.cfg.ts_double_2nd_count;
+                } else if (g_state.cfg.ts_single_2nd_count > 0) {
+                    drag_binding = g_state.cfg.ts_single_2nd; drag_count = g_state.cfg.ts_single_2nd_count;
+                } else {
+                    g_state.gesture_post_double_tap_drag = false;
+                    return;
+                }
             } else {
-                g_state.gesture_post_double_tap_drag = false;
-                return;
+                if (g_state.cfg.ts_double_tap_drag_count > 0) {
+                    drag_binding = g_state.cfg.ts_double_tap_drag; drag_count = g_state.cfg.ts_double_tap_drag_count;
+                } else if (g_state.cfg.ts_double_tap_count > 0) {
+                    drag_binding = g_state.cfg.ts_double_tap; drag_count = g_state.cfg.ts_double_tap_count;
+                } else if (g_state.cfg.ts_single_tap_count > 0) {
+                    drag_binding = g_state.cfg.ts_single_tap; drag_count = g_state.cfg.ts_single_tap_count;
+                } else {
+                    g_state.gesture_post_double_tap_drag = false;
+                    return;
+                }
             }
         } else {
             // Java resolveDragAction: postDoubleTapDrag -> doubleTapDrag || null
-            if (g_state.cfg.tp_double_tap_drag_count == 0) {
+            // When second finger is active, use second-finger bindings (matches Java cur switching)
+            bool use_second = g_state.gesture_second_active;
+            const TouchBinding* dt_drag = use_second ? g_state.cfg.tp_double_drag_2nd : g_state.cfg.tp_double_tap_drag;
+            int dt_drag_count = use_second ? g_state.cfg.tp_double_drag_2nd_count : g_state.cfg.tp_double_tap_drag_count;
+            if (dt_drag_count == 0) {
                 g_state.gesture_post_double_tap_drag = false;
                 return;
             }
-            drag_binding = g_state.cfg.tp_double_tap_drag; drag_count = g_state.cfg.tp_double_tap_drag_count;
+            drag_binding = dt_drag; drag_count = dt_drag_count;
         }
         g_state.gesture_post_double_tap_drag = false;
-    } else if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN && f->cached_has_active_single_tap_drag) {
-        // TouchscreenGestureHandler.resolveDragAction allows singleTapDrag for main finger
-        drag_binding = fb->single_tap_drag; drag_count = fb->single_tap_drag_count;
-    } else if (f->is_second_finger) {
-        // Java GestureHandler.resolveDragAction: secondFingerActive -> singleTapDrag -> longPressDrag -> doubleTapDrag -> null
-        if (f->cached_has_active_single_tap_drag) {
+    } else if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
+        // Java TouchscreenGestureHandler.resolveDragAction:
+        //   hasActiveSingleTapDrag() ? activeSingleTapDragAction() : null
+        //   Uses cur (switched to secondFingerSet when gesture_second_active)
+        if (g_state.gesture_second_active) {
+            if (g_state.cfg.ts_single_drag_2nd_count > 0) {
+                drag_binding = g_state.cfg.ts_single_drag_2nd; drag_count = g_state.cfg.ts_single_drag_2nd_count;
+            } else {
+                return;
+            }
+        } else if (f->cached_has_active_single_tap_drag) {
             drag_binding = fb->single_tap_drag; drag_count = fb->single_tap_drag_count;
-        } else if (f->cached_has_active_long_press_drag) {
-            drag_binding = fb->long_press_drag; drag_count = fb->long_press_drag_count;
-        } else if (f->cached_has_active_double_tap_drag) {
-            drag_binding = fb->double_tap_drag; drag_count = fb->double_tap_drag_count;
+        } else {
+            return;
+        }
+    } else if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD && g_state.gesture_second_active) {
+        // Java GestureHandler.resolveDragAction: secondFingerActive -> singleTapDrag -> longPressDrag -> doubleTapDrag -> null
+        // Uses cur = secondFingerSet when secondFingerActive; C uses config-level 2nd bindings
+        // (applies to ANY finger when gesture_second_active, matching Java semantics)
+        if (g_state.cfg.tp_single_drag_2nd_count > 0) {
+            drag_binding = g_state.cfg.tp_single_drag_2nd; drag_count = g_state.cfg.tp_single_drag_2nd_count;
+        } else if (g_state.cfg.tp_long_drag_2nd_count > 0) {
+            drag_binding = g_state.cfg.tp_long_drag_2nd; drag_count = g_state.cfg.tp_long_drag_2nd_count;
+        } else if (g_state.cfg.tp_double_drag_2nd_count > 0) {
+            drag_binding = g_state.cfg.tp_double_drag_2nd; drag_count = g_state.cfg.tp_double_drag_2nd_count;
         } else {
             return;
         }
@@ -137,6 +191,18 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
     g_state.gesture_pending_double_count = 0;
     g_state.gesture_deferred_tap_count = 0;
 
+    // Mirror Java checkStartDrag: removeCallbacks(longPressRunnable) — clears the global timer.
+    // When second finger is active in touchscreen, its per-finger timer must also be cancelled.
+    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN && g_state.gesture_second_active) {
+        for (int _ci = 0; _ci < MAX_FINGERS; _ci++) {
+            TouchFinger* _cf = &g_state.fingers[_ci];
+            if (_cf->active && _cf->ptr_id != g_state.gesture_main_ptr_id) {
+                _cf->cached_has_long_press_timer = false;
+                break;
+            }
+        }
+    }
+
     on_drag_start(f);
     f->state = GESTURE_STATE_DRAGGING;
     
@@ -153,18 +219,32 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
             // Java: in longTapMode, TouchscreenGestureHandler posts timer unconditionally
             bool is_ts_longtap_main = (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN
                 && g_state.long_tap_mode && f->ptr_id == g_state.gesture_main_ptr_id);
-            if ((f->cached_has_long_press_timer || is_ts_longtap_main)
-                && !(g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN
-                     && f->ptr_id == g_state.gesture_main_ptr_id
-                     && (!g_state.long_tap_mode
-                         || (!f->cached_has_active_single_tap_drag && (f->travel_x > 0 || f->travel_y > 0))))
-            ) {
+
+            // Determine if long-press should be cancelled due to finger movement.
+            // Mirrors Java GestureHandler.checkStartDrag: removeCallbacks(longPressRunnable)
+            // when movement exceeds dragThreshold (OR any movement for touchscreen non-long-tap).
+            bool cancel_lp = false;
+            if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN
+                && f->ptr_id == g_state.gesture_main_ptr_id) {
+                cancel_lp = g_state.gesture_second_active
+                    || !g_state.long_tap_mode
+                    || (!f->cached_has_active_single_tap_drag && (f->travel_x > 0 || f->travel_y > 0));
+            } else if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD
+                       && (f->ptr_id == g_state.gesture_main_ptr_id || g_state.gesture_second_active)) {
+                // Mirror Java: checkStartDrag cancels long-press when net displacement > dragThreshold.
+                // Also applies to second finger when gesture_second_active (Java removes callbacks
+                // for any finger that moves past the threshold).
+                cancel_lp = fabsf(f->x - f->down_x) > g_state.cfg.drag_threshold_px
+                    || fabsf(f->y - f->down_y) > g_state.cfg.drag_threshold_px;
+            }
+
+            if ((f->cached_has_long_press_timer || is_ts_longtap_main) && !cancel_lp) {
                 if (time_ms - f->down_time_ms >= g_state.cfg.long_press_timeout_ms) {
                     g_state.gesture_handler_active = false;
-                    f->second_tap_fallback_count = 0;
-                    memset(f->second_tap_fallback, 0, sizeof(f->second_tap_fallback));
-                    f->pending_second_double_count = 0;
-                    memset(f->pending_second_double, 0, sizeof(f->pending_second_double));
+                    g_state.second_tap_fallback_count = 0;
+                    memset(g_state.second_tap_fallback, 0, sizeof(g_state.second_tap_fallback));
+                    g_state.pending_second_double_count = 0;
+                    memset(g_state.pending_second_double, 0, sizeof(g_state.pending_second_double));
                     if (f->cached_can_hold_long_press)
                         hold_actions(result, f->bindings.long_press, f->bindings.long_press_count);
                     f->state = GESTURE_STATE_LONG_PRESSING;
@@ -182,16 +262,28 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
                 }
             }
         }
+    }
 
-        // Second-finger double-tap timeout — mirrors TouchpadGestureHandler.onSecondFingerDoubleTapTimer()
-        if (f->second_double_tap_waiting
-            && time_ms - f->second_tap_fallback_time >= g_state.cfg.double_tap_timeout_ms) {
-            f->second_double_tap_waiting = false;
-            if (f->second_tap_fallback_count > 0) {
-                execute_actions(result, f->second_tap_fallback, f->second_tap_fallback_count);
-                f->second_tap_fallback_count = 0;
+    // Second-finger double-tap timeout — mirrors TouchpadGestureHandler.onSecondFingerDoubleTapTimer()
+    // MUST be outside the per-finger loop because it uses global state and setting f->state
+    // on whichever finger the loop happens to be iterating is incorrect.
+    if (g_state.second_double_tap_waiting
+        && time_ms - g_state.second_tap_fallback_time >= g_state.cfg.double_tap_timeout_ms) {
+        g_state.second_double_tap_waiting = false;
+        if (g_state.second_tap_fallback_count > 0) {
+            execute_actions(result, g_state.second_tap_fallback, g_state.second_tap_fallback_count);
+            g_state.second_tap_fallback_count = 0;
+        }
+        // Mirror Java: if (state != State.DRAGGING) state = State.IDLE
+        // Set main finger (not the second finger, which is already deactivated) to IDLE.
+        if (g_state.gesture_main_ptr_id >= 0) {
+            for (int _fi = 0; _fi < MAX_FINGERS; _fi++) {
+                TouchFinger* mf = &g_state.fingers[_fi];
+                if (mf->active && mf->ptr_id == g_state.gesture_main_ptr_id) {
+                    if (mf->state != GESTURE_STATE_DRAGGING) mf->state = GESTURE_STATE_IDLE;
+                    break;
+                }
             }
-            if (f->state != GESTURE_STATE_DRAGGING) f->state = GESTURE_STATE_IDLE;
         }
     }
 
@@ -227,14 +319,47 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) 
     }
     const FingerBindings* fb = &f->bindings;
 
-    
+    // Java GestureHandler.handleTapUp: cur = secondFingerSet when secondFingerActive
+    int active_single_count = fb->single_tap_count;
+    const TouchBinding* active_single = fb->single_tap;
+    int active_double_count = fb->double_tap_count;
+    const TouchBinding* active_double = fb->double_tap;
+    bool active_has_single_tap_drag = f->cached_has_active_single_tap_drag;
+    bool active_has_double_tap = f->cached_has_active_double_tap;
+    bool active_has_double_tap_drag = f->cached_has_active_double_tap_drag;
+    if (g_state.gesture_second_active) {
+        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
+            active_single = g_state.cfg.ts_single_2nd;
+            active_single_count = g_state.cfg.ts_single_2nd_count;
+            active_double = g_state.cfg.ts_double_2nd;
+            active_double_count = g_state.cfg.ts_double_2nd_count;
+            active_has_single_tap_drag = g_state.cfg.ts_single_drag_2nd_count > 0;
+            active_has_double_tap = g_state.cfg.ts_double_2nd_count > 0;
+            active_has_double_tap_drag = g_state.cfg.ts_double_drag_2nd_count > 0;
+        } else {
+            active_single = g_state.cfg.tp_single_2nd;
+            active_single_count = g_state.cfg.tp_single_2nd_count;
+            active_double = g_state.cfg.tp_double_2nd;
+            active_double_count = g_state.cfg.tp_double_2nd_count;
+            active_has_single_tap_drag = g_state.cfg.tp_single_drag_2nd_count > 0;
+            active_has_double_tap = g_state.cfg.tp_double_2nd_count > 0;
+            active_has_double_tap_drag = g_state.cfg.tp_double_drag_2nd_count > 0;
+        }
+    }
 
     // Java handleTapUp: pendingDoubleTapAction != null → double-tap confirmed (drag case)
-    // gesture_pending_deferred_double_count > 0 means second finger confirmed
-    // a double-tap-with-drag: pendingDoubleTapAction was saved, fire fire-and-forget
+    // Java re-evaluates hasActiveDoubleTapDrag() at lift time (uses cur).
+    // When cur = firstFingerSet (second finger already lifted), uses first-finger bindings.
+    // When cur = secondFingerSet (second finger still down), uses second-finger bindings.
     if (g_state.gesture_pending_deferred_double_count > 0) {
-        
-        execute_actions(result, g_state.gesture_pending_deferred_double, g_state.gesture_pending_deferred_double_count);
+        bool has_dt_drag = (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN)
+            ? (g_state.gesture_second_active ? g_state.cfg.ts_double_drag_2nd_count > 0 : g_state.cfg.ts_double_tap_drag_count > 0)
+            : (g_state.gesture_second_active ? g_state.cfg.tp_double_drag_2nd_count > 0 : g_state.cfg.tp_double_tap_drag_count > 0);
+        if (has_dt_drag) {
+            execute_actions(result, g_state.gesture_pending_deferred_double, g_state.gesture_pending_deferred_double_count);
+        } else {
+            hold_actions(result, g_state.gesture_pending_deferred_double, g_state.gesture_pending_deferred_double_count);
+        }
         g_state.gesture_pending_deferred_double_count = 0;
         g_state.gesture_deferred_tap_count = 0;
         g_state.gesture_post_double_tap_drag = false;
@@ -261,31 +386,31 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) 
         
         g_state.gesture_double_tap_consumed = false;
         if (!g_state.gesture_is_action_held) {
-            if (!f->cached_has_active_single_tap_drag) hold_actions(result, fb->single_tap, fb->single_tap_count);
-            else execute_actions(result, fb->single_tap, fb->single_tap_count);
+            if (!active_has_single_tap_drag) hold_actions(result, active_single, active_single_count);
+            else execute_actions(result, active_single, active_single_count);
         }
         f->state = GESTURE_STATE_IDLE;
         return;
     }
 
     // Java handleTapUp normal path: first tap up — set up double-tap waiting
-    bool has_dt = f->cached_has_active_double_tap;
+    bool has_dt = active_has_double_tap;
     if (has_dt) {
         
         g_state.gesture_deferred_tap_count = 0;
-        for (int i = 0; i < fb->single_tap_count && i < 8; i++)
-            g_state.gesture_deferred_tap[g_state.gesture_deferred_tap_count++] = fb->single_tap[i];
+        for (int i = 0; i < active_single_count && i < 8; i++)
+            g_state.gesture_deferred_tap[g_state.gesture_deferred_tap_count++] = active_single[i];
         g_state.gesture_pending_double_count = 0;
-        for (int i = 0; i < fb->double_tap_count && i < 8; i++)
-            g_state.gesture_pending_double[g_state.gesture_pending_double_count++] = fb->double_tap[i];
+        for (int i = 0; i < active_double_count && i < 8; i++)
+            g_state.gesture_pending_double[g_state.gesture_pending_double_count++] = active_double[i];
         // Also save in deferred field (Java: pendingDeferredDoubleAction)
         // This survives the gesture_pending_double_count = 0 reset at the top of
         // handle_touchscreen_down / handle_touchpad_down on the next finger-down,
         // matching Java's handleDoubleTapConfirmed recovery:
         //   pendingDoubleTapAction = pendingDeferredDoubleAction
         g_state.gesture_pending_deferred_double_count = 0;
-        for (int i = 0; i < fb->double_tap_count && i < 8; i++)
-            g_state.gesture_pending_deferred_double[g_state.gesture_pending_deferred_double_count++] = fb->double_tap[i];
+        for (int i = 0; i < active_double_count && i < 8; i++)
+            g_state.gesture_pending_deferred_double[g_state.gesture_pending_deferred_double_count++] = active_double[i];
         g_state.gesture_double_tap_waiting = true;
         g_state.gesture_double_tap_start_time = time_ms;
         g_state.gesture_last_tap_up_x = f->tap_up_x;
@@ -294,10 +419,10 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) 
     } else {
         
         if (!g_state.gesture_is_action_held) {
-            if (!f->cached_has_active_single_tap_drag) hold_actions(result, fb->single_tap, fb->single_tap_count);
-            else execute_actions(result, fb->single_tap, fb->single_tap_count);
+            if (!active_has_single_tap_drag) hold_actions(result, active_single, active_single_count);
+            else execute_actions(result, active_single, active_single_count);
         }
-        if (f->cached_has_active_double_tap_drag) {
+        if (active_has_double_tap_drag) {
             
             g_state.gesture_double_tap_waiting = true;
             g_state.gesture_double_tap_start_time = time_ms;

@@ -4,8 +4,8 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
     // Java TouchscreenGestureHandler.handlePointerDown: InputControlsView.findAt(x, y) iterates REVERSE
     g_state.passthrough_active = false;
     for (int i = g_state.element_count - 1; i >= 0; i--) {
-        if (point_in_element(x, y, &g_state.elements[i])) {
-            if (g_state.elements[i].passthrough_touch) g_state.passthrough_active = true;
+        if (point_in_element(x, y, &g_state.elements[i]) && g_state.elements[i].passthrough_touch) {
+            g_state.passthrough_active = true;
             break;
         }
     }
@@ -28,7 +28,7 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
         TouchElement* e = &g_state.elements[i];
         if (e->type != ELEM_BUTTON && point_in_element(x, y, e)) {
             handle_element_down(e, f->ptr_id, x, y, time_ms, result);
-            if (e->current_ptr_id == f->ptr_id) handled = true;
+            if (!e->passthrough_touch) handled = true;
         }
     }
 
@@ -60,12 +60,13 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
     // Java TouchscreenGestureHandler.handlePointerDown resets at the very top:
     //   postDoubleTapDrag = false;
     //   pendingDoubleTapAction = null;
-    // NOTE: gesture_pending_deferred_double_count is NOT cleared here because
+    // NOTE: doubleTapConsumed is NOT reset in Java handlePointerDown — it persists
+    // across fingers to handle the third-tap single-tap after a double-tap.
+    // gesture_pending_deferred_double_count is NOT cleared here because
     // Java handlePointerDown only clears pendingDoubleTapAction (the primary field),
     // NOT pendingDeferredDoubleAction (the backup). The backup is consumed by
     // handleDoubleTapConfirmed: pendingDoubleTapAction = pendingDeferredDoubleAction.
     g_state.gesture_post_double_tap_drag = false;
-    g_state.gesture_double_tap_consumed = false;
     g_state.gesture_pending_double_count = 0;
 
     // Java: setSecondFingerActive(false) called before double-tap check
@@ -96,9 +97,9 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
                 g_state.gesture_pending_deferred_double_count = 0;
                 if (g_state.gesture_pending_double_count > 0) {
                     if (g_state.cfg.ts_double_tap_drag_count == 0) {
-                        
-                        for (int _pi = 0; _pi < g_state.gesture_pending_double_count; _pi++)
-                            press_binding(result, &g_state.gesture_pending_double[_pi], false);
+                        // Mirror Java handleDoubleTapConfirmed:
+                        // executeActionsAndHold(pendingDoubleTapAction) — press + hold
+                        hold_actions(result, g_state.gesture_pending_double, g_state.gesture_pending_double_count);
                     } else {
                         
                         g_state.gesture_pending_deferred_double_count = g_state.gesture_pending_double_count;
@@ -112,16 +113,59 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
                 // TAP_WAITING state so that up/move events work correctly
                 f->state = GESTURE_STATE_TAP_WAITING;
                 g_state.gesture_main_ptr_id = f->ptr_id;
-                
-                return;
+
+                // Java TouchscreenGestureHandler.handlePointerDown:
+                //   savedOriginalPointerId >= 0 → return (switch to original ptr)
+                //   savedOriginalPointerId < 0 → fall through (normal case)
+                if (f->double_tap_original_id_set) {
+                    bool found_orig = false;
+                    int orig_ptr_id = -1;
+                    for (int _oi = 0; _oi < MAX_FINGERS; _oi++) {
+                        TouchFinger* _of = &g_state.fingers[_oi];
+                        if (_of->active && _of->double_tap_original_id_set && _of->ptr_id != f->ptr_id) {
+                            found_orig = true;
+                            orig_ptr_id = _of->ptr_id;
+                            break;
+                        }
+                    }
+                    if (found_orig) {
+                        g_state.gesture_second_active = false;
+                        g_state.gesture_main_ptr_id = orig_ptr_id;
+                        add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
+                        g_state.ptr_x = x;
+                        g_state.ptr_y = y;
+                        f->state = GESTURE_STATE_TAP_WAITING;
+                        return;
+                    }
+                }
+
+                // Java TouchscreenGestureHandler.handlePointerDown:
+                //   wasSecondFingerDeferred → setSecondFingerActive(true) inside success branch
+                if (was_second_deferred) {
+                    g_state.gesture_second_active = true;
+                    f->is_second_finger = true;
+                    FingerBindings* fb = &f->bindings;
+                    fb->single_tap_count = g_state.cfg.ts_single_2nd_count;
+                    memcpy(fb->single_tap, g_state.cfg.ts_single_2nd, sizeof(g_state.cfg.ts_single_2nd));
+                    fb->long_press_count = g_state.cfg.ts_long_2nd_count;
+                    memcpy(fb->long_press, g_state.cfg.ts_long_2nd, sizeof(g_state.cfg.ts_long_2nd));
+                    fb->double_tap_count = g_state.cfg.ts_double_2nd_count;
+                    memcpy(fb->double_tap, g_state.cfg.ts_double_2nd, sizeof(g_state.cfg.ts_double_2nd));
+                    fb->single_tap_drag_count = g_state.cfg.ts_single_drag_2nd_count;
+                    memcpy(fb->single_tap_drag, g_state.cfg.ts_single_drag_2nd, sizeof(g_state.cfg.ts_single_drag_2nd));
+                    fb->long_press_drag_count = g_state.cfg.ts_long_drag_2nd_count;
+                    memcpy(fb->long_press_drag, g_state.cfg.ts_long_drag_2nd, sizeof(g_state.cfg.ts_long_drag_2nd));
+                    fb->double_tap_drag_count = g_state.cfg.ts_double_drag_2nd_count;
+                    memcpy(fb->double_tap_drag, g_state.cfg.ts_double_drag_2nd, sizeof(g_state.cfg.ts_double_drag_2nd));
+                    touch_finger_cache_bs(f);
+                }
             } else {
                 
                 gesture_cancel_double_tap_wait(result);
             }
-        }
-
-        // Java: after double-tap check, wasSecondFingerDeferred → setSecondFingerActive(true)
-        if (was_second_deferred) {
+        } else if (was_second_deferred) {
+            // No double-tap waiting, but deferred second finger was active:
+            // restore second-finger bindings (matches Java's post-double-tap-check fallthrough)
             g_state.gesture_second_active = true;
             f->is_second_finger = true;
             FingerBindings* fb = &f->bindings;
@@ -137,6 +181,7 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
             memcpy(fb->long_press_drag, g_state.cfg.ts_long_drag_2nd, sizeof(g_state.cfg.ts_long_drag_2nd));
             fb->double_tap_drag_count = g_state.cfg.ts_double_drag_2nd_count;
             memcpy(fb->double_tap_drag, g_state.cfg.ts_double_drag_2nd, sizeof(g_state.cfg.ts_double_drag_2nd));
+            touch_finger_cache_bs(f);
         }
 
         f->original_ptr_id = f->ptr_id;
@@ -154,17 +199,13 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
 
         if (g_state.gesture_double_tap_waiting) {
             if (gesture_is_within_tap_distance(f->x, f->y)) {
-                int saved_original_ptr_id = -1;
-                for (int i = 0; i < MAX_FINGERS; i++) {
-                    if (g_state.fingers[i].active && g_state.fingers[i].ptr_id == g_state.gesture_main_ptr_id) {
-                        saved_original_ptr_id = g_state.fingers[i].original_ptr_id;
-                        break;
-                    }
-                }
+                // Java TouchscreenGestureHandler.handlePointerDown second-finger path:
+                //   state == DOUBLE_TAP_WAITING → handleDoubleTapConfirmed() + return
+                //   Does NOT swap mainPointerId, does NOT set secondPointerId
+                //   Does NOT set up gesture state for this finger
                 g_state.gesture_double_tap_waiting = false;
                 g_state.gesture_deferred_tap_count = 0;
                 // Java handleDoubleTapConfirmed: pendingDoubleTapAction = pendingDeferredDoubleAction
-                // Recover from deferred backup before checking pending_double_count
                 if (g_state.gesture_pending_deferred_double_count > 0 && g_state.gesture_pending_double_count == 0) {
                     g_state.gesture_pending_double_count = g_state.gesture_pending_deferred_double_count;
                     for (int _i = 0; _i < g_state.gesture_pending_deferred_double_count; _i++)
@@ -173,54 +214,21 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
                 }
                 g_state.gesture_pending_deferred_double_count = 0;
 
-                // Initialize this finger's bindings from config (Java: second finger uses handler bindings,
-                // which are the primary ts_* config, not ts_single_2nd).
-                // This is needed so check_start_drag can find the drag binding after confirm.
-                FingerBindings* fb2 = &f->bindings;
-                fb2->single_tap_count = g_state.cfg.ts_single_tap_count;
-                memcpy(fb2->single_tap, g_state.cfg.ts_single_tap, sizeof(g_state.cfg.ts_single_tap));
-                fb2->long_press_count = g_state.cfg.ts_long_press_count;
-                memcpy(fb2->long_press, g_state.cfg.ts_long_press, sizeof(g_state.cfg.ts_long_press));
-                fb2->double_tap_count = g_state.cfg.ts_double_tap_count;
-                memcpy(fb2->double_tap, g_state.cfg.ts_double_tap, sizeof(g_state.cfg.ts_double_tap));
-                fb2->single_tap_drag_count = g_state.cfg.ts_single_tap_drag_count;
-                memcpy(fb2->single_tap_drag, g_state.cfg.ts_single_tap_drag, sizeof(g_state.cfg.ts_single_tap_drag));
-                fb2->long_press_drag_count = g_state.cfg.ts_long_press_drag_count;
-                memcpy(fb2->long_press_drag, g_state.cfg.ts_long_press_drag, sizeof(g_state.cfg.ts_long_press_drag));
-                fb2->double_tap_drag_count = g_state.cfg.ts_double_tap_drag_count;
-                memcpy(fb2->double_tap_drag, g_state.cfg.ts_double_tap_drag, sizeof(g_state.cfg.ts_double_tap_drag));
-
-                // Use config-level check for drag vs non-drag (finger bindings may be uninited)
                 bool has_dt_drag = (g_state.cfg.ts_double_tap_drag_count > 0);
                 if (g_state.gesture_pending_double_count > 0) {
                     if (!has_dt_drag) {
-                        
-                        for (int _pi = 0; _pi < g_state.gesture_pending_double_count; _pi++)
-                            press_binding(result, &g_state.gesture_pending_double[_pi], false);
+                        hold_actions(result, g_state.gesture_pending_double, g_state.gesture_pending_double_count);
                     } else {
-                        
-                        g_state.gesture_pending_deferred_double_count = g_state.gesture_pending_double_count;
-                        for (int _i = 0; _i < g_state.gesture_pending_double_count; _i++)
-                            g_state.gesture_pending_deferred_double[_i] = g_state.gesture_pending_double[_i];
+                        // Java second-finger double-tap confirm calls executeActions
+                        // (fire-and-forget) on pendingDoubleTapAction for drag case.
+                        // Execute immediately, don't defer to finger-up.
+                        execute_actions(result, g_state.gesture_pending_double, g_state.gesture_pending_double_count);
                     }
                     g_state.gesture_pending_double_count = 0;
                 }
+                // Java handleDoubleTapConfirmed: setSecondFingerActive(false); state = IDLE; postDoubleTapDrag = true
+                g_state.gesture_second_active = false;
                 g_state.gesture_post_double_tap_drag = true;
-                // Reassign main pointer to second finger for drag (matches Java handleDoubleTapConfirmed:
-                // mainPointerId = event.getPointerId(actionIndex))
-                g_state.gesture_main_ptr_id = f->ptr_id;
-                f->state = GESTURE_STATE_TAP_WAITING;
-                f->down_x = f->x;
-                f->down_y = f->y;
-                
-                if (saved_original_ptr_id >= 0) {
-                    for (int i = 0; i < MAX_FINGERS; i++) {
-                        if (g_state.fingers[i].active && g_state.fingers[i].ptr_id == g_state.gesture_main_ptr_id) {
-                            g_state.fingers[i].original_ptr_id = saved_original_ptr_id;
-                            break;
-                        }
-                    }
-                }
                 return;
             } else {
                 gesture_cancel_double_tap_wait(result);
@@ -257,7 +265,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
         if (e->engaged && e->current_ptr_id == f->ptr_id) {
             
             handle_element_move(e, x, y, time_ms, result);
-            had_element_move = true;
+            if (!e->passthrough_touch) had_element_move = true;
         }
     }
 
@@ -281,9 +289,10 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                                 if (tb->count == 0) {
                                     handle_element_down(new_btn, f->ptr_id, x, y, time_ms, result);
                                 } else {
-                                    if (new_btn->bindings[0].type != BINDING_NONE)
+                                    if (new_btn->bindings[0].type != BINDING_NONE) {
                                         press_binding(result, &new_btn->bindings[0], true);
-                                    new_btn->visual_active = true;
+                                        new_btn->visual_active = true;
+                                    }
                                 }
                             }
                             if (!new_btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER) {
@@ -302,9 +311,10 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                             release_element_bindings(prev, result);
                         if (curr && curr->type == ELEM_BUTTON && curr != prev) {
                             if (curr->current_ptr_id == -1) {
-                                if (curr->bindings[0].type != BINDING_NONE)
+                                if (curr->bindings[0].type != BINDING_NONE) {
                                     press_binding(result, &curr->bindings[0], true);
-                                curr->visual_active = true;
+                                    curr->visual_active = true;
+                                }
                             }
                             g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
                         } else if (!curr || curr->type != ELEM_BUTTON) {
@@ -347,25 +357,52 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
 
     if (f->state >= GESTURE_STATE_TAP_WAITING) {
         if (f->ptr_id == g_state.gesture_main_ptr_id) {
-            
-            if (!f->cached_has_active_single_tap_drag && f->cached_has_active_single_tap && !g_state.gesture_post_double_tap_drag) {
+            if (g_state.gesture_second_active) {
                 // Java TouchscreenGestureHandler.handlePointerMove:
-                //   if !hasActiveSingleTapDrag: removeCallbacks(longPressRunnable); move pointer; return
-                // Long-press cancelled in gesture_tick by checking travel_x/y
-                // Skip early return when post_double_tap_drag is active — drag uses double_tap_drag binding
-                
-                g_state.ptr_x = x;
-                g_state.ptr_y = y;
-                add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
-                f->last_x = x;
-                f->last_y = y;
-                return;
+                //   cur = secondFingerSet
+                //   hasActiveSingleTapDrag() → secondFingerSet.hasActiveSingleTapDrag
+                //   hasActiveSingleTap() → secondFingerSet.hasActiveSingleTap
+                bool sf_has_st_drag = g_state.cfg.ts_single_drag_2nd_count > 0;
+                if (!sf_has_st_drag) {
+                    // Java: removeCallbacks(longPressRunnable) — cancel second finger's timer
+                    for (int _si = 0; _si < MAX_FINGERS; _si++) {
+                        TouchFinger* _sf = &g_state.fingers[_si];
+                        if (_sf->active && _sf->ptr_id != g_state.gesture_main_ptr_id) {
+                            _sf->cached_has_long_press_timer = false;
+                            break;
+                        }
+                    }
+                    // Java: hasActiveSingleTap() → move pointer, return (no drag)
+                    if (g_state.cfg.ts_single_2nd_count > 0) {
+                        
+                        g_state.ptr_x = x;
+                        g_state.ptr_y = y;
+                        add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
+                        f->last_x = x;
+                        f->last_y = y;
+                        return;
+                    }
+                }
+            } else {
+                if (!f->cached_has_active_single_tap_drag && f->cached_has_active_single_tap && !g_state.gesture_post_double_tap_drag) {
+                    // Java TouchscreenGestureHandler.handlePointerMove:
+                    //   if !hasActiveSingleTapDrag: removeCallbacks(longPressRunnable); move pointer; return
+                    // Long-press cancelled in gesture_tick by checking travel_x/y
+                    // Skip early return when post_double_tap_drag is active — drag uses double_tap_drag binding
+                    
+                    g_state.ptr_x = x;
+                    g_state.ptr_y = y;
+                    add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
+                    f->last_x = x;
+                    f->last_y = y;
+                    return;
+                }
             }
+            float dx = x - f->down_x;
+            float dy = y - f->down_y;
+            
+            check_start_drag(f, dx, dy, result);
         }
-        float dx = x - f->down_x;
-        float dy = y - f->down_y;
-        
-        check_start_drag(f, dx, dy, result);
     }
 
     g_state.ptr_x = x;
@@ -448,9 +485,9 @@ void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, T
 
         // Java: always clears secondFingerActive when main finger lifts
         g_state.gesture_second_active = false;
-    } else if (f->second_double_tap_waiting) {
-        f->second_double_tap_waiting = false;
-        f->second_tap_fallback_count = 0;
+    } else if (g_state.second_double_tap_waiting) {
+        g_state.second_double_tap_waiting = false;
+        g_state.second_tap_fallback_count = 0;
         f->active = false;
     } else if (f->double_tap_original_id_set && g_state.gesture_main_ptr_id >= 0
                && f->ptr_id != g_state.gesture_main_ptr_id
@@ -495,12 +532,9 @@ void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, T
         g_state.gesture_second_ptr_id = -1;
         f->active = false;
     } else {
-        if (g_state.gesture_post_double_tap_drag) {
-            // Second-finger double-tap confirm: release any held action
-            
-            g_state.gesture_post_double_tap_drag = false;
-            release_held_actions(result);
-        }
+        // Java TouchscreenGestureHandler.handlePointerUp: non-matching fingers are silently
+        // ignored. The held action (if any) is released on the next finger event through
+        // normal gesture processing (handleTapUp → releaseHeldAction), NOT immediately here.
         f->active = false;
     }
 }

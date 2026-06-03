@@ -37,7 +37,7 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, uint64_t time_ms, To
         if (e->type != ELEM_BUTTON && point_in_element(x, y, e)) {
             
             handle_element_down(e, f->ptr_id, x, y, time_ms, result);
-            if (e->current_ptr_id == f->ptr_id) {
+            if (!e->passthrough_touch) {
                 handled = true;
             }
         }
@@ -86,9 +86,12 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, uint64_t time_ms, To
 
     
 
-    // Java TouchpadGestureHandler.onFingerDown resets these after LOCK/TOUCHSCREEN handling
-    g_state.gesture_post_double_tap_drag = false;
-    g_state.gesture_second_active = false;
+    // Java TouchpadGestureHandler.onFingerDown resets postDoubleTapDrag only for main finger
+    // (inside if (mainPointerId < 0)). Second finger should NOT clear postDoubleTapDrag.
+    if (g_state.gesture_main_ptr_id < 0) {
+        g_state.gesture_post_double_tap_drag = false;
+        g_state.gesture_second_active = false;
+    }
     g_state.scrolling = false;
     g_state.scroll_accum_y = 0;
 
@@ -120,10 +123,8 @@ void handle_touchpad_down(TouchFinger* f, float x, float y, uint64_t time_ms, To
         }
     }
 
-    // Java TouchpadGestureHandler.onFingerDown: release held actions when second finger arrives
-    if (g_state.gesture_main_ptr_id >= 0) {
-        release_held_actions(result);
-    }
+    // release_held_actions moved inside touchpad_finger_down (entry.c)
+    // to match Java's position after the double-tap check in onFingerDown second-finger path.
     touchpad_finger_down(f, result, time_ms);
 }
 
@@ -135,7 +136,7 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
         if (e->engaged && e->current_ptr_id == f->ptr_id) {
             
             handle_element_move(e, x, y, time_ms, result);
-            had_element_move = true;
+            if (!e->passthrough_touch) had_element_move = true;
         }
     }
 
@@ -164,9 +165,10 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
                                 if (tb->count == 0) {
                                     handle_element_down(new_btn, f->ptr_id, x, y, time_ms, result);
                                 } else {
-                                    if (new_btn->bindings[0].type != BINDING_NONE)
+                                    if (new_btn->bindings[0].type != BINDING_NONE) {
                                         press_binding(result, &new_btn->bindings[0], true);
-                                    new_btn->visual_active = true;
+                                        new_btn->visual_active = true;
+                                    }
                                 }
                             }
                             // Add to tracked list for finger-up release
@@ -185,14 +187,14 @@ void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, To
                         int hovered = g_state.hovered_element_per_ptr[pi];
                         TouchElement* prev = (hovered >= 0 && hovered < g_state.element_count) ? &g_state.elements[hovered] : NULL;
                         TouchElement* curr = hit_test_element(x, y);
-                        if (prev && prev->current_ptr_id == f->ptr_id && (!curr || curr != prev))
-                            handle_element_up(prev, x, y, time_ms, result);
+                        if (prev && (!curr || curr != prev))
+                            release_element_bindings(prev, result);
                         if (curr && curr->type == ELEM_BUTTON && curr != prev) {
                             if (curr->current_ptr_id == -1) {
-                                // Java activate(): press primary binding only (no gesture pointer)
-                                if (curr->bindings[0].type != BINDING_NONE)
+                                if (curr->bindings[0].type != BINDING_NONE) {
                                     press_binding(result, &curr->bindings[0], true);
-                                curr->visual_active = true;
+                                    curr->visual_active = true;
+                                }
                             }
                             g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
                         } else if (!curr || curr->type != ELEM_BUTTON) {
@@ -354,6 +356,7 @@ void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touc
                     e->double_tap_waiting = false;
                     e->current_ptr_id = -1;
                     e->engaged = false;
+                    e->visual_active = false;
                 }
             }
             had_tracked = true;

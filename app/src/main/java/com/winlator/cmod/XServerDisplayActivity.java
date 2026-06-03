@@ -145,6 +145,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (reloaded != null) {
                 activity.touchpadView.setProfile(reloaded);
                 activity.inputControlsView.setProfile(reloaded);
+                if (activity.nativeTouchProcessor != null && activity.nativeTouchProcessor.isLoaded()) {
+                    NativeTouchProcessor.NativeConfig updatedConfig =
+                        NativeTouchProcessor.buildNativeConfig(reloaded,
+                            activity.xServer.screenInfo.width,
+                            activity.xServer.screenInfo.height,
+                            activity.globalCursorSpeed);
+                    activity.nativeTouchProcessor.updateConfig(updatedConfig);
+                }
             }
         }
     }
@@ -1580,7 +1588,7 @@ private void applySidebarSettings() {
         if (nativeTouchProcessor != null && nativeTouchProcessor.isLoaded()) {
             // Build and apply config (early — before view is laid out)
             NativeTouchProcessor.NativeConfig nativeConfig =
-                NativeTouchProcessor.buildNativeConfig(profile, xServer.screenInfo.width, xServer.screenInfo.height);
+                NativeTouchProcessor.buildNativeConfig(profile, xServer.screenInfo.width, xServer.screenInfo.height, globalCursorSpeed);
             // Set xform scale so trackpad deltas map view-pixels to Wine-screen-pixels
             {
                 int outerW = AppUtils.getScreenWidth();
