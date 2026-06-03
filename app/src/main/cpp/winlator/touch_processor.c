@@ -11,7 +11,6 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     g_state.gesture_second_ptr_id = -1;
     g_state.finger_pointer_left = -1;
     g_state.finger_pointer_right = -1;
-    g_state.long_tap_mode = (config->second_finger_mode == SECOND_FINGER_LONG_TAP);
     g_state.pointer_left_enabled = true;
     g_state.pointer_right_enabled = true;
     g_state.pending_left_release_ptr_id = -1;
@@ -27,7 +26,6 @@ void touch_processor_init(const TouchProcessorConfig* config) {
 
 void touch_processor_update_config(const TouchProcessorConfig* config) {
     memcpy(&g_state.cfg, config, sizeof(TouchProcessorConfig));
-    g_state.long_tap_mode = (config->second_finger_mode == SECOND_FINGER_LONG_TAP);
     g_state.cfg.bindings_generation++;
 }
 
@@ -156,7 +154,7 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
     // Gesture-level timeouts (long-press, double-tap, single-tap-hold, second-finger double-tap)
     gesture_tick(time_ms, &result);
 
-    // Single merged element loop: long-press, range hold, range deferred release, double-tap timeout
+    // Single merged element loop: long-press, range hold, range deferred release
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
 
@@ -168,26 +166,10 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
             if (time_ms - e->down_time_ms >= g_state.cfg.long_press_delay_ms) {
                 e->gesture_long_press_triggered = true;
                 e->long_press_arm = false;
-                e->double_tap_waiting = false;
                 for (int k = 0; k < e->element_long_press_count; k++)
                     press_binding(&result, &e->element_long_press[k], true);
                 if (e->button_long_press_haptic > 0)
                     add_action(&result, ACT_HAPTIC, e->button_long_press_haptic, 0, 0);
-            }
-        }
-
-        // Element double-tap timeout (works even after finger lift)
-        if (e->type == ELEM_BUTTON && e->double_tap_waiting) {
-            int dt_ms = g_state.cfg.button_double_tap_timeout_ms > 0
-                ? g_state.cfg.button_double_tap_timeout_ms
-                : g_state.cfg.double_tap_timeout_ms;
-            if (time_ms - e->gesture_last_tap_time >= dt_ms) {
-                e->double_tap_waiting = false;
-                e->visual_active = false; // Java: active=false on timeout
-                if (e->bindings[0].type != BINDING_NONE) {
-                    press_binding(&result, &e->bindings[0], false);
-                    release_binding(&result, &e->bindings[0]);
-                }
             }
         }
 

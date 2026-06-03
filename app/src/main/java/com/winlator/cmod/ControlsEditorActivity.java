@@ -391,7 +391,6 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             loadBindingSection(element, container, 0, R.string.binding);
             loadLongPressBindingSection(element, container);
             loadGestureBindingSection(element, container);
-            loadDoubleTapBindingSection(element, container);
         }
         else if (type == ControlElement.Type.D_PAD || type == ControlElement.Type.STICK || type == ControlElement.Type.TRACKPAD) {
             loadBindingSection(element, container, 0, R.string.binding_up);
@@ -425,16 +424,6 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         List<Binding> seq = new ArrayList<>(element.getGestureBindings());
         View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Gesture", 0, seq, () -> {
             element.setGestureBindings(seq);
-            profile.save();
-            inputControlsView.invalidate();
-        });
-        container.addView(section);
-    }
-
-    private void loadDoubleTapBindingSection(final ControlElement element, LinearLayout container) {
-        List<Binding> seq = new ArrayList<>(element.getDoubleTapBindings());
-        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Double Tap", R.string.single_tap_delay_help, seq, () -> {
-            element.setDoubleTapBindings(seq);
             profile.save();
             inputControlsView.invalidate();
         });

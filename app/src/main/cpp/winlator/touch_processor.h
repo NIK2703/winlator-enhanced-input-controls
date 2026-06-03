@@ -60,10 +60,8 @@ typedef struct {
     int current_ptr_id;
     uint64_t down_time_ms;
     bool engaged;
-    bool double_tap_waiting;
     bool long_press_arm;
     bool gesture_long_press_triggered;
-    uint64_t gesture_last_tap_time;
     int range_ordinal;
     int range_index;
     int element_long_press_count;
@@ -94,14 +92,11 @@ typedef struct {
     uint64_t range_tap_release_time;
     int range_initial_kc;
     TouchBinding element_gesture[8];  int element_gesture_count;
-    TouchBinding element_double_tap[8];  int element_double_tap_count;
 
     bool toggle_switch;
     bool selected;
     int button_long_press_haptic;
     int button_gesture_haptic;
-    bool gesture_double_tap_triggered;
-    float gesture_tap_up_x, gesture_tap_up_y;
     int gesture_swipe_direction;
     bool gesture_swipe_triggered;
 
@@ -135,14 +130,10 @@ typedef struct {
     int double_tap_drag_count;
     TouchBinding single_tap_2nd[8];
     int single_tap_2nd_count;
-    TouchBinding long_press_2nd[8];
-    int long_press_2nd_count;
     TouchBinding double_tap_2nd[8];
     int double_tap_2nd_count;
     TouchBinding single_tap_drag_2nd[8];
     int single_tap_drag_2nd_count;
-    TouchBinding long_press_drag_2nd[8];
-    int long_press_drag_2nd_count;
     TouchBinding double_tap_drag_2nd[8];
     int double_tap_drag_2nd_count;
 } FingerBindings;
@@ -209,20 +200,14 @@ typedef enum {
     INPUT_RELATIVE, INPUT_ABSOLUTE
 } InputMode;
 
-typedef enum {
-    SECOND_FINGER_TAP, SECOND_FINGER_LONG_TAP
-} SecondFingerMode;
-
 // --- Configuration ---
 typedef struct {
     TouchMode touch_mode;
     InputMode input_mode;
-    SecondFingerMode second_finger_mode;
 
     // Gesture timing
     int long_press_timeout_ms;
     int double_tap_timeout_ms;
-    int button_double_tap_timeout_ms; // element button double-tap timeout (separate from gesture)
     int single_tap_delay_ms;
     int drag_threshold_px;
     int gesture_threshold_px;      // separate threshold for element swipe detection
@@ -253,10 +238,8 @@ typedef struct {
     TouchBinding ts_double_tap_drag[8];  int ts_double_tap_drag_count;
     // Second finger
     TouchBinding ts_single_2nd[8];       int ts_single_2nd_count;
-    TouchBinding ts_long_2nd[8];         int ts_long_2nd_count;
     TouchBinding ts_double_2nd[8];       int ts_double_2nd_count;
     TouchBinding ts_single_drag_2nd[8];  int ts_single_drag_2nd_count;
-    TouchBinding ts_long_drag_2nd[8];    int ts_long_drag_2nd_count;
     TouchBinding ts_double_drag_2nd[8];  int ts_double_drag_2nd_count;
 
     // Gesture bindings — touchpad
@@ -267,10 +250,8 @@ typedef struct {
     TouchBinding tp_long_press_drag[8];  int tp_long_press_drag_count;
     TouchBinding tp_double_tap_drag[8];  int tp_double_tap_drag_count;
     TouchBinding tp_single_2nd[8];       int tp_single_2nd_count;
-    TouchBinding tp_long_2nd[8];         int tp_long_2nd_count;
     TouchBinding tp_double_2nd[8];       int tp_double_2nd_count;
     TouchBinding tp_single_drag_2nd[8];  int tp_single_drag_2nd_count;
-    TouchBinding tp_long_drag_2nd[8];    int tp_long_drag_2nd_count;
     TouchBinding tp_double_drag_2nd[8];  int tp_double_drag_2nd_count;
     uint32_t bindings_generation;
 } TouchProcessorConfig;

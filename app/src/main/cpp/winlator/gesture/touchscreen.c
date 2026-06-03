@@ -147,14 +147,12 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
                     FingerBindings* fb = &f->bindings;
                     fb->single_tap_count = g_state.cfg.ts_single_2nd_count;
                     memcpy(fb->single_tap, g_state.cfg.ts_single_2nd, sizeof(g_state.cfg.ts_single_2nd));
-                    fb->long_press_count = g_state.cfg.ts_long_2nd_count;
-                    memcpy(fb->long_press, g_state.cfg.ts_long_2nd, sizeof(g_state.cfg.ts_long_2nd));
+                    fb->long_press_count = 0;
                     fb->double_tap_count = g_state.cfg.ts_double_2nd_count;
                     memcpy(fb->double_tap, g_state.cfg.ts_double_2nd, sizeof(g_state.cfg.ts_double_2nd));
                     fb->single_tap_drag_count = g_state.cfg.ts_single_drag_2nd_count;
                     memcpy(fb->single_tap_drag, g_state.cfg.ts_single_drag_2nd, sizeof(g_state.cfg.ts_single_drag_2nd));
-                    fb->long_press_drag_count = g_state.cfg.ts_long_drag_2nd_count;
-                    memcpy(fb->long_press_drag, g_state.cfg.ts_long_drag_2nd, sizeof(g_state.cfg.ts_long_drag_2nd));
+                    fb->long_press_drag_count = 0;
                     fb->double_tap_drag_count = g_state.cfg.ts_double_drag_2nd_count;
                     memcpy(fb->double_tap_drag, g_state.cfg.ts_double_drag_2nd, sizeof(g_state.cfg.ts_double_drag_2nd));
                     touch_finger_cache_bs(f);
@@ -171,14 +169,12 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
             FingerBindings* fb = &f->bindings;
             fb->single_tap_count = g_state.cfg.ts_single_2nd_count;
             memcpy(fb->single_tap, g_state.cfg.ts_single_2nd, sizeof(g_state.cfg.ts_single_2nd));
-            fb->long_press_count = g_state.cfg.ts_long_2nd_count;
-            memcpy(fb->long_press, g_state.cfg.ts_long_2nd, sizeof(g_state.cfg.ts_long_2nd));
+            fb->long_press_count = 0;
             fb->double_tap_count = g_state.cfg.ts_double_2nd_count;
             memcpy(fb->double_tap, g_state.cfg.ts_double_2nd, sizeof(g_state.cfg.ts_double_2nd));
             fb->single_tap_drag_count = g_state.cfg.ts_single_drag_2nd_count;
             memcpy(fb->single_tap_drag, g_state.cfg.ts_single_drag_2nd, sizeof(g_state.cfg.ts_single_drag_2nd));
-            fb->long_press_drag_count = g_state.cfg.ts_long_drag_2nd_count;
-            memcpy(fb->long_press_drag, g_state.cfg.ts_long_drag_2nd, sizeof(g_state.cfg.ts_long_drag_2nd));
+            fb->long_press_drag_count = 0;
             fb->double_tap_drag_count = g_state.cfg.ts_double_drag_2nd_count;
             memcpy(fb->double_tap_drag, g_state.cfg.ts_double_drag_2nd, sizeof(g_state.cfg.ts_double_drag_2nd));
             touch_finger_cache_bs(f);
@@ -193,9 +189,6 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
 
         touchpad_finger_down(f, result, time_ms);
     } else if (f->ptr_id != g_state.gesture_main_ptr_id) {
-        if (g_state.long_tap_mode) {
-            return;
-        }
 
         if (g_state.gesture_double_tap_waiting) {
             if (gesture_is_within_tap_distance(f->x, f->y)) {
@@ -212,23 +205,35 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
                         g_state.gesture_pending_double[_i] = g_state.gesture_pending_deferred_double[_i];
                     g_state.gesture_pending_deferred_double_count = 0;
                 }
+                // Java handleDoubleTapConfirmed: pendingDeferredDoubleAction = null
                 g_state.gesture_pending_deferred_double_count = 0;
 
                 bool has_dt_drag = (g_state.cfg.ts_double_tap_drag_count > 0);
                 if (g_state.gesture_pending_double_count > 0) {
                     if (!has_dt_drag) {
+                        // Java: executeActionsAndHold(pendingDoubleTapAction) — press + hold
                         hold_actions(result, g_state.gesture_pending_double, g_state.gesture_pending_double_count);
                     } else {
-                        // Java second-finger double-tap confirm calls executeActions
-                        // (fire-and-forget) on pendingDoubleTapAction for drag case.
-                        // Execute immediately, don't defer to finger-up.
-                        execute_actions(result, g_state.gesture_pending_double, g_state.gesture_pending_double_count);
+                        // Java: keep pendingDoubleTapAction for later handling
+                        // (discarded on drag start, executed on finger-up via handleTapUp)
+                        g_state.gesture_pending_deferred_double_count = g_state.gesture_pending_double_count;
+                        for (int _i = 0; _i < g_state.gesture_pending_double_count; _i++)
+                            g_state.gesture_pending_deferred_double[_i] = g_state.gesture_pending_double[_i];
                     }
                     g_state.gesture_pending_double_count = 0;
                 }
                 // Java handleDoubleTapConfirmed: setSecondFingerActive(false); state = IDLE; postDoubleTapDrag = true
+                // Then TouchscreenGestureHandler.handlePointerDown sets state = TAP_WAITING
                 g_state.gesture_second_active = false;
                 g_state.gesture_post_double_tap_drag = true;
+                // Transition main finger from DOUBLE_TAP_WAITING to TAP_WAITING so drag can start
+                for (int _mi = 0; _mi < MAX_FINGERS; _mi++) {
+                    TouchFinger* _mf = &g_state.fingers[_mi];
+                    if (_mf->active && _mf->ptr_id == g_state.gesture_main_ptr_id) {
+                        _mf->state = GESTURE_STATE_TAP_WAITING;
+                        break;
+                    }
+                }
                 return;
             } else {
                 gesture_cancel_double_tap_wait(result);
@@ -363,25 +368,15 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                 //   hasActiveSingleTapDrag() → secondFingerSet.hasActiveSingleTapDrag
                 //   hasActiveSingleTap() → secondFingerSet.hasActiveSingleTap
                 bool sf_has_st_drag = g_state.cfg.ts_single_drag_2nd_count > 0;
-                if (!sf_has_st_drag) {
-                    // Java: removeCallbacks(longPressRunnable) — cancel second finger's timer
-                    for (int _si = 0; _si < MAX_FINGERS; _si++) {
-                        TouchFinger* _sf = &g_state.fingers[_si];
-                        if (_sf->active && _sf->ptr_id != g_state.gesture_main_ptr_id) {
-                            _sf->cached_has_long_press_timer = false;
-                            break;
-                        }
-                    }
+                if (!sf_has_st_drag && g_state.cfg.ts_single_2nd_count > 0) {
                     // Java: hasActiveSingleTap() → move pointer, return (no drag)
-                    if (g_state.cfg.ts_single_2nd_count > 0) {
-                        
-                        g_state.ptr_x = x;
-                        g_state.ptr_y = y;
-                        add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
-                        f->last_x = x;
-                        f->last_y = y;
-                        return;
-                    }
+                    
+                    g_state.ptr_x = x;
+                    g_state.ptr_y = y;
+                    add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
+                    f->last_x = x;
+                    f->last_y = y;
+                    return;
                 }
             } else {
                 if (!f->cached_has_active_single_tap_drag && f->cached_has_active_single_tap && !g_state.gesture_post_double_tap_drag) {
@@ -435,16 +430,9 @@ void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, T
                             if (e->element_long_press[k].type != BINDING_NONE)
                                 release_binding(result, &e->element_long_press[k]);
                     }
-                    if (e->gesture_double_tap_triggered) {
-                        for (int k = e->element_double_tap_count - 1; k >= 0; k--)
-                            if (e->element_double_tap[k].type != BINDING_NONE)
-                                release_binding(result, &e->element_double_tap[k]);
-                    }
                     e->long_press_arm = false;
                     e->gesture_long_press_triggered = false;
                     e->gesture_swipe_triggered = false;
-                    e->gesture_double_tap_triggered = false;
-                    e->double_tap_waiting = false;
                     e->current_ptr_id = -1;
                     e->engaged = false;
                     e->visual_active = false;

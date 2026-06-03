@@ -62,8 +62,6 @@ typedef struct {
     TouchBinding pending_second_double[8];
     int pending_second_double_count;
 
-    bool long_tap_mode;
-
     // TouchActivationMode state
     TrackedButtons tracked[MAX_FINGERS];
     int hovered_element_per_ptr[MAX_FINGERS];
@@ -148,10 +146,8 @@ static inline int active_finger_count(void) {
     COPY_SINGLE_BINDING(fb_, cfg_, long_press_drag, pfx_##_long_press_drag); \
     COPY_SINGLE_BINDING(fb_, cfg_, double_tap_drag, pfx_##_double_tap_drag); \
     COPY_SINGLE_BINDING(fb_, cfg_, single_tap_2nd, pfx_##_single_2nd); \
-    COPY_SINGLE_BINDING(fb_, cfg_, long_press_2nd, pfx_##_long_2nd); \
     COPY_SINGLE_BINDING(fb_, cfg_, double_tap_2nd, pfx_##_double_2nd); \
     COPY_SINGLE_BINDING(fb_, cfg_, single_tap_drag_2nd, pfx_##_single_drag_2nd); \
-    COPY_SINGLE_BINDING(fb_, cfg_, long_press_drag_2nd, pfx_##_long_drag_2nd); \
     COPY_SINGLE_BINDING(fb_, cfg_, double_tap_drag_2nd, pfx_##_double_drag_2nd); \
 }
 

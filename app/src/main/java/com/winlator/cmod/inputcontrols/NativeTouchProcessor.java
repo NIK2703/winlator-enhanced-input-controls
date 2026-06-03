@@ -44,10 +44,8 @@ public class NativeTouchProcessor {
     public static class NativeConfig {
         public int touchMode;
         public int inputMode;
-        public int secondFingerMode;
         public int longPressTimeoutMs;
         public int doubleTapTimeoutMs;
-        public int buttonDoubleTapTimeoutMs;
         public int singleTapDelayMs;
         public int dragThresholdPx;
         public int doubleTapDistancePx;
@@ -72,10 +70,8 @@ public class NativeTouchProcessor {
         public int[] tsLongPressDrag;
         public int[] tsDoubleTapDrag;
         public int[] tsSingleTap2nd;
-        public int[] tsLongPress2nd;
         public int[] tsDoubleTap2nd;
         public int[] tsSingleTapDrag2nd;
-        public int[] tsLongPressDrag2nd;
         public int[] tsDoubleTapDrag2nd;
 
         // Touchpad gesture bindings (12 lists)
@@ -86,10 +82,8 @@ public class NativeTouchProcessor {
         public int[] tpLongPressDrag;
         public int[] tpDoubleTapDrag;
         public int[] tpSingleTap2nd;
-        public int[] tpLongPress2nd;
         public int[] tpDoubleTap2nd;
         public int[] tpSingleTapDrag2nd;
-        public int[] tpLongPressDrag2nd;
         public int[] tpDoubleTapDrag2nd;
     }
 
@@ -107,7 +101,6 @@ public class NativeTouchProcessor {
         public int[] bindingTypes; // [type0, keycode0, type1, keycode1, ...]
         public int[] elementLongPress;   // [type0, keycode0, ...]
         public int[] elementGesture;     // [type0, keycode0, ...]
-        public int[] elementDoubleTap;   // [type0, keycode0, ...]
         public boolean toggleSwitch;
         public float opacity;
         public int buttonLongPressHaptic = 1;
@@ -237,7 +230,6 @@ public class NativeTouchProcessor {
             c.touchMode = 0; // TOUCH_MODE_TOUCHPAD
         }
         c.inputMode = profile.getInputMode() == com.winlator.cmod.inputcontrols.InputMode.RELATIVE ? 0 : 1;
-        c.secondFingerMode = profile.getSecondFingerMode() == SecondFingerMode.LONG_TAP_ACTION ? 1 : 0;
         // Use mode-appropriate timeout/drag values
         if (c.touchMode == 0) { // TOUCHPAD
             c.longPressTimeoutMs = profile.getTouchpadLongPressTimeout();
@@ -250,7 +242,6 @@ public class NativeTouchProcessor {
             c.dragThresholdPx = profile.getDragThreshold();
             c.cursorSpeed = (int)(profile.getCursorSpeed() * globalCursorSpeed * 100);
         }
-        c.buttonDoubleTapTimeoutMs = profile.getButtonDoubleTapTimeout();
         c.singleTapDelayMs = profile.getSingleTapDelay();
         c.doubleTapDistancePx = profile.getDoubleTapDistance();
         c.bindingDelayMs = profile.getBindingDelay();
@@ -271,10 +262,8 @@ public class NativeTouchProcessor {
         c.tsLongPressDrag = bindingListToEncoded(profile.getLongPressDragAction());
         c.tsDoubleTapDrag = bindingListToEncoded(profile.getDoubleTapDragAction());
         c.tsSingleTap2nd = bindingListToEncoded(profile.getSingleTap2ndFingerAction());
-        c.tsLongPress2nd = bindingListToEncoded(profile.getLongPress2ndFingerAction());
         c.tsDoubleTap2nd = bindingListToEncoded(profile.getDoubleTap2ndFingerAction());
         c.tsSingleTapDrag2nd = bindingListToEncoded(profile.getSingleTap2ndFingerDragAction());
-        c.tsLongPressDrag2nd = bindingListToEncoded(profile.getLongPress2ndFingerDragAction());
         c.tsDoubleTapDrag2nd = bindingListToEncoded(profile.getDoubleTap2ndFingerDragAction());
 
         // Touchpad gesture bindings
@@ -285,10 +274,8 @@ public class NativeTouchProcessor {
         c.tpLongPressDrag = bindingListToEncoded(profile.getTouchpadLongPressDragAction());
         c.tpDoubleTapDrag = bindingListToEncoded(profile.getTouchpadDoubleTapDragAction());
         c.tpSingleTap2nd = bindingListToEncoded(profile.getTouchpadSingleTap2ndFingerAction());
-        c.tpLongPress2nd = bindingListToEncoded(profile.getTouchpadLongPress2ndFingerAction());
         c.tpDoubleTap2nd = bindingListToEncoded(profile.getTouchpadDoubleTap2ndFingerAction());
         c.tpSingleTapDrag2nd = bindingListToEncoded(profile.getTouchpadSingleTap2ndFingerDragAction());
-        c.tpLongPressDrag2nd = bindingListToEncoded(profile.getTouchpadLongPress2ndFingerDragAction());
         c.tpDoubleTapDrag2nd = bindingListToEncoded(profile.getTouchpadDoubleTap2ndFingerDragAction());
 
         return c;
@@ -336,7 +323,6 @@ public class NativeTouchProcessor {
             // Element-specific gesture bindings
             ne.elementLongPress = bindingListToEncoded(ce.getLongPressBindings());
             ne.elementGesture = bindingListToEncoded(ce.getGestureBindings());
-            ne.elementDoubleTap = bindingListToEncoded(ce.getDoubleTapBindings());
 
             // Encode up to 4 bindings as [type0, keycode0, type1, keycode1, ...]
             ne.bindingTypes = new int[ce.getBindingCount() * 2];

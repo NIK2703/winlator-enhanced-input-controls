@@ -10,23 +10,7 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
         return;
     }
 
-    if (e->double_tap_waiting) {
-        // Second tap confirmed — hold all double-tap bindings (Java pressBindings)
-        e->double_tap_waiting = false;
-        e->gesture_double_tap_triggered = true;
-        e->gesture_swipe_triggered = false; // Java handleDoubleTapConfirmed: gestureTriggered = false
-        for (int k = 0; k < e->element_double_tap_count; k++)
-            press_binding(result, &e->element_double_tap[k], true);
-        return;
-    }
-
-    bool has_dt = e->element_double_tap_count > 0 && e->element_double_tap[0].type != BINDING_NONE;
     bool has_lp = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
-    if (has_dt) {
-        // Java: hasDoubleTapBinding() && hasLongPressBinding() && !toggleSwitch -> startLongPressTimer
-        if (has_lp && !e->toggle_switch) e->long_press_arm = true;
-        return;
-    }
 
     // Java: hasLongPressBinding() && !toggleSwitch -> startLongPressTimer (no primary press)
     e->long_press_arm = has_lp && !e->toggle_switch;
@@ -37,7 +21,7 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     // Java else: pressBindings(bindings.get(0))
     if (e->bindings[0].type != BINDING_NONE)
         press_binding(result, &e->bindings[0], true);
-    else if (!e->double_tap_waiting && !e->toggle_switch)
+    else if (!e->toggle_switch)
         e->visual_active = false;
 }
 
@@ -46,22 +30,8 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
     float dx = x - e->down_x;
     float dy = y - e->down_y;
 
-    if (e->double_tap_waiting) {
-        if (!e->gesture_swipe_triggered
-            && !e->gesture_long_press_triggered && !e->gesture_double_tap_triggered
-            && !point_in_element(x, y, e)) {
-            e->double_tap_waiting = false;
-            e->long_press_arm = false;
-            if (e->bindings[0].type != BINDING_NONE) {
-                press_binding(result, &e->bindings[0], false);
-                release_binding(result, &e->bindings[0]);
-            }
-        }
-    }
-
-    // Java: gesture binding check — hasGestureBinding() && !gestureTriggered && !longPressTriggered && !doubleTapTriggered
-    if (!e->gesture_swipe_triggered && !e->gesture_long_press_triggered
-        && !e->gesture_double_tap_triggered) {
+    // Java: gesture binding check — hasGestureBinding() && !gestureTriggered && !longPressTriggered
+    if (!e->gesture_swipe_triggered && !e->gesture_long_press_triggered) {
         bool has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
         if (has_gesture) {
             float gesture_threshold = g_state.cfg.gesture_threshold_px > 0 ?
@@ -72,7 +42,6 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
                 e->gesture_swipe_triggered = true;
                 e->long_press_arm = false;
                 e->gesture_long_press_triggered = false;
-                e->double_tap_waiting = false;
                 // Java: does NOT release primary binding on gesture trigger
                 if (e->button_gesture_haptic > 0)
                     add_action(result, ACT_HAPTIC, e->button_gesture_haptic, 0, 0);
@@ -92,8 +61,7 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
     if (e->bindings[0].type == BINDING_NONE
         && !e->toggle_switch
         && !e->gesture_swipe_triggered
-        && !e->gesture_long_press_triggered
-        && !e->gesture_double_tap_triggered) {
+        && !e->gesture_long_press_triggered) {
         e->visual_active = false;
     }
 }
@@ -122,13 +90,6 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
                 release_binding(result, &e->element_long_press[k]);
         }
         e->gesture_long_press_triggered = false;
-    } else if (e->gesture_double_tap_triggered) {
-        // Java releaseHeldBindings: releases double-tap bindings only (NOT primary)
-        for (int k = e->element_double_tap_count - 1; k >= 0; k--) {
-            if (e->element_double_tap[k].type != BINDING_NONE)
-                release_binding(result, &e->element_double_tap[k]);
-        }
-        e->gesture_double_tap_triggered = false;
     } else if (e->gesture_swipe_triggered) {
         if (e->element_gesture_count > 0) {
             for (int k = e->element_gesture_count - 1; k >= 0; k--) {
@@ -138,31 +99,15 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
         }
         e->gesture_swipe_triggered = false;
     } else {
-        bool has_dt = e->element_double_tap_count > 0 && e->element_double_tap[0].type != BINDING_NONE;
-
-        if (has_dt && !e->double_tap_waiting) {
-            // Java handleTouchUp: first tap-up with double-tap binding
-            // cancelPendingLongPress() + startDoubleTapTimer()
-            // Keep visual_active true — Java keeps active=true while timer runs
-            e->gesture_last_tap_time = time_ms;
-            e->gesture_tap_up_x = x;
-            e->gesture_tap_up_y = y;
-            e->double_tap_waiting = true;
-            e->long_press_arm = false; // Java cancelPendingLongPress
-            e->engaged = false;
-            e->current_ptr_id = -1;
-            return;
-        } else {
-            bool has_lp = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
-            if (has_lp && !e->gesture_long_press_triggered) {
-                if (e->bindings[0].type != BINDING_NONE) {
-                    press_binding(result, &e->bindings[0], true);
-                    release_binding(result, &e->bindings[0]);
-                }
-            } else {
-                if (e->bindings[0].type != BINDING_NONE)
-                    release_binding(result, &e->bindings[0]);
+        bool has_lp = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
+        if (has_lp && !e->gesture_long_press_triggered) {
+            if (e->bindings[0].type != BINDING_NONE) {
+                press_binding(result, &e->bindings[0], true);
+                release_binding(result, &e->bindings[0]);
             }
+        } else {
+            if (e->bindings[0].type != BINDING_NONE)
+                release_binding(result, &e->bindings[0]);
         }
     }
 

@@ -153,7 +153,6 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeInit(
     c.second_finger_mode = (SecondFingerMode)env->GetIntField(config, env->GetFieldID(configClass, "secondFingerMode", "I"));
     c.long_press_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "longPressTimeoutMs", "I"));
     c.double_tap_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "doubleTapTimeoutMs", "I"));
-    c.button_double_tap_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "buttonDoubleTapTimeoutMs", "I"));
     c.single_tap_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "singleTapDelayMs", "I"));
     c.drag_threshold_px = env->GetIntField(config, env->GetFieldID(configClass, "dragThresholdPx", "I"));
     c.double_tap_distance_px = env->GetIntField(config, env->GetFieldID(configClass, "doubleTapDistancePx", "I"));
@@ -180,10 +179,8 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeInit(
     READ_GESTURE_LIST(env, config, configClass, "tsLongPressDrag",  c.ts_long_press_drag, c.ts_long_press_drag_count);
     READ_GESTURE_LIST(env, config, configClass, "tsDoubleTapDrag",  c.ts_double_tap_drag, c.ts_double_tap_drag_count);
     READ_GESTURE_LIST(env, config, configClass, "tsSingleTap2nd",   c.ts_single_2nd,      c.ts_single_2nd_count);
-    READ_GESTURE_LIST(env, config, configClass, "tsLongPress2nd",   c.ts_long_2nd,        c.ts_long_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tsDoubleTap2nd",   c.ts_double_2nd,      c.ts_double_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tsSingleTapDrag2nd", c.ts_single_drag_2nd, c.ts_single_drag_2nd_count);
-    READ_GESTURE_LIST(env, config, configClass, "tsLongPressDrag2nd",  c.ts_long_drag_2nd,   c.ts_long_drag_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tsDoubleTapDrag2nd",  c.ts_double_drag_2nd, c.ts_double_drag_2nd_count);
 
     // Touchpad gesture bindings (12 lists)
@@ -194,16 +191,11 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeInit(
     READ_GESTURE_LIST(env, config, configClass, "tpLongPressDrag",  c.tp_long_press_drag, c.tp_long_press_drag_count);
     READ_GESTURE_LIST(env, config, configClass, "tpDoubleTapDrag",  c.tp_double_tap_drag, c.tp_double_tap_drag_count);
     READ_GESTURE_LIST(env, config, configClass, "tpSingleTap2nd",   c.tp_single_2nd,      c.tp_single_2nd_count);
-    READ_GESTURE_LIST(env, config, configClass, "tpLongPress2nd",   c.tp_long_2nd,        c.tp_long_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tpDoubleTap2nd",   c.tp_double_2nd,      c.tp_double_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tpSingleTapDrag2nd", c.tp_single_drag_2nd, c.tp_single_drag_2nd_count);
-    READ_GESTURE_LIST(env, config, configClass, "tpLongPressDrag2nd",  c.tp_long_drag_2nd,   c.tp_long_drag_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tpDoubleTapDrag2nd",  c.tp_double_drag_2nd, c.tp_double_drag_2nd_count);
 
-    
-    
-    
-    
+
 
     // Touchscreen gesture bindings logged above via READ_GESTURE_LIST
 
@@ -262,10 +254,6 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeSetElements(
         elems[i].element_gesture_count = read_binding_list(env,
             (jintArray)env->GetObjectField(je, env->GetFieldID(elemClass, "elementGesture", "[I")),
             elems[i].element_gesture, 8);
-        elems[i].element_double_tap_count = read_binding_list(env,
-            (jintArray)env->GetObjectField(je, env->GetFieldID(elemClass, "elementDoubleTap", "[I")),
-            elems[i].element_double_tap, 8);
-
         // Read bindings — Java sends [type0, keycode0, type1, keycode1, ...]
         jintArray bindingTypes = (jintArray)env->GetObjectField(je, env->GetFieldID(elemClass, "bindingTypes", "[I"));
         if (bindingTypes) {
@@ -456,25 +444,9 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeUpdateConfig(
     c.second_finger_mode = (SecondFingerMode)env->GetIntField(config, env->GetFieldID(configClass, "secondFingerMode", "I"));
     c.long_press_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "longPressTimeoutMs", "I"));
     c.double_tap_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "doubleTapTimeoutMs", "I"));
-    c.button_double_tap_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "buttonDoubleTapTimeoutMs", "I"));
     c.single_tap_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "singleTapDelayMs", "I"));
-    c.drag_threshold_px = env->GetIntField(config, env->GetFieldID(configClass, "dragThresholdPx", "I"));
-    c.double_tap_distance_px = env->GetIntField(config, env->GetFieldID(configClass, "doubleTapDistancePx", "I"));
-    c.binding_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "bindingDelayMs", "I"));
-    c.long_press_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "longPressDelayMs", "I"));
-    c.cursor_speed = env->GetIntField(config, env->GetFieldID(configClass, "cursorSpeed", "I"));
-    c.gesture_threshold_px = env->GetIntField(config, env->GetFieldID(configClass, "gestureThresholdPx", "I"));
-    c.cursor_acceleration_threshold = env->GetIntField(config, env->GetFieldID(configClass, "cursorAccelerationThreshold", "I"));
-    c.cursor_acceleration_factor = env->GetFloatField(config, env->GetFieldID(configClass, "cursorAccelerationFactor", "F"));
-    c.screen_w = env->GetIntField(config, env->GetFieldID(configClass, "screenW", "I"));
-    c.screen_h = env->GetIntField(config, env->GetFieldID(configClass, "screenH", "I"));
-    c.xform_scale_x = env->GetFloatField(config, env->GetFieldID(configClass, "xformScaleX", "F"));
-    if (c.xform_scale_x <= 0.0f) c.xform_scale_x = 1.0f;
-    c.xform_scale_y = env->GetFloatField(config, env->GetFieldID(configClass, "xformScaleY", "F"));
-    if (c.xform_scale_y <= 0.0f) c.xform_scale_y = 1.0f;
-    c.gesture_long_press_haptic = env->GetIntField(config, env->GetFieldID(configClass, "gestureLongPressHaptic", "I"));
-    c.haptic_enabled = env->GetBooleanField(config, env->GetFieldID(configClass, "hapticEnabled", "Z"));
 
+    // Touchscreen gesture bindings (12 lists, each read individually)
     READ_GESTURE_LIST(env, config, configClass, "tsSingleTap",      c.ts_single_tap,      c.ts_single_tap_count);
     READ_GESTURE_LIST(env, config, configClass, "tsLongPress",      c.ts_long_press,      c.ts_long_press_count);
     READ_GESTURE_LIST(env, config, configClass, "tsDoubleTap",      c.ts_double_tap,      c.ts_double_tap_count);
@@ -482,12 +454,11 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeUpdateConfig(
     READ_GESTURE_LIST(env, config, configClass, "tsLongPressDrag",  c.ts_long_press_drag, c.ts_long_press_drag_count);
     READ_GESTURE_LIST(env, config, configClass, "tsDoubleTapDrag",  c.ts_double_tap_drag, c.ts_double_tap_drag_count);
     READ_GESTURE_LIST(env, config, configClass, "tsSingleTap2nd",   c.ts_single_2nd,      c.ts_single_2nd_count);
-    READ_GESTURE_LIST(env, config, configClass, "tsLongPress2nd",   c.ts_long_2nd,        c.ts_long_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tsDoubleTap2nd",   c.ts_double_2nd,      c.ts_double_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tsSingleTapDrag2nd", c.ts_single_drag_2nd, c.ts_single_drag_2nd_count);
-    READ_GESTURE_LIST(env, config, configClass, "tsLongPressDrag2nd",  c.ts_long_drag_2nd,   c.ts_long_drag_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tsDoubleTapDrag2nd",  c.ts_double_drag_2nd, c.ts_double_drag_2nd_count);
 
+    // Touchpad gesture bindings (12 lists)
     READ_GESTURE_LIST(env, config, configClass, "tpSingleTap",      c.tp_single_tap,      c.tp_single_tap_count);
     READ_GESTURE_LIST(env, config, configClass, "tpLongPress",      c.tp_long_press,      c.tp_long_press_count);
     READ_GESTURE_LIST(env, config, configClass, "tpDoubleTap",      c.tp_double_tap,      c.tp_double_tap_count);
@@ -495,13 +466,11 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeUpdateConfig(
     READ_GESTURE_LIST(env, config, configClass, "tpLongPressDrag",  c.tp_long_press_drag, c.tp_long_press_drag_count);
     READ_GESTURE_LIST(env, config, configClass, "tpDoubleTapDrag",  c.tp_double_tap_drag, c.tp_double_tap_drag_count);
     READ_GESTURE_LIST(env, config, configClass, "tpSingleTap2nd",   c.tp_single_2nd,      c.tp_single_2nd_count);
-    READ_GESTURE_LIST(env, config, configClass, "tpLongPress2nd",   c.tp_long_2nd,        c.tp_long_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tpDoubleTap2nd",   c.tp_double_2nd,      c.tp_double_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tpSingleTapDrag2nd", c.tp_single_drag_2nd, c.tp_single_drag_2nd_count);
-    READ_GESTURE_LIST(env, config, configClass, "tpLongPressDrag2nd",  c.tp_long_drag_2nd,   c.tp_long_drag_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tpDoubleTapDrag2nd",  c.tp_double_drag_2nd, c.tp_double_drag_2nd_count);
 
-    touch_processor_update_config(&c);
+    touch_processor_init(&c);
 }
 
 JNIEXPORT void JNICALL

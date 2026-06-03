@@ -232,29 +232,6 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Button Double Tap Delay (ms)"/>
-
-            <TextView
-                android:id="@+id/TVButtonDoubleTapDelay"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
-
-        <SeekBar
-            android:id="@+id/SBButtonDoubleTapDelay"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:max="25" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:text="Button Gesture Threshold"/>
 
             <TextView

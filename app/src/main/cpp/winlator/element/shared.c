@@ -160,7 +160,6 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     e->visual_y = y;
     e->gesture_swipe_triggered = false;
     e->gesture_long_press_triggered = false;
-    e->gesture_double_tap_triggered = false;
     e->gesture_swipe_direction = -1;
     e->long_press_arm = false;
     
@@ -198,16 +197,9 @@ void release_element_bindings(TouchElement* e, TouchActionResult* result) {
             if (e->element_long_press[k].type != BINDING_NONE)
                 release_binding(result, &e->element_long_press[k]);
     }
-    if (e->gesture_double_tap_triggered) {
-        for (int k = e->element_double_tap_count - 1; k >= 0; k--)
-            if (e->element_double_tap[k].type != BINDING_NONE)
-                release_binding(result, &e->element_double_tap[k]);
-    }
     e->long_press_arm = false;
     e->gesture_long_press_triggered = false;
     e->gesture_swipe_triggered = false;
-    e->gesture_double_tap_triggered = false;
-    e->double_tap_waiting = false;
     e->current_ptr_id = -1;
     e->engaged = false;
     e->visual_active = false;

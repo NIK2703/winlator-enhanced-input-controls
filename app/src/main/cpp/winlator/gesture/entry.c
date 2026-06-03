@@ -125,27 +125,23 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
         if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
             fb2->single_tap_count = g_state.cfg.ts_single_2nd_count;
             memcpy(fb2->single_tap, g_state.cfg.ts_single_2nd, sizeof(g_state.cfg.ts_single_2nd));
-            fb2->long_press_count = g_state.cfg.ts_long_2nd_count;
-            memcpy(fb2->long_press, g_state.cfg.ts_long_2nd, sizeof(g_state.cfg.ts_long_2nd));
+            fb2->long_press_count = 0;
             fb2->double_tap_count = g_state.cfg.ts_double_2nd_count;
             memcpy(fb2->double_tap, g_state.cfg.ts_double_2nd, sizeof(g_state.cfg.ts_double_2nd));
             fb2->single_tap_drag_count = g_state.cfg.ts_single_drag_2nd_count;
             memcpy(fb2->single_tap_drag, g_state.cfg.ts_single_drag_2nd, sizeof(g_state.cfg.ts_single_drag_2nd));
-            fb2->long_press_drag_count = g_state.cfg.ts_long_drag_2nd_count;
-            memcpy(fb2->long_press_drag, g_state.cfg.ts_long_drag_2nd, sizeof(g_state.cfg.ts_long_drag_2nd));
+            fb2->long_press_drag_count = 0;
             fb2->double_tap_drag_count = g_state.cfg.ts_double_drag_2nd_count;
             memcpy(fb2->double_tap_drag, g_state.cfg.ts_double_drag_2nd, sizeof(g_state.cfg.ts_double_drag_2nd));
         } else {
             fb2->single_tap_count = g_state.cfg.tp_single_2nd_count;
             memcpy(fb2->single_tap, g_state.cfg.tp_single_2nd, sizeof(g_state.cfg.tp_single_2nd));
-            fb2->long_press_count = g_state.cfg.tp_long_2nd_count;
-            memcpy(fb2->long_press, g_state.cfg.tp_long_2nd, sizeof(g_state.cfg.tp_long_2nd));
+            fb2->long_press_count = 0;
             fb2->double_tap_count = g_state.cfg.tp_double_2nd_count;
             memcpy(fb2->double_tap, g_state.cfg.tp_double_2nd, sizeof(g_state.cfg.tp_double_2nd));
             fb2->single_tap_drag_count = g_state.cfg.tp_single_drag_2nd_count;
             memcpy(fb2->single_tap_drag, g_state.cfg.tp_single_drag_2nd, sizeof(g_state.cfg.tp_single_drag_2nd));
-            fb2->long_press_drag_count = g_state.cfg.tp_long_drag_2nd_count;
-            memcpy(fb2->long_press_drag, g_state.cfg.tp_long_drag_2nd, sizeof(g_state.cfg.tp_long_drag_2nd));
+            fb2->long_press_drag_count = 0;
             fb2->double_tap_drag_count = g_state.cfg.tp_double_drag_2nd_count;
             memcpy(fb2->double_tap_drag, g_state.cfg.tp_double_drag_2nd, sizeof(g_state.cfg.tp_double_drag_2nd));
         }
@@ -312,10 +308,6 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time
         g_state.gesture_second_ptr_id = -1;
         g_state.gesture_post_double_tap_drag = false;
 
-        if (f->state == GESTURE_STATE_LONG_PRESSING && f->cached_has_active_long_press && !f->cached_can_hold_long_press) {
-            execute_actions(result, f->bindings.long_press, f->bindings.long_press_count);
-        }
-
         // Java: postDoubleTapDrag = false; if (!secondFingerDoubleTapWaiting && state != DRAGGING) state = IDLE
         if (!g_state.second_double_tap_waiting && f->state != GESTURE_STATE_DRAGGING) {
             f->state = GESTURE_STATE_IDLE;
@@ -329,40 +321,6 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time
 
     switch (f->state) {
         case GESTURE_STATE_TAP_WAITING: {
-            // Java TouchpadGestureHandler.onFingerUp uses shared state. When the second
-            // finger's LP timer has fired (second finger state = LONG_PRESSING) and the
-            // main finger lifts, Java enters the LONG_PRESSING case. C uses per-finger
-            // state, so detect this scenario and handle as LONG_PRESSING to match Java.
-            bool handled_second_lp = false;
-            if (g_state.gesture_second_active) {
-                for (int _si = 0; _si < MAX_FINGERS; _si++) {
-                    TouchFinger* _sf = &g_state.fingers[_si];
-                    if (_sf->active && _sf->ptr_id != f->ptr_id
-                        && _sf->ptr_id == g_state.gesture_second_ptr_id
-                        && _sf->state == GESTURE_STATE_LONG_PRESSING) {
-                        // Mirror Java main-finger-up LONG_PRESSING case:
-                        //   if (!isActionHeld && hasActiveLongPress()) executeActions(activeLongPressAction())
-                        if (!g_state.gesture_is_action_held) {
-                            const TouchBinding* active_lp = (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN)
-                                ? g_state.cfg.ts_long_2nd : g_state.cfg.tp_long_2nd;
-                            int active_lp_count = (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN)
-                                ? g_state.cfg.ts_long_2nd_count : g_state.cfg.tp_long_2nd_count;
-                            if (active_lp_count > 0)
-                                execute_actions(result, active_lp, active_lp_count);
-                        }
-                        release_held_actions(result);
-                        // Clear second finger's LONG_PRESSING state (Java cleanupMainPointer
-                        // sets shared state = IDLE, preventing double-fire on second finger lift)
-                        _sf->state = GESTURE_STATE_IDLE;
-                        cleanup_main_finger(f);
-                        f->active = false;
-                        handled_second_lp = true;
-                        break;
-                    }
-                }
-            }
-            if (handled_second_lp) break;
-
             if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD
                 && !(f->travel_x < MAX_TAP_TRAVEL && f->travel_y < MAX_TAP_TRAVEL && (time_ms - f->down_time_ms) < TAP_MAX_TIME_MS)) {
                 release_held_actions(result);

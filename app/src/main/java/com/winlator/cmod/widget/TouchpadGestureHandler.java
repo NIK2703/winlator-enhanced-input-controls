@@ -41,13 +41,11 @@ public class TouchpadGestureHandler extends GestureHandler {
         longPressAction = new ArrayList<>(profile.getTouchpadLongPressAction());
         doubleTapAction = new ArrayList<>(profile.getTouchpadDoubleTapAction());
         singleTap2ndFingerAction = new ArrayList<>(profile.getTouchpadSingleTap2ndFingerAction());
-        longPress2ndFingerAction = new ArrayList<>(profile.getTouchpadLongPress2ndFingerAction());
         doubleTap2ndFingerAction = new ArrayList<>(profile.getTouchpadDoubleTap2ndFingerAction());
         singleTapDragAction = new ArrayList<>(profile.getTouchpadSingleTapDragAction());
         longPressDragAction = new ArrayList<>(profile.getTouchpadLongPressDragAction());
         doubleTapDragAction = new ArrayList<>(profile.getTouchpadDoubleTapDragAction());
         singleTap2ndFingerDragAction = new ArrayList<>(profile.getTouchpadSingleTap2ndFingerDragAction());
-        longPress2ndFingerDragAction = new ArrayList<>(profile.getTouchpadLongPress2ndFingerDragAction());
         doubleTap2ndFingerDragAction = new ArrayList<>(profile.getTouchpadDoubleTap2ndFingerDragAction());
         bindingDelay = profile.getBindingDelay();
         doubleTapTimeout = profile.getTouchpadDoubleTapTimeout();
@@ -59,8 +57,8 @@ public class TouchpadGestureHandler extends GestureHandler {
 
         firstFingerSet = buildBindingSet(singleTapAction, longPressAction, doubleTapAction,
             singleTapDragAction, longPressDragAction, doubleTapDragAction);
-        secondFingerSet = buildBindingSet(singleTap2ndFingerAction, longPress2ndFingerAction, doubleTap2ndFingerAction,
-            singleTap2ndFingerDragAction, longPress2ndFingerDragAction, doubleTap2ndFingerDragAction);
+        secondFingerSet = buildBindingSet(singleTap2ndFingerAction, new ArrayList<>(), doubleTap2ndFingerAction,
+            singleTap2ndFingerDragAction, new ArrayList<>(), doubleTap2ndFingerDragAction);
         cur = firstFingerSet;
     }
 

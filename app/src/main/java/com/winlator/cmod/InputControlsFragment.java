@@ -87,8 +87,6 @@ public class InputControlsFragment extends Fragment {
     private Spinner spGestureLongPressHaptic;
     private SeekBar sbGestureThreshold;
     private TextView tvGestureThreshold;
-    private SeekBar sbButtonDoubleTapDelay;
-    private TextView tvButtonDoubleTapDelay;
     private SeekBar sbDoubleTapDistance;
     private TextView tvDoubleTapDistance;
     private SeekBar sbStrokeWidth;
@@ -287,27 +285,6 @@ public class InputControlsFragment extends Fragment {
             int threshold = currentProfile != null ? currentProfile.getGestureThreshold() : 20;
             sbGestureThreshold.setProgress(threshold - 10);
             tvGestureThreshold.setText(threshold + " px");
-        });
-
-        sbButtonDoubleTapDelay = view.findViewById(R.id.SBButtonDoubleTapDelay);
-        tvButtonDoubleTapDelay = view.findViewById(R.id.TVButtonDoubleTapDelay);
-        sbButtonDoubleTapDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                int value = 50 + progress * 10;
-                tvButtonDoubleTapDelay.setText(value + " ms");
-                if (fromUser && currentProfile != null) {
-                    currentProfile.setButtonDoubleTapTimeout(value);
-                    currentProfile.save();
-                }
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-        sbButtonDoubleTapDelay.post(() -> {
-            int timeout = currentProfile != null ? currentProfile.getButtonDoubleTapTimeout() : 100;
-            sbButtonDoubleTapDelay.setProgress((timeout - 50) / 10);
-            tvButtonDoubleTapDelay.setText(timeout + " ms");
         });
 
         tvDoubleTapDistance = view.findViewById(R.id.TVDoubleTapDistance);

@@ -22,13 +22,11 @@ public abstract class GestureHandler {
     protected List<Binding> longPressAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
     protected List<Binding> doubleTapAction = new ArrayList<>();
     protected List<Binding> singleTap2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
-    protected List<Binding> longPress2ndFingerAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_RIGHT_BUTTON));
     protected List<Binding> doubleTap2ndFingerAction = new ArrayList<>();
     protected List<Binding> singleTapDragAction = new ArrayList<>();
     protected List<Binding> longPressDragAction = new ArrayList<>(Collections.singletonList(Binding.MOUSE_LEFT_BUTTON));
     protected List<Binding> doubleTapDragAction = new ArrayList<>();
     protected List<Binding> singleTap2ndFingerDragAction = new ArrayList<>();
-    protected List<Binding> longPress2ndFingerDragAction = new ArrayList<>();
     protected List<Binding> doubleTap2ndFingerDragAction = new ArrayList<>();
 
     protected int bindingDelay;
@@ -150,8 +148,8 @@ public abstract class GestureHandler {
     void applyDefaultBindings() {
         firstFingerSet = buildBindingSet(singleTapAction, longPressAction, doubleTapAction,
             singleTapDragAction, longPressDragAction, doubleTapDragAction);
-        secondFingerSet = buildBindingSet(singleTap2ndFingerAction, longPress2ndFingerAction, doubleTap2ndFingerAction,
-            singleTap2ndFingerDragAction, longPress2ndFingerDragAction, doubleTap2ndFingerDragAction);
+        secondFingerSet = buildBindingSet(singleTap2ndFingerAction, new ArrayList<>(), doubleTap2ndFingerAction,
+            singleTap2ndFingerDragAction, new ArrayList<>(), doubleTap2ndFingerDragAction);
         cur = firstFingerSet;
     }
 
@@ -165,13 +163,11 @@ public abstract class GestureHandler {
         longPressAction = new ArrayList<>(profile.getLongPressAction());
         doubleTapAction = new ArrayList<>(profile.getDoubleTapAction());
         singleTap2ndFingerAction = new ArrayList<>(profile.getSingleTap2ndFingerAction());
-        longPress2ndFingerAction = new ArrayList<>(profile.getLongPress2ndFingerAction());
         doubleTap2ndFingerAction = new ArrayList<>(profile.getDoubleTap2ndFingerAction());
         singleTapDragAction = new ArrayList<>(profile.getSingleTapDragAction());
         longPressDragAction = new ArrayList<>(profile.getLongPressDragAction());
         doubleTapDragAction = new ArrayList<>(profile.getDoubleTapDragAction());
         singleTap2ndFingerDragAction = new ArrayList<>(profile.getSingleTap2ndFingerDragAction());
-        longPress2ndFingerDragAction = new ArrayList<>(profile.getLongPress2ndFingerDragAction());
         doubleTap2ndFingerDragAction = new ArrayList<>(profile.getDoubleTap2ndFingerDragAction());
         bindingDelay = profile.getBindingDelay();
         doubleTapTimeout = profile.getDoubleTapTimeout();
@@ -184,8 +180,8 @@ public abstract class GestureHandler {
 
         firstFingerSet = buildBindingSet(singleTapAction, longPressAction, doubleTapAction,
             singleTapDragAction, longPressDragAction, doubleTapDragAction);
-        secondFingerSet = buildBindingSet(singleTap2ndFingerAction, longPress2ndFingerAction, doubleTap2ndFingerAction,
-            singleTap2ndFingerDragAction, longPress2ndFingerDragAction, doubleTap2ndFingerDragAction);
+        secondFingerSet = buildBindingSet(singleTap2ndFingerAction, new ArrayList<>(), doubleTap2ndFingerAction,
+            singleTap2ndFingerDragAction, new ArrayList<>(), doubleTap2ndFingerDragAction);
         cur = firstFingerSet;
     }
 

@@ -97,34 +97,7 @@
             android:orientation="vertical" />
 
         <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Hold Mode"
-                android:textStyle="bold"
-                android:textSize="16sp"
-                android:textColor="@color/colorPrimary" />
-
-            <ImageView
-                android:id="@+id/BTHelpHoldMode"
-                style="@style/HelpButton" />
-        </LinearLayout>
-
-        <View style="@style/HorizontalLine" />
-
-        <Spinner
-            android:id="@+id/SPHoldMode"
-            style="@style/ComboBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:spinnerMode="dialog" />
-
-        <LinearLayout
-            android:id="@+id/LLHoldModeOptions"
+            android:id="@+id/LLHoldGestures"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
@@ -140,44 +113,37 @@
             <View style="@style/HorizontalLine" />
 
             <LinearLayout
-                android:id="@+id/LLHoldGestures"
+                android:id="@+id/LLHoldGesturesContent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/LLTwoFingerSection"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="horizontal">
 
-            <LinearLayout
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:text="Two-Finger Gestures"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="@color/colorPrimary" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Two-Finger Gestures"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:textColor="@color/colorPrimary" />
-
-                <ImageView
-                    android:id="@+id/BTHelpTwoFinger"
-                    style="@style/HelpButton" />
-            </LinearLayout>
-
-            <View style="@style/HorizontalLine" />
-
-            <LinearLayout
-                android:id="@+id/LLTwoFinger"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
+            <ImageView
+                android:id="@+id/BTHelpTwoFinger"
+                style="@style/HelpButton" />
         </LinearLayout>
+
+        <View style="@style/HorizontalLine" />
+
+        <LinearLayout
+            android:id="@+id/LLTwoFinger"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
 
     </LinearLayout>
 </ScrollView>

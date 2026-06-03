@@ -82,8 +82,6 @@ public class TouchpadGestureSettingsDialog {
         LinearLayout llTwoFinger = view.findViewById(R.id.LLTwoFinger);
         addBindingSection(llTwoFinger, "single_2nd", "Single Tap", profile.getTouchpadSingleTap2ndFingerAction());
         addBindingSection(llTwoFinger, "single_2nd_drag", "  Single Tap Drag", profile.getTouchpadSingleTap2ndFingerDragAction());
-        addBindingSection(llTwoFinger, "long_2nd", "Long Press", profile.getTouchpadLongPress2ndFingerAction(), R.string.long_press_drag_help);
-        addBindingSection(llTwoFinger, "long_2nd_drag", "  Long Press Drag", profile.getTouchpadLongPress2ndFingerDragAction(), R.string.long_press_drag_help);
         addBindingSection(llTwoFinger, "double_2nd", "Double Tap", profile.getTouchpadDoubleTap2ndFingerAction(), R.string.single_tap_delay_help);
         addBindingSection(llTwoFinger, "double_2nd_drag", "  Double Tap Drag", profile.getTouchpadDoubleTap2ndFingerDragAction(), R.string.single_tap_delay_help);
 
@@ -107,8 +105,6 @@ public class TouchpadGestureSettingsDialog {
         profile.setTouchpadDoubleTapDragAction(bindingValues.getOrDefault("double_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setTouchpadSingleTap2ndFingerAction(bindingValues.getOrDefault("single_2nd", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setTouchpadSingleTap2ndFingerDragAction(bindingValues.getOrDefault("single_2nd_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setTouchpadLongPress2ndFingerAction(bindingValues.getOrDefault("long_2nd", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setTouchpadLongPress2ndFingerDragAction(bindingValues.getOrDefault("long_2nd_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setTouchpadDoubleTap2ndFingerAction(bindingValues.getOrDefault("double_2nd", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
         profile.setTouchpadDoubleTap2ndFingerDragAction(bindingValues.getOrDefault("double_2nd_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
 

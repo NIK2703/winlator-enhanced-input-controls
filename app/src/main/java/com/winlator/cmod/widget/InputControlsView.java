@@ -107,9 +107,6 @@ public class InputControlsView extends View {
 
     private final SparseArray<ControlElement> hoveredButtons = new SparseArray<>();
     private final SparseArray<ArrayList<ControlElement>> trackedButtons = new SparseArray<>();
-    private final android.os.Handler dtVisualHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-    private final java.util.HashSet<ControlElement> dtWaitingElements = new java.util.HashSet<>();
-
     private ControlElement findButtonAt(float x, float y) {
         for (ControlElement element : profile.getElements()) {
             if (element.getType() == ControlElement.Type.BUTTON && element.containsPoint(x, y)) {
@@ -542,19 +539,6 @@ public class InputControlsView extends View {
         }
     }
 
-    private void startDoubleTapWaitVisual(ControlElement element, int timeoutMs) {
-        element.setVisualActive(true);
-        element.setDoubleTapScale(1.15f);
-        element.setDoubleTapWaiting(true);
-        dtWaitingElements.add(element);
-        dtVisualHandler.removeCallbacksAndMessages(null);
-        dtVisualHandler.postDelayed(() -> {
-            element.resetDoubleTapVisual();
-            element.setDoubleTapWaiting(false);
-            dtWaitingElements.remove(element);
-        }, timeoutMs);
-    }
-
     public XServer getXServer() {
         return xServer;
     }
@@ -762,8 +746,6 @@ public class InputControlsView extends View {
                 }
                 case MotionEvent.ACTION_CANCEL: {
                     nativeTouchProcessor.reset();
-                    dtVisualHandler.removeCallbacksAndMessages(null);
-                    dtWaitingElements.clear();
                     if (profile != null) deactivateAllElements();
                     return true;
                 }

@@ -143,14 +143,6 @@ public class ControlElement {
     private boolean longPressTriggered;
     private List<Binding> gestureBindings = new ArrayList<>();
     private boolean gestureTriggered;
-    private List<Binding> doubleTapBindings = new ArrayList<>();
-    private boolean doubleTapTriggered;
-    private boolean doubleTapWaiting;
-    private float doubleTapScale = 1.0f;
-    private float doubleTapDownX;
-    private float doubleTapDownY;
-    private android.os.Handler doubleTapHandler;
-
     private float gestureDownX;
 
     private float gestureDownY;
@@ -477,46 +469,9 @@ public class ControlElement {
         return true;
     }
 
-    public List<Binding> getDoubleTapBindings() {
-        return doubleTapBindings;
-    }
-
-    public void setDoubleTapBindings(List<Binding> bindings) {
-        doubleTapBindings.clear();
-        doubleTapBindings.addAll(bindings);
-    }
-
-    public void addDoubleTapBinding(Binding binding) {
-        doubleTapBindings.add(binding);
-    }
-
-    public void removeDoubleTapBinding(int index) {
-        if (index >= 0 && index < doubleTapBindings.size()) {
-            doubleTapBindings.remove(index);
-        }
-    }
-
-    public boolean hasDoubleTapBinding() {
-        if (doubleTapBindings == null || doubleTapBindings.isEmpty()) return false;
-        if (doubleTapBindings.size() == 1 && doubleTapBindings.get(0) == Binding.NONE) return false;
-        return true;
-    }
-
     public void setGestureDownPosition(float x, float y) {
         gestureDownX = x;
         gestureDownY = y;
-    }
-
-    public boolean isGestureTriggered() {
-        return gestureTriggered;
-    }
-
-    public boolean isLongPressTriggered() {
-        return longPressTriggered;
-    }
-
-    public boolean isDoubleTapTriggered() {
-        return doubleTapTriggered;
     }
 
     public float getScale() {
@@ -1186,13 +1141,7 @@ public class ControlElement {
         int colorAlpha = elementAlpha;
         int inactiveAlpha = colorAlpha * fillAlphaInactive() / 255;
 
-        boolean scaled = false;
-        if (type == Type.BUTTON && doubleTapScale > 1.0f) {
-            canvas.save();
-            canvas.scale(doubleTapScale, doubleTapScale, box.centerX(), box.centerY());
-            scaled = true;
-        }
-        try {
+        {
             if (type == Type.D_PAD) {
                 ensureDPadCaches(snappingSize);
                 if (dpadPetalStroke == null) { draw(canvas); return; }
@@ -1389,9 +1338,6 @@ public class ControlElement {
             }
         }
         }
-        finally {
-            if (scaled) canvas.restore();
-        }
     }
 
     public void draw(Canvas canvas) {
@@ -1416,11 +1362,6 @@ public class ControlElement {
             case BUTTON: {
                 float cx = boundingBox.centerX();
                 float cy = boundingBox.centerY();
-
-                if (doubleTapScale > 1.0f && !buildingCache) {
-                    canvas.save();
-                    canvas.scale(doubleTapScale, doubleTapScale, cx, cy);
-                }
 
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(fillColor);
@@ -1450,9 +1391,6 @@ public class ControlElement {
                     canvas.drawText(text, x, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
                 }
 
-                if (doubleTapScale > 1.0f && !buildingCache) {
-                    canvas.restore();
-                }
                 break;
             }
             case D_PAD: {
@@ -1783,14 +1721,6 @@ public class ControlElement {
                 elementJSONObject.put("gestureBindings", gArray);
             }
 
-            if (hasDoubleTapBinding()) {
-                JSONArray dtArray = new JSONArray();
-                for (Binding b : doubleTapBindings) {
-                    if (b != null && b != Binding.NONE) dtArray.put(b.name());
-                }
-                elementJSONObject.put("doubleTapBindings", dtArray);
-            }
-
             if (type == Type.RANGE_BUTTON && range != null) {
                 elementJSONObject.put("range", range.name());
                 if (orientation != 0) elementJSONObject.put("orientation", orientation);
@@ -1854,24 +1784,6 @@ public class ControlElement {
         }
 
         heldBindings = null;
-    }
-
-    public void setDoubleTapScale(float scale) {
-        doubleTapScale = scale;
-    }
-
-    public boolean isDoubleTapWaiting() {
-        return doubleTapWaiting;
-    }
-
-    public void setDoubleTapWaiting(boolean waiting) {
-        doubleTapWaiting = waiting;
-    }
-
-    public void resetDoubleTapVisual() {
-        doubleTapScale = 1.0f;
-        active = false;
-        inputControlsView.invalidate();
     }
 
     public void setVisualActive(boolean engaged) {
@@ -2029,70 +1941,12 @@ public class ControlElement {
             if (longPressHandler == null) longPressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
             longPressHandler.postDelayed(() -> {
                 longPressTriggered = true;
-                cancelPendingDoubleTap();
-                doubleTapWaiting = false;
                 vibrateHaptic(cachedButtonLongPressHaptic, 30);
                 heldBindings = new ArrayList<>(longPressBindings);
                 pressBindings(longPressBindings);
                 inputControlsView.invalidate();
             }, delay);
         }
-    }
-
-    public void cancelPendingDoubleTap() {
-        if (doubleTapHandler != null) {
-            doubleTapHandler.removeCallbacksAndMessages(null);
-            doubleTapHandler = null;
-        }
-    }
-
-    private void startDoubleTapTimer() {
-        ControlsProfile p = inputControlsView.getProfile();
-        int delay = p != null ? p.getButtonDoubleTapTimeout() : 150;
-        if (doubleTapHandler == null) doubleTapHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-        doubleTapHandler.removeCallbacksAndMessages(null);
-        doubleTapHandler.postDelayed(this::onDoubleTapTimeout, delay);
-        doubleTapWaiting = true;
-    }
-
-    private void onDoubleTapTimeout() {
-        if (!doubleTapWaiting) return;
-        doubleTapWaiting = false;
-        cancelPendingLongPress();
-        List<Binding> seq = bindings.get(0);
-        heldBindings = new ArrayList<>(seq);
-        pressBindings(seq);
-        releaseHeldBindings();
-        doubleTapScale = 1.0f;
-        active = false;
-        inputControlsView.invalidate();
-    }
-
-    private void cancelDoubleTap() {
-        cancelPendingDoubleTap();
-        cancelPendingLongPress();
-        longPressTriggered = false;
-        doubleTapWaiting = false;
-        doubleTapScale = 1.0f;
-        active = false;
-        List<Binding> seq = bindings.get(0);
-        heldBindings = new ArrayList<>(seq);
-        pressBindings(seq);
-        releaseHeldBindings();
-        inputControlsView.invalidate();
-    }
-
-    private void handleDoubleTapConfirmed() {
-        doubleTapWaiting = false;
-        cancelPendingDoubleTap();
-        cancelPendingLongPress();
-        longPressTriggered = false;
-        gestureTriggered = false;
-        doubleTapTriggered = true;
-        doubleTapScale = 1.5f;
-        heldBindings = new ArrayList<>(doubleTapBindings);
-        pressBindings(doubleTapBindings);
-        inputControlsView.invalidate();
     }
 
     public boolean handleTouchDown(int pointerId, float x, float y) {
@@ -2103,18 +1957,6 @@ public class ControlElement {
                 gestureDownY = y;
                 if (isKeepButtonPressedAfterMinTime()) touchTime = System.currentTimeMillis();
                 if (toggleSwitch && selected) {                    releaseHeldBindings();
-                }
-                else if (hasDoubleTapBinding()) {
-                    doubleTapDownX = x;
-                    doubleTapDownY = y;
-                    if (doubleTapWaiting) {
-                        handleDoubleTapConfirmed();
-                    }
-                    else {
-                        if (hasLongPressBinding() && !toggleSwitch) {
-                            startLongPressTimer();
-                        }
-                    }
                 }
                 else if (hasLongPressBinding() && !toggleSwitch) {
                     startLongPressTimer();
@@ -2144,7 +1986,7 @@ public class ControlElement {
 
     public boolean handleTouchMove(int pointerId, float x, float y) {
         if (pointerId == currentPointerId) {
-            if (type == Type.BUTTON && hasGestureBinding() && !gestureTriggered && !longPressTriggered && !doubleTapTriggered) {
+            if (type == Type.BUTTON && hasGestureBinding() && !gestureTriggered && !longPressTriggered) {
                 float dx = x - gestureDownX;
                 float dy = y - gestureDownY;
                 ControlsProfile p = inputControlsView.getProfile();
@@ -2157,7 +1999,6 @@ public class ControlElement {
                         longPressHandler = null;
                     }
                     longPressTriggered = false;
-                    cancelPendingDoubleTap();
                     vibrateHaptic(cachedButtonGestureHaptic, 10);
                     heldBindings = new ArrayList<>(gestureBindings);
                     pressBindings(gestureBindings);
@@ -2169,9 +2010,6 @@ public class ControlElement {
                 longPressHandler.removeCallbacksAndMessages(null);
                 longPressHandler = null;
                 longPressTriggered = false;
-            }
-            if (type == Type.BUTTON && !containsPoint(x, y) && !gestureTriggered && !longPressTriggered && doubleTapWaiting) {
-                cancelDoubleTap();
             }
             if (type == Type.D_PAD || type == Type.STICK || type == Type.TRACKPAD) {
             float deltaX, deltaY;
@@ -2363,25 +2201,10 @@ public class ControlElement {
                     active = true;
                     inputControlsView.postOnAnimation(() ->
                         inputControlsView.postOnAnimation(() -> {
-                            if (!doubleTapWaiting) {
-                                active = false;
-                                inputControlsView.invalidate();
-                            }
+                            active = false;
+                            inputControlsView.invalidate();
                         })
                     );
-                }
-                else if (doubleTapTriggered) {
-                    releaseHeldBindings();
-                    doubleTapScale = 1.0f;
-                    doubleTapTriggered = false;
-                    active = false;
-                }
-                else if (hasDoubleTapBinding() && !doubleTapWaiting) {
-                    cancelPendingLongPress();
-                    longPressTriggered = false;
-                    active = true;
-                    doubleTapScale = 1.15f;
-                    startDoubleTapTimer();
                 }
                 else if (hasLongPressBinding()) {
                     if (longPressHandler != null) longPressHandler.removeCallbacksAndMessages(null);

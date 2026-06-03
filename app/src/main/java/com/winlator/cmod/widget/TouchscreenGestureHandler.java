@@ -4,8 +4,6 @@ import android.view.MotionEvent;
 
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
-import com.winlator.cmod.inputcontrols.SecondFingerMode;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,7 +11,6 @@ public class TouchscreenGestureHandler extends GestureHandler {
     private int originalPointerId = -1;
     private int secondPointerId = -1;
     private boolean deferredSecondFingerTap;
-    private boolean isLongTapMode;
     private List<Binding> pendingResumeAction;
 
     public TouchscreenGestureHandler(TouchpadView touchpadView) {
@@ -23,7 +20,6 @@ public class TouchscreenGestureHandler extends GestureHandler {
     @Override
     public void applyConfig(ControlsProfile profile) {
         super.applyConfig(profile);
-        isLongTapMode = profile.getSecondFingerMode() == SecondFingerMode.LONG_TAP_ACTION;
     }
 
     @Override
@@ -142,9 +138,6 @@ public class TouchscreenGestureHandler extends GestureHandler {
 
             movePointerToTapPoint();
 
-            if (isLongTapMode) {
-                touchpadView.postDelayed(longPressRunnable, longPressTimeout);
-            }
             state = State.TAP_WAITING;
             if (hasActiveSingleTap() && !hasActiveSingleTapDrag()) {
                 boolean hasDoubleTapAction = hasActiveDoubleTap() || hasActiveDoubleTapDrag();
@@ -160,10 +153,6 @@ public class TouchscreenGestureHandler extends GestureHandler {
             }
         }
         else if (pointerId != mainPointerId) {
-            if (isLongTapMode) {
-                return;
-            }
-
             if (state == State.DOUBLE_TAP_WAITING) {
                 float newX = event.getX(actionIndex);
                 float newY = event.getY(actionIndex);
