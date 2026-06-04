@@ -39,6 +39,7 @@ static void handle_ts_single_tap_hold(TouchFinger* f, TouchActionResult* result,
     if (!f->cached_has_active_single_tap || f->cached_has_active_single_tap_drag) return;
 
     bool has_dt = f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag;
+    bool has_lp = f->cached_has_long_press_timer;
     if (has_dt) {
         g_state.gesture_deferred_tap_count = 0;
         for (int i = 0; i < f->bindings.single_tap_count && i < 8; i++)
@@ -48,6 +49,11 @@ static void handle_ts_single_tap_hold(TouchFinger* f, TouchActionResult* result,
             g_state.gesture_pending_double[g_state.gesture_pending_double_count++] = f->bindings.double_tap[i];
         f->single_tap_hold_delay_ms = g_state.cfg.double_tap_timeout_ms;
         f->single_tap_hold_timer = time_ms;
+    } else if (has_lp) {
+        if (!f->cached_has_active_long_press_drag) {
+            f->single_tap_hold_delay_ms = g_state.cfg.long_press_timeout_ms;
+            f->single_tap_hold_timer = time_ms;
+        }
     } else if (g_state.cfg.single_tap_delay_ms > 0) {
         f->single_tap_hold_delay_ms = g_state.cfg.single_tap_delay_ms;
         f->single_tap_hold_timer = time_ms;
@@ -75,9 +81,17 @@ static inline void cleanup_main_finger(TouchFinger* f) {
 // ---- touchpad_finger_down ----
 void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) {
     if (!g_state.cfg.caps_has_gesture_bindings && !g_state.gesture_double_tap_waiting) {
-        g_state.gesture_handler_active = false;
-        if (g_state.gesture_main_ptr_id < 0)
-            g_state.gesture_main_ptr_id = f->ptr_id;
+        if (g_state.gesture_main_ptr_id >= 0 && f->ptr_id != g_state.gesture_main_ptr_id) {
+            g_state.gesture_second_active = true;
+            g_state.gesture_second_ptr_id = f->ptr_id;
+            f->is_second_finger = true;
+            // Keep gesture_handler_active as-is (passthrough main set it true).
+            // This prevents the TP fallback tap and two-finger tap left PRESS.
+        } else {
+            if (g_state.gesture_main_ptr_id < 0)
+                g_state.gesture_main_ptr_id = f->ptr_id;
+            g_state.gesture_handler_active = false;
+        }
         f->state = GESTURE_STATE_IDLE;
         return;
     }
@@ -158,8 +172,7 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
             fb2->long_press_count = 0;
             fb2->double_tap_count = g_state.cfg.tp_double_2nd_count;
             memcpy(fb2->double_tap, g_state.cfg.tp_double_2nd, sizeof(g_state.cfg.tp_double_2nd));
-            fb2->single_tap_drag_count = g_state.cfg.tp_single_drag_2nd_count;
-            memcpy(fb2->single_tap_drag, g_state.cfg.tp_single_drag_2nd, sizeof(g_state.cfg.tp_single_drag_2nd));
+            fb2->single_tap_drag_count = 0;
             fb2->long_press_drag_count = 0;
             fb2->double_tap_drag_count = g_state.cfg.tp_double_drag_2nd_count;
             memcpy(fb2->double_tap_drag, g_state.cfg.tp_double_drag_2nd, sizeof(g_state.cfg.tp_double_drag_2nd));
@@ -168,6 +181,10 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
 
         // SDTW check
         if (g_state.second_double_tap_waiting) {
+            __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 SDTW enter: d_tap=%d d_drag=%d s_tap=%d s_drag=%d fallback=%d",
+                f->cached_has_active_double_tap, f->cached_has_active_double_tap_drag,
+                f->cached_has_active_single_tap, f->cached_has_active_single_tap_drag,
+                g_state.second_tap_fallback_count);
             g_state.second_double_tap_waiting = false;
             __android_log_print(ANDROID_LOG_INFO, "Gesture", "STATE sdtw=0 SDTW_handler");
             g_state.second_tap_fallback_count = 0;
@@ -176,7 +193,8 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
                     // Defer Dd: save DT to pending_second_double, set post_dtd
                     // Drag movement triggers Dd via check_start_drag; UP without
                     // drag fires DT pulse from pending_second_double.
-                    __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 SDTW Dd defer post_dtd");
+                    __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 SDTW Dd defer post_dtd pending_dbl=%d",
+                        f->bindings.double_tap_count);
                     g_state.pending_second_double_count = 0;
                     for (int _i = 0; _i < f->bindings.double_tap_count && _i < 8; _i++)
                         g_state.pending_second_double[_i] = f->bindings.double_tap[_i];
@@ -184,6 +202,7 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
                     g_state.gesture_post_double_tap_drag = true;
                     __android_log_print(ANDROID_LOG_INFO, "Gesture", "STATE post_dtd=1 SDTW_handler");
                 } else {
+                    __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 SDTW DT hold_actions");
                     hold_actions(result, f->bindings.double_tap, f->bindings.double_tap_count);
                 }
                 // SDTW confirmed DT/Dd — clear the ST fallback so it does not
@@ -200,6 +219,8 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
                 f->state = GESTURE_STATE_TAP_WAITING;
                 f->single_tap_hold_delay_ms = 0;
                 f->single_tap_hold_timer = 0;
+                __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 SDTW Dd exit: gha=%d state=%d post_dtd=%d pending=%d",
+                    g_state.gesture_handler_active, f->state, g_state.gesture_post_double_tap_drag, g_state.pending_second_double_count);
                 return;  // DT/Dd: done, skip normal second-finger processing
             }
             // ST-only with stale SDTW: fall through to normal ST hold/fallback
@@ -258,6 +279,8 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
 
         // ST handling for second finger:
         // - Without STD: hold ST (immediate or delayed by DT timeout).
+        //   For TP mode, skip immediate hold — ST fires on UP via
+        //   second_tap_fallback (execute_actions = tap).
         // - With STD: no hold — drag threshold crossing (first finger
         //   movement for TS, aggregate for TP) activates SF STD via
         //   check_start_drag in handler.c. If a finger lifts before
@@ -266,8 +289,12 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
         if (f->cached_has_active_single_tap && !f->cached_has_active_single_tap_drag) {
             bool has_dt_or_dd = f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag;
             if (!has_dt_or_dd) {
-                __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 ST hold immediate");
-                hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+                if (g_state.cfg.touch_mode != TOUCH_MODE_TOUCHPAD) {
+                    __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 ST hold immediate");
+                    hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+                } else {
+                    __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 ST deferred to UP (TP tap)");
+                }
             } else {
                 __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 ST delayed hold (DT present)");
                 f->single_tap_hold_delay_ms = g_state.cfg.double_tap_timeout_ms;
@@ -280,7 +307,15 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
 // ---- touchpad_finger_up ----
 void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) {
     if (f->is_second_finger) {
-        if (!g_state.gesture_second_active) return;
+        if (!g_state.gesture_second_active) {
+            __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 UP skip: gsa=0 ptr=%d", f->ptr_id);
+            return;
+        }
+
+        __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 UP enter: ptr=%d held=%d d_tap=%d d_drag=%d fallback=%d pending_dbl=%d post_dtd=%d gha=%d passthru=%d",
+            f->ptr_id, g_state.gesture_is_action_held, f->cached_has_active_double_tap, f->cached_has_active_double_tap_drag,
+            g_state.second_tap_fallback_count, g_state.pending_second_double_count,
+            g_state.gesture_post_double_tap_drag, g_state.gesture_handler_active, g_state.passthrough_active);
 
         if (g_state.gesture_is_action_held) {
             g_state.second_double_tap_waiting = false;
@@ -295,11 +330,13 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time
             __android_log_print(ANDROID_LOG_INFO, "Gesture", "STATE sdtw=1 second_finger_up");
             g_state.second_tap_fallback_time = time_ms;
         } else if (g_state.second_tap_fallback_count > 0) {
+            __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 UP execute_actions fallback count=%d", g_state.second_tap_fallback_count);
             execute_actions(result, g_state.second_tap_fallback, g_state.second_tap_fallback_count);
             g_state.second_tap_fallback_count = 0;
         }
 
         if (g_state.pending_second_double_count > 0) {
+            __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 UP execute_actions pending_dbl count=%d", g_state.pending_second_double_count);
             execute_actions(result, g_state.pending_second_double, g_state.pending_second_double_count);
             g_state.pending_second_double_count = 0;
             // Clear stale SDTW state that may have been set by the DT/Dd
@@ -309,10 +346,13 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time
             g_state.second_tap_fallback_count = 0;
         }
 
-        release_held_actions(result);
-
-        add_action(result, ACT_POINTER_BUTTON_RELEASE, 0, 0, 0);
-        add_action(result, ACT_POINTER_BUTTON_RELEASE, 2, 0, 0);
+        if (g_state.gesture_post_double_tap_drag && g_state.gesture_is_action_held) {
+            __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 UP skip release (post_dtd drag)");
+        } else {
+            release_held_actions(result);
+            add_action(result, ACT_POINTER_BUTTON_RELEASE, 0, 0, 0);
+            add_action(result, ACT_POINTER_BUTTON_RELEASE, 2, 0, 0);
+        }
 
         g_state.gesture_second_active = false;
         __android_log_print(ANDROID_LOG_INFO, "Gesture", "STATE gsa=0 second_finger_up");
@@ -324,6 +364,8 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time
 
         if (!g_state.second_double_tap_waiting && f->state != GESTURE_STATE_DRAGGING)
             f->state = GESTURE_STATE_IDLE;
+        __android_log_print(ANDROID_LOG_INFO, "Gesture", "SEC2 UP exit: ptr=%d state=%d gsa=%d sdtw=%d",
+            f->ptr_id, f->state, g_state.gesture_second_active, g_state.second_double_tap_waiting);
         f->active = false;
         return;
     }
@@ -339,8 +381,8 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time
     switch (f->state) {
         case GESTURE_STATE_TAP_WAITING: {
             if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD
-                && !(f->travel_x < MAX_TAP_TRAVEL && f->travel_y < MAX_TAP_TRAVEL
-                     && (time_ms - f->down_time_ms) < TAP_MAX_TIME_MS)) {
+                && (f->cached_has_moved_beyond_threshold
+                    || (time_ms - f->down_time_ms) >= TAP_MAX_TIME_MS)) {
                 if (g_state.gesture_double_tap_consumed) {
                     g_state.gesture_double_tap_consumed = false;
                     if (!g_state.gesture_is_action_held) {

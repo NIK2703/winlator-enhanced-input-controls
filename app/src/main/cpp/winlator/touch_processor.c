@@ -1,5 +1,6 @@
 #include "touch_processor_internal.h"
 #include "touch_processor_activation.h"
+#include <android/log.h>
 
 TouchProcessorState g_state;
 
@@ -23,20 +24,37 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     if (g_state.cfg.xform_scale_y <= 0.0f) g_state.cfg.xform_scale_y = 1.0f;
     compute_gesture_caps(&g_state.cfg);
     g_state.cfg.bindings_generation = 1;
+
+    __android_log_print(ANDROID_LOG_INFO, "Gesture", "INIT mode=%d caps_has_gesture=%d caps_has_drag=%d caps_dbl=%d",
+        g_state.cfg.touch_mode, g_state.cfg.caps_has_gesture_bindings, g_state.cfg.caps_has_drag_bindings, g_state.cfg.caps_has_double_tap);
+    __android_log_print(ANDROID_LOG_INFO, "Gesture", "INIT TP 2nd: s_tap=%d s_drag=%d d_tap=%d d_drag=%d sim_ts=%d",
+        g_state.cfg.tp_single_2nd_count, g_state.cfg.tp_single_drag_2nd_count,
+        g_state.cfg.tp_double_2nd_count, g_state.cfg.tp_double_drag_2nd_count,
+        g_state.sim_touch_screen);
 }
 
 void touch_processor_update_config(const TouchProcessorConfig* config) {
     memcpy(&g_state.cfg, config, sizeof(TouchProcessorConfig));
     compute_gesture_caps(&g_state.cfg);
     g_state.cfg.bindings_generation++;
+
+    __android_log_print(ANDROID_LOG_INFO, "Gesture", "UPDCFG caps_has_gesture=%d caps_has_drag=%d",
+        g_state.cfg.caps_has_gesture_bindings, g_state.cfg.caps_has_drag_bindings);
+    __android_log_print(ANDROID_LOG_INFO, "Gesture", "UPDCFG TP 2nd: s_tap=%d s_drag=%d d_tap=%d d_drag=%d",
+        g_state.cfg.tp_single_2nd_count, g_state.cfg.tp_single_drag_2nd_count,
+        g_state.cfg.tp_double_2nd_count, g_state.cfg.tp_double_drag_2nd_count);
+
     for (int i = 0; i < MAX_FINGERS; i++) {
         TouchFinger* f = &g_state.fingers[i];
         if (!f->active) continue;
         FingerBindings* fb = &f->bindings;
-        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN)
+        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
             COPY_FINGER_BINDINGS(fb, &g_state.cfg, ts)
-        else
+        } else {
             COPY_FINGER_BINDINGS(fb, &g_state.cfg, tp)
+            fb->single_tap_drag_count = 0;
+            fb->single_tap_drag_2nd_count = 0;
+        }
         f->bindings_generation = g_state.cfg.bindings_generation;
         touch_finger_cache_bs(f);
     }
@@ -93,10 +111,13 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     // Copy all 12 FingerBindings lists from config
     FingerBindings* fb = &f->bindings;
     if (f->bindings_generation != g_state.cfg.bindings_generation) {
-        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN)
+        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
             COPY_FINGER_BINDINGS(fb, &g_state.cfg, ts)
-        else
+        } else {
             COPY_FINGER_BINDINGS(fb, &g_state.cfg, tp)
+            fb->single_tap_drag_count = 0;
+            fb->single_tap_drag_2nd_count = 0;
+        }
         f->bindings_generation = g_state.cfg.bindings_generation;
     }
     touch_finger_cache_bs(f);
@@ -219,6 +240,7 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
 
     // Process simTouchScreen delayed press (matching Java clickDelay Runnable, 50ms CLICK_DELAYED_TIME)
     if (g_state.sim_click_press_time > 0 && time_ms >= g_state.sim_click_press_time) {
+        __android_log_print(ANDROID_LOG_INFO, "Gesture", "LCLICK sim_press: sim_cont=%d", g_state.sim_continue_click);
         if (g_state.sim_continue_click) {
             TouchFinger* sf = find_finger(g_state.sim_click_ptr_id);
             if (sf) {

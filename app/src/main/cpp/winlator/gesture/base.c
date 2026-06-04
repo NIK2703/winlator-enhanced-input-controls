@@ -38,8 +38,14 @@ void gesture_cancel_double_tap_wait(TouchActionResult* result) {
 
 // ---- check_start_drag ----
 void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* result) {
-    if (f->state != GESTURE_STATE_TAP_WAITING && f->state != GESTURE_STATE_LONG_PRESSING) return;
+    if (f->state != GESTURE_STATE_TAP_WAITING && f->state != GESTURE_STATE_LONG_PRESSING) {
+        __android_log_print(ANDROID_LOG_INFO, "Gesture", "DRAG skip: state=%d", f->state);
+        return;
+    }
     if (fabsf(dx) <= g_state.cfg.drag_threshold_px && fabsf(dy) <= g_state.cfg.drag_threshold_px) return;
+
+    __android_log_print(ANDROID_LOG_INFO, "Gesture", "DRAG enter: ptr=%d is_2nd=%d post_dtd=%d gsa=%d state=%d",
+        f->ptr_id, f->is_second_finger, g_state.gesture_post_double_tap_drag, g_state.gesture_second_active, f->state);
 
     g_state.gesture_handler_active = false;
     const FingerBindings* fb = &f->bindings;
@@ -120,7 +126,7 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
             }
         }
     } else if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
-        if (!g_state.cfg.caps_has_drag_bindings) return;
+        if (!g_state.cfg.caps_has_drag_bindings) { __android_log_print(ANDROID_LOG_INFO, "Gesture", "CSD TS: no drag bindings"); return; }
         // Only use 2nd-finger bindings when the second finger itself is moving,
         // not when the main finger moves while a second finger happens to be present.
         // Post-double-tap drag (handled above) is the only context where the main
@@ -129,6 +135,7 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         // Dd (double-tap-drag) is exclusive to the SDTW->post_dtd main-finger drag path,
         // and must not set gesture_is_action_held here or it will block SDTW on lift.
         if (g_state.gesture_second_active && f->is_second_finger) {
+            __android_log_print(ANDROID_LOG_INFO, "Gesture", "CSD TS SF: ts_sd_2nd=%d", g_state.cfg.ts_single_drag_2nd_count);
             if (g_state.cfg.ts_single_drag_2nd_count > 0) {
                 drag_binding = g_state.cfg.ts_single_drag_2nd; drag_count = g_state.cfg.ts_single_drag_2nd_count;
             } else {
@@ -147,7 +154,7 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         } else {
             return;
         }
-    } else if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD) {
+    } else if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD && !g_state.gesture_second_active) {
         if (!g_state.cfg.caps_has_drag_bindings) return;
         if (f->cached_has_active_single_tap_drag) {
             drag_binding = fb->single_tap_drag; drag_count = fb->single_tap_drag_count;
@@ -171,6 +178,11 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         }
     }
 
+    if (drag_binding) {
+        __android_log_print(ANDROID_LOG_INFO, "Gesture", "DRAG bind: ptr=%d type=%d count=%d same=%d held=%d",
+            f->ptr_id, drag_binding[0].type, drag_count, same_as_held, g_state.gesture_is_action_held);
+    }
+
     if (!same_as_held) {
         release_held_actions(result);
         hold_actions(result, drag_binding, drag_count);
@@ -181,6 +193,8 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
 
     on_drag_start(f);
     f->state = GESTURE_STATE_DRAGGING;
+    __android_log_print(ANDROID_LOG_INFO, "Gesture", "DRAG done: ptr=%d state=DRAGGING gha=%d held=%d",
+        f->ptr_id, g_state.gesture_handler_active, g_state.gesture_is_action_held);
 }
 
 // ---- gesture_tick ----
@@ -210,14 +224,17 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
                     g_state.gesture_pending_deferred_long_press_count = f->bindings.long_press_count;
                     for (int _li = 0; _li < f->bindings.long_press_count && _li < 8; _li++)
                         g_state.gesture_pending_deferred_long_press[_li] = f->bindings.long_press[_li];
+                    f->single_tap_hold_delay_ms = 0;
                     f->state = GESTURE_STATE_LONG_PRESSING;
                 } else if (f->cached_can_hold_long_press) {
                     hold_actions(result, f->bindings.long_press, f->bindings.long_press_count);
+                    f->single_tap_hold_delay_ms = 0;
                     f->state = GESTURE_STATE_LONG_PRESSING;
                 } else {
                     execute_actions(result, f->bindings.long_press, f->bindings.long_press_count);
                     if (f->cached_has_active_single_tap && !g_state.gesture_is_action_held)
                         execute_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+                    f->single_tap_hold_delay_ms = 0;
                     f->cached_has_long_press_timer = false;
                     f->cached_has_active_long_press = false;
                     f->cached_can_hold_long_press = false;

@@ -190,6 +190,12 @@ void execute_actions(TouchActionResult* result, const TouchBinding* actions, int
 void release_binding(TouchActionResult* result, const TouchBinding* b);
 void press_binding(TouchActionResult* result, const TouchBinding* b, bool hold);
 
+static inline void delay_ms(int ms) {
+    if (ms <= 0) return;
+    struct timespec ts = {0, ms * 1000000};
+    nanosleep(&ts, NULL);
+}
+
 // Element shared helpers
 bool point_in_element(float px, float py, const TouchElement* e);
 TouchElement* hit_test_element(float x, float y);
