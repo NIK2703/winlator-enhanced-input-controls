@@ -44,8 +44,7 @@ import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
-import com.winlator.cmod.contentdialog.TouchpadGestureSettingsDialog;
-import com.winlator.cmod.contentdialog.TouchscreenGestureSettingsDialog;
+import com.winlator.cmod.contentdialog.GestureSettingsDialog;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
@@ -54,7 +53,6 @@ import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
-import com.winlator.cmod.inputcontrols.MouseMode;
 import com.winlator.cmod.inputcontrols.TouchActivationMode;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.contentdialog.ContentDialog;
@@ -77,7 +75,6 @@ public class InputControlsFragment extends Fragment {
     private Callback<ControlsProfile> importProfileCallback;
     private final int selectedProfileId;
     private SharedPreferences preferences;
-    private Spinner spMouseMode;
     private SeekBar sbBindingDelay;
     private TextView tvBindingDelay;
     private SeekBar sbLongPressDelay;
@@ -349,21 +346,6 @@ public class InputControlsFragment extends Fragment {
             tvFillAlphaInactive.setText(String.valueOf(fa));
         });
 
-        spMouseMode = view.findViewById(R.id.SPMouseMode);
-        setupEnumSpinner(spMouseMode, MouseMode.values(), currentProfile != null ? currentProfile.getMouseMode() : MouseMode.TOUCHPAD);
-        spMouseMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) {
-                if (currentProfile != null) {
-                    MouseMode newMode = (MouseMode) spMouseMode.getSelectedItem();
-                    if (newMode != currentProfile.getMouseMode()) {
-                        currentProfile.setMouseMode(newMode);
-                        currentProfile.save();
-                    }
-                }
-            }
-            @Override public void onNothingSelected(AdapterView<?> parent) {}
-        });
-
         Spinner spTouchActivation = view.findViewById(R.id.SPTouchActivation);
         setupEnumSpinner(spTouchActivation, TouchActivationMode.values(), currentProfile != null ? currentProfile.getTouchActivationMode() : TouchActivationMode.LOCK);
         spTouchActivation.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -471,25 +453,11 @@ public class InputControlsFragment extends Fragment {
 
         view.findViewById(R.id.BTGestureSettings).setOnClickListener((v) -> {
             if (currentProfile != null) {
-                TouchscreenGestureSettingsDialog dialog = new TouchscreenGestureSettingsDialog(getContext(), currentProfile);
+                GestureSettingsDialog dialog = new GestureSettingsDialog(getContext(), currentProfile);
                 dialog.setOnSaveListener((savedProfile) -> {
                     loadProfileSpinner(view.findViewById(R.id.SProfile));
                     XServerDisplayActivity.updateGestureConfig();
                     AppUtils.showToast(getContext(), "Gesture settings saved");
-                });
-                dialog.show();
-            } else {
-                AppUtils.showToast(context, R.string.no_profile_selected);
-            }
-        });
-
-        view.findViewById(R.id.BTTouchpadGestureSettings).setOnClickListener((v) -> {
-            if (currentProfile != null) {
-                TouchpadGestureSettingsDialog dialog = new TouchpadGestureSettingsDialog(getContext(), currentProfile);
-                dialog.setOnSaveListener((savedProfile) -> {
-                    loadProfileSpinner(view.findViewById(R.id.SProfile));
-                    XServerDisplayActivity.updateGestureConfig();
-                    AppUtils.showToast(getContext(), "Touchpad gesture settings saved");
                 });
                 dialog.show();
             } else {
@@ -581,7 +549,6 @@ public class InputControlsFragment extends Fragment {
                 currentProfile = position > 0 ? profiles.get(position - 1) : null;
                 updateLayout.run();
                 if (currentProfile != null) {
-                    AppUtils.setSpinnerSelectionFromValue(spMouseMode, currentProfile.getMouseMode().name());
                     sbBindingDelay.setProgress(currentProfile.getBindingDelay());
                     tvBindingDelay.setText(currentProfile.getBindingDelay() + " ms");
                     int lpDelay = currentProfile.getLongPressDelay();

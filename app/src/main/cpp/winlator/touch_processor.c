@@ -21,11 +21,13 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     if (g_state.cfg.cursor_acceleration_factor <= 0.0f) g_state.cfg.cursor_acceleration_factor = 1.25f;
     if (g_state.cfg.xform_scale_x <= 0.0f) g_state.cfg.xform_scale_x = 1.0f;
     if (g_state.cfg.xform_scale_y <= 0.0f) g_state.cfg.xform_scale_y = 1.0f;
+    compute_gesture_caps(&g_state.cfg);
     g_state.cfg.bindings_generation = 1;
 }
 
 void touch_processor_update_config(const TouchProcessorConfig* config) {
     memcpy(&g_state.cfg, config, sizeof(TouchProcessorConfig));
+    compute_gesture_caps(&g_state.cfg);
     g_state.cfg.bindings_generation++;
 }
 
@@ -88,12 +90,7 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     }
     touch_finger_cache_bs(f);
 
-    switch (g_state.cfg.touch_mode) {
-        case TOUCH_MODE_TOUCHPAD: handle_touchpad_down(f, x, y, time_ms, &result); break;
-        case TOUCH_MODE_TOUCHSCREEN: handle_touchscreen_down(f, x, y, time_ms, &result); break;
-        default: break;
-    }
-    
+    handle_gesture_down(f, x, y, time_ms, &result);
     return result;
 }
 
@@ -105,11 +102,7 @@ TouchActionResult touch_processor_on_finger_move(int ptr_id, float x, float y, u
     f->travel_y += fabsf(y - f->y);
     if (f->travel_x > MAX_TAP_TRAVEL || f->travel_y > MAX_TAP_TRAVEL) f->is_tap = false;
     f->x = x; f->y = y;
-    switch (g_state.cfg.touch_mode) {
-        case TOUCH_MODE_TOUCHPAD: handle_touchpad_move(f, x, y, time_ms, &result); break;
-        case TOUCH_MODE_TOUCHSCREEN: handle_touchscreen_move(f, x, y, time_ms, &result); break;
-        default: break;
-    }
+    handle_gesture_move(f, x, y, time_ms, &result);
     return result;
 }
 
@@ -118,11 +111,7 @@ TouchActionResult touch_processor_on_finger_up(int ptr_id, float x, float y, uin
     TouchFinger* f = find_finger(ptr_id);
     if (!f) return result;
     f->x = x; f->y = y;
-    switch (g_state.cfg.touch_mode) {
-        case TOUCH_MODE_TOUCHPAD: handle_touchpad_up(f, x, y, time_ms, &result); break;
-        case TOUCH_MODE_TOUCHSCREEN: handle_touchscreen_up(f, x, y, time_ms, &result); break;
-        default: break;
-    }
+    handle_gesture_up(f, x, y, time_ms, &result);
     f->active = false;
     return result;
 }

@@ -32,8 +32,6 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.InputMode;
-import com.winlator.cmod.inputcontrols.MouseMode;
-import com.winlator.cmod.inputcontrols.TouchActivationMode;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.NativeTouchProcessor;
@@ -81,8 +79,8 @@ public class InputControlsView extends View {
     private final PointF mouseMoveOffset = new PointF();
     private boolean showTouchscreenControls = true;
     private boolean cachesPreBuilt = false;
-    private Handler timeoutHandler; // Reference to the activity's timeout handler
-    private Runnable hideControlsRunnable; // Runnable to hide the controls
+    private Handler timeoutHandler;
+    private Runnable hideControlsRunnable;
 
     private SharedPreferences preferences;
     private boolean cachedRenderingEnabled;
@@ -105,17 +103,6 @@ public class InputControlsView extends View {
     private InputMode inputMode = InputMode.ABSOLUTE;
     private boolean focusOnStick = false;
 
-    private final SparseArray<ControlElement> hoveredButtons = new SparseArray<>();
-    private final SparseArray<ArrayList<ControlElement>> trackedButtons = new SparseArray<>();
-    private ControlElement findButtonAt(float x, float y) {
-        for (ControlElement element : profile.getElements()) {
-            if (element.getType() == ControlElement.Type.BUTTON && element.containsPoint(x, y)) {
-                return element;
-            }
-        }
-        return null;
-    }
-
     public void setInputMode(InputMode mode) {
         this.inputMode = mode;
     }
@@ -126,10 +113,8 @@ public class InputControlsView extends View {
 
     public void setFocusOnStick(boolean focus) {
         this.focusOnStick = focus;
-        invalidate(); // Redraw the view with the new focus setting
+        invalidate();
     }
-
-
 
     @SuppressLint("ResourceType")
     public InputControlsView(Context context) {
@@ -176,7 +161,6 @@ public class InputControlsView extends View {
 
         initPreferences();
     }
-
 
     public void setEditMode(boolean editMode) {
         this.editMode = editMode;
@@ -262,38 +246,33 @@ public class InputControlsView extends View {
         super.onDraw(canvas);
     }
 
-
     public void resetStickPosition() {
         if (stickElement != null) {
             Rect boundingBox = stickElement.getBoundingBox();
             float centerX = boundingBox.centerX();
             float centerY = boundingBox.centerY();
 
-            stickElement.setCurrentPosition(centerX, centerY); // Reset to the center of the bounding box
-            invalidate(); // Redraw the stick in the centered position
+            stickElement.setCurrentPosition(centerX, centerY);
+            invalidate();
         }
     }
-
-
 
     public void initializeStickElement(float x, float y, float scale) {
         stickElement = new ControlElement(this);
-        stickElement.setType(ControlElement.Type.STICK); // Set type to STICK
+        stickElement.setType(ControlElement.Type.STICK);
         stickElement.setX((int) x);
         stickElement.setY((int) y);
         stickElement.setScale(scale);
-        invalidate(); // Force the view to redraw with the stick
+        invalidate();
     }
-
 
     public void updateStickPosition(float x, float y) {
         if (stickElement != null) {
-            stickElement.getCurrentPosition().x = x;  // Update the thumbstick's position
-            stickElement.getCurrentPosition().y = y;  // Update the thumbstick's position
-            invalidate(); // Redraw the view
+            stickElement.getCurrentPosition().x = x;
+            stickElement.getCurrentPosition().y = y;
+            invalidate();
         }
     }
-
 
     public ControlElement getStickElement() {
         return stickElement;
@@ -495,48 +474,24 @@ public class InputControlsView extends View {
         this.nativeTouchProcessor = p;
     }
 
-    private void activateElementsAt(float x, float y) {
-        if (profile == null) return;
-        for (ControlElement element : profile.getElements()) {
-            element.setVisualActive(element.containsPoint(x, y), x, y);
-        }
-    }
-
-    private ControlElement hitTestElement(float x, float y) {
-        List<ControlElement> elements = profile.getElements();
-        for (int i = elements.size() - 1; i >= 0; i--) {
-            ControlElement elem = elements.get(i);
-            if (elem.containsPoint(x, y)) return elem;
-        }
-        return null;
-    }
-
     private void applyVisualStates() {
         if (profile == null) return;
         List<ControlElement> elements = profile.getElements();
         int count = elements.size();
         for (int i = 0; i < count && i * 5 + 4 < visualActive.length && i * 3 + 2 < visualPositions.length; i++) {
             ControlElement e = elements.get(i);
-            int base = i * 5;
             e.syncVisualState(
-                visualActive[base] != 0,
+                visualActive[i * 5] != 0,
                 visualPositions[i * 3],
                 visualPositions[i * 3 + 1],
-                visualActive[base + 1] != 0,
-                visualActive[base + 2] != 0,
-                visualActive[base + 3] != 0,
-                visualActive[base + 4] != 0,
+                visualActive[i * 5 + 1] != 0,
+                visualActive[i * 5 + 2] != 0,
+                visualActive[i * 5 + 3] != 0,
+                visualActive[i * 5 + 4] != 0,
                 visualPositions[i * 3 + 2]
             );
         }
         invalidate();
-    }
-
-    private void deactivateAllElements() {
-        if (profile == null) return;
-        for (ControlElement element : profile.getElements()) {
-            element.setVisualActive(false);
-        }
     }
 
     public XServer getXServer() {
@@ -598,8 +553,6 @@ public class InputControlsView extends View {
         }
     }
 
-
-
     private void processJoystickInput(ExternalController controller) {
         final int[] axes = {
                 MotionEvent.AXIS_X, MotionEvent.AXIS_Y,
@@ -644,7 +597,7 @@ public class InputControlsView extends View {
     private void processTriggerInput(ExternalController controller, float value, int keyCode, boolean sendUpdate) {
         ExternalControllerBinding binding = controller.getControllerBinding(keyCode);
         if (binding != null) {
-            boolean isPressed = value > ControlElement.STICK_DEAD_ZONE; // Use deadzone or simple > 0
+            boolean isPressed = value > ControlElement.STICK_DEAD_ZONE;
             if (isPressed) {
                 handleInputEvent(controller, binding.getBinding(), true, value, sendUpdate);
             } else {
@@ -653,23 +606,17 @@ public class InputControlsView extends View {
         }
     }
 
-
-
-
     @Override
     public boolean dispatchGenericMotionEvent(MotionEvent event) {
         Log.d("InputControlsView", "dispatchGenericMotionEvent called. Source: " + event.getSource());
         return super.dispatchGenericMotionEvent(event);
     }
 
-
     @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
-
         Log.d("InputControlsView", "Motion event received. Source: " + event.getSource());
         Log.d("InputControlsView", "Device ID: " + event.getDeviceId());
         Log.d("InputControlsView", "Profile is " + (profile != null ? "set" : "null"));
-
 
         if (!editMode && profile != null) {
             ExternalController controller = profile.getController(event.getDeviceId());
@@ -700,17 +647,15 @@ public class InputControlsView extends View {
         return super.onGenericMotionEvent(event);
     }
 
-
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         resetTouchscreenTimeout();
 
-        // Route through native processor when active - single JNI call per event
+        // Route through native processor
         if (nativeTouchProcessor != null && !editMode) {
             int action = event.getActionMasked();
             int actionIndex = event.getActionIndex();
             int pointerId = event.getPointerId(actionIndex);
-            // Ensure visual state buffers are allocated
             int elemCount = profile != null ? profile.getElements().size() : 0;
             if (visualPositions == null || visualPositions.length < elemCount * 3 + 16) {
                 visualPositions = new float[elemCount * 3 + 16];
@@ -746,7 +691,7 @@ public class InputControlsView extends View {
                 }
                 case MotionEvent.ACTION_CANCEL: {
                     nativeTouchProcessor.reset();
-                    if (profile != null) deactivateAllElements();
+                    invalidate();
                     return true;
                 }
             }
@@ -785,211 +730,14 @@ public class InputControlsView extends View {
             }
         }
 
-        if (!editMode && profile != null) {
-            int actionIndex = event.getActionIndex();
-            int pointerId = event.getPointerId(actionIndex);
-            int actionMasked = event.getActionMasked();
-
-            if (profile.getElements().isEmpty()) {
-                touchpadView.onTouchEvent(event);
-                return true;
-            }
-
-            TouchActivationMode actMode = profile.getTouchActivationMode();
-
-            switch (actionMasked) {
-                case MotionEvent.ACTION_DOWN:
-                case MotionEvent.ACTION_POINTER_DOWN: {
-                    float x = event.getX(actionIndex);
-                    float y = event.getY(actionIndex);
-                    touchpadView.setPointerButtonLeftEnabled(true);
-
-                    boolean handled = handleDownByMode(pointerId, x, y, actMode);
-                    if (!handled) {
-                        for (ControlElement element : profile.getElements()) {
-                            if (element.isPassthroughTouch() && element.containsPoint(x, y)) {
-                                touchpadView.setPassthroughActive(true);
-                                break;
-                            }
-                        }
-                        touchpadView.onTouchEvent(event);
-                    }
-                    break;
-                }
-                case MotionEvent.ACTION_MOVE: {
-                    handleMoveByMode(event, actMode);
-                    break;
-                }
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_POINTER_UP:
-                case MotionEvent.ACTION_CANCEL: {
-                    boolean handled = handleUpByMode(pointerId, actMode);
-                    for (ControlElement element : profile.getElements()) {
-                        if (element.handleTouchUp(pointerId)) handled = true;
-                    }
-                    if (!handled) touchpadView.onTouchEvent(event);
-                    touchpadView.setPassthroughActive(false);
-                    break;
-                }
-            }
-        }
         return true;
-    }
-
-    private boolean handleDownByMode(int pointerId, float x, float y, TouchActivationMode actMode) {
-        boolean handled = false;
-        for (ControlElement element : profile.getElements()) {
-            if (element.getBindingAt(0) == Binding.MOUSE_LEFT_BUTTON) {
-                touchpadView.setPointerButtonLeftEnabled(false);
-            }
-        }
-        int longPressDelay = profile.getLongPressDelay();
-        switch (actMode) {
-            case LOCK: {
-                for (ControlElement element : profile.getElements()) {
-                    if (element.handleTouchDown(pointerId, x, y)) {
-                        handled = true;
-                    }
-                }
-                break;
-            }
-            case TRACK:
-            case HOVER: {
-                for (ControlElement element : profile.getElements()) {
-                    if (element.getType() != ControlElement.Type.BUTTON && element.handleTouchDown(pointerId, x, y)) {
-                        handled = true;
-                    }
-                }
-                ControlElement btn = findButtonAt(x, y);
-                if (btn != null) {
-                    btn.setGestureDownPosition(x, y);
-                    if (!btn.isPassthroughTouch()) {
-                        ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
-                        if (tracked == null) {
-                            tracked = new ArrayList<>();
-                            trackedButtons.put(pointerId, tracked);
-                        }
-                        if (!tracked.contains(btn)) {
-                            btn.handleTouchDown(pointerId, x, y);
-                            tracked.add(btn);
-                        }
-                    }
-                    else {
-                        btn.handleTouchDown(pointerId, x, y);
-                    }
-                    if (actMode == TouchActivationMode.HOVER) {
-                        hoveredButtons.put(pointerId, btn);
-                    }
-                    if (!btn.isPassthroughTouch()) {
-                        handled = true;
-                    }
-                }
-                break;
-            }
-        }
-        return handled;
-    }
-
-    private void handleMoveByMode(MotionEvent event, TouchActivationMode actMode) {
-        switch (actMode) {
-            case LOCK:
-                for (byte i = 0, count = (byte) event.getPointerCount(); i < count; i++) {
-                    if (!processElementsTouchMove(event.getPointerId(i), event.getX(i), event.getY(i)))
-                        touchpadView.onTouchEvent(event);
-                }
-                break;
-            case TRACK:
-                for (byte i = 0, count = (byte) event.getPointerCount(); i < count; i++) {
-                    float x = event.getX(i);
-                    float y = event.getY(i);
-                    int pid = event.getPointerId(i);
-                    boolean h = processElementsTouchMove(pid, x, y);
-                    ArrayList<ControlElement> tracked = trackedButtons.get(pid);
-                    if (tracked != null) {
-                        ControlElement btn = findButtonAt(x, y);
-                        if (btn != null && !tracked.contains(btn)) {
-                            btn.activate();
-                            tracked.add(btn);
-                            if (tracked.size() == 2) tracked.get(0).cancelPendingLongPress();
-                        }
-                        if (!tracked.get(0).isPassthroughTouch()) {
-                            h = true;
-                        }
-                    }
-                    if (!h) touchpadView.onTouchEvent(event);
-                }
-                break;
-            case HOVER:
-                for (byte i = 0, count = (byte) event.getPointerCount(); i < count; i++) {
-                    float x = event.getX(i);
-                    float y = event.getY(i);
-                    int pid = event.getPointerId(i);
-                    boolean h = processElementsTouchMove(pid, x, y);
-                    ArrayList<ControlElement> tracked = trackedButtons.get(pid);
-                    if (tracked != null) {
-                        ControlElement btn = findButtonAt(x, y);
-                        ControlElement prev = hoveredButtons.get(pid);
-                        if (btn != prev) {
-                            if (prev != null) {
-                                prev.deactivate();
-                            }
-                            if (btn != null) {
-                                btn.activate();
-                                if (!tracked.contains(btn)) {
-                                    tracked.add(btn);
-                                    if (tracked.size() == 2) tracked.get(0).cancelPendingLongPress();
-                                }
-                                hoveredButtons.put(pid, btn);
-                            }
-                            else {
-                                hoveredButtons.remove(pid);
-                            }
-                        }
-                        if (!tracked.get(0).isPassthroughTouch()) {
-                            h = true;
-                        }
-                    }
-                    if (!h) touchpadView.onTouchEvent(event);
-                }
-                break;
-        }
-    }
-
-    private boolean handleUpByMode(int pointerId, TouchActivationMode actMode) {
-        boolean handled = false;
-        switch (actMode) {
-            case TRACK:
-            case HOVER: {
-                ArrayList<ControlElement> tracked = trackedButtons.get(pointerId);
-                if (tracked != null) {
-                    if (tracked.size() > 1) {
-                        for (ControlElement btn : tracked) btn.deactivate();
-                    }
-                    tracked.clear();
-                    trackedButtons.remove(pointerId);
-                    if (actMode == TouchActivationMode.HOVER) {
-                        hoveredButtons.remove(pointerId);
-                    }
-                    handled = true;
-                }
-                break;
-            }
-        }
-        return handled;
-    }
-
-    private boolean processElementsTouchMove(int pointerId, float x, float y) {
-        for (ControlElement element : profile.getElements()) {
-            if (element.handleTouchMove(pointerId, x, y)) return true;
-        }
-        return false;
     }
 
     private void resetTouchscreenTimeout() {
         Log.d("InputControlsView", "Touch detected, resetting timeout.");
         if (timeoutHandler != null && hideControlsRunnable != null) {
             timeoutHandler.removeCallbacks(hideControlsRunnable);
-            timeoutHandler.postDelayed(hideControlsRunnable, 5000); // Adjust timeout as necessary
+            timeoutHandler.postDelayed(hideControlsRunnable, 5000);
         }
     }
 

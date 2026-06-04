@@ -93,7 +93,6 @@ public class SettingsFragment extends Fragment {
     private CheckBox cbDarkMode;
     boolean isDarkMode;
 
-    private CheckBox cbNativeTouch;
 
     private static final int REQUEST_CODE_WINLATOR_PATH = 1002;
     private static final int REQUEST_CODE_SHORTCUT_EXPORT_PATH = 1003;
@@ -304,8 +303,6 @@ public class SettingsFragment extends Fragment {
         final EditText etDownloadableContentsURL = view.findViewById(R.id.ETDownloadableContentsURL);
         etDownloadableContentsURL.setText(preferences.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES));
 
-        cbNativeTouch = view.findViewById(R.id.CBNativeTouch);
-        cbNativeTouch.setChecked(preferences.getBoolean("native_touch_processor", false));
 
         view.findViewById(R.id.BTReInstallImagefs).setOnClickListener(v -> {
             ContentDialog.confirm(context, R.string.do_you_want_to_reinstall_imagefs, () -> ImageFsInstaller.installFromAssets((MainActivity) getActivity()));
@@ -337,7 +334,6 @@ public class SettingsFragment extends Fragment {
 
             editor.putString("downloadable_contents_url", etDownloadableContentsURL.getText().toString());
 
-            editor.putBoolean("native_touch_processor", cbNativeTouch.isChecked());
 
             if (!wineDebugChannels.isEmpty()) {
                 editor.putString("wine_debug_channels", String.join(",", wineDebugChannels));

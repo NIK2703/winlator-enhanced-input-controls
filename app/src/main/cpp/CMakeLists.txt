@@ -43,8 +43,7 @@ add_library(touch_processor SHARED
         winlator/touch_processor_activation.c
         winlator/gesture/types.h
         winlator/gesture/base.c
-        winlator/gesture/touchscreen.c
-        winlator/gesture/touchpad.c
+        winlator/gesture/handler.c
         winlator/gesture/executor.c
         winlator/gesture/entry.c
         winlator/element/shared.c

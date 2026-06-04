@@ -145,7 +145,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (reloaded != null) {
                 activity.touchpadView.setProfile(reloaded);
                 activity.inputControlsView.setProfile(reloaded);
-                if (activity.nativeTouchProcessor != null && activity.nativeTouchProcessor.isLoaded()) {
+                if (activity.nativeTouchProcessor != null) {
                     NativeTouchProcessor.NativeConfig updatedConfig =
                         NativeTouchProcessor.buildNativeConfig(reloaded,
                             activity.xServer.screenInfo.width,
@@ -936,17 +936,15 @@ if (enableLogs) {
         inputControlsView.setVisibility(View.GONE);
         rootView.addView(inputControlsView);
 
-        if (preferences.getBoolean("native_touch_processor", false)) {
-            nativeTouchProcessor = new NativeTouchProcessor();
-            if (nativeTouchProcessor.isLoaded()) {
-                nativeTouchProcessor.setXServer(xServer);
-                nativeTouchProcessor.setInputControlsView(inputControlsView);
-                touchpadView.setNativeTouchProcessor(nativeTouchProcessor);
-                inputControlsView.setNativeTouchProcessor(nativeTouchProcessor);
-                nativeTouchProcessor.start();
-            } else {
-                nativeTouchProcessor = null;
-            }
+        nativeTouchProcessor = new NativeTouchProcessor();
+        if (nativeTouchProcessor.isLoaded()) {
+            nativeTouchProcessor.setXServer(xServer);
+            nativeTouchProcessor.setInputControlsView(inputControlsView);
+            touchpadView.setNativeTouchProcessor(nativeTouchProcessor);
+            inputControlsView.setNativeTouchProcessor(nativeTouchProcessor);
+            nativeTouchProcessor.start();
+        } else {
+            nativeTouchProcessor = null;
         }
 
         startTouchscreenTimeout();
@@ -1585,7 +1583,7 @@ private void applySidebarSettings() {
         xServer.getInputDeviceManager().setInputMode(profile.getInputMode());
 
         // Initialize native touch processor
-        if (nativeTouchProcessor != null && nativeTouchProcessor.isLoaded()) {
+        if (nativeTouchProcessor != null) {
             // Build and apply config (early — before view is laid out)
             NativeTouchProcessor.NativeConfig nativeConfig =
                 NativeTouchProcessor.buildNativeConfig(profile, xServer.screenInfo.width, xServer.screenInfo.height, globalCursorSpeed);

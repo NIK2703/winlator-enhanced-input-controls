@@ -13,6 +13,7 @@ typedef struct {
     bool has_active_double_tap_drag;
     bool can_hold_long_press;
     bool has_long_press_timer;
+
 } GestureBindingSet;
 
 // Build a GestureBindingSet from a FingerBindings struct (mirrors Java buildBindingSet())
@@ -26,7 +27,6 @@ static inline GestureBindingSet gesture_build_binding_set(const FingerBindings* 
     s.has_active_double_tap_drag = fb->double_tap_drag_count > 0;
     s.can_hold_long_press = false;
     if (s.has_active_long_press && !s.has_active_long_press_drag && !s.has_active_single_tap_drag) {
-        // Java: checks ONLY the first binding (firstLP.isMouseMove() || firstLP == MOUSE_SCROLL_UP/DOWN)
         int t = fb->long_press[0].type;
         bool has_non_holdable = (t == BINDING_MOUSE_SCROLL_UP || t == BINDING_MOUSE_SCROLL_DOWN
                               || (t >= BINDING_MOUSE_MOVE_LEFT && t <= BINDING_MOUSE_MOVE_DOWN));

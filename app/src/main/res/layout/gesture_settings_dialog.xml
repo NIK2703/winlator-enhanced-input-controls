@@ -13,10 +13,29 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Timing"
+            android:text="Input Mode"
             android:textStyle="bold"
             android:textSize="16sp"
             android:textColor="@color/colorPrimary" />
+
+        <View style="@style/HorizontalLine" />
+
+        <Spinner
+            android:id="@+id/SPInputMode"
+            style="@style/ComboBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:spinnerMode="dialog" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Timing"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="@color/colorPrimary"
+            android:layout_marginTop="8dp" />
 
         <View style="@style/HorizontalLine" />
 
@@ -80,13 +99,51 @@
             app:step="1"
             app:value="0" />
 
+        <LinearLayout
+            android:id="@+id/LLCursorSpeed"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Cursor Speed"
+                android:layout_marginTop="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <SeekBar
+                    android:id="@+id/SBCursorSpeed"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="55"
+                    android:progress="15" />
+
+                <TextView
+                    android:id="@+id/TVCursorSpeed"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="100%"
+                    android:minWidth="48dp"
+                    android:gravity="end"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+        </LinearLayout>
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Single Finger Gestures"
             android:textStyle="bold"
             android:textSize="16sp"
-            android:textColor="@color/colorPrimary" />
+            android:textColor="@color/colorPrimary"
+            android:layout_marginTop="8dp" />
 
         <View style="@style/HorizontalLine" />
 

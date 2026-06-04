@@ -276,19 +276,6 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Mouse Mode"
-            android:layout_marginTop="8dp" />
-
-        <Spinner
-            android:id="@+id/SPMouseMode"
-            style="@style/ComboBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:spinnerMode="dialog" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
             android:text="Touch Activation"
             android:layout_marginTop="8dp" />
 
@@ -342,16 +329,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="8dp"
-            android:text="Touchscreen Gestures" />
-
-        <Button
-            style="@style/ButtonPositive"
-            android:id="@+id/BTTouchpadGestureSettings"
-            android:layout_width="240dp"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="8dp"
-            android:text="Touchpad Gestures" />
+            android:text="Gesture Settings" />
 
         <Button
             style="@style/ButtonPositive"

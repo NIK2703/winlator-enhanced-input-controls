@@ -230,18 +230,12 @@ public class NativeTouchProcessor {
             c.touchMode = 0; // TOUCH_MODE_TOUCHPAD
         }
         c.inputMode = profile.getInputMode() == com.winlator.cmod.inputcontrols.InputMode.RELATIVE ? 0 : 1;
-        // Use mode-appropriate timeout/drag values
-        if (c.touchMode == 0) { // TOUCHPAD
-            c.longPressTimeoutMs = profile.getTouchpadLongPressTimeout();
-            c.doubleTapTimeoutMs = profile.getTouchpadDoubleTapTimeout();
-            c.dragThresholdPx = profile.getTouchpadDragThreshold();
-            c.cursorSpeed = (int)(profile.getTouchpadCursorSpeed() * globalCursorSpeed * 100);
-        } else { // TOUCHSCREEN
-            c.longPressTimeoutMs = profile.getLongPressTimeout();
-            c.doubleTapTimeoutMs = profile.getDoubleTapTimeout();
-            c.dragThresholdPx = profile.getDragThreshold();
-            c.cursorSpeed = (int)(profile.getCursorSpeed() * globalCursorSpeed * 100);
-        }
+        // Unified gesture settings (shared between touchscreen and touchpad)
+        c.longPressTimeoutMs = profile.getLongPressTimeout();
+        c.doubleTapTimeoutMs = profile.getDoubleTapTimeout();
+        c.dragThresholdPx = profile.getDragThreshold();
+        // Cursor speed is touchpad-only
+        c.cursorSpeed = (int)(profile.getCursorSpeed() * globalCursorSpeed * 100);
         c.singleTapDelayMs = profile.getSingleTapDelay();
         c.doubleTapDistancePx = profile.getDoubleTapDistance();
         c.bindingDelayMs = profile.getBindingDelay();
@@ -254,29 +248,41 @@ public class NativeTouchProcessor {
         c.cursorAccelerationThreshold = 6;
         c.cursorAccelerationFactor = 1.25f;
 
-        // Touchscreen gesture bindings
-        c.tsSingleTap = bindingListToEncoded(profile.getSingleTapAction());
-        c.tsLongPress = bindingListToEncoded(profile.getLongPressAction());
-        c.tsDoubleTap = bindingListToEncoded(profile.getDoubleTapAction());
-        c.tsSingleTapDrag = bindingListToEncoded(profile.getSingleTapDragAction());
-        c.tsLongPressDrag = bindingListToEncoded(profile.getLongPressDragAction());
-        c.tsDoubleTapDrag = bindingListToEncoded(profile.getDoubleTapDragAction());
-        c.tsSingleTap2nd = bindingListToEncoded(profile.getSingleTap2ndFingerAction());
-        c.tsDoubleTap2nd = bindingListToEncoded(profile.getDoubleTap2ndFingerAction());
-        c.tsSingleTapDrag2nd = bindingListToEncoded(profile.getSingleTap2ndFingerDragAction());
-        c.tsDoubleTapDrag2nd = bindingListToEncoded(profile.getDoubleTap2ndFingerDragAction());
+        // Unified gesture bindings — used for BOTH touchscreen and touchpad modes
+        // The C side separates ts/tp arrays, but we populate both from the same unified source.
+        // This ensures identical gesture behavior regardless of mode toggle.
+        int[] unifiedSingleTap = bindingListToEncoded(profile.getGestureSingleTapAction());
+        int[] unifiedLongPress = bindingListToEncoded(profile.getGestureLongPressAction());
+        int[] unifiedDoubleTap = bindingListToEncoded(profile.getGestureDoubleTapAction());
+        int[] unifiedSingleTapDrag = bindingListToEncoded(profile.getGestureSingleTapDragAction());
+        int[] unifiedLongPressDrag = bindingListToEncoded(profile.getGestureLongPressDragAction());
+        int[] unifiedDoubleTapDrag = bindingListToEncoded(profile.getGestureDoubleTapDragAction());
+        int[] unifiedSingleTap2nd = bindingListToEncoded(profile.getGestureSingleTap2ndFingerAction());
+        int[] unifiedDoubleTap2nd = bindingListToEncoded(profile.getGestureDoubleTap2ndFingerAction());
+        int[] unifiedSingleTapDrag2nd = bindingListToEncoded(profile.getGestureSingleTap2ndFingerDragAction());
+        int[] unifiedDoubleTapDrag2nd = bindingListToEncoded(profile.getGestureDoubleTap2ndFingerDragAction());
 
-        // Touchpad gesture bindings
-        c.tpSingleTap = bindingListToEncoded(profile.getTouchpadSingleTapAction());
-        c.tpLongPress = bindingListToEncoded(profile.getTouchpadLongPressAction());
-        c.tpDoubleTap = bindingListToEncoded(profile.getTouchpadDoubleTapAction());
-        c.tpSingleTapDrag = bindingListToEncoded(profile.getTouchpadSingleTapDragAction());
-        c.tpLongPressDrag = bindingListToEncoded(profile.getTouchpadLongPressDragAction());
-        c.tpDoubleTapDrag = bindingListToEncoded(profile.getTouchpadDoubleTapDragAction());
-        c.tpSingleTap2nd = bindingListToEncoded(profile.getTouchpadSingleTap2ndFingerAction());
-        c.tpDoubleTap2nd = bindingListToEncoded(profile.getTouchpadDoubleTap2ndFingerAction());
-        c.tpSingleTapDrag2nd = bindingListToEncoded(profile.getTouchpadSingleTap2ndFingerDragAction());
-        c.tpDoubleTapDrag2nd = bindingListToEncoded(profile.getTouchpadDoubleTap2ndFingerDragAction());
+        c.tsSingleTap = unifiedSingleTap;
+        c.tsLongPress = unifiedLongPress;
+        c.tsDoubleTap = unifiedDoubleTap;
+        c.tsSingleTapDrag = unifiedSingleTapDrag;
+        c.tsLongPressDrag = unifiedLongPressDrag;
+        c.tsDoubleTapDrag = unifiedDoubleTapDrag;
+        c.tsSingleTap2nd = unifiedSingleTap2nd;
+        c.tsDoubleTap2nd = unifiedDoubleTap2nd;
+        c.tsSingleTapDrag2nd = unifiedSingleTapDrag2nd;
+        c.tsDoubleTapDrag2nd = unifiedDoubleTapDrag2nd;
+
+        c.tpSingleTap = unifiedSingleTap;
+        c.tpLongPress = unifiedLongPress;
+        c.tpDoubleTap = unifiedDoubleTap;
+        c.tpSingleTapDrag = unifiedSingleTapDrag;
+        c.tpLongPressDrag = unifiedLongPressDrag;
+        c.tpDoubleTapDrag = unifiedDoubleTapDrag;
+        c.tpSingleTap2nd = unifiedSingleTap2nd;
+        c.tpDoubleTap2nd = unifiedDoubleTap2nd;
+        c.tpSingleTapDrag2nd = unifiedSingleTapDrag2nd;
+        c.tpDoubleTapDrag2nd = unifiedDoubleTapDrag2nd;
 
         return c;
     }

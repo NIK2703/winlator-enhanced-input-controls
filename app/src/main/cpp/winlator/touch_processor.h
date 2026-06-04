@@ -254,7 +254,52 @@ typedef struct {
     TouchBinding tp_single_drag_2nd[8];  int tp_single_drag_2nd_count;
     TouchBinding tp_double_drag_2nd[8];  int tp_double_drag_2nd_count;
     uint32_t bindings_generation;
+
+    // Pre-computed gesture capability flags (set by compute_gesture_caps)
+    bool caps_has_gesture_bindings;
+    bool caps_has_drag_bindings;
+    bool caps_has_double_tap;
+    bool caps_has_long_press;
+    bool caps_has_long_press_timer;
 } TouchProcessorConfig;
+
+// Compute gesture capability flags from a TouchProcessorConfig
+static inline void compute_gesture_caps(TouchProcessorConfig* cfg) {
+    bool has_ts = cfg->ts_single_tap_count > 0 || cfg->ts_long_press_count > 0 ||
+                  cfg->ts_double_tap_count > 0 || cfg->ts_single_tap_drag_count > 0 ||
+                  cfg->ts_long_press_drag_count > 0 || cfg->ts_double_tap_drag_count > 0 ||
+                  cfg->ts_single_2nd_count > 0 || cfg->ts_double_2nd_count > 0 ||
+                  cfg->ts_single_drag_2nd_count > 0 || cfg->ts_double_drag_2nd_count > 0;
+    bool has_tp = cfg->tp_single_tap_count > 0 || cfg->tp_long_press_count > 0 ||
+                  cfg->tp_double_tap_count > 0 || cfg->tp_single_tap_drag_count > 0 ||
+                  cfg->tp_long_press_drag_count > 0 || cfg->tp_double_tap_drag_count > 0 ||
+                  cfg->tp_single_2nd_count > 0 || cfg->tp_double_2nd_count > 0 ||
+                  cfg->tp_single_drag_2nd_count > 0 || cfg->tp_double_drag_2nd_count > 0;
+    cfg->caps_has_gesture_bindings = has_ts || has_tp;
+    cfg->caps_has_drag_bindings = cfg->ts_single_tap_drag_count > 0 ||
+                                  cfg->ts_long_press_drag_count > 0 ||
+                                  cfg->ts_double_tap_drag_count > 0 ||
+                                  cfg->ts_single_drag_2nd_count > 0 ||
+                                  cfg->ts_double_drag_2nd_count > 0 ||
+                                  cfg->tp_single_tap_drag_count > 0 ||
+                                  cfg->tp_long_press_drag_count > 0 ||
+                                  cfg->tp_double_tap_drag_count > 0 ||
+                                  cfg->tp_single_drag_2nd_count > 0 ||
+                                  cfg->tp_double_drag_2nd_count > 0;
+    cfg->caps_has_double_tap = cfg->ts_double_tap_count > 0 ||
+                               cfg->ts_double_2nd_count > 0 ||
+                               cfg->tp_double_tap_count > 0 ||
+                               cfg->tp_double_2nd_count > 0 ||
+                               cfg->ts_double_tap_drag_count > 0 ||
+                               cfg->ts_double_drag_2nd_count > 0 ||
+                               cfg->tp_double_tap_drag_count > 0 ||
+                               cfg->tp_double_drag_2nd_count > 0;
+    cfg->caps_has_long_press = cfg->ts_long_press_count > 0 ||
+                               cfg->tp_long_press_count > 0;
+    cfg->caps_has_long_press_timer = cfg->caps_has_long_press ||
+                                     cfg->ts_long_press_drag_count > 0 ||
+                                     cfg->tp_long_press_drag_count > 0;
+}
 
 // --- Output actions ---
 typedef enum {

@@ -236,15 +236,13 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms);
 void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t time_ms);
 void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms);
 
-// Touchscreen mode handler (maps to TouchscreenGestureHandler.java)
-void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
-
-// Touchpad mode handler (maps to TouchpadGestureHandler.java)
-void handle_touchpad_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void handle_touchpad_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void handle_touchpad_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
+// Unified gesture handler (replaces both touchscreen.c and touchpad.c)
+// The only difference between TOUCHPAD and TOUCHSCREEN modes is cursor behavior:
+//   TOUCHSCREEN - cursor attached absolutely to first finger
+//   TOUCHPAD    - relative cursor movement with delta accumulation
+void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
 
 // --- Activation internal helpers ---
 bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);

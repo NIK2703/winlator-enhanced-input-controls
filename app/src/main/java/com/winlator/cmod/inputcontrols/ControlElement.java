@@ -48,7 +48,7 @@ public class ControlElement {
     public static final float TRACKPAD_MIN_SPEED = 0.8f;
     public static final float TRACKPAD_MAX_SPEED = 20.0f;
     public static final byte TRACKPAD_ACCELERATION_THRESHOLD = 4;
-    public static final short BUTTON_MIN_TIME_TO_KEEP_PRESSED = 300;
+
     public enum Type {
         BUTTON, D_PAD, RANGE_BUTTON, STICK, TRACKPAD;
 
@@ -112,6 +112,8 @@ public class ControlElement {
     private boolean toggleSwitch = false;
     private boolean passthroughTouch;
     private float opacity = -1f;
+    private float gestureDownX;
+    private float gestureDownY;
     private int currentPointerId = -1;
     private final Rect boundingBox = new Rect();
     private boolean[] states = new boolean[4];
@@ -138,23 +140,14 @@ public class ControlElement {
     private Bitmap customIcon;
     private String cachedDisplayText;
     private boolean displayTextDirty = true;
-    private List<Binding> heldBindings;
     private List<Binding> longPressBindings = new ArrayList<>();
-    private boolean longPressTriggered;
     private List<Binding> gestureBindings = new ArrayList<>();
-    private boolean gestureTriggered;
-    private float gestureDownX;
-
-    private float gestureDownY;
     private boolean buildingCache;
     private boolean active;
-    private android.os.Handler longPressHandler;
     private Range range;
     private byte orientation;
     private PointF currentPosition;
     private RangeScroller scroller;
-    private CubicBezierInterpolator interpolator;
-    private long touchTime;
     private final boolean[] scratchStates = new boolean[4];
     private final Rect drawIconSrcRect = new Rect();
     private final Rect drawIconDstRect = new Rect();
@@ -164,15 +157,11 @@ public class ControlElement {
 
     private float cachedStrokeWidth;
     private int cachedFillAlphaInactive;
-    private int cachedButtonLongPressHaptic = 1;
-    private int cachedButtonGestureHaptic = 1;
 
     private void refreshProfileCache() {
         ControlsProfile p = inputControlsView.getProfile();
         cachedStrokeWidth = p != null ? p.getStrokeWidth() : 0.2f;
         cachedFillAlphaInactive = p != null ? p.getFillAlphaInactive() : 50;
-        cachedButtonLongPressHaptic = p != null ? p.getButtonLongPressHaptic() : 1;
-        cachedButtonGestureHaptic = p != null ? p.getButtonGestureHaptic() : 1;
     }
 
     public ControlElement(InputControlsView inputControlsView) {
@@ -467,11 +456,6 @@ public class ControlElement {
         if (gestureBindings == null || gestureBindings.isEmpty()) return false;
         if (gestureBindings.size() == 1 && gestureBindings.get(0) == Binding.NONE) return false;
         return true;
-    }
-
-    public void setGestureDownPosition(float x, float y) {
-        gestureDownX = x;
-        gestureDownY = y;
     }
 
     public float getScale() {
@@ -1739,81 +1723,6 @@ public class ControlElement {
         return getBoundingBox().contains((int)(x + 0.5f), (int)(y + 0.5f));
     }
 
-    private boolean isKeepButtonPressedAfterMinTime() {
-        Binding binding = getBindingAt(0);
-        return !toggleSwitch && (binding == Binding.GAMEPAD_BUTTON_L3 || binding == Binding.GAMEPAD_BUTTON_R3);
-    }
-
-    private void pressBindings(List<Binding> seq) {
-        ControlsProfile profile = inputControlsView.getProfile();
-        int delay = profile != null ? profile.getBindingDelay() : 0;
-        int size = seq.size();
-
-        for (int i = 0; i < size; i++) {
-            Binding b = seq.get(i);
-            if (b == null || b == Binding.NONE) continue;
-            Binding kb = b.toKeyboardBinding();
-            if (kb != null) inputControlsView.handleInputEvent(kb, true);
-        }
-
-        for (int i = 0; i < size; i++) {
-            Binding b = seq.get(i);
-            if (b == null || b == Binding.NONE) continue;
-            if (b.isModifier()) continue;
-            inputControlsView.handleInputEvent(b, true);
-            if (delay > 0 && i < size - 1) SystemClock.sleep(delay);
-        }
-    }
-
-    private void releaseHeldBindings() {
-        if (heldBindings == null) return;
-        int size = heldBindings.size();
-
-        for (int i = size - 1; i >= 0; i--) {
-            Binding b = heldBindings.get(i);
-            if (b == null || b == Binding.NONE) continue;
-            if (b.isModifier()) continue;
-            inputControlsView.handleInputEvent(b, false);
-        }
-
-        for (int i = size - 1; i >= 0; i--) {
-            Binding b = heldBindings.get(i);
-            if (b == null || b == Binding.NONE) continue;
-            Binding kb = b.toKeyboardBinding();
-            if (kb != null) inputControlsView.handleInputEvent(kb, false);
-        }
-
-        heldBindings = null;
-    }
-
-    public void setVisualActive(boolean engaged) {
-        if (!engaged && currentPosition != null) currentPosition = null;
-        setVisualActive(engaged, -1, -1);
-    }
-
-    public void setVisualState(boolean active, float posX, float posY) {
-        this.active = active;
-        if (type == Type.D_PAD && active) {
-            int snapSize = inputControlsView.getSnappingSize();
-            float dx = posX - x;
-            float dy = posY - y;
-            float radius = snapSize * 7 * scale;
-            float dist = (float)Math.sqrt(dx*dx + dy*dy);
-            if (dist > radius) {
-                dx = dx / dist * radius;
-                dy = dy / dist * radius;
-            }
-            float nx = Math.max(-1f, Math.min(1f, dx / radius));
-            float ny = Math.max(-1f, Math.min(1f, dy / radius));
-            states[0] = ny <= -DPAD_DEAD_ZONE;
-            states[1] = nx >= DPAD_DEAD_ZONE;
-            states[2] = ny >= DPAD_DEAD_ZONE;
-            states[3] = nx <= -DPAD_DEAD_ZONE;
-        }
-        if (currentPosition == null) currentPosition = new android.graphics.PointF();
-        currentPosition.set(posX, posY);
-    }
-
     /**
      * Ultra-fast visual state sync from C — skips DPAD recomputation.
      * Petal states are pre-computed in C and passed directly.
@@ -1834,414 +1743,6 @@ public class ControlElement {
         if (type == Type.RANGE_BUTTON && scroller != null) {
             scroller.updateVisualState(active, posX, posY, rangeScrollOffset);
         }
-    }
-
-    public void setVisualActive(boolean engaged, float touchX, float touchY) {
-        if (type == Type.D_PAD && engaged) {
-            int snapSize = inputControlsView.getSnappingSize();
-            float dx = touchX - x;
-            float dy = touchY - y;
-            float radius = snapSize * 7 * scale;
-            float dist = (float)Math.sqrt(dx*dx + dy*dy);
-            if (dist > radius) {
-                dx = dx / dist * radius;
-                dy = dy / dist * radius;
-            }
-            float nx = Math.max(-1f, Math.min(1f, dx / radius));
-            float ny = Math.max(-1f, Math.min(1f, dy / radius));
-            states[0] = ny <= -DPAD_DEAD_ZONE;
-            states[1] = nx >= DPAD_DEAD_ZONE;
-            states[2] = ny >= DPAD_DEAD_ZONE;
-            states[3] = nx <= -DPAD_DEAD_ZONE;
-        } else if (type == Type.D_PAD) {
-            Arrays.fill(states, false);
-        }
-        if (engaged != active) {
-            active = engaged;
-            inputControlsView.invalidate();
-        } else if (engaged && type == Type.D_PAD) {
-            inputControlsView.invalidate();
-        }
-    }
-
-    public void activate() {
-        active = true;
-        if (bindings.isEmpty() || bindings.get(0).isEmpty()) {
-            inputControlsView.invalidate();
-            return;
-        }
-        if (toggleSwitch) {
-            selected = !selected;
-            if (selected) {
-                heldBindings = new ArrayList<>(bindings.get(0));
-                pressBindings(bindings.get(0));
-            } else {
-                releaseHeldBindings();
-            }
-        } else {
-            heldBindings = new ArrayList<>(bindings.get(0));
-            pressBindings(bindings.get(0));
-        }
-        inputControlsView.invalidate();
-    }
-
-    private void vibrateHaptic(int hapticType, int fallbackMs) {
-        if (hapticType <= 0) return;
-        android.os.Vibrator vib = (android.os.Vibrator) inputControlsView.getContext().getSystemService(Context.VIBRATOR_SERVICE);
-        if (vib == null || !vib.hasVibrator()) return;
-        com.winlator.cmod.core.HapticUtils.perform(inputControlsView.getContext(), hapticType);
-    }
-
-    public void startLongPressTimer(int delay) {
-        if (!hasLongPressBinding() || toggleSwitch || delay <= 0) return;
-        if (longPressHandler == null) longPressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-        longPressTriggered = false;
-        longPressHandler.postDelayed(() -> {
-            if (gestureTriggered) return;
-            longPressTriggered = true;
-            vibrateHaptic(cachedButtonLongPressHaptic, 50);
-            heldBindings = new ArrayList<>(longPressBindings);
-            pressBindings(longPressBindings);
-            inputControlsView.invalidate();
-        }, delay);
-    }
-
-    public void deactivate() {
-        active = false;
-        currentPointerId = -1;
-        cancelLongPress();
-        if (!(toggleSwitch && selected)) releaseHeldBindings();
-        inputControlsView.invalidate();
-    }
-
-    public void releaseTapBindings() {
-        active = false;
-        releaseHeldBindings();
-        inputControlsView.invalidate();
-    }
-
-    public void cancelLongPress() {
-        cancelPendingLongPress();
-        longPressTriggered = false;
-        gestureTriggered = false;
-    }
-
-    public void cancelPendingLongPress() {
-        if (longPressHandler != null) {
-            longPressHandler.removeCallbacksAndMessages(null);
-            longPressHandler = null;
-        }
-    }
-
-    private void startLongPressTimer() {
-        longPressTriggered = false;
-        ControlsProfile localProfile = inputControlsView.getProfile();
-        int delay = localProfile != null ? localProfile.getLongPressDelay() : 0;
-        if (delay > 0) {
-            if (longPressHandler == null) longPressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-            longPressHandler.postDelayed(() -> {
-                longPressTriggered = true;
-                vibrateHaptic(cachedButtonLongPressHaptic, 30);
-                heldBindings = new ArrayList<>(longPressBindings);
-                pressBindings(longPressBindings);
-                inputControlsView.invalidate();
-            }, delay);
-        }
-    }
-
-    public boolean handleTouchDown(int pointerId, float x, float y) {
-        if (currentPointerId == -1 && containsPoint(x, y)) {
-            currentPointerId = pointerId;
-            if (type == Type.BUTTON) {
-                gestureDownX = x;
-                gestureDownY = y;
-                if (isKeepButtonPressedAfterMinTime()) touchTime = System.currentTimeMillis();
-                if (toggleSwitch && selected) {                    releaseHeldBindings();
-                }
-                else if (hasLongPressBinding() && !toggleSwitch) {
-                    startLongPressTimer();
-                }
-                else {
-                    heldBindings = bindings.get(0);
-                    pressBindings(bindings.get(0));
-                }
-                inputControlsView.invalidate();
-                return !passthroughTouch;
-            }
-            else if (type == Type.RANGE_BUTTON) {
-                scroller.handleTouchDown(x, y);
-                inputControlsView.invalidate();
-                return true;
-            }
-            else {
-                if (type == Type.TRACKPAD) {
-                    if (currentPosition == null) currentPosition = new PointF();
-                    currentPosition.set(x, y);
-                }
-                return handleTouchMove(pointerId, x, y);
-            }
-        }
-        else return false;
-    }
-
-    public boolean handleTouchMove(int pointerId, float x, float y) {
-        if (pointerId == currentPointerId) {
-            if (type == Type.BUTTON && hasGestureBinding() && !gestureTriggered && !longPressTriggered) {
-                float dx = x - gestureDownX;
-                float dy = y - gestureDownY;
-                ControlsProfile p = inputControlsView.getProfile();
-                int threshold = p != null ? p.getGestureThreshold() : 20;
-                float distSq = dx * dx + dy * dy;
-                if (distSq > threshold * threshold) {
-                    gestureTriggered = true;
-                    if (longPressHandler != null) {
-                        longPressHandler.removeCallbacksAndMessages(null);
-                        longPressHandler = null;
-                    }
-                    longPressTriggered = false;
-                    vibrateHaptic(cachedButtonGestureHaptic, 10);
-                    heldBindings = new ArrayList<>(gestureBindings);
-                    pressBindings(gestureBindings);
-                inputControlsView.invalidate();
-                return !passthroughTouch;
-                }
-            }
-            if (type == Type.BUTTON && hasLongPressBinding() && !longPressTriggered && longPressHandler != null && !containsPoint(x, y)) {
-                longPressHandler.removeCallbacksAndMessages(null);
-                longPressHandler = null;
-                longPressTriggered = false;
-            }
-            if (type == Type.D_PAD || type == Type.STICK || type == Type.TRACKPAD) {
-            float deltaX, deltaY;
-            Rect boundingBox = getBoundingBox();
-            float radius = boundingBox.width() * 0.5f;
-            TouchpadView touchpadView =  inputControlsView.getTouchpadView();
-
-            if (type == Type.TRACKPAD) {
-                if (currentPosition == null) currentPosition = new PointF();
-                float[] deltaPoint = touchpadView.computeDeltaPoint(currentPosition.x, currentPosition.y, x, y);
-                deltaX = deltaPoint[0];
-                deltaY = deltaPoint[1];
-                currentPosition.set(x, y);
-            }
-            else {
-                float localX = x - boundingBox.left;
-                float localY = y - boundingBox.top;
-                float offsetX = localX - radius;
-                float offsetY = localY - radius;
-
-                float distance = Mathf.lengthSq(radius - localX, radius - localY);
-                if (distance > radius * radius) {
-                    float angle = (float)Math.atan2(offsetY, offsetX);
-                    offsetX = (float)(Math.cos(angle) * radius);
-                    offsetY = (float)(Math.sin(angle) * radius);
-                }
-
-                deltaX = Mathf.clamp(offsetX / radius, -1, 1);
-                deltaY = Mathf.clamp(offsetY / radius, -1, 1);
-            }
-
-            if (type == Type.STICK) {
-                if (currentPosition == null) currentPosition = new PointF();
-                currentPosition.x = boundingBox.left + deltaX * radius + radius;
-                currentPosition.y = boundingBox.top + deltaY * radius + radius;
-                
-                Binding firstBinding = getBindingAt(0);
-                if (firstBinding.isGamepad()) {
-                    float magnitude = (float)Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-                    
-                    float finalX = 0;
-                    float finalY = 0;
-                    
-                    if (magnitude > STICK_DEAD_ZONE) {
-                        float normalizedX = deltaX / magnitude;
-                        float normalizedY = deltaY / magnitude;
-                        
-                        float scaledMagnitude = Math.max(0, magnitude - 0.01f) * STICK_SENSITIVITY;
-                        scaledMagnitude = Math.min(scaledMagnitude, 1.0f);
-                        
-                        finalX = normalizedX * scaledMagnitude;
-                        finalY = normalizedY * scaledMagnitude;
-                    }
-                    
-                    inputControlsView.handleStickInput(firstBinding, finalX, finalY);
-                    
-                    for (byte i = 0; i < 4; i++) {
-                        this.states[i] = true;
-                    }
-                } else {
-                    scratchStates[0] = deltaY <= -STICK_DEAD_ZONE;
-                    scratchStates[1] = deltaX >= STICK_DEAD_ZONE;
-                    scratchStates[2] = deltaY >= STICK_DEAD_ZONE;
-                    scratchStates[3] = deltaX <= -STICK_DEAD_ZONE;
-                    for (byte i = 0; i < 4; i++) {
-                        float value = i == 1 || i == 3 ? deltaX : deltaY;
-                        List<Binding> seq = bindings.get(i);
-                        for (int j = 0, sz = seq.size(); j < sz; j++) {
-                            Binding binding = seq.get(j);
-                            boolean state = binding.isMouseMove() ? (scratchStates[i] || scratchStates[(i+2)%4]) : scratchStates[i];
-                            inputControlsView.handleInputEvent(binding, state, value);
-                            this.states[i] = state;
-                        }
-                    }
-                }
-
-                inputControlsView.invalidate();
-            }
-            else if (type == Type.TRACKPAD) {
-                Binding firstBinding = getBindingAt(0);
-                if (firstBinding.isGamepad()) {
-                    if (interpolator == null) interpolator = new CubicBezierInterpolator();
-                    interpolator.set(0.075f, 0.95f, 0.45f, 0.95f);
-                    
-                    float valueX = deltaX;
-                    float valueY = deltaY;
-                    if (Math.abs(valueX) > TRACKPAD_ACCELERATION_THRESHOLD) valueX *= STICK_SENSITIVITY;
-                    if (Math.abs(valueY) > TRACKPAD_ACCELERATION_THRESHOLD) valueY *= STICK_SENSITIVITY;
-                    
-                    float interpX = interpolator.getInterpolation(Math.min(1.0f, Math.abs(valueX / TRACKPAD_MAX_SPEED)));
-                    float interpY = interpolator.getInterpolation(Math.min(1.0f, Math.abs(valueY / TRACKPAD_MAX_SPEED)));
-                    
-                    float finalX = Mathf.clamp(interpX * Mathf.sign(valueX), -1, 1);
-                    float finalY = Mathf.clamp(interpY * Mathf.sign(valueY), -1, 1);
-                    
-                    inputControlsView.handleStickInput(firstBinding, finalX, finalY);
-                    
-                    for (byte i = 0; i < 4; i++) {
-                        this.states[i] = true;
-                    }
-                } else {
-                    scratchStates[0] = deltaY <= -TRACKPAD_MIN_SPEED;
-                    scratchStates[1] = deltaX >= TRACKPAD_MIN_SPEED;
-                    scratchStates[2] = deltaY >= TRACKPAD_MIN_SPEED;
-                    scratchStates[3] = deltaX <= -TRACKPAD_MIN_SPEED;
-                    int cursorDx = 0;
-                    int cursorDy = 0;
-
-                    for (byte i = 0; i < 4; i++) {
-                        float value = (i == 1 || i == 3 ? deltaX : deltaY);
-                        if (Math.abs(value) > TouchpadView.CURSOR_ACCELERATION_THRESHOLD) value *= TouchpadView.CURSOR_ACCELERATION;
-                        List<Binding> seq = bindings.get(i);
-                        for (int j = 0, sz = seq.size(); j < sz; j++) {
-                            Binding binding = seq.get(j);
-                            if (binding == Binding.MOUSE_MOVE_LEFT || binding == Binding.MOUSE_MOVE_RIGHT) {
-                                cursorDx = Mathf.roundPoint(value);
-                            }
-                            else if (binding == Binding.MOUSE_MOVE_UP || binding == Binding.MOUSE_MOVE_DOWN) {
-                                cursorDy = Mathf.roundPoint(value);
-                            }
-                            else {
-                                inputControlsView.handleInputEvent(binding, scratchStates[i], value);
-                            }
-                        }
-                        this.states[i] = scratchStates[i];
-                    }
-
-                    if (cursorDx != 0 || cursorDy != 0)  {
-                        XServer xServer = inputControlsView.getXServer();
-                        if (xServer.getInputMode() == InputMode.RELATIVE)
-                            xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, cursorDx, cursorDy, 0);
-                        else
-                            inputControlsView.getXServer().injectPointerMoveDelta(cursorDx, cursorDy);
-                    }
-                }
-            }
-            else {
-                scratchStates[0] = deltaY <= -DPAD_DEAD_ZONE;
-                scratchStates[1] = deltaX >= DPAD_DEAD_ZONE;
-                scratchStates[2] = deltaY >= DPAD_DEAD_ZONE;
-                scratchStates[3] = deltaX <= -DPAD_DEAD_ZONE;
-
-                for (byte i = 0; i < 4; i++) {
-                    float value = i == 1 || i == 3 ? deltaX : deltaY;
-                    List<Binding> seq = bindings.get(i);
-                    for (int j = 0, sz = seq.size(); j < sz; j++) {
-                        Binding binding = seq.get(j);
-                        boolean state = binding.isMouseMove() ? (scratchStates[i] || scratchStates[(i+2)%4]) : scratchStates[i];
-                        inputControlsView.handleInputEvent(binding, state, value);
-                        this.states[i] = state;
-                    }
-                }
-                inputControlsView.invalidate();
-                return true;
-            }
-            }
-            if (type == Type.RANGE_BUTTON) {
-                scroller.handleTouchMove(x, y);
-                return true;
-            }
-            return !passthroughTouch;
-        }
-        return false;
-    }
-
-    public boolean handleTouchUp(int pointerId) {
-        if (pointerId == currentPointerId) {
-            if (type == Type.BUTTON) {
-                if (isKeepButtonPressedAfterMinTime() && touchTime != 0) {
-                    selected = (System.currentTimeMillis() - touchTime) > BUTTON_MIN_TIME_TO_KEEP_PRESSED;
-                    touchTime = 0;
-                }
-
-                if (toggleSwitch) {
-                    selected = !selected;
-                    if (selected) {
-                        currentPointerId = -1;
-                        return !passthroughTouch;
-                    }
-                }
-
-                if (longPressTriggered) {
-                    releaseHeldBindings();
-                    longPressTriggered = false;
-                }
-                else if (gestureTriggered) {
-                    releaseHeldBindings();
-                    gestureTriggered = false;
-                    active = true;
-                    inputControlsView.postOnAnimation(() ->
-                        inputControlsView.postOnAnimation(() -> {
-                            active = false;
-                            inputControlsView.invalidate();
-                        })
-                    );
-                }
-                else if (hasLongPressBinding()) {
-                    if (longPressHandler != null) longPressHandler.removeCallbacksAndMessages(null);
-                    List<Binding> seq = bindings.get(0);
-                    heldBindings = new ArrayList<>(seq);
-                    pressBindings(seq);
-                    releaseHeldBindings();
-                }
-                else {
-                    releaseHeldBindings();
-                }
-                inputControlsView.invalidate();
-            }
-            else if (type == Type.RANGE_BUTTON || type == Type.D_PAD || type == Type.STICK || type == Type.TRACKPAD) {
-                for (byte i = 0; i < states.length; i++) {
-                    if (states[i]) {
-                        for (Binding b : bindings.get(i)) {
-                            if (b != Binding.NONE) inputControlsView.handleInputEvent(b, false);
-                        }
-                    }
-                    states[i] = false;
-                }
-
-                if (type == Type.RANGE_BUTTON) {
-                    scroller.handleTouchUp();
-                    inputControlsView.invalidate();
-                }
-                else if (type == Type.STICK || type == Type.D_PAD) {
-                    inputControlsView.invalidate();
-                }
-
-                if (currentPosition != null) currentPosition = null;
-            }
-            currentPointerId = -1;
-            return passthroughTouch ? false : true;
-        }
-        return false;
     }
 
     public PointF getCurrentPosition() {

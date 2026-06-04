@@ -1,7 +1,17 @@
 #include "../touch_processor_internal.h"
+#include <android/log.h>
 
 void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) {
-    
+    // Fast path: no gesture bindings — skip all gesture state machine
+    if (!g_state.cfg.caps_has_gesture_bindings && !g_state.gesture_double_tap_waiting) {
+        g_state.gesture_handler_active = false;
+        if (g_state.gesture_main_ptr_id < 0) {
+            g_state.gesture_main_ptr_id = f->ptr_id;
+        }
+        f->state = GESTURE_STATE_IDLE;
+        return;
+    }
+
     if (g_state.gesture_main_ptr_id < 0) {
         f->is_second_finger = false;
         g_state.gesture_main_ptr_id = f->ptr_id;
@@ -19,6 +29,12 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
         if (g_state.gesture_double_tap_waiting) {
             float dx = fabsf(f->x - g_state.gesture_last_tap_up_x);
             float dy = fabsf(f->y - g_state.gesture_last_tap_up_y);
+            __android_log_print(ANDROID_LOG_INFO, "Gesture",
+                "TP_down DT_waiting: finger(%.1f,%.1f) last_up(%.1f,%.1f) dx=%.1f dy=%.1f dbl_dist=%d %s",
+                f->x, f->y,
+                g_state.gesture_last_tap_up_x, g_state.gesture_last_tap_up_y,
+                dx, dy, g_state.cfg.double_tap_distance_px,
+                (dx <= g_state.cfg.double_tap_distance_px && dy <= g_state.cfg.double_tap_distance_px) ? "PASS" : "FAIL");
             if (dx <= g_state.cfg.double_tap_distance_px && dy <= g_state.cfg.double_tap_distance_px) {
                 // Confirm double-tap (mirrors handleDoubleTapConfirmed)
                 g_state.gesture_double_tap_waiting = false;
@@ -154,13 +170,11 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
         //   We do NOT cancel it here — touch_finger_cache_bs at call site already set the
         //   correct flags from second-finger bindings.
 
-        // Java TouchpadGestureHandler.onFingerDown (touchpad-only):
-        //   secondFingerDoubleTapWaiting is checked FIRST (before global DOUBLE_TAP_WAITING)
-        //   and returns early — matching Java's early-return behavior.
-        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD && g_state.second_double_tap_waiting) {
+        // second-finger double-tap waiting check (before global DOUBLE_TAP_WAITING)
+        if (g_state.second_double_tap_waiting) {
             g_state.second_double_tap_waiting = false;
             g_state.second_tap_fallback_count = 0;
-            if (f->cached_has_active_double_tap) {
+            if (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag) {
                 if (f->cached_has_active_double_tap_drag) {
                     g_state.pending_second_double_count = 0;
                     for (int _i = 0; _i < f->bindings.double_tap_count && _i < 8; _i++)
@@ -229,18 +243,13 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
         // (unconditional, runs for ALL second-finger down events, not just double-tap waiting)
         release_held_actions(result);
 
-        // Java TouchpadGestureHandler.onFingerDown (touchpad-only): store single-tap as
-        // pendingSecondTapAction AFTER the double-tap checks (matching Java order).
-        // Guard with touch_mode because TouchscreenGestureHandler has no equivalent fields.
-        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD) {
-            g_state.second_tap_fallback_count = 0;
-            for (int _i = 0; _i < f->bindings.single_tap_count && _i < 8; _i++) {
-                g_state.second_tap_fallback[_i] = f->bindings.single_tap[_i];
-                g_state.second_tap_fallback_count++;
-            }
-            // Java: resetLongPressTimer() for normal second-finger path
-            f->down_time_ms = time_ms;
+        g_state.second_tap_fallback_count = 0;
+        for (int _i = 0; _i < f->bindings.single_tap_count && _i < 8; _i++) {
+            g_state.second_tap_fallback[_i] = f->bindings.single_tap[_i];
+            g_state.second_tap_fallback_count++;
         }
+        // Java: resetLongPressTimer() for normal second-finger path
+        f->down_time_ms = time_ms;
         f->state = GESTURE_STATE_TAP_WAITING;
         f->single_tap_hold_delay_ms = 0;
         f->single_tap_hold_timer = 0;
@@ -273,6 +282,7 @@ static inline void cleanup_main_finger(TouchFinger* f) {
     g_state.gesture_pending_deferred_double_count = 0;
     g_state.pending_second_double_count = 0;
     g_state.gesture_main_ptr_id = -1;
+    g_state.gesture_double_tap_consumed = false;
 }
 void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) {
     if (f->is_second_finger) {
@@ -285,8 +295,7 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time
         if (g_state.gesture_is_action_held) {
             g_state.second_double_tap_waiting = false;
             g_state.second_tap_fallback_count = 0;
-            g_state.pending_second_double_count = 0;
-        } else if (g_state.second_tap_fallback_count > 0 && f->cached_has_active_double_tap) {
+        } else if (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag) {
             g_state.second_double_tap_waiting = true;
             g_state.second_tap_fallback_time = time_ms;
         } else if (g_state.second_tap_fallback_count > 0) {
@@ -323,6 +332,15 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time
         case GESTURE_STATE_TAP_WAITING: {
             if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD
                 && !(f->travel_x < MAX_TAP_TRAVEL && f->travel_y < MAX_TAP_TRAVEL && (time_ms - f->down_time_ms) < TAP_MAX_TIME_MS)) {
+                if (g_state.gesture_double_tap_consumed) {
+                    g_state.gesture_double_tap_consumed = false;
+                    if (!g_state.gesture_is_action_held) {
+                        if (!f->cached_has_active_single_tap_drag)
+                            hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+                        else
+                            execute_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+                    }
+                }
                 release_held_actions(result);
                 g_state.gesture_double_tap_waiting = false;
                 cleanup_main_finger(f);
@@ -337,10 +355,18 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time
             break;
         }
         case GESTURE_STATE_LONG_PRESSING:
+            // Execute pending deferred double (from DT confirm) before cleanup
+            if (g_state.gesture_pending_deferred_double_count > 0) {
+                execute_actions(result, g_state.gesture_pending_deferred_double, g_state.gesture_pending_deferred_double_count);
+                g_state.gesture_pending_deferred_double_count = 0;
+            }
             // Java TouchpadGestureHandler: if isActionHeld, releaseHeldAction;
             // else if hasActiveLongPress, executeActions (fire-and-forget)
+            // When can_hold_long_press is false, the LP timer already fire-and-forgot L
+            // via execute_actions at gesture_tick:216. Re-firing here would duplicate
+            // the action — skip it.
             if (!g_state.gesture_is_action_held) {
-                if (f->cached_has_active_long_press)
+                if (f->cached_has_active_long_press && f->cached_can_hold_long_press)
                     execute_actions(result, f->bindings.long_press, f->bindings.long_press_count);
             }
             release_held_actions(result);

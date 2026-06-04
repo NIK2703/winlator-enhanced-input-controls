@@ -150,7 +150,6 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeInit(
     jclass configClass = env->GetObjectClass(config);
     c.touch_mode = (TouchMode)env->GetIntField(config, env->GetFieldID(configClass, "touchMode", "I"));
     c.input_mode = (InputMode)env->GetIntField(config, env->GetFieldID(configClass, "inputMode", "I"));
-    c.second_finger_mode = (SecondFingerMode)env->GetIntField(config, env->GetFieldID(configClass, "secondFingerMode", "I"));
     c.long_press_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "longPressTimeoutMs", "I"));
     c.double_tap_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "doubleTapTimeoutMs", "I"));
     c.single_tap_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "singleTapDelayMs", "I"));
@@ -441,10 +440,25 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeUpdateConfig(
     jclass configClass = env->GetObjectClass(config);
     c.touch_mode = (TouchMode)env->GetIntField(config, env->GetFieldID(configClass, "touchMode", "I"));
     c.input_mode = (InputMode)env->GetIntField(config, env->GetFieldID(configClass, "inputMode", "I"));
-    c.second_finger_mode = (SecondFingerMode)env->GetIntField(config, env->GetFieldID(configClass, "secondFingerMode", "I"));
     c.long_press_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "longPressTimeoutMs", "I"));
     c.double_tap_timeout_ms = env->GetIntField(config, env->GetFieldID(configClass, "doubleTapTimeoutMs", "I"));
     c.single_tap_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "singleTapDelayMs", "I"));
+    c.drag_threshold_px = env->GetIntField(config, env->GetFieldID(configClass, "dragThresholdPx", "I"));
+    c.double_tap_distance_px = env->GetIntField(config, env->GetFieldID(configClass, "doubleTapDistancePx", "I"));
+    c.binding_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "bindingDelayMs", "I"));
+    c.long_press_delay_ms = env->GetIntField(config, env->GetFieldID(configClass, "longPressDelayMs", "I"));
+    c.cursor_speed = env->GetIntField(config, env->GetFieldID(configClass, "cursorSpeed", "I"));
+    c.gesture_threshold_px = env->GetIntField(config, env->GetFieldID(configClass, "gestureThresholdPx", "I"));
+    c.cursor_acceleration_threshold = env->GetIntField(config, env->GetFieldID(configClass, "cursorAccelerationThreshold", "I"));
+    c.cursor_acceleration_factor = env->GetFloatField(config, env->GetFieldID(configClass, "cursorAccelerationFactor", "F"));
+    c.screen_w = env->GetIntField(config, env->GetFieldID(configClass, "screenW", "I"));
+    c.screen_h = env->GetIntField(config, env->GetFieldID(configClass, "screenH", "I"));
+    c.xform_scale_x = env->GetFloatField(config, env->GetFieldID(configClass, "xformScaleX", "F"));
+    if (c.xform_scale_x <= 0.0f) c.xform_scale_x = 1.0f;
+    c.xform_scale_y = env->GetFloatField(config, env->GetFieldID(configClass, "xformScaleY", "F"));
+    if (c.xform_scale_y <= 0.0f) c.xform_scale_y = 1.0f;
+    c.gesture_long_press_haptic = env->GetIntField(config, env->GetFieldID(configClass, "gestureLongPressHaptic", "I"));
+    c.haptic_enabled = env->GetBooleanField(config, env->GetFieldID(configClass, "hapticEnabled", "Z"));
 
     // Touchscreen gesture bindings (12 lists, each read individually)
     READ_GESTURE_LIST(env, config, configClass, "tsSingleTap",      c.ts_single_tap,      c.ts_single_tap_count);
