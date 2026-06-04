@@ -45,7 +45,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private List<Binding> doubleTapDragAction = new ArrayList<>();
     private List<Binding> singleTap2ndFingerDragAction = new ArrayList<>();
     private List<Binding> doubleTap2ndFingerDragAction = new ArrayList<>();
-    private int doubleTapTimeout = 150;
+    private int doubleTapTimeout = 300;
     private int longPressTimeout = 200;
     private int bindingDelay;
     private int longPressDelay = 200;

@@ -398,6 +398,16 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
             
             check_start_drag(f, dx, dy, result);
         }
+
+        // TS second finger gesture move (e.g. post-double-tap drag)
+        if (g_state.gesture_second_active
+            && f->ptr_id == g_state.gesture_second_ptr_id
+            && f->ptr_id != g_state.gesture_main_ptr_id) {
+            float dx = x - f->down_x;
+            float dy = y - f->down_y;
+            if (f->state != GESTURE_STATE_DRAGGING)
+                check_start_drag(f, dx, dy, result);
+        }
     }
 
     g_state.ptr_x = x;

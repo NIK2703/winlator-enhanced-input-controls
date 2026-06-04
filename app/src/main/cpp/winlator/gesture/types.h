@@ -26,7 +26,7 @@ static inline GestureBindingSet gesture_build_binding_set(const FingerBindings* 
     s.has_active_long_press_drag = fb->long_press_drag_count > 0;
     s.has_active_double_tap_drag = fb->double_tap_drag_count > 0;
     s.can_hold_long_press = false;
-    if (s.has_active_long_press && !s.has_active_long_press_drag && !s.has_active_single_tap_drag) {
+    if (s.has_active_long_press) {
         int t = fb->long_press[0].type;
         bool has_non_holdable = (t == BINDING_MOUSE_SCROLL_UP || t == BINDING_MOUSE_SCROLL_DOWN
                               || (t >= BINDING_MOUSE_MOVE_LEFT && t <= BINDING_MOUSE_MOVE_DOWN));
@@ -37,10 +37,9 @@ static inline GestureBindingSet gesture_build_binding_set(const FingerBindings* 
 }
 
 // Gesture handler tick (processes long-press, single-tap-hold, double-tap, second-finger timeouts)
-// Called from touch_processor_tick(); mirrors GestureHandler.onLongPressTimer/onDoubleTapTimer
 void gesture_tick(uint64_t time_ms, TouchActionResult* result);
 
-// Gesture handler state machine (mirrors GestureHandler.java)
+// Gesture handler state machine
 void on_drag_start(TouchFinger* f);
 bool gesture_is_within_tap_distance(float x, float y);
 void gesture_cancel_double_tap_wait(TouchActionResult* result);

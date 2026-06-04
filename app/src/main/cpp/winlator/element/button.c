@@ -45,8 +45,13 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
                 // Java: does NOT release primary binding on gesture trigger
                 if (e->button_gesture_haptic > 0)
                     add_action(result, ACT_HAPTIC, e->button_gesture_haptic, 0, 0);
+                // Press modifier bindings first (held for entire sequence)
                 for (int k = 0; k < e->element_gesture_count; k++)
-                    press_binding(result, &e->element_gesture[k], true);
+                    if (is_modifier_binding(&e->element_gesture[k]))
+                        press_binding(result, &e->element_gesture[k], true);
+                for (int k = 0; k < e->element_gesture_count; k++)
+                    if (!is_modifier_binding(&e->element_gesture[k]))
+                        press_binding(result, &e->element_gesture[k], true);
                 return;
             }
         }
@@ -85,15 +90,25 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
 
     if (e->gesture_long_press_triggered) {
         // Java releaseHeldBindings: releases long-press bindings only (NOT primary)
+        // Release non-modifiers first, then modifiers last
         for (int k = e->element_long_press_count - 1; k >= 0; k--) {
-            if (e->element_long_press[k].type != BINDING_NONE)
+            if (e->element_long_press[k].type != BINDING_NONE && !is_modifier_binding(&e->element_long_press[k]))
+                release_binding(result, &e->element_long_press[k]);
+        }
+        for (int k = e->element_long_press_count - 1; k >= 0; k--) {
+            if (e->element_long_press[k].type != BINDING_NONE && is_modifier_binding(&e->element_long_press[k]))
                 release_binding(result, &e->element_long_press[k]);
         }
         e->gesture_long_press_triggered = false;
     } else if (e->gesture_swipe_triggered) {
         if (e->element_gesture_count > 0) {
+            // Release non-modifiers first, then modifiers last
             for (int k = e->element_gesture_count - 1; k >= 0; k--) {
-                if (e->element_gesture[k].type != BINDING_NONE)
+                if (e->element_gesture[k].type != BINDING_NONE && !is_modifier_binding(&e->element_gesture[k]))
+                    release_binding(result, &e->element_gesture[k]);
+            }
+            for (int k = e->element_gesture_count - 1; k >= 0; k--) {
+                if (e->element_gesture[k].type != BINDING_NONE && is_modifier_binding(&e->element_gesture[k]))
                     release_binding(result, &e->element_gesture[k]);
             }
         }

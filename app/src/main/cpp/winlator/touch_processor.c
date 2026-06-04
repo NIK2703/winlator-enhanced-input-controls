@@ -29,6 +29,17 @@ void touch_processor_update_config(const TouchProcessorConfig* config) {
     memcpy(&g_state.cfg, config, sizeof(TouchProcessorConfig));
     compute_gesture_caps(&g_state.cfg);
     g_state.cfg.bindings_generation++;
+    for (int i = 0; i < MAX_FINGERS; i++) {
+        TouchFinger* f = &g_state.fingers[i];
+        if (!f->active) continue;
+        FingerBindings* fb = &f->bindings;
+        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN)
+            COPY_FINGER_BINDINGS(fb, &g_state.cfg, ts)
+        else
+            COPY_FINGER_BINDINGS(fb, &g_state.cfg, tp)
+        f->bindings_generation = g_state.cfg.bindings_generation;
+        touch_finger_cache_bs(f);
+    }
 }
 
 void touch_processor_set_elements(const TouchElement* elements, int count) {
@@ -155,8 +166,13 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
             if (time_ms - e->down_time_ms >= g_state.cfg.long_press_delay_ms) {
                 e->gesture_long_press_triggered = true;
                 e->long_press_arm = false;
+                // Press modifier bindings first (held for entire sequence)
                 for (int k = 0; k < e->element_long_press_count; k++)
-                    press_binding(&result, &e->element_long_press[k], true);
+                    if (is_modifier_binding(&e->element_long_press[k]))
+                        press_binding(&result, &e->element_long_press[k], true);
+                for (int k = 0; k < e->element_long_press_count; k++)
+                    if (!is_modifier_binding(&e->element_long_press[k]))
+                        press_binding(&result, &e->element_long_press[k], true);
                 if (e->button_long_press_haptic > 0)
                     add_action(&result, ACT_HAPTIC, e->button_long_press_haptic, 0, 0);
             }

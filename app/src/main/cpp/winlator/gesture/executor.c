@@ -46,10 +46,16 @@ void release_held_actions(TouchActionResult* result) {
         if (!is_keyboard_binding(b))
             release_binding(result, b);
     }
-    // Pass 2: release keyboard bindings in forward order (mirrors Java releaseHeldAction)
+    // Pass 2: release non-modifier keyboard bindings first
     for (int i = 0; i < g_state.gesture_held_count; i++) {
         const TouchBinding* b = &g_state.gesture_held_actions[i];
-        if (is_keyboard_binding(b))
+        if (is_keyboard_binding(b) && !is_modifier_binding(b))
+            release_binding(result, b);
+    }
+    // Pass 3: release modifier keyboard bindings last (held for entire sequence)
+    for (int i = 0; i < g_state.gesture_held_count; i++) {
+        const TouchBinding* b = &g_state.gesture_held_actions[i];
+        if (is_modifier_binding(b))
             release_binding(result, b);
     }
     g_state.gesture_held_count = 0;

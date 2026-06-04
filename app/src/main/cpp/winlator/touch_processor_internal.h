@@ -40,6 +40,8 @@ typedef struct {
     int gesture_main_ptr_id;
     int gesture_second_ptr_id;
     bool gesture_second_active;
+    float gesture_second_main_ref_x;
+    float gesture_second_main_ref_y;
     bool gesture_post_double_tap_drag;
     bool gesture_double_tap_consumed;
     bool gesture_double_tap_waiting;
@@ -49,6 +51,8 @@ typedef struct {
     int gesture_pending_double_count;
     TouchBinding gesture_pending_deferred_double[8];
     int gesture_pending_deferred_double_count;
+    TouchBinding gesture_pending_deferred_long_press[8];
+    int gesture_pending_deferred_long_press_count;
     TouchBinding gesture_held_actions[16];
     int gesture_held_count;
     bool gesture_is_action_held;

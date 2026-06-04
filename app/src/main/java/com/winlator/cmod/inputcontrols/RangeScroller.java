@@ -49,7 +49,7 @@ public class RangeScroller {
                 isActionDown = true;
                 pressedIndex = getIndexByPosition(x, y);
                 scrolling = false;
-                currentOffset = 0;
+                currentOffset = -cScrollOffset;
                 scrollOffset = cScrollOffset;
                 lastPosition = element.getOrientation() == 0 ? x : y;
                 updateRangeIndex();

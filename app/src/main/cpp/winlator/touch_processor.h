@@ -188,6 +188,7 @@ typedef struct {
     bool cached_has_active_double_tap_drag;
     bool cached_can_hold_long_press;
     bool cached_has_long_press_timer;
+    bool cached_has_moved_beyond_threshold;
 } TouchFinger;
 
 typedef enum {

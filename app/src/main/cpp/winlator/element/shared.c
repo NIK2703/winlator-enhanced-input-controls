@@ -188,13 +188,21 @@ void release_element_bindings(TouchElement* e, TouchActionResult* result) {
     if (e->bindings[0].type != BINDING_NONE)
         release_binding(result, &e->bindings[0]);
     if (e->gesture_swipe_triggered) {
+        // Release non-modifiers first, then modifiers last
         for (int k = e->element_gesture_count - 1; k >= 0; k--)
-            if (e->element_gesture[k].type != BINDING_NONE)
+            if (e->element_gesture[k].type != BINDING_NONE && !is_modifier_binding(&e->element_gesture[k]))
+                release_binding(result, &e->element_gesture[k]);
+        for (int k = e->element_gesture_count - 1; k >= 0; k--)
+            if (e->element_gesture[k].type != BINDING_NONE && is_modifier_binding(&e->element_gesture[k]))
                 release_binding(result, &e->element_gesture[k]);
     }
     if (e->gesture_long_press_triggered) {
+        // Release non-modifiers first, then modifiers last
         for (int k = e->element_long_press_count - 1; k >= 0; k--)
-            if (e->element_long_press[k].type != BINDING_NONE)
+            if (e->element_long_press[k].type != BINDING_NONE && !is_modifier_binding(&e->element_long_press[k]))
+                release_binding(result, &e->element_long_press[k]);
+        for (int k = e->element_long_press_count - 1; k >= 0; k--)
+            if (e->element_long_press[k].type != BINDING_NONE && is_modifier_binding(&e->element_long_press[k]))
                 release_binding(result, &e->element_long_press[k]);
     }
     e->long_press_arm = false;
