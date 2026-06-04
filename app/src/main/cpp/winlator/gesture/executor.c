@@ -1,5 +1,4 @@
 #include "../touch_processor_internal.h"
-#include <android/log.h>
 
 #define MAX_HELD_ACTIONS 16
 
@@ -29,13 +28,11 @@ void add_action(TouchActionResult* r, ActionType type, int a0, int a1, int a2) {
 void release_held_actions(TouchActionResult* result) {
     if (!g_state.gesture_is_action_held) return;
     
-    __android_log_print(ANDROID_LOG_INFO, "Gesture", "RHEL release: held_count=%d passthru=%d", g_state.gesture_held_count, g_state.passthrough_active);
 
     // Java GestureActionExecutor.releaseHeldAction: if passthrough active, silently clear without emitting events
     if (g_state.passthrough_active) {
         g_state.gesture_held_count = 0;
         g_state.gesture_is_action_held = false;
-        __android_log_print(ANDROID_LOG_INFO, "Gesture", "RHEL passthrough skip");
         return;
     }
     // Pass 1: release non-keyboard bindings first (forward order)
@@ -71,7 +68,6 @@ bool is_modifier_binding(const TouchBinding* b) {
 }
 
 void hold_actions(TouchActionResult* result, const TouchBinding* actions, int count) {
-    __android_log_print(ANDROID_LOG_INFO, "Gesture", "HOLD enter: count=%d passthru=%d", count, g_state.passthrough_active);
     if (g_state.passthrough_active) return;
     
     release_held_actions(result);
@@ -120,14 +116,11 @@ void hold_actions(TouchActionResult* result, const TouchBinding* actions, int co
     }
     g_state.gesture_is_action_held = true;
     if (g_state.gesture_held_count > 0) {
-        __android_log_print(ANDROID_LOG_INFO, "Gesture", "HOLD done: held_count=%d first_type=%d fkey=%d", g_state.gesture_held_count, g_state.gesture_held_actions[0].type, g_state.gesture_held_actions[0].keycode);
     } else {
-        __android_log_print(ANDROID_LOG_INFO, "Gesture", "HOLD done: held_count=0");
     }
 }
 
 void execute_actions(TouchActionResult* result, const TouchBinding* actions, int count) {
-    __android_log_print(ANDROID_LOG_INFO, "Gesture", "EXEC enter: count=%d passthru=%d", count, g_state.passthrough_active);
     if (g_state.passthrough_active) return;
     
     int binding_delay = g_state.cfg.binding_delay_ms;
@@ -177,7 +170,6 @@ void execute_actions(TouchActionResult* result, const TouchBinding* actions, int
             add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0);
     }
     if (count > 0) {
-        __android_log_print(ANDROID_LOG_INFO, "Gesture", "EXEC done: count=%d first_type=%d fkey=%d", count, actions[0].type, actions[0].keycode);
     }
 }
 

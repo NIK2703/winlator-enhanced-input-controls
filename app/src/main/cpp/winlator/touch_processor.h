@@ -99,6 +99,7 @@ typedef struct {
     int button_gesture_haptic;
     int gesture_swipe_direction;
     bool gesture_swipe_triggered;
+    bool gesture_timer_armed;
 
     bool visual_active;
     float visual_x;

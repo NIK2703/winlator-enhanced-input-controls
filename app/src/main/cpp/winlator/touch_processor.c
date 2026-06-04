@@ -1,6 +1,5 @@
 #include "touch_processor_internal.h"
 #include "touch_processor_activation.h"
-#include <android/log.h>
 
 TouchProcessorState g_state;
 
@@ -24,25 +23,12 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     if (g_state.cfg.xform_scale_y <= 0.0f) g_state.cfg.xform_scale_y = 1.0f;
     compute_gesture_caps(&g_state.cfg);
     g_state.cfg.bindings_generation = 1;
-
-    __android_log_print(ANDROID_LOG_INFO, "Gesture", "INIT mode=%d caps_has_gesture=%d caps_has_drag=%d caps_dbl=%d",
-        g_state.cfg.touch_mode, g_state.cfg.caps_has_gesture_bindings, g_state.cfg.caps_has_drag_bindings, g_state.cfg.caps_has_double_tap);
-    __android_log_print(ANDROID_LOG_INFO, "Gesture", "INIT TP 2nd: s_tap=%d s_drag=%d d_tap=%d d_drag=%d sim_ts=%d",
-        g_state.cfg.tp_single_2nd_count, g_state.cfg.tp_single_drag_2nd_count,
-        g_state.cfg.tp_double_2nd_count, g_state.cfg.tp_double_drag_2nd_count,
-        g_state.sim_touch_screen);
 }
 
 void touch_processor_update_config(const TouchProcessorConfig* config) {
     memcpy(&g_state.cfg, config, sizeof(TouchProcessorConfig));
     compute_gesture_caps(&g_state.cfg);
     g_state.cfg.bindings_generation++;
-
-    __android_log_print(ANDROID_LOG_INFO, "Gesture", "UPDCFG caps_has_gesture=%d caps_has_drag=%d",
-        g_state.cfg.caps_has_gesture_bindings, g_state.cfg.caps_has_drag_bindings);
-    __android_log_print(ANDROID_LOG_INFO, "Gesture", "UPDCFG TP 2nd: s_tap=%d s_drag=%d d_tap=%d d_drag=%d",
-        g_state.cfg.tp_single_2nd_count, g_state.cfg.tp_single_drag_2nd_count,
-        g_state.cfg.tp_double_2nd_count, g_state.cfg.tp_double_drag_2nd_count);
 
     for (int i = 0; i < MAX_FINGERS; i++) {
         TouchFinger* f = &g_state.fingers[i];
@@ -199,6 +185,26 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
             }
         }
 
+        // Element gesture timer (50ms for gesture-only buttons without primary bindings)
+        if (e->type == ELEM_BUTTON && e->current_ptr_id >= 0
+            && e->gesture_timer_armed && !e->gesture_swipe_triggered
+            && !e->gesture_long_press_triggered
+            && e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE)
+        {
+            if (time_ms - e->down_time_ms >= GESTURE_TIMER_MS) {
+                e->gesture_swipe_triggered = true;
+                e->gesture_timer_armed = false;
+                for (int k = 0; k < e->element_gesture_count; k++)
+                    if (is_modifier_binding(&e->element_gesture[k]))
+                        press_binding(&result, &e->element_gesture[k], true);
+                for (int k = 0; k < e->element_gesture_count; k++)
+                    if (!is_modifier_binding(&e->element_gesture[k]))
+                        press_binding(&result, &e->element_gesture[k], true);
+                if (e->button_gesture_haptic > 0)
+                    add_action(&result, ACT_HAPTIC, e->button_gesture_haptic, 0, 0);
+            }
+        }
+
         // Range button (both hold timer and deferred release in one pass)
         if (e->type != ELEM_RANGE_BUTTON) continue;
         int kc = range_keycode(e->range_ordinal, e->range_index);
@@ -240,7 +246,6 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
 
     // Process simTouchScreen delayed press (matching Java clickDelay Runnable, 50ms CLICK_DELAYED_TIME)
     if (g_state.sim_click_press_time > 0 && time_ms >= g_state.sim_click_press_time) {
-        __android_log_print(ANDROID_LOG_INFO, "Gesture", "LCLICK sim_press: sim_cont=%d", g_state.sim_continue_click);
         if (g_state.sim_continue_click) {
             TouchFinger* sf = find_finger(g_state.sim_click_ptr_id);
             if (sf) {

@@ -43,7 +43,7 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
             }
             if (!already) {
                 handle_element_down(btn, f->ptr_id, x, y, time_ms, result);
-                if (btn->current_ptr_id == f->ptr_id && !btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER)
+                if (btn->current_ptr_id == f->ptr_id && tb->count < MAX_TRACKED_PER_POINTER)
                     tb->element_indices[tb->count++] = (int)(btn - g_state.elements);
             }
             if (btn->activation_mode == ACTIVATION_HOVER)
@@ -274,6 +274,43 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
         }
     }
 
+    // Toggle switch slide-over: handle toggles under finger regardless of tb->count
+    // (works even when finger starts on empty space)
+    {
+        TouchElement* toggle_btn = hit_test_element(x, y);
+        if (toggle_btn && toggle_btn->type == ELEM_BUTTON && toggle_btn->toggle_switch) {
+            ActivationMode mode = g_state.element_count > 0 ?
+                g_state.elements[0].activation_mode : ACTIVATION_LOCK;
+            if (mode == ACTIVATION_TRACK || mode == ACTIVATION_HOVER) {
+                int pi = f->ptr_id % MAX_FINGERS;
+                TrackedButtons* tb = &g_state.tracked[pi];
+                bool already_tracked = false;
+                for (int j = 0; j < tb->count; j++) {
+                    if (tb->element_indices[j] == (int)(toggle_btn - g_state.elements)) { already_tracked = true; break; }
+                }
+                if (!already_tracked && !toggle_btn->gesture_timer_armed) {
+                    if (toggle_btn->selected) {
+                        if (toggle_btn->bindings[0].type != BINDING_NONE)
+                            release_binding(result, &toggle_btn->bindings[0]);
+                        toggle_btn->selected = false;
+                        toggle_btn->visual_active = false;
+                    } else {
+                        if (toggle_btn->bindings[0].type != BINDING_NONE)
+                            press_binding(result, &toggle_btn->bindings[0], true);
+                        toggle_btn->selected = true;
+                        toggle_btn->visual_active = true;
+                    }
+                    toggle_btn->gesture_timer_armed = true;
+                }
+            }
+        } else {
+            // Finger not on a toggle — reset gates so re-entry can toggle again
+            for (int i = 0; i < g_state.element_count; i++)
+                if (g_state.elements[i].toggle_switch)
+                    g_state.elements[i].gesture_timer_armed = false;
+        }
+    }
+
     // TRACK/HOVER: tracked button processing runs every move (matches Java handleMoveByMode)
     {
         int pi = f->ptr_id % MAX_FINGERS;
@@ -285,24 +322,26 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                 if (first->type == ELEM_BUTTON) {
                     TouchElement* new_btn = hit_test_element(x, y);
                     if (new_btn && new_btn->type == ELEM_BUTTON) {
-                        bool already = false;
-                        for (int j = 0; j < tb->count; j++) {
-                            if (tb->element_indices[j] == (int)(new_btn - g_state.elements)) { already = true; break; }
-                        }
-                        if (!already) {
-                            if (new_btn->current_ptr_id == -1) {
-                                if (tb->count == 0) {
-                                    handle_element_down(new_btn, f->ptr_id, x, y, time_ms, result);
-                                } else {
-                                    if (new_btn->bindings[0].type != BINDING_NONE) {
-                                        press_binding(result, &new_btn->bindings[0], true);
-                                        new_btn->visual_active = true;
+                        if (!new_btn->toggle_switch) {
+                            bool already = false;
+                            for (int j = 0; j < tb->count; j++) {
+                                if (tb->element_indices[j] == (int)(new_btn - g_state.elements)) { already = true; break; }
+                            }
+                            if (!already) {
+                                if (new_btn->current_ptr_id == -1) {
+                                    if (tb->count == 0) {
+                                        handle_element_down(new_btn, f->ptr_id, x, y, time_ms, result);
+                                    } else {
+                                        if (new_btn->bindings[0].type != BINDING_NONE) {
+                                            press_binding(result, &new_btn->bindings[0], true);
+                                            new_btn->visual_active = true;
+                                        }
                                     }
                                 }
-                            }
-                            if (!new_btn->passthrough_touch && tb->count < MAX_TRACKED_PER_POINTER) {
-                                if (tb->count == 1) first->long_press_arm = false;
-                                tb->element_indices[tb->count++] = (int)(new_btn - g_state.elements);
+                                if (tb->count < MAX_TRACKED_PER_POINTER) {
+                                    if (tb->count == 1) first->long_press_arm = false;
+                                    tb->element_indices[tb->count++] = (int)(new_btn - g_state.elements);
+                                }
                             }
                         }
                     }
@@ -315,13 +354,17 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                         if (prev && (!curr || curr != prev))
                             release_element_bindings(prev, result);
                         if (curr && curr->type == ELEM_BUTTON && curr != prev) {
-                            if (curr->current_ptr_id == -1) {
-                                if (curr->bindings[0].type != BINDING_NONE) {
-                                    press_binding(result, &curr->bindings[0], true);
-                                    curr->visual_active = true;
+                            if (curr->toggle_switch) {
+                                g_state.hovered_element_per_ptr[pi] = -1;
+                            } else {
+                                if (curr->current_ptr_id == -1) {
+                                    if (curr->bindings[0].type != BINDING_NONE) {
+                                        press_binding(result, &curr->bindings[0], true);
+                                        curr->visual_active = true;
+                                    }
                                 }
+                                g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
                             }
-                            g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
                         } else if (!curr || curr->type != ELEM_BUTTON) {
                             g_state.hovered_element_per_ptr[pi] = -1;
                         }

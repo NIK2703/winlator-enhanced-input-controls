@@ -162,7 +162,7 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     e->gesture_long_press_triggered = false;
     e->gesture_swipe_direction = -1;
     e->long_press_arm = false;
-    
+    e->gesture_timer_armed = false;
 
     int idx = e->type;
     if (idx >= 0 && idx < (int)(sizeof(element_down_handlers)/sizeof(element_down_handlers[0])) && element_down_handlers[idx])
@@ -208,6 +208,7 @@ void release_element_bindings(TouchElement* e, TouchActionResult* result) {
     e->long_press_arm = false;
     e->gesture_long_press_triggered = false;
     e->gesture_swipe_triggered = false;
+    e->gesture_timer_armed = false;
     e->current_ptr_id = -1;
     e->engaged = false;
     e->visual_active = false;

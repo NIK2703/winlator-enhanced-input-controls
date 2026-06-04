@@ -19,10 +19,17 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     }
 
     // Java else: pressBindings(bindings.get(0))
-    if (e->bindings[0].type != BINDING_NONE)
+    if (e->bindings[0].type != BINDING_NONE) {
         press_binding(result, &e->bindings[0], true);
-    else if (!e->toggle_switch)
-        e->visual_active = false;
+    } else if (!e->toggle_switch) {
+        // Gesture-only button (no primary, no LP): arm gesture timer, keep visual active
+        bool has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
+        if (has_gesture) {
+            e->gesture_timer_armed = true;
+        } else {
+            e->visual_active = false;
+        }
+    }
 }
 
 void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
@@ -60,13 +67,17 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
     if (e->long_press_arm && !point_in_element(x, y, e)) {
         e->long_press_arm = false;
     }
+    if (e->gesture_timer_armed && !point_in_element(x, y, e)) {
+        e->gesture_timer_armed = false;
+    }
 
     // Suppress visual for NONE-binding buttons (no single-tap action) when no gesture is active.
     // Matches element_button_down which sets visual_active = false for the same condition.
     if (e->bindings[0].type == BINDING_NONE
         && !e->toggle_switch
         && !e->gesture_swipe_triggered
-        && !e->gesture_long_press_triggered) {
+        && !e->gesture_long_press_triggered
+        && !e->gesture_timer_armed) {
         e->visual_active = false;
     }
 }
@@ -129,4 +140,5 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     e->engaged = false;
     e->current_ptr_id = -1;
     e->visual_active = false;
+    e->gesture_timer_armed = false;
 }

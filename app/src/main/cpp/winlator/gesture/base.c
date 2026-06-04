@@ -1,7 +1,5 @@
 #include "../touch_processor_internal.h"
-#include <android/log.h>
 
-#define LOG_TAG "Gesture"
 
 // ---- helpers ----
 void on_drag_start(TouchFinger* f) {
@@ -39,13 +37,9 @@ void gesture_cancel_double_tap_wait(TouchActionResult* result) {
 // ---- check_start_drag ----
 void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* result) {
     if (f->state != GESTURE_STATE_TAP_WAITING && f->state != GESTURE_STATE_LONG_PRESSING) {
-        __android_log_print(ANDROID_LOG_INFO, "Gesture", "DRAG skip: state=%d", f->state);
         return;
     }
     if (fabsf(dx) <= g_state.cfg.drag_threshold_px && fabsf(dy) <= g_state.cfg.drag_threshold_px) return;
-
-    __android_log_print(ANDROID_LOG_INFO, "Gesture", "DRAG enter: ptr=%d is_2nd=%d post_dtd=%d gsa=%d state=%d",
-        f->ptr_id, f->is_second_finger, g_state.gesture_post_double_tap_drag, g_state.gesture_second_active, f->state);
 
     g_state.gesture_handler_active = false;
     const FingerBindings* fb = &f->bindings;
@@ -126,7 +120,6 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
             }
         }
     } else if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
-        if (!g_state.cfg.caps_has_drag_bindings) { __android_log_print(ANDROID_LOG_INFO, "Gesture", "CSD TS: no drag bindings"); return; }
         // Only use 2nd-finger bindings when the second finger itself is moving,
         // not when the main finger moves while a second finger happens to be present.
         // Post-double-tap drag (handled above) is the only context where the main
@@ -135,7 +128,6 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         // Dd (double-tap-drag) is exclusive to the SDTW->post_dtd main-finger drag path,
         // and must not set gesture_is_action_held here or it will block SDTW on lift.
         if (g_state.gesture_second_active && f->is_second_finger) {
-            __android_log_print(ANDROID_LOG_INFO, "Gesture", "CSD TS SF: ts_sd_2nd=%d", g_state.cfg.ts_single_drag_2nd_count);
             if (g_state.cfg.ts_single_drag_2nd_count > 0) {
                 drag_binding = g_state.cfg.ts_single_drag_2nd; drag_count = g_state.cfg.ts_single_drag_2nd_count;
             } else {
@@ -178,11 +170,6 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         }
     }
 
-    if (drag_binding) {
-        __android_log_print(ANDROID_LOG_INFO, "Gesture", "DRAG bind: ptr=%d type=%d count=%d same=%d held=%d",
-            f->ptr_id, drag_binding[0].type, drag_count, same_as_held, g_state.gesture_is_action_held);
-    }
-
     if (!same_as_held) {
         release_held_actions(result);
         hold_actions(result, drag_binding, drag_count);
@@ -193,8 +180,6 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
 
     on_drag_start(f);
     f->state = GESTURE_STATE_DRAGGING;
-    __android_log_print(ANDROID_LOG_INFO, "Gesture", "DRAG done: ptr=%d state=DRAGGING gha=%d held=%d",
-        f->ptr_id, g_state.gesture_handler_active, g_state.gesture_is_action_held);
 }
 
 // ---- gesture_tick ----
@@ -274,7 +259,6 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
     if (g_state.second_double_tap_waiting
         && time_ms - g_state.second_tap_fallback_time >= g_state.cfg.double_tap_timeout_ms) {
         g_state.second_double_tap_waiting = false;
-        __android_log_print(ANDROID_LOG_INFO, "Gesture", "STATE sdtw=0 SDTW_timeout");
         if (g_state.second_tap_fallback_count > 0) {
             execute_actions(result, g_state.second_tap_fallback, g_state.second_tap_fallback_count);
             g_state.second_tap_fallback_count = 0;
@@ -363,7 +347,6 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) 
 
     // Path 1: deferred D from DT confirm (DT deferred when Dd set; fire on finger-up only if no drag)
     if (g_state.gesture_pending_deferred_double_count > 0) {
-        __android_log_print(ANDROID_LOG_INFO, "Gesture", "tap_up path=1 count=%d consumed=%d", g_state.gesture_pending_deferred_double_count, g_state.gesture_double_tap_consumed);
         execute_actions(result, g_state.gesture_pending_deferred_double, g_state.gesture_pending_deferred_double_count);
         g_state.gesture_pending_deferred_double_count = 0;
         g_state.gesture_deferred_tap_count = 0;
@@ -375,7 +358,6 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) 
 
     // Path 2: post_double_tap_drag cleanup
     if (g_state.gesture_post_double_tap_drag) {
-        __android_log_print(ANDROID_LOG_INFO, "Gesture", "tap_up path=2 consumed=%d", g_state.gesture_double_tap_consumed);
         g_state.gesture_deferred_tap_count = 0;
         g_state.gesture_pending_deferred_double_count = 0;
         g_state.gesture_post_double_tap_drag = false;
@@ -386,7 +368,6 @@ void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms) 
 
     // Path 3: double_tap_consumed (3+ tap)
     if (g_state.gesture_double_tap_consumed) {
-        __android_log_print(ANDROID_LOG_INFO, "Gesture", "tap_up path=3");
         g_state.gesture_double_tap_consumed = false;
         if (!g_state.gesture_is_action_held) {
             if (!active_has_single_tap_drag)
