@@ -27,11 +27,6 @@ import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XServer;
 
 public class TouchpadView extends View {
-    public static final byte MAX_TAP_TRAVEL_DISTANCE = 10;
-    public static final short MAX_TAP_MILLISECONDS = 200;
-    public static final float CURSOR_ACCELERATION = 1.25f;
-    public static final byte CURSOR_ACCELERATION_THRESHOLD = 6;
-
     private final XServer xServer;
     private NativeTouchProcessor nativeTouchProcessor;
     private InputControlsView inputControlsView;
@@ -44,8 +39,6 @@ public class TouchpadView extends View {
     private final float[] xform = XForm.getInstance();
     private boolean pointerButtonLeftEnabled = true;
     private boolean pointerButtonRightEnabled = true;
-    private int lastTransformedX;
-    private int lastTransformedY;
 
     private Handler timeoutHandler;
     private Runnable hideControlsRunnable;
@@ -119,23 +112,6 @@ public class TouchpadView extends View {
 
     public InputMode getCurrentInputMode() {
         return currentProfile != null ? currentProfile.getInputMode() : InputMode.ABSOLUTE;
-    }
-
-    public void movePointer(float screenX, float screenY) {
-        float[] transformed = XForm.transformPoint(xform, screenX, screenY);
-        int tx = (int)transformed[0];
-        int ty = (int)transformed[1];
-
-        if (getCurrentInputMode() == InputMode.RELATIVE) {
-            int dx = tx - lastTransformedX;
-            int dy = ty - lastTransformedY;
-            lastTransformedX = tx;
-            lastTransformedY = ty;
-            xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, dx, dy, 0);
-            updateVisibleRelativeCursor(tx, ty);
-        } else {
-            xServer.injectPointerMove(tx, ty);
-        }
     }
 
     @Override
@@ -334,22 +310,6 @@ public class TouchpadView extends View {
             }
         }
         return handled;
-    }
-
-    private final float[] deltaResult = new float[2];
-
-    public float[] computeDeltaPoint(float lastX, float lastY, float x, float y) {
-        XForm.transformPoint(xform, lastX, lastY, deltaResult);
-        lastX = deltaResult[0];
-        lastY = deltaResult[1];
-
-        XForm.transformPoint(xform, x, y, deltaResult);
-        x = deltaResult[0];
-        y = deltaResult[1];
-
-        deltaResult[0] = x - lastX;
-        deltaResult[1] = y - lastY;
-        return deltaResult;
     }
 
     private StateListDrawable createTransparentBg() {

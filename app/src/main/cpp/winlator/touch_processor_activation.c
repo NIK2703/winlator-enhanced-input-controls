@@ -94,27 +94,32 @@ bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, Touc
             // Button at point: handle with tracking
             TouchElement* btn = hit_test_element(x, y);
             if (btn && btn->type == ELEM_BUTTON) {
+                // In track/hover mode, skip OFF toggle switches to prevent accidental activation
+                bool skip_toggle = btn->toggle_switch && !btn->selected;
+
                 if (!btn->passthrough_touch) {
                     TrackedButtons* tb = &g_state.tracked[ptr_id % MAX_FINGERS];
                     if (tb->ptr_id != ptr_id) {
                         tb->ptr_id = ptr_id;
                         tb->count = 0;
                     }
-                    bool already = false;
-                    for (int j = 0; j < tb->count; j++) {
-                        if (tb->element_indices[j] == (int)(btn - g_state.elements)) {
-                            already = true;
-                            break;
+                    if (!skip_toggle) {
+                        bool already = false;
+                        for (int j = 0; j < tb->count; j++) {
+                            if (tb->element_indices[j] == (int)(btn - g_state.elements)) {
+                                already = true;
+                                break;
+                            }
+                        }
+                        if (!already && tb->count < MAX_TRACKED_PER_POINTER) {
+                            tb->element_indices[tb->count++] = (int)(btn - g_state.elements);
+                            handle_element_down(btn, ptr_id, x, y, time_ms, result);
                         }
                     }
-                    if (!already && tb->count < MAX_TRACKED_PER_POINTER) {
-                        tb->element_indices[tb->count++] = (int)(btn - g_state.elements);
-                        handle_element_down(btn, ptr_id, x, y, time_ms, result);
-                    }
-                } else {
+                } else if (!skip_toggle) {
                     handle_element_down(btn, ptr_id, x, y, time_ms, result);
                 }
-                if (mode == ACTIVATION_HOVER) {
+                if (mode == ACTIVATION_HOVER && !skip_toggle) {
                     g_state.hovered_element_per_ptr[ptr_id % MAX_FINGERS] = (int)(btn - g_state.elements);
                 }
                 if (!btn->passthrough_touch) {
@@ -154,20 +159,25 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
             if (tb->ptr_id == ptr_id && tb->count > 0) {
                 TouchElement* btn = hit_test_element(x, y);
                 if (btn && btn->type == ELEM_BUTTON && !btn->passthrough_touch) {
-                    bool already = false;
-                    for (int j = 0; j < tb->count; j++) {
-                        if (tb->element_indices[j] == (int)(btn - g_state.elements)) {
-                            already = true;
-                            break;
+                    // In track mode, skip OFF toggle switches
+                    if (btn->toggle_switch && !btn->selected) {
+                        // Do not track OFF toggles
+                    } else {
+                        bool already = false;
+                        for (int j = 0; j < tb->count; j++) {
+                            if (tb->element_indices[j] == (int)(btn - g_state.elements)) {
+                                already = true;
+                                break;
+                            }
                         }
-                    }
-                    if (!already && tb->count < MAX_TRACKED_PER_POINTER) {
-                        tb->element_indices[tb->count++] = (int)(btn - g_state.elements);
-                        handle_element_down(btn, ptr_id, x, y, time_ms, result);
-                        if (tb->count == 2) {
-                            TouchElement* first = &g_state.elements[tb->element_indices[0]];
-                            first->long_press_arm = false;
-                            first->gesture_long_press_triggered = false;
+                        if (!already && tb->count < MAX_TRACKED_PER_POINTER) {
+                            tb->element_indices[tb->count++] = (int)(btn - g_state.elements);
+                            handle_element_down(btn, ptr_id, x, y, time_ms, result);
+                            if (tb->count == 2) {
+                                TouchElement* first = &g_state.elements[tb->element_indices[0]];
+                                first->long_press_arm = false;
+                                first->gesture_long_press_triggered = false;
+                            }
                         }
                     }
                 }

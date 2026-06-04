@@ -112,9 +112,6 @@ public class ControlElement {
     private boolean toggleSwitch = false;
     private boolean passthroughTouch;
     private float opacity = -1f;
-    private float gestureDownX;
-    private float gestureDownY;
-    private int currentPointerId = -1;
     private final Rect boundingBox = new Rect();
     private boolean[] states = new boolean[4];
     private boolean boundingBoxNeedsUpdate = true;
@@ -646,7 +643,7 @@ public class ControlElement {
     }
 
     public boolean isEngaged() {
-        return currentPointerId != -1 || active || (toggleSwitch && selected);
+        return active || (toggleSwitch && selected);
     }
 
     public void invalidateElementCache() {
@@ -853,7 +850,6 @@ public class ControlElement {
             Canvas c = new Canvas(cacheCombined);
             c.translate(-box.left + pad, -box.top + pad);
             boolean savedSelected = selected;
-            int savedPointerId = currentPointerId;
             boolean savedActive = active;
             boolean[] savedStates = scratchStates;
             scratchStates[0] = states[0];
@@ -861,7 +857,6 @@ public class ControlElement {
             scratchStates[2] = states[2];
             scratchStates[3] = states[3];
             selected = false;
-            currentPointerId = -1;
             active = false;
             Arrays.fill(states, false);
             inputControlsView.setCacheAlphaOverride(1.0f);
@@ -870,7 +865,6 @@ public class ControlElement {
             buildingCache = false;
             inputControlsView.setCacheAlphaOverride(-1);
             selected = savedSelected;
-            currentPointerId = savedPointerId;
             active = savedActive;
             states[0] = savedStates[0];
             states[1] = savedStates[1];

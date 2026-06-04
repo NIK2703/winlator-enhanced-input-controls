@@ -178,12 +178,7 @@ public class InputControlsManager {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         int defaultProfileId = preferences.getInt("default_profile_id", -1);
         if (defaultProfileId == profile.id) {
-            for (ControlsProfile p : profiles) {
-                if (p.getName().equals("Default")) {
-                    preferences.edit().putInt("default_profile_id", p.id).apply();
-                    break;
-                }
-            }
+            preferences.edit().putInt("default_profile_id", -1).apply();
         }
     }
 

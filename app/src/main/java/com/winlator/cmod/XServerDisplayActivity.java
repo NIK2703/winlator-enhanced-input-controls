@@ -1007,7 +1007,6 @@ if (enableLogs) {
                 for (ControlsProfile p : inputControlsManager.getProfiles()) {
                     if (p.getName().equals("Default")) {
                         profile = p;
-                        preferences.edit().putInt("default_profile_id", p.id).apply();
                         break;
                     }
                 }
@@ -1508,7 +1507,6 @@ private void applySidebarSettings() {
             if (position >= 0 && position < profiles.size()) {
                 ControlsProfile selectedProfile = profiles.get(position);
                 showInputControls(selectedProfile);
-                editor.putInt("default_profile_id", selectedProfile.id);
             }
             editor.apply();
 

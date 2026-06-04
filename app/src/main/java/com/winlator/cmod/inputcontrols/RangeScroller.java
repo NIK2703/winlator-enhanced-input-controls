@@ -3,7 +3,6 @@ package com.winlator.cmod.inputcontrols;
 import android.graphics.Rect;
 
 import com.winlator.cmod.widget.InputControlsView;
-import com.winlator.cmod.widget.TouchpadView;
 
 public class RangeScroller {
     private final InputControlsView inputControlsView;
@@ -56,7 +55,7 @@ public class RangeScroller {
             } else {
                 float position = element.getOrientation() == 0 ? x : y;
                 float deltaPosition = position - lastPosition;
-                if (Math.abs(deltaPosition) >= TouchpadView.MAX_TAP_TRAVEL_DISTANCE) {
+                if (Math.abs(deltaPosition) >= 10) {
                     if (!scrolling) {
                         scrolling = true;
                         pressedIndex = -1;
