@@ -3,11 +3,13 @@
 #define RANGE_SCROLL_THRESHOLD 10
 
 static void range_compute_sizes(const TouchElement* e, float* out_cw, float* out_ch, float* out_element_size) {
-    float hs = g_state.snapping_size;
+    TouchProcessorState* s = &g_state;
+    float hs = s->snapping_size;
     *out_cw = hs * (e->range_binding_count * 2) * e->scale;
     *out_ch = hs * 2.0f * e->scale;
     if (e->range_orientation == 1) SWAP_F(*out_cw, *out_ch);
-    *out_element_size = (e->range_orientation == 0 ? *out_cw * 2.0f : *out_ch * 2.0f) / (float)e->range_binding_count;
+    int rbc = e->range_binding_count > 0 ? e->range_binding_count : 1;
+    *out_element_size = (e->range_orientation == 0 ? *out_cw * 2.0f : *out_ch * 2.0f) / (float)rbc;
 }
 
 int range_keycode(int ordinal, int index) {
@@ -51,6 +53,7 @@ void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, ui
 }
 
 void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    TouchProcessorState* s = &g_state;
     float pos = e->range_orientation == 0 ? x : y;
     float delta = pos - e->range_last_position;
 
@@ -68,14 +71,15 @@ void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_
         e->range_scroll_offset = -fmodf(e->range_current_offset, scroll_size);
         if (e->range_scroll_offset < 0) e->range_scroll_offset += scroll_size;
         e->range_last_position = pos;
-        g_state.visual_state_dirty = true;
+        s->visual_state_dirty = true;
     }
 }
 
 void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     (void)x; (void)y;
+    TouchProcessorState* s = &g_state;
     e->visual_active = false;
-    g_state.visual_state_dirty = true;
+    s->visual_state_dirty = true;
     e->engaged = false;
     e->current_ptr_id = -1;
 

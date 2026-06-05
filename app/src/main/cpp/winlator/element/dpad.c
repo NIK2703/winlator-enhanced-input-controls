@@ -14,9 +14,11 @@ static void dpad_normalize(float dx, float dy, float radius, float* out_nx, floa
 }
 
 static void dpad_update(TouchElement* e, float x, float y, TouchActionResult* result) {
-    float radius = g_state.snapping_size * 7.0f * e->scale;
+    TouchProcessorState* s = &g_state;
+    float radius = s->snapping_size * 7.0f * e->scale;
     float dx = x - e->x;
     float dy = y - e->y;
+    if (fabsf(dx) < 0.0001f && fabsf(dy) < 0.0001f) return;
     float nx, ny;
     dpad_normalize(dx, dy, radius, &nx, &ny);
     element_set_petals(e, nx, ny, DPAD_DEAD_ZONE, result);

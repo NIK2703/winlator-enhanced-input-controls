@@ -36,7 +36,7 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
     TouchElement* btn = hit_test_element(x, y);
     if (btn && btn->type == ELEM_BUTTON) {
         if (btn->activation_mode == ACTIVATION_TRACK || btn->activation_mode == ACTIVATION_HOVER) {
-            TrackedButtons* tb = &g_state.tracked[f->ptr_id % MAX_FINGERS];
+            TrackedButtons* tb = &g_state.tracked[(uint32_t)f->ptr_id % MAX_FINGERS];
             bool already = false;
             for (int j = 0; j < tb->count; j++) {
                 if (tb->element_indices[j] == (int)(btn - g_state.elements)) { already = true; break; }
@@ -47,7 +47,7 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
                     tb->element_indices[tb->count++] = (int)(btn - g_state.elements);
             }
             if (btn->activation_mode == ACTIVATION_HOVER)
-                g_state.hovered_element_per_ptr[f->ptr_id % MAX_FINGERS] = (int)(btn - g_state.elements);
+                g_state.hovered_element_per_ptr[(uint32_t)f->ptr_id % MAX_FINGERS] = (int)(btn - g_state.elements);
             if (!btn->passthrough_touch) handled = true;
         } else {
             handle_element_down(btn, f->ptr_id, x, y, time_ms, result);
@@ -274,7 +274,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
             ActivationMode mode = g_state.element_count > 0 ?
                 g_state.elements[0].activation_mode : ACTIVATION_LOCK;
             if (mode == ACTIVATION_TRACK || mode == ACTIVATION_HOVER) {
-                int pi = f->ptr_id % MAX_FINGERS;
+                int pi = (uint32_t)f->ptr_id % MAX_FINGERS;
                 TrackedButtons* tb = &g_state.tracked[pi];
                 bool already_tracked = false;
                 for (int j = 0; j < tb->count; j++) {
@@ -307,7 +307,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
 
     // TRACK/HOVER: tracked button processing runs every move (matches Java handleMoveByMode)
     {
-        int pi = f->ptr_id % MAX_FINGERS;
+        int pi = (uint32_t)f->ptr_id % MAX_FINGERS;
         TrackedButtons* tb = &g_state.tracked[pi];
         if (tb->count > 0) {
             int first_idx = tb->element_indices[0];
@@ -378,7 +378,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
 
     // Java handleMoveByMode: !passthrough check on first tracked → skip gesture
     {
-        TrackedButtons* tb = &g_state.tracked[f->ptr_id % MAX_FINGERS];
+        TrackedButtons* tb = &g_state.tracked[(uint32_t)f->ptr_id % MAX_FINGERS];
         if (tb->count > 0) {
             int first_idx = tb->element_indices[0];
             if (first_idx >= 0 && first_idx < g_state.element_count) {
@@ -470,7 +470,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
 
 void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     // Java handleUpByMode: process tracked buttons FIRST (matches Java order)
-    int pi = f->ptr_id % MAX_FINGERS;
+    int pi = (uint32_t)f->ptr_id % MAX_FINGERS;
     TrackedButtons* tb = &g_state.tracked[pi];
     bool had_tracked = false;
     if (tb->count > 0) {

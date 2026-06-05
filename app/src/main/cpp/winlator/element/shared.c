@@ -31,6 +31,7 @@ TouchElement* hit_test_element(float x, float y) {
                 for (int c = max_c; c >= min_c; c--) {
                     int cell = r * GRID_COLS + c;
                     int cnt = g_state.spatial_grid_count[cell];
+                    if (cnt > MAX_ELEMENTS) cnt = MAX_ELEMENTS;
                     for (int j = cnt - 1; j >= 0; j--) {
                         TouchElement* e = &g_state.elements[g_state.spatial_grid[cell][j]];
                         if (point_in_element(x, y, e))
@@ -130,14 +131,15 @@ void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, To
     bool raw_down = ny >= dead_zone;
     bool raw_left = nx <= -dead_zone;
     bool states[4] = {raw_up, raw_right, raw_down, raw_left};
+    bool mouse_move[4];
+    for (int i = 0; i < 4; i++)
+        mouse_move[i] = e->bindings[i].type != BINDING_NONE && is_mouse_move_binding(&e->bindings[i]);
     for (int i = 0; i < 4; i++) {
         const TouchBinding* b = &e->bindings[i];
         if (b->type == BINDING_NONE) continue;
-        bool active;
-        if (is_mouse_move_binding(b))
-            active = states[i] || states[(i + 2) % 4];
-        else
-            active = states[i];
+        bool active = states[i];
+        if (mouse_move[i])
+            active = active || states[(i + 2) % 4];
         if (active != e->petal_active[i]) {
             e->petal_active[i] = active;
             if (active) press_binding(result, b, true);
@@ -155,13 +157,13 @@ bool finger_has_engaged_element(int ptr_id) {
 }
 
 void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
-    LOG_SHARED("handle_element_down type=%d ptr=%d x=%.0f y=%.0f cur_ptr=%d engaged=%d b0=%d",
-        e->type, ptr_id, x, y, e->current_ptr_id, e->engaged, e->bindings[0].type);
+    //LOG_SHARED("handle_element_down type=%d ptr=%d x=%.0f y=%.0f cur_ptr=%d engaged=%d b0=%d",
+    //    e->type, ptr_id, x, y, e->current_ptr_id, e->engaged, e->bindings[0].type);
     // Java ControlElement.handleTouchDown: if (currentPointerId == -1 && containsPoint(x, y))
     // containsPoint is checked by the caller; guard already-engaged elements here.
     if (e->current_ptr_id >= 0) {
-        LOG_SHARED("  already engaged (ptr=%d), returning", e->current_ptr_id);
-        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN skip: already engaged ptr=%d type=%d", ptr_id, e->type);
+        //LOG_SHARED("  already engaged (ptr=%d), returning", e->current_ptr_id);
+        //__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN skip: already engaged ptr=%d type=%d", ptr_id, e->type);
         return;
     }
     e->current_ptr_id = ptr_id;
@@ -187,7 +189,7 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
         case ELEM_TRACKPAD: element_trackpad_down(e, ptr_id, x, y, time_ms, result); break;
         case ELEM_RANGE_BUTTON: element_range_button_down(e, ptr_id, x, y, time_ms, result); break;
     }
-    LOG_SHARED("  after switch: result_count=%d", result->count);
+    //LOG_SHARED("  after switch: result_count=%d", result->count);
 }
 
 void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
@@ -212,8 +214,8 @@ void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, To
 }
 
 void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
-    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "UP type=%d ptr=%d lp_trig=%d swipe=%d b0=%d",
-        e->type, e->current_ptr_id, e->gesture_long_press_triggered, e->gesture_swipe_triggered, e->bindings[0].type);
+    //__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "UP type=%d ptr=%d lp_trig=%d swipe=%d b0=%d",
+    //    e->type, e->current_ptr_id, e->gesture_long_press_triggered, e->gesture_swipe_triggered, e->bindings[0].type);
     switch (e->type) {
         case ELEM_BUTTON: element_button_up(e, x, y, time_ms, result); break;
         case ELEM_DPAD: element_dpad_up(e, x, y, time_ms, result); break;
@@ -225,8 +227,8 @@ void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
 }
 
 void suppress_element_gestures(TouchElement* e, TouchActionResult* result) {
-    LOG_SHARED("suppress_element_gestures type=%d b0=%d lp_arm=%d",
-        e->type, e->bindings[0].type, e->long_press_arm);
+    //LOG_SHARED("suppress_element_gestures type=%d b0=%d lp_arm=%d",
+    //    e->type, e->bindings[0].type, e->long_press_arm);
     if (e->long_press_arm && e->bindings[0].type != BINDING_NONE)
         press_binding(result, &e->bindings[0], true);
     e->long_press_arm = false;
@@ -239,24 +241,10 @@ void suppress_element_gestures(TouchElement* e, TouchActionResult* result) {
 void release_element_bindings(TouchElement* e, TouchActionResult* result) {
     if (e->bindings[0].type != BINDING_NONE)
         release_binding(result, &e->bindings[0]);
-    if (e->gesture_swipe_triggered) {
-        // Release non-modifiers first, then modifiers last
-        for (int k = e->element_gesture_count - 1; k >= 0; k--)
-            if (e->element_gesture[k].type != BINDING_NONE && !is_modifier_binding(&e->element_gesture[k]))
-                release_binding(result, &e->element_gesture[k]);
-        for (int k = e->element_gesture_count - 1; k >= 0; k--)
-            if (e->element_gesture[k].type != BINDING_NONE && is_modifier_binding(&e->element_gesture[k]))
-                release_binding(result, &e->element_gesture[k]);
-    }
-    if (e->gesture_long_press_triggered) {
-        // Release non-modifiers first, then modifiers last
-        for (int k = e->element_long_press_count - 1; k >= 0; k--)
-            if (e->element_long_press[k].type != BINDING_NONE && !is_modifier_binding(&e->element_long_press[k]))
-                release_binding(result, &e->element_long_press[k]);
-        for (int k = e->element_long_press_count - 1; k >= 0; k--)
-            if (e->element_long_press[k].type != BINDING_NONE && is_modifier_binding(&e->element_long_press[k]))
-                release_binding(result, &e->element_long_press[k]);
-    }
+    if (e->gesture_swipe_triggered)
+        release_bindings_list(result, e->element_gesture, e->element_gesture_count);
+    if (e->gesture_long_press_triggered)
+        release_bindings_list(result, e->element_long_press, e->element_long_press_count);
     e->long_press_arm = false;
     e->gesture_long_press_triggered = false;
     e->gesture_swipe_triggered = false;

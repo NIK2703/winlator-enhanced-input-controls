@@ -15,12 +15,14 @@ void element_trackpad_down(TouchElement* e, int ptr_id, float x, float y, uint64
 }
 
 void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    TouchProcessorState* s = &g_state;
     float dx = x - e->trackpad_last_x;
     float dy = y - e->trackpad_last_y;
+    if (fabsf(dx) < 0.0001f && fabsf(dy) < 0.0001f) return;
 
     // Apply xform scale: maps view-pixels to Wine-screen-pixels (Java computeDeltaPoint)
-    dx *= g_state.cfg.xform_scale_x;
-    dy *= g_state.cfg.xform_scale_y;
+    dx *= s->cfg.xform_scale_x;
+    dy *= s->cfg.xform_scale_y;
 
     if (is_gamepad_binding(&e->bindings[0])) {
         // Java: TRACKPAD_ACCELERATION_THRESHOLD=4, STICK_SENSITIVITY=2.0f

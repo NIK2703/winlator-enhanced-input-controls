@@ -11,10 +11,12 @@ void element_stick_down(TouchElement* e, int ptr_id, float x, float y, uint64_t 
 
 void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     (void)time_ms;
-    float radius = g_state.snapping_size * 6.0f * e->scale;
+    TouchProcessorState* s = &g_state;
+    float radius = s->snapping_size * 6.0f * e->scale;
     float dx = x - e->x;
     float dy = y - e->y;
     float dist = sqrtf(dx*dx + dy*dy);
+    if (dist < 0.0001f) return;
     float inv_dist = dist > 0.0f ? 1.0f / dist : 0.0f;
     float nx, ny;
     if (dist > radius) {
@@ -31,10 +33,10 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
         e->visual_y = e->y + dy;
     }
 
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
-        "stick_move dist=%f nx=%f ny=%f bind0_type=0x%x is_gamepad=%d mag=%f",
-        dist, nx, ny, e->bindings[0].type, is_gamepad_binding(&e->bindings[0]),
-        fminf(dist * inv_dist, 1.0f));
+    //__android_log_print(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
+    //    "stick_move dist=%f nx=%f ny=%f bind0_type=0x%x is_gamepad=%d mag=%f",
+    //    dist, nx, ny, e->bindings[0].type, is_gamepad_binding(&e->bindings[0]),
+    //    fminf(dist * inv_dist, 1.0f));
 
     if (is_gamepad_binding(&e->bindings[0])) {
         float mag = fminf(dist * inv_dist, 1.0f);
@@ -47,14 +49,14 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
         e->stick_value_x = axis_x;
         e->stick_value_y = axis_y;
         int is_left = !is_right_stick_binding(e);
-        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
-            "stick_move GAMEPAD AXIS is_left=%d axis_x=%f axis_y=%f",
-            is_left, axis_x, axis_y);
+        //__android_log_print(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
+        //    "stick_move GAMEPAD AXIS is_left=%d axis_x=%f axis_y=%f",
+        //    is_left, axis_x, axis_y);
         add_action(result, ACT_GAMEPAD_AXIS, is_left, (int)(axis_x * 32767), (int)(axis_y * 32767));
     } else {
-        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
-            "stick_move PETAL mode bind0=0x%x bind1=0x%x bind2=0x%x bind3=0x%x",
-            e->bindings[0].type, e->bindings[1].type, e->bindings[2].type, e->bindings[3].type);
+        //__android_log_print(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
+        //    "stick_move PETAL mode bind0=0x%x bind1=0x%x bind2=0x%x bind3=0x%x",
+        //    e->bindings[0].type, e->bindings[1].type, e->bindings[2].type, e->bindings[3].type);
         element_set_petals(e, nx, ny, STICK_DEAD_ZONE, result);
     }
 }

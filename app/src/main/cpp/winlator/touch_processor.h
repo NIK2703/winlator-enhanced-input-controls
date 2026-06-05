@@ -125,27 +125,16 @@ typedef enum {
 } GestureState;
 
 typedef struct {
-    // 12 binding lists as flat arrays (first binding is the action, then modifiers)
-    TouchBinding single_tap[8];
-    int single_tap_count;
-    TouchBinding long_press[8];
-    int long_press_count;
-    TouchBinding double_tap[8];
-    int double_tap_count;
-    TouchBinding single_tap_drag[8];
-    int single_tap_drag_count;
-    TouchBinding long_press_drag[8];
-    int long_press_drag_count;
-    TouchBinding double_tap_drag[8];
-    int double_tap_drag_count;
-    TouchBinding single_tap_2nd[8];
-    int single_tap_2nd_count;
-    TouchBinding double_tap_2nd[8];
-    int double_tap_2nd_count;
-    TouchBinding single_tap_drag_2nd[8];
-    int single_tap_drag_2nd_count;
-    TouchBinding double_tap_drag_2nd[8];
-    int double_tap_drag_2nd_count;
+    const TouchBinding* single_tap;       int single_tap_count;
+    const TouchBinding* long_press;       int long_press_count;
+    const TouchBinding* double_tap;       int double_tap_count;
+    const TouchBinding* single_tap_drag;  int single_tap_drag_count;
+    const TouchBinding* long_press_drag;  int long_press_drag_count;
+    const TouchBinding* double_tap_drag;  int double_tap_drag_count;
+    const TouchBinding* single_tap_2nd;   int single_tap_2nd_count;
+    const TouchBinding* double_tap_2nd;   int double_tap_2nd_count;
+    const TouchBinding* single_tap_drag_2nd; int single_tap_drag_2nd_count;
+    const TouchBinding* double_tap_drag_2nd; int double_tap_drag_2nd_count;
 } FingerBindings;
 
 typedef struct {
