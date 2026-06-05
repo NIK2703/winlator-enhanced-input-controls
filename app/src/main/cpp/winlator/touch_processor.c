@@ -165,6 +165,32 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
 
+        // Auto-repeat: toggle primary binding at the configured rate while finger is held
+        // For toggle+auto-repeat mode, continues repeating even after finger-up while selected
+        if (e->type == ELEM_BUTTON && e->auto_repeat && (e->toggle_switch ? e->selected : (e->current_ptr_id >= 0 && e->engaged))) {
+            // In toggle+auto-repeat mode, skip the inside check — state is latched
+            bool skip_inside = e->toggle_switch && e->selected;
+            bool inside = skip_inside || point_in_element(e->visual_x, e->visual_y, e);
+            if (!inside) {
+                if (e->auto_repeat_primary_pressed && e->bindings[0].type != BINDING_NONE) {
+                    release_binding(&result, &e->bindings[0]);
+                    e->auto_repeat_primary_pressed = false;
+                }
+            } else {
+                int auto_repeat_interval_ms = 1000 / (e->auto_repeat_rate_hz > 0 ? e->auto_repeat_rate_hz : 10);
+                if (e->auto_repeat_last_time == 0 || time_ms - e->auto_repeat_last_time >= (uint64_t)auto_repeat_interval_ms) {
+                    e->auto_repeat_primary_pressed = !e->auto_repeat_primary_pressed;
+                    if (e->bindings[0].type != BINDING_NONE) {
+                        if (e->auto_repeat_primary_pressed)
+                            press_binding(&result, &e->bindings[0], true);
+                        else
+                            release_binding(&result, &e->bindings[0]);
+                    }
+                    e->auto_repeat_last_time = time_ms;
+                }
+            }
+        }
+
         // Element long-press timeout (requires finger down, ELEM_BUTTON only)
         if (e->type == ELEM_BUTTON && e->current_ptr_id >= 0
             && e->long_press_arm && !e->gesture_long_press_triggered

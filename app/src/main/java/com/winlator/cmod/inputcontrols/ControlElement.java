@@ -110,6 +110,8 @@ public class ControlElement {
     private short y;
     private boolean selected = false;
     private boolean toggleSwitch = false;
+    private boolean autoRepeat = false;
+    private int autoRepeatRateHz = 10;
     private boolean passthroughTouch;
     private float opacity = -1f;
     private final Rect boundingBox = new Rect();
@@ -308,6 +310,22 @@ public class ControlElement {
 
     public void setToggleSwitch(boolean toggleSwitch) {
         this.toggleSwitch = toggleSwitch;
+    }
+
+    public boolean isAutoRepeat() {
+        return autoRepeat;
+    }
+
+    public void setAutoRepeat(boolean autoRepeat) {
+        this.autoRepeat = autoRepeat;
+    }
+
+    public int getAutoRepeatRateHz() {
+        return autoRepeatRateHz;
+    }
+
+    public void setAutoRepeatRateHz(int autoRepeatRateHz) {
+        this.autoRepeatRateHz = autoRepeatRateHz;
     }
 
     public boolean isPassthroughTouch() {
@@ -1677,6 +1695,8 @@ public class ControlElement {
             elementJSONObject.put("x", (float)x / inputControlsView.getMaxWidth());
             elementJSONObject.put("y", (float)y / inputControlsView.getMaxHeight());
             elementJSONObject.put("toggleSwitch", toggleSwitch);
+            elementJSONObject.put("autoRepeat", autoRepeat);
+            elementJSONObject.put("autoRepeatRateHz", autoRepeatRateHz);
             if (passthroughTouch) elementJSONObject.put("passthroughTouch", true);
             if (opacity >= 0) elementJSONObject.put("opacity", opacity);
             elementJSONObject.put("text", text);

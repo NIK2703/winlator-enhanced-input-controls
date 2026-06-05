@@ -101,6 +101,12 @@ typedef struct {
     bool gesture_swipe_triggered;
     bool gesture_timer_armed;
 
+    // Auto-repeat (toggle primary binding at configured rate while held)
+    bool auto_repeat;
+    int auto_repeat_rate_hz;
+    uint64_t auto_repeat_last_time;
+    bool auto_repeat_primary_pressed;
+
     bool visual_active;
     float visual_x;
     float visual_y;
@@ -223,9 +229,11 @@ typedef struct {
     // For touchpad absolute mode
     int screen_w, screen_h;
 
-    // Xform scale (maps view-pixels to Wine-screen-pixels, for trackpad delta)
+    // Xform scale + view offset (maps view-pixels to Wine-screen-pixels, for touchscreen absolute)
     float xform_scale_x;
     float xform_scale_y;
+    float view_offset_x;
+    float view_offset_y;
 
     // Haptic
     int gesture_long_press_haptic;

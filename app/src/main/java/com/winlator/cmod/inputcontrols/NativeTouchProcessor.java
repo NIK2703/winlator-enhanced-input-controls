@@ -59,6 +59,8 @@ public class NativeTouchProcessor {
         public int gestureThresholdPx;
         public float xformScaleX = 1.0f;
         public float xformScaleY = 1.0f;
+        public float viewOffsetX;
+        public float viewOffsetY;
         public int cursorAccelerationThreshold;
         public float cursorAccelerationFactor;
 
@@ -102,6 +104,8 @@ public class NativeTouchProcessor {
         public int[] elementLongPress;   // [type0, keycode0, ...]
         public int[] elementGesture;     // [type0, keycode0, ...]
         public boolean toggleSwitch;
+        public boolean autoRepeat;
+        public int autoRepeatRateHz = 10;
         public float opacity;
         public int buttonLongPressHaptic = 1;
         public int buttonGestureHaptic = 1;
@@ -145,6 +149,7 @@ public class NativeTouchProcessor {
     private static native void nativeSetSimTouchScreen(boolean enabled);
     private static native void nativeUpdateConfig(NativeConfig config);
     private static native void nativeSetXformScale(float scaleX, float scaleY);
+    private static native void nativeSetViewOffset(float offsetX, float offsetY);
     private static native boolean nativeGetElementState(int elemIndex, float[] outXY);
 
     private static native boolean nativeHandleDownByMode(int ptrId, float x, float y, long timeMs);
@@ -186,6 +191,11 @@ public class NativeTouchProcessor {
     public void setXformScale(float scaleX, float scaleY) {
         if (!loaded) return;
         nativeSetXformScale(scaleX, scaleY);
+    }
+
+    public void setViewOffset(float offsetX, float offsetY) {
+        if (!loaded) return;
+        nativeSetViewOffset(offsetX, offsetY);
     }
 
     public boolean handleDownByMode(int ptrId, float x, float y) {
@@ -312,6 +322,8 @@ public class NativeTouchProcessor {
             ne.passthroughTouch = ce.isPassthroughTouch();
             ne.activationMode = activationMode != null ? activationMode.ordinal() : 0;
             ne.toggleSwitch = ce.isToggleSwitch();
+            ne.autoRepeat = ce.isAutoRepeat();
+            ne.autoRepeatRateHz = ce.getAutoRepeatRateHz();
             ne.opacity = ce.getEffectiveOpacity();
 
             // Per-element haptic settings from profile

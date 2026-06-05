@@ -1,28 +1,75 @@
+#include <android/log.h>
+#define LOG_TAG "Winlator_Button"
 #include "../touch_processor_internal.h"
 
 void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     (void)ptr_id; (void)x; (void)y; (void)time_ms;
 
+    if (e->toggle_switch) {
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN toggle mode=%d sel=%d auto=%d refrain=%d",
+            e->activation_mode, e->selected, e->auto_repeat, e->auto_repeat_primary_pressed);
+    }
+
+    // Toggle + Auto-repeat mode: toggle on/off (same for all modes — quick-toggle on DOWN)
+    if (e->toggle_switch && e->auto_repeat) {
+        if (e->selected) {
+            if (e->auto_repeat_primary_pressed && e->bindings[0].type != BINDING_NONE)
+                release_binding(result, &e->bindings[0]);
+            e->auto_repeat_primary_pressed = false;
+            e->selected = false;
+            e->visual_active = false;
+        } else {
+            if (e->bindings[0].type != BINDING_NONE) {
+                press_binding(result, &e->bindings[0], true);
+                e->auto_repeat_primary_pressed = true;
+            }
+            e->selected = true;
+            e->auto_repeat_last_time = 0;
+        }
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN auto-repeat toggle: sel=%d vis=%d",
+            e->selected, e->visual_active);
+        return;
+    }
+
+    // Normal toggle switch (non-auto-repeat)
     if (e->toggle_switch && e->selected) {
+        // TRACK/HOVER: keep toggle active on DOWN, let MOVE handler deactivate when finger leaves
+        if (e->activation_mode == ACTIVATION_TRACK || e->activation_mode == ACTIVATION_HOVER) {
+            __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN TRACK/HOVER active toggle: keep active");
+            return;
+        }
+        // LOCK mode: release binding and keep selected for UP flip
         if (e->bindings[0].type != BINDING_NONE)
             release_binding(result, &e->bindings[0]);
-        // Java: toggle-selected on down releases then STOPS — no long-press, no double-tap, no press
+        return;
+    }
+
+    // Auto-repeat (non-toggle): press primary immediately
+    if (e->auto_repeat) {
+        if (e->bindings[0].type != BINDING_NONE) {
+            press_binding(result, &e->bindings[0], true);
+            e->auto_repeat_primary_pressed = true;
+        }
+        e->auto_repeat_last_time = 0;
         return;
     }
 
     bool has_lp = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
 
-    // Java: hasLongPressBinding() && !toggleSwitch -> startLongPressTimer (no primary press)
     e->long_press_arm = has_lp && !e->toggle_switch;
     if (has_lp && !e->toggle_switch) {
         return;
     }
 
-    // Java else: pressBindings(bindings.get(0))
     if (e->bindings[0].type != BINDING_NONE) {
         press_binding(result, &e->bindings[0], true);
+        if (e->toggle_switch && (e->activation_mode == ACTIVATION_TRACK || e->activation_mode == ACTIVATION_HOVER)) {
+            e->selected = true;
+            e->auto_repeat_primary_pressed = true;
+            __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN fresh activate toggle: sel=%d refrain=%d",
+                e->selected, e->auto_repeat_primary_pressed);
+        }
     } else if (!e->toggle_switch) {
-        // Gesture-only button (no primary, no LP): arm gesture timer, keep visual active
         bool has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
         if (has_gesture) {
             e->gesture_timer_armed = true;
@@ -64,6 +111,56 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
         }
     }
 
+    // Auto-repeat toggle: latched state (visual = selected)
+    if (e->toggle_switch && e->auto_repeat) {
+        e->visual_active = e->selected;
+        return;
+    }
+
+    // Non-auto-repeat toggle in TRACK/HOVER mode: deactivate when finger leaves element.
+    if (e->toggle_switch && !e->auto_repeat && (e->activation_mode == ACTIVATION_TRACK || e->activation_mode == ACTIVATION_HOVER)) {
+        bool inside = point_in_element(x, y, e);
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "MOVE toggle: sel=%d vis=%d in=%d refrain=%d",
+            e->selected, e->visual_active, inside, e->auto_repeat_primary_pressed);
+        if (e->selected) {
+            if (!inside) {
+                if (e->bindings[0].type != BINDING_NONE)
+                    release_binding(result, &e->bindings[0]);
+                e->selected = false;
+                e->auto_repeat_primary_pressed = false;
+                e->visual_active = false;
+            } else {
+                e->visual_active = true;
+            }
+        } else {
+            e->visual_active = false;
+        }
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "MOVE toggle: result sel=%d vis=%d",
+            e->selected, e->visual_active);
+        return;
+    }
+
+    // Auto-repeat: release binding if finger leaves element, press again if re-enters
+    // (Skip for toggle+auto-repeat mode — state is latched, not finger-dependent)
+    if (e->auto_repeat && !e->toggle_switch) {
+        bool inside = point_in_element(x, y, e);
+        if (!inside && e->auto_repeat_primary_pressed) {
+            if (e->bindings[0].type != BINDING_NONE)
+                release_binding(result, &e->bindings[0]);
+            e->auto_repeat_primary_pressed = false;
+        } else if (inside && !e->auto_repeat_primary_pressed) {
+            if (e->bindings[0].type != BINDING_NONE) {
+                press_binding(result, &e->bindings[0], true);
+                e->auto_repeat_primary_pressed = true;
+            }
+            e->auto_repeat_last_time = 0;
+        }
+        if (!inside) {
+            e->visual_active = false;
+        }
+        return;
+    }
+
     if (e->long_press_arm && !point_in_element(x, y, e)) {
         e->long_press_arm = false;
     }
@@ -90,13 +187,52 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
         if (bt0 == BINDING_GAMEPAD_BASE + 8 || bt0 == BINDING_GAMEPAD_BASE + 9)
             e->selected = (time_ms - e->down_time_ms) > BUTTON_MIN_KEEP_PRESSED_MS;
     }
-    if (e->toggle_switch && e->bindings[0].type != BINDING_NONE) {
+    // Toggle + Auto-repeat: keep repeating after finger-up, don't flip selected
+    if (e->toggle_switch && e->auto_repeat) {
+        if (e->selected) {
+            e->engaged = false;
+            e->current_ptr_id = -1;
+            return;
+        }
+    }
+
+    // Normal toggle switch (non-auto-repeat)
+    if (e->toggle_switch && !e->auto_repeat && e->bindings[0].type != BINDING_NONE) {
+        if (e->activation_mode == ACTIVATION_TRACK || e->activation_mode == ACTIVATION_HOVER) {
+            if (e->selected) {
+                bool inside = point_in_element(x, y, e);
+                bool was_fresh = e->auto_repeat_primary_pressed;
+                __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "UP toggle: sel=%d vis=%d in=%d fresh=%d",
+                    e->selected, e->visual_active, inside, was_fresh);
+                e->auto_repeat_primary_pressed = false;
+                if (inside && !was_fresh) {
+                    if (e->bindings[0].type != BINDING_NONE)
+                        release_binding(result, &e->bindings[0]);
+                    e->selected = false;
+                    e->visual_active = false;
+                    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "UP toggle: DEACTIVATE (tap off)");
+                }
+            } else {
+                e->auto_repeat_primary_pressed = false;
+            }
+            e->engaged = false;
+            e->current_ptr_id = -1;
+            return;
+        }
         e->selected = !e->selected;
         if (e->selected) {
             e->engaged = false;
             e->current_ptr_id = -1;
             return;
         }
+    }
+
+    // Auto-repeat (non-toggle): release primary binding, no long-press/gesture processing
+    if (e->auto_repeat) {
+        if (e->auto_repeat_primary_pressed && e->bindings[0].type != BINDING_NONE)
+            release_binding(result, &e->bindings[0]);
+        e->auto_repeat_primary_pressed = false;
+        goto cleanup;
     }
 
     if (e->gesture_long_press_triggered) {
@@ -137,6 +273,7 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
         }
     }
 
+cleanup:
     e->engaged = false;
     e->current_ptr_id = -1;
     e->visual_active = false;

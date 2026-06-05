@@ -392,6 +392,37 @@
                         android:min="10"
                         android:max="200" />
 
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="8dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/native_tick_rate"/>
+
+                        <TextView
+                            android:id="@+id/TVNativeTickRate"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+
+                        <ImageView
+                            android:id="@+id/BTHelpNativeTickRate"
+                            style="@style/HelpButton"
+                            android:contentDescription="@string/help_native_tick_rate"
+                            android:src="@drawable/icon_help" />
+                    </LinearLayout>
+
+                    <SeekBar
+                        android:id="@+id/SBNativeTickRate"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:min="20"
+                        android:max="240" />
+
                     <CheckBox
                         android:id="@+id/CBUseDRI3"
                         android:layout_width="wrap_content"

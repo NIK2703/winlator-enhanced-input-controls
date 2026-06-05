@@ -1,3 +1,4 @@
+#include <android/log.h>
 #include "touch_processor_internal.h"
 
 ActivationMode activation_get_mode(int elem_index) {
@@ -129,6 +130,12 @@ bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, Touc
 void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     ActivationMode mode = g_state.element_count > 0 ?
         g_state.elements[0].activation_mode : ACTIVATION_LOCK;
+
+    // Check if our toggle's visual was modified
+    for (int i = 0; i < g_state.element_count; i++)
+        if (g_state.elements[i].toggle_switch && g_state.elements[i].current_ptr_id == ptr_id)
+            __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Button", "ACT_MOVE entry: elem=%d sel=%d vis=%d ptr=%d",
+                i, g_state.elements[i].selected, g_state.elements[i].visual_active, ptr_id);
 
     switch (mode) {
         case ACTIVATION_LOCK: {

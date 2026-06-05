@@ -131,9 +131,11 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
                     if (found_orig) {
                         g_state.gesture_second_active = false;
                         g_state.gesture_main_ptr_id = orig_ptr_id;
-                        add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
-                        g_state.ptr_x = x;
-                        g_state.ptr_y = y;
+                        int tx, ty;
+                        touch_transform_coords(x, y, &tx, &ty);
+                        add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
+                        g_state.ptr_x = tx;
+                        g_state.ptr_y = ty;
                         f->state = GESTURE_STATE_TAP_WAITING;
                         return;
                     }
@@ -183,9 +185,13 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
         f->original_ptr_id = f->ptr_id;
         f->double_tap_original_id_set = true;
 
-        add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
-        g_state.ptr_x = x;
-        g_state.ptr_y = y;
+        {
+            int tx, ty;
+            touch_transform_coords(x, y, &tx, &ty);
+            add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
+            g_state.ptr_x = tx;
+            g_state.ptr_y = ty;
+        }
 
         touchpad_finger_down(f, result, time_ms);
     } else if (f->ptr_id != g_state.gesture_main_ptr_id) {
@@ -351,7 +357,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                         int hovered = g_state.hovered_element_per_ptr[pi];
                         TouchElement* prev = (hovered >= 0 && hovered < g_state.element_count) ? &g_state.elements[hovered] : NULL;
                         TouchElement* curr = hit_test_element(x, y);
-                        if (prev && (!curr || curr != prev))
+                        if (prev && (!curr || curr != prev) && !prev->toggle_switch)
                             release_element_bindings(prev, result);
                         if (curr && curr->type == ELEM_BUTTON && curr != prev) {
                             if (curr->toggle_switch) {
@@ -414,9 +420,13 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                 if (!sf_has_st_drag && g_state.cfg.ts_single_2nd_count > 0) {
                     // Java: hasActiveSingleTap() → move pointer, return (no drag)
                     
-                    g_state.ptr_x = x;
-                    g_state.ptr_y = y;
-                    add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
+                    {
+                        int tx, ty;
+                        touch_transform_coords(x, y, &tx, &ty);
+                        g_state.ptr_x = tx;
+                        g_state.ptr_y = ty;
+                        add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
+                    }
                     f->last_x = x;
                     f->last_y = y;
                     return;
@@ -428,9 +438,13 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                     // Long-press cancelled in gesture_tick by checking travel_x/y
                     // Skip early return when post_double_tap_drag is active — drag uses double_tap_drag binding
                     
-                    g_state.ptr_x = x;
-                    g_state.ptr_y = y;
-                    add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
+                    {
+                        int tx, ty;
+                        touch_transform_coords(x, y, &tx, &ty);
+                        g_state.ptr_x = tx;
+                        g_state.ptr_y = ty;
+                        add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
+                    }
                     f->last_x = x;
                     f->last_y = y;
                     return;
@@ -453,9 +467,13 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
         }
     }
 
-    g_state.ptr_x = x;
-    g_state.ptr_y = y;
-    add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
+    {
+        int tx, ty;
+        touch_transform_coords(x, y, &tx, &ty);
+        g_state.ptr_x = tx;
+        g_state.ptr_y = ty;
+        add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
+    }
     f->last_x = x;
     f->last_y = y;
 }
@@ -471,8 +489,12 @@ void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, T
                 int idx = tb->element_indices[j];
                 if (idx >= 0 && idx < g_state.element_count) {
                     TouchElement* e = &g_state.elements[idx];
-                    if (e->bindings[0].type != BINDING_NONE)
-                        release_binding(result, &e->bindings[0]);
+                    if (e->toggle_switch) {
+                        handle_element_up(e, x, y, time_ms, result);
+                    } else {
+                        if (e->bindings[0].type != BINDING_NONE)
+                            release_binding(result, &e->bindings[0]);
+                    }
                     if (e->gesture_swipe_triggered) {
                         for (int k = e->element_gesture_count - 1; k >= 0; k--)
                             if (e->element_gesture[k].type != BINDING_NONE)
@@ -486,8 +508,20 @@ void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, T
                     e->long_press_arm = false;
                     e->gesture_long_press_triggered = false;
                     e->gesture_swipe_triggered = false;
-                    e->current_ptr_id = -1;
-                    e->engaged = false;
+                    if (!e->toggle_switch) {
+                        e->current_ptr_id = -1;
+                        e->engaged = false;
+                        e->visual_active = false;
+                    }
+                }
+            }
+            had_tracked = true;
+        } else {
+            int idx = tb->element_indices[0];
+            if (idx >= 0 && idx < g_state.element_count) {
+                TouchElement* e = &g_state.elements[idx];
+                handle_element_up(e, x, y, time_ms, result);
+                if (!e->toggle_switch) {
                     e->visual_active = false;
                 }
             }

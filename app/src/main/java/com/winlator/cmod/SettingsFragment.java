@@ -287,6 +287,22 @@ public class SettingsFragment extends Fragment {
         });
         sbCursorSpeed.setProgress((int)(preferences.getFloat("cursor_speed", 1.0f) * 100));
 
+        final TextView tvNativeTickRate = view.findViewById(R.id.TVNativeTickRate);
+        final SeekBar sbNativeTickRate = view.findViewById(R.id.SBNativeTickRate);
+        sbNativeTickRate.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvNativeTickRate.setText(progress+" Hz");
+            }
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbNativeTickRate.setProgress(preferences.getInt("native_tick_rate_hz", 60));
+        view.findViewById(R.id.BTHelpNativeTickRate).setOnClickListener(v ->
+            AppUtils.showHelpBox(context, v, R.string.help_native_tick_rate));
+
         final CheckBox cbEnableFileProvider = view.findViewById(R.id.CBEnableFileProvider);
         final View btHelpFileProvider = view.findViewById(R.id.BTHelpFileProvider);
 
@@ -323,6 +339,7 @@ public class SettingsFragment extends Fragment {
             editor.putBoolean("use_dri3", cbUseDRI3.isChecked());
             editor.putBoolean("use_xr", cbUseXR.isChecked());
             editor.putFloat("cursor_speed", sbCursorSpeed.getProgress() / 100.0f);
+            editor.putInt("native_tick_rate_hz", sbNativeTickRate.getProgress());
             editor.putBoolean("enable_wine_debug", cbEnableWineDebug.isChecked());
             editor.putBoolean("enable_box64_logs", cbEnableBox64Logs.isChecked());
             editor.putBoolean("cursor_lock", cbCursorLock.isChecked()); 

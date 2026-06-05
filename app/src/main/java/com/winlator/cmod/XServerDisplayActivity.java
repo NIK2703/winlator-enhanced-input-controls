@@ -1596,26 +1596,31 @@ private void applySidebarSettings() {
                     float aspect = Math.min((float)outerW / innerW, (float)outerH / innerH);
                     nativeConfig.xformScaleX = 1.0f / aspect;
                     nativeConfig.xformScaleY = 1.0f / aspect;
+                    nativeConfig.viewOffsetX = (outerW - innerW * aspect) / 2.0f;
+                    nativeConfig.viewOffsetY = (outerH - innerH * aspect) / 2.0f;
                 } else {
                     nativeConfig.xformScaleX = (float)innerW / outerW;
                     nativeConfig.xformScaleY = (float)innerH / outerH;
+                    nativeConfig.viewOffsetX = 0;
+                    nativeConfig.viewOffsetY = 0;
                 }
             }
             nativeTouchProcessor.init(nativeConfig);
 
             // Start tick timer early (for long-press / double-tap timeouts)
+            final int tickIntervalMs = 1000 / Math.max(preferences.getInt("native_tick_rate_hz", 60), 1);
             if (nativeTickRunnable == null) {
                 nativeTickRunnable = () -> {
                     if (nativeTouchProcessor != null) {
                         nativeTouchProcessor.tick();
                         if (handler != null) {
-                            handler.postDelayed(nativeTickRunnable, 50);
+                            handler.postDelayed(nativeTickRunnable, tickIntervalMs);
                         }
                     }
                 };
             }
             handler.removeCallbacks(nativeTickRunnable);
-            handler.postDelayed(nativeTickRunnable, 50);
+            handler.postDelayed(nativeTickRunnable, tickIntervalMs);
 
             // Defer element loading & param setting until view is laid out (needs dimensions)
             inputControlsView.post(() -> {

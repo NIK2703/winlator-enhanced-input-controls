@@ -128,6 +128,9 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             view.findViewById(R.id.LLShape).setVisibility(View.GONE);
             view.findViewById(R.id.CBToggleSwitch).setVisibility(View.GONE);
             view.findViewById(R.id.CBPassthroughTouch).setVisibility(View.GONE);
+            view.findViewById(R.id.CBAutoRepeat).setVisibility(View.GONE);
+            view.findViewById(R.id.LLRepeatRate).setVisibility(View.GONE);
+            view.findViewById(R.id.SBRepeatRate).setVisibility(View.GONE);
             view.findViewById(R.id.LLCustomTextIcon).setVisibility(View.GONE);
             view.findViewById(R.id.LLRangeOptions).setVisibility(View.GONE);
             view.findViewById(R.id.LLRectDimensions).setVisibility(View.GONE);
@@ -137,6 +140,11 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                 view.findViewById(R.id.LLShape).setVisibility(View.VISIBLE);
                 view.findViewById(R.id.CBToggleSwitch).setVisibility(View.VISIBLE);
                 view.findViewById(R.id.CBPassthroughTouch).setVisibility(View.VISIBLE);
+                view.findViewById(R.id.CBAutoRepeat).setVisibility(View.VISIBLE);
+                if (element.isAutoRepeat()) {
+                    view.findViewById(R.id.LLRepeatRate).setVisibility(View.VISIBLE);
+                    view.findViewById(R.id.SBRepeatRate).setVisibility(View.VISIBLE);
+                }
                 view.findViewById(R.id.LLCustomTextIcon).setVisibility(View.VISIBLE);
                 if (shape == ControlElement.Shape.RECT) {
                     view.findViewById(R.id.LLRectDimensions).setVisibility(View.VISIBLE);
@@ -310,6 +318,31 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             profile.save();
         });
 
+        CheckBox cbAutoRepeat = view.findViewById(R.id.CBAutoRepeat);
+        cbAutoRepeat.setChecked(element.isAutoRepeat());
+        cbAutoRepeat.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            element.setAutoRepeat(isChecked);
+            profile.save();
+            updateLayout.run();
+        });
+
+        final TextView tvRepeatRate = view.findViewById(R.id.TVRepeatRate);
+        SeekBar sbRepeatRate = view.findViewById(R.id.SBRepeatRate);
+        sbRepeatRate.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvRepeatRate.setText(progress + " Hz");
+                if (fromUser) {
+                    element.setAutoRepeatRateHz(progress);
+                    profile.save();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbRepeatRate.setProgress(element.getAutoRepeatRateHz());
+        tvRepeatRate.setText(element.getAutoRepeatRateHz() + " Hz");
+
         final EditText etCustomText = view.findViewById(R.id.ETCustomText);
         etCustomText.setText(element.getText());
         final LinearLayout llIconList = view.findViewById(R.id.LLIconList);
@@ -389,7 +422,8 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         ControlElement.Type type = element.getType();
         if (type == ControlElement.Type.BUTTON) {
             loadBindingSection(element, container, 0, R.string.binding);
-            loadLongPressBindingSection(element, container);
+            if (!element.isAutoRepeat())
+                loadLongPressBindingSection(element, container);
             loadGestureBindingSection(element, container);
         }
         else if (type == ControlElement.Type.D_PAD || type == ControlElement.Type.STICK || type == ControlElement.Type.TRACKPAD) {

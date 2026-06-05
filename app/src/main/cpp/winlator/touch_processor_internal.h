@@ -118,6 +118,13 @@ static inline uint64_t now_ms(void) {
     return (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
 }
 
+// Transform raw touch coordinates to Wine screen coordinates using the configured
+// view offset and scale (applied in TOUCHSCREEN mode).
+static inline void touch_transform_coords(float x, float y, int* out_x, int* out_y) {
+    *out_x = (int)((x - g_state.cfg.view_offset_x) * g_state.cfg.xform_scale_x);
+    *out_y = (int)((y - g_state.cfg.view_offset_y) * g_state.cfg.xform_scale_y);
+}
+
 static inline TouchFinger* find_finger(int ptr_id) {
     for (int i = 0; i < MAX_FINGERS; i++)
         if (g_state.fingers[i].active && g_state.fingers[i].ptr_id == ptr_id)

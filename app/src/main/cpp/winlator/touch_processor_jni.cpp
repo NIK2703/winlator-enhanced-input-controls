@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <android/log.h>
 #include "touch_processor.h"
 #include "touch_processor_internal.h"
 #include <string.h>
@@ -167,6 +168,8 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeInit(
     if (c.xform_scale_x <= 0.0f) c.xform_scale_x = 1.0f;
     c.xform_scale_y = env->GetFloatField(config, env->GetFieldID(configClass, "xformScaleY", "F"));
     if (c.xform_scale_y <= 0.0f) c.xform_scale_y = 1.0f;
+    c.view_offset_x = env->GetFloatField(config, env->GetFieldID(configClass, "viewOffsetX", "F"));
+    c.view_offset_y = env->GetFloatField(config, env->GetFieldID(configClass, "viewOffsetY", "F"));
     c.gesture_long_press_haptic = env->GetIntField(config, env->GetFieldID(configClass, "gestureLongPressHaptic", "I"));
     c.haptic_enabled = env->GetBooleanField(config, env->GetFieldID(configClass, "hapticEnabled", "Z"));
 
@@ -193,7 +196,6 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeInit(
     READ_GESTURE_LIST(env, config, configClass, "tpDoubleTap2nd",   c.tp_double_2nd,      c.tp_double_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tpSingleTapDrag2nd", c.tp_single_drag_2nd, c.tp_single_drag_2nd_count);
     READ_GESTURE_LIST(env, config, configClass, "tpDoubleTapDrag2nd",  c.tp_double_drag_2nd, c.tp_double_drag_2nd_count);
-
 
 
     // Touchscreen gesture bindings logged above via READ_GESTURE_LIST
@@ -228,6 +230,9 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeSetElements(
         elems[i].passthrough_touch = env->GetBooleanField(je, env->GetFieldID(elemClass, "passthroughTouch", "Z"));
         elems[i].activation_mode = (ActivationMode)env->GetIntField(je, env->GetFieldID(elemClass, "activationMode", "I"));
         elems[i].toggle_switch = env->GetBooleanField(je, env->GetFieldID(elemClass, "toggleSwitch", "Z"));
+        elems[i].auto_repeat = env->GetBooleanField(je, env->GetFieldID(elemClass, "autoRepeat", "Z"));
+        elems[i].auto_repeat_rate_hz = env->GetIntField(je, env->GetFieldID(elemClass, "autoRepeatRateHz", "I"));
+        if (elems[i].auto_repeat_rate_hz <= 0) elems[i].auto_repeat_rate_hz = 10;
 
         // Range button fields
         jfieldID range_ord_id = env->GetFieldID(elemClass, "rangeOrdinal", "I");
@@ -349,11 +354,14 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeOnFingerMove(
             pos[i * 3 + 1] = g_state.elements[i].visual_y;
             pos[i * 3 + 2] = g_state.elements[i].range_scroll_offset;
             int base = i * 5;
-            act[base] = g_state.elements[i].visual_active ? 1 : 0;
+            bool va = g_state.elements[i].visual_active;
+            act[base] = va ? 1 : 0;
             act[base + 1] = g_state.elements[i].petal_active[0] ? 1 : 0;
             act[base + 2] = g_state.elements[i].petal_active[1] ? 1 : 0;
             act[base + 3] = g_state.elements[i].petal_active[2] ? 1 : 0;
             act[base + 4] = g_state.elements[i].petal_active[3] ? 1 : 0;
+            if (g_state.elements[i].toggle_switch)
+                __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Button", "JNI_MOVE: elem=%d vis=%d", i, va);
         }
         env->ReleaseFloatArrayElements(outPositions, pos, 0);
         env->ReleaseByteArrayElements(outActive, act, 0);
@@ -457,6 +465,8 @@ Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeUpdateConfig(
     if (c.xform_scale_x <= 0.0f) c.xform_scale_x = 1.0f;
     c.xform_scale_y = env->GetFloatField(config, env->GetFieldID(configClass, "xformScaleY", "F"));
     if (c.xform_scale_y <= 0.0f) c.xform_scale_y = 1.0f;
+    c.view_offset_x = env->GetFloatField(config, env->GetFieldID(configClass, "viewOffsetX", "F"));
+    c.view_offset_y = env->GetFloatField(config, env->GetFieldID(configClass, "viewOffsetY", "F"));
     c.gesture_long_press_haptic = env->GetIntField(config, env->GetFieldID(configClass, "gestureLongPressHaptic", "I"));
     c.haptic_enabled = env->GetBooleanField(config, env->GetFieldID(configClass, "hapticEnabled", "Z"));
 
@@ -491,6 +501,13 @@ JNIEXPORT void JNICALL
 Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeSetXformScale(
     JNIEnv* env, jclass clazz, jfloat scaleX, jfloat scaleY) {
     touch_processor_set_xform_scale(scaleX, scaleY);
+}
+
+JNIEXPORT void JNICALL
+Java_com_winlator_cmod_inputcontrols_NativeTouchProcessor_nativeSetViewOffset(
+    JNIEnv* env, jclass clazz, jfloat offsetX, jfloat offsetY) {
+    g_state.cfg.view_offset_x = offsetX;
+    g_state.cfg.view_offset_y = offsetY;
 }
 
 JNIEXPORT jboolean JNICALL

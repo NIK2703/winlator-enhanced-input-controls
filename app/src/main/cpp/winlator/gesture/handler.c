@@ -162,9 +162,11 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                     if (found_orig) {
                         g_state.gesture_second_active = false;
                         g_state.gesture_main_ptr_id = orig_ptr_id;
-                        add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
-                        g_state.ptr_x = x;
-                        g_state.ptr_y = y;
+                        int tx, ty;
+                        touch_transform_coords(x, y, &tx, &ty);
+                        add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
+                        g_state.ptr_x = tx;
+                        g_state.ptr_y = ty;
                         f->state = GESTURE_STATE_TAP_WAITING;
                         return;
                     }
@@ -212,9 +214,13 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 
         f->original_ptr_id = f->ptr_id;
         f->double_tap_original_id_set = true;
-        add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
-        g_state.ptr_x = x;
-        g_state.ptr_y = y;
+        {
+            int tx, ty;
+            touch_transform_coords(x, y, &tx, &ty);
+            add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
+            g_state.ptr_x = tx;
+            g_state.ptr_y = ty;
+        }
 
         touchpad_finger_down(f, result, time_ms);
         return;
@@ -397,12 +403,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                             }
                             if (!already) {
                                 if (new_btn->current_ptr_id == -1) {
-                                    if (tb->count == 0)
-                                        handle_element_down(new_btn, f->ptr_id, x, y, time_ms, result);
-                                    else if (new_btn->bindings[0].type != BINDING_NONE) {
-                                        press_binding(result, &new_btn->bindings[0], true);
-                                        new_btn->visual_active = true;
-                                    }
+                                    handle_element_down(new_btn, f->ptr_id, x, y, time_ms, result);
                                 }
                                 if (tb->count < MAX_TRACKED_PER_POINTER) {
                                     if (tb->count == 1) first->long_press_arm = false;
@@ -422,12 +423,11 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                             if (curr->toggle_switch) {
                                 g_state.hovered_element_per_ptr[pi] = -1;
                             } else {
-                                if (curr->current_ptr_id == -1) {
-                                    if (curr->bindings[0].type != BINDING_NONE) {
-                                        press_binding(result, &curr->bindings[0], true);
-                                        curr->visual_active = true;
-                                    }
+                            if (curr->current_ptr_id == -1) {
+                                if (curr->bindings[0].type != BINDING_NONE) {
+                                    handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
                                 }
+                            }
                                 g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
                             }
                         } else if (!curr || curr->type != ELEM_BUTTON) {
@@ -479,9 +479,13 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
             && f->cached_has_active_single_tap
             && !g_state.gesture_post_double_tap_drag
             && f->state != GESTURE_STATE_LONG_PRESSING) {
-            g_state.ptr_x = x;
-            g_state.ptr_y = y;
-            add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
+            {
+                int tx, ty;
+                touch_transform_coords(x, y, &tx, &ty);
+                g_state.ptr_x = tx;
+                g_state.ptr_y = ty;
+                add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
+            }
             f->last_x = x;
             f->last_y = y;
             return;
@@ -528,9 +532,11 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     // TS: update absolute pointer
     if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
         if (g_state.gesture_main_ptr_id < 0 || f->ptr_id == g_state.gesture_main_ptr_id) {
-            g_state.ptr_x = x;
-            g_state.ptr_y = y;
-            add_action(result, ACT_POINTER_MOVE, (int)x, (int)y, 0);
+            int tx, ty;
+            touch_transform_coords(x, y, &tx, &ty);
+            g_state.ptr_x = tx;
+            g_state.ptr_y = ty;
+            add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
         }
         f->last_x = x;
         f->last_y = y;
@@ -636,8 +642,23 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
                     e->long_press_arm = false;
                     e->gesture_long_press_triggered = false;
                     e->gesture_swipe_triggered = false;
-                    e->current_ptr_id = -1;
-                    e->engaged = false;
+                    if (!e->toggle_switch) {
+                        e->current_ptr_id = -1;
+                        e->engaged = false;
+                        e->visual_active = false;
+                    }
+                }
+            }
+            had_tracked = true;
+        } else {
+            // Single tracked button: ensure full cleanup via handle_element_up
+            // Fixes bug where visual_active could remain true after finger-up
+            // when the element loop doesn't find it (current_ptr_id mismatch)
+            int idx = tb->element_indices[0];
+            if (idx >= 0 && idx < g_state.element_count) {
+                TouchElement* e = &g_state.elements[idx];
+                handle_element_up(e, x, y, time_ms, result);
+                if (!e->toggle_switch) {
                     e->visual_active = false;
                 }
             }

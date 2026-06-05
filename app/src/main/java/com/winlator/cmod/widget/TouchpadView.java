@@ -89,14 +89,20 @@ public class TouchpadView extends View {
 
         if (nativeTouchProcessor != null) {
             float scaleX, scaleY;
+            float offsetX, offsetY;
             if (!xServer.getRenderer().isFullscreen()) {
                 scaleX = invAspect;
                 scaleY = invAspect;
+                offsetX = viewTransformation.viewOffsetX;
+                offsetY = viewTransformation.viewOffsetY;
             } else {
                 scaleX = (float) innerWidth / outerWidth;
                 scaleY = (float) innerHeight / outerHeight;
+                offsetX = 0;
+                offsetY = 0;
             }
             nativeTouchProcessor.setXformScale(scaleX, scaleY);
+            nativeTouchProcessor.setViewOffset(offsetX, offsetY);
         }
     }
 
