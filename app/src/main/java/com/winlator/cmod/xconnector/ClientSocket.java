@@ -1,6 +1,6 @@
 package com.winlator.cmod.xconnector;
 
-import android.util.Log;
+
 
 import androidx.annotation.Keep;
 
@@ -51,7 +51,7 @@ public class ClientSocket {
         if (bytesWritten >= 0) {
             data.position(bytesWritten);
         }
-        else Log.d("ClientSocket", "Failed to write data.");
+        else throw new IOException("Failed to write data.");
     }
 
     public int recvAncillaryMsg(ByteBuffer data) throws IOException {

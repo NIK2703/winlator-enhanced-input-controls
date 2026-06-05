@@ -1,7 +1,7 @@
 package com.winlator.cmod.winhandler;
 
 import android.content.SharedPreferences;
-import android.util.Log;
+
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 
@@ -18,6 +18,7 @@ import com.winlator.cmod.xserver.XServer;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.hardware.input.InputManager;
+import android.util.Log;
 import android.os.Handler;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
@@ -45,6 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class WinHandler {
+    private static final String TAG = "WinHandler";
     private static final short SERVER_PORT = 7947;
     private static final short CLIENT_PORT = 7946;
     public static final byte FLAG_INPUT_TYPE_XINPUT = 0x04;
@@ -119,8 +121,10 @@ public class WinHandler {
             sendPacket.setAddress(localhost);
             sendPacket.setPort(port);
             socket.send(sendPacket);
+            Log.d("Winlator_WinH", "sendPacket port="+port+" size="+size+" code="+sendData.array()[0]);
             return true;
         } catch (IOException e) {
+            Log.d("Winlator_WinH", "sendPacket FAILED port="+port+" "+e);
             return false;
         }
     }
@@ -218,8 +222,11 @@ public class WinHandler {
     }
 
     public void mouseEvent(int flags, int dx, int dy, int wheelDelta) {
-        if (!initReceived)
+        if (!initReceived) {
+            Log.d("Winlator_WinH", "mouseEvent SKIP initReceived=false flags="+flags+" dx="+dx+" dy="+dy+" wheel="+wheelDelta);
             return;
+        }
+        Log.d("Winlator_WinH", "mouseEvent flags="+flags+" dx="+dx+" dy="+dy+" wheel="+wheelDelta);
         addAction(() -> {
             sendData.rewind();
             sendData.put(RequestCodes.MOUSE_EVENT);
@@ -234,8 +241,11 @@ public class WinHandler {
     }
 
     public void keyboardEvent(byte vkey, int flags) {
-        if (!initReceived)
+        if (!initReceived) {
+            Log.d("Winlator_WinH", "keyboardEvent SKIP initReceived=false vkey="+vkey+" flags="+flags);
             return;
+        }
+        Log.d("Winlator_WinH", "keyboardEvent vkey="+vkey+" flags="+flags);
         addAction(() -> {
             sendData.rewind();
             sendData.put(RequestCodes.KEYBOARD_EVENT);
@@ -243,6 +253,40 @@ public class WinHandler {
             sendData.putInt(flags);
             sendPacket(CLIENT_PORT);
         });
+    }
+
+    public void mouseEventImmediate(int flags, int dx, int dy, int wheelDelta) {
+        if (!initReceived) return;
+        try {
+            sendData.rewind();
+            sendData.put(RequestCodes.MOUSE_EVENT);
+            sendData.putInt(10);
+            sendData.putInt(flags);
+            sendData.putShort((short) dx);
+            sendData.putShort((short) dy);
+            sendData.putShort((short) wheelDelta);
+            sendData.put((byte) ((flags & MouseEventFlags.MOVE) != 0 ? 1 : 0));
+            sendPacket.setAddress(localhost);
+            sendPacket.setPort(CLIENT_PORT);
+            socket.send(sendPacket);
+        } catch (IOException e) {
+
+        }
+    }
+
+    public void keyboardEventImmediate(byte vkey, int flags) {
+        if (!initReceived) return;
+        try {
+            sendData.rewind();
+            sendData.put(RequestCodes.KEYBOARD_EVENT);
+            sendData.put(vkey);
+            sendData.putInt(flags);
+            sendPacket.setAddress(localhost);
+            sendPacket.setPort(CLIENT_PORT);
+            socket.send(sendPacket);
+        } catch (IOException e) {
+
+        }
     }
 
     public void bringToFront(final String processName) {
@@ -320,7 +364,7 @@ public class WinHandler {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 vibrationServer = new LocalServerSocket("winlator_vibration");
-                Log.d("WinHandler", "Vibration listener started on abstract socket: winlator_vibration");
+
 
                 while (vibrationRunning) {
                     LocalSocket client = vibrationServer.accept();
@@ -337,12 +381,12 @@ public class WinHandler {
                         }
                         client.close();
                     } catch (IOException e) {
-                        Log.e("WinHandler", "Vibration client error: " + e.getMessage());
+
                     }
                 }
             } catch (IOException e) {
                 if (vibrationRunning) {
-                    Log.e("WinHandler", "Vibration listener error: " + e.getMessage());
+
                 }
             }
         });
@@ -420,6 +464,7 @@ public class WinHandler {
     }
 
     private void handleRequest(byte requestCode, final int port) {
+        Log.d("Winlator_WinH", "handleRequest code="+requestCode+" port="+port+" initReceived="+initReceived);
         switch (requestCode) {
             case RequestCodes.INIT: {
                 initReceived = true;
@@ -512,6 +557,7 @@ public class WinHandler {
     }
 
     public void sendGamepadState() {
+        Log.d("Winlator_WinH", "sendGamepadState");
         final ControlsProfile profile = activity.getInputControlsView().getProfile();
         if (profile == null) {
             releaseSlot(OSC_DEVICE_ID);
@@ -534,25 +580,30 @@ public class WinHandler {
     }
 
     public void sendGamepadState(ExternalController controller) {
-        if (controller == null)
+        if (controller == null) {
+            Log.d("Winlator_WinH", "sendGamepadState: controller=null");
             return;
+        }
+        Log.d("Winlator_WinH", "sendGamepadState deviceId="+controller.getDeviceId());
 
         ControlsProfile profile = activity.getInputControlsView().getProfile();
         if (profile != null) {
             ExternalController profileController = profile.getController(controller.getDeviceId());
             if (profileController != null && profileController.getControllerBindingCount() > 0) {
-                // If bindings are present, use the remappedState from the controller
-                // This reverts the single-slot consolidation where the no-arg
-                // sendGamepadState()
-                // was solely responsible for sending remapped states.
+                Log.d("Winlator_StickBinding", "sendGamepadState USING REMAPPED state bindingsCount="+profileController.getControllerBindingCount()+
+                        " remapped(thumbLX="+controller.remappedState.thumbLX+" thumbLY="+controller.remappedState.thumbLY+
+                        " thumbRX="+controller.remappedState.thumbRX+" thumbRY="+controller.remappedState.thumbRY+")");
                 int slot = assignSlot(controller.getDeviceId());
                 if (slot >= 0 && writers[slot] != null) {
                     writers[slot].writeGamepadState(controller.remappedState);
                 }
-                return; // Suppress raw state sending if remapped state was sent
+                return;
             }
         }
 
+        Log.d("Winlator_StickBinding", "sendGamepadState USING RAW state bindingsCount=0"+
+                " raw(thumbLX="+controller.state.thumbLX+" thumbLY="+controller.state.thumbLY+
+                " thumbRX="+controller.state.thumbRX+" thumbRY="+controller.state.thumbRY+")");
         int slot = assignSlot(controller.getDeviceId());
         if (slot >= 0 && writers[slot] != null) {
             writers[slot].writeGamepadState(controller.state);
@@ -575,12 +626,12 @@ public class WinHandler {
                 if (fakeInputBasePath != null && writers[slot] == null) {
                     writers[slot] = new FakeInputWriter(fakeInputBasePath, slot);
                     writers[slot].open();
-                    Log.d("WinHandler", "Assigned device " + deviceId + " to slot " + slot);
+
                 }
                 return slot;
             }
         }
-        Log.w("WinHandler", "No slots available for device " + deviceId);
+
         return -1;
     }
 
@@ -594,14 +645,14 @@ public class WinHandler {
             }
             usedSlots.remove(slot);
             controllers.remove(deviceId);
-            Log.d("WinHandler", "Device " + deviceId + " disconnected (or OSC disabled). Slot released: " + slot);
+
         }
     }
 
     public void setXInputDisabled(boolean disabled) {
         this.xinputDisabled = disabled;
         this.xinputDisabledInitialized = true;
-        Log.d("WinHandler", "XInput Disabled set to: " + xinputDisabled);
+
     }
 
     /**
@@ -611,7 +662,7 @@ public class WinHandler {
     public void setFakeInputPath(String fakeInputPath) {
         if (fakeInputPath != null && !fakeInputPath.isEmpty()) {
             this.fakeInputBasePath = fakeInputPath;
-            Log.d("WinHandler", "FakeInputWriter base path set: " + fakeInputPath);
+
             startVibrationListener();
         }
     }
@@ -643,11 +694,16 @@ public class WinHandler {
 
     private ExternalController getController(int deviceId) {
         if (controllers.containsKey(deviceId)) {
+            Log.d("Winlator_StickBinding", "WinHandler.getController CACHED deviceId="+deviceId+" controller="+controllers.get(deviceId).getName());
             return controllers.get(deviceId);
         }
         ExternalController controller = ExternalController.getController(deviceId);
         if (controller != null) {
+            Log.d("Winlator_StickBinding", "WinHandler.getController CREATED deviceId="+deviceId+" name="+controller.getName()+" id="+controller.getId());
             controllers.put(deviceId, controller);
+        } else {
+            Log.d("Winlator_StickBinding", "WinHandler.getController NOT_FOUND deviceId="+deviceId+
+                    " deviceExists="+(android.view.InputDevice.getDevice(deviceId) != null));
         }
         return controller;
     }
@@ -658,6 +714,9 @@ public class WinHandler {
 
         if (controller != null) {
             handled = controller.updateStateFromMotionEvent(event);
+            Log.d("Winlator_StickBinding", "WinHandler.onGenericMotionEvent deviceId="+event.getDeviceId()+
+                    " updateResult="+handled+" action="+event.getAction()+
+                    " isJoystick="+ExternalController.isJoystickDevice(event));
             if (handled)
                 sendGamepadState(controller);
         }
@@ -681,6 +740,34 @@ public class WinHandler {
                 sendGamepadState(controller);
         }
         return handled;
+    }
+
+    public void sendGamepadState(int btn, boolean isDown) {
+        ControlsProfile profile = activity.getInputControlsView().getProfile();
+        if (profile != null) {
+            GamepadState state = profile.getGamepadState();
+            state.setPressed(btn, isDown);
+            Log.d("Winlator_StickBinding", "WinHandler.sendGamepadState(btn) btn="+btn+" isDown="+isDown+" state.buttons="+state.buttons);
+            sendGamepadState();
+        }
+    }
+
+    public void sendGamepadAxis(boolean isLeft, int axisX, int axisY) {
+        ControlsProfile profile = activity.getInputControlsView().getProfile();
+        if (profile != null) {
+            GamepadState state = profile.getGamepadState();
+            float fx = axisX / 32767.0f;
+            float fy = axisY / 32767.0f;
+            Log.d("Winlator_StickBinding", "WinHandler.sendGamepadAxis isLeft="+isLeft+" axisX="+axisX+" fx="+fx+" axisY="+axisY+" fy="+fy);
+            if (isLeft) {
+                state.thumbLX = fx;
+                state.thumbLY = fy;
+            } else {
+                state.thumbRX = fx;
+                state.thumbRY = fy;
+            }
+            sendGamepadState();
+        }
     }
 
     public byte getInputType() {

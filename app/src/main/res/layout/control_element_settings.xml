@@ -340,20 +340,22 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Repeat Rate"/>
+                android:text="Repeat Interval (ms)"/>
 
             <TextView
-                android:id="@+id/TVRepeatRate"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
+                android:id="@+id/ETRepeatRate"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:padding="4dp"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <SeekBar
             android:id="@+id/SBRepeatRate"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:min="1"
-            android:max="60"
+            android:max="99"
             android:visibility="gone" />
 
         <LinearLayout

@@ -11,7 +11,7 @@ static void range_compute_sizes(const TouchElement* e, float* out_cw, float* out
 }
 
 int range_keycode(int ordinal, int index) {
-    static const int alphabet[26] = {38,56,54,40,26,41,42,43,31,44,45,46,58,57,32,33,24,27,39,28,30,55,25,52,29,53};
+    static const int alphabet[26] = {38,56,54,40,26,41,42,43,31,44,45,46,58,57,32,33,24,27,39,28,30,55,25,53,29,52};
     static const int number[10]  = {10,11,12,13,14,15,16,17,18,19};
     static const int function[12]= {67,68,69,70,71,72,73,74,75,76,95,96};
     static const int numpad[10]  = {87,88,89,83,84,85,79,80,81,90};
@@ -68,19 +68,20 @@ void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_
         e->range_scroll_offset = -fmodf(e->range_current_offset, scroll_size);
         if (e->range_scroll_offset < 0) e->range_scroll_offset += scroll_size;
         e->range_last_position = pos;
+        g_state.visual_state_dirty = true;
     }
 }
 
 void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     (void)x; (void)y;
     e->visual_active = false;
+    g_state.visual_state_dirty = true;
     e->engaged = false;
     e->current_ptr_id = -1;
 
-    int kc = range_keycode(e->range_ordinal, e->range_index);
-
     if (e->range_hold_pressed) {
         // Hold press was already sent by tick — just release
+        int kc = range_keycode(e->range_ordinal, e->range_index);
         if (kc > 0)
             add_action(result, ACT_KEY_RELEASE, kc, 0, 0);
         e->range_scrolling = false;
@@ -103,19 +104,19 @@ void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms
     uint64_t duration = time_ms - e->down_time_ms;
     bool is_tap = duration < RANGE_TAP_TIMEOUT_MS && !e->range_scrolling;
 
-    
+    int kc = range_keycode(e->range_ordinal, e->range_index);
 
     if (kc > 0) {
         if (is_tap) {
             // Tap (<200ms, no scroll): press immediately, schedule release for next tick
             // (matches Java postDelayed 30ms, but non-blocking)
-            add_action(result, ACT_KEY_PRESS, kc, 0, 0);
+            add_action(result, ACT_KEY_PRESS, kc, 1, 0);
             e->range_pending_tap_release = true;
             e->range_tap_release_time = now_ms() + 30;
             // Don't clear flags yet — deferred release in tick will do it
         } else {
             // Hold (>=200ms without hold-press, or scroll): press + release immediately
-            add_action(result, ACT_KEY_PRESS, kc, 0, 0);
+            add_action(result, ACT_KEY_PRESS, kc, 1, 0);
             add_action(result, ACT_KEY_RELEASE, kc, 0, 0);
             e->range_scrolling = false;
             e->range_has_binding = false;

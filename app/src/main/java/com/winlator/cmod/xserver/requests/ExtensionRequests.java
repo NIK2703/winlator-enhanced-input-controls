@@ -2,7 +2,6 @@ package com.winlator.cmod.xserver.requests;
 
 import static com.winlator.cmod.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
 
-import android.util.Log;
 
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
@@ -20,7 +19,7 @@ public abstract class ExtensionRequests {
         inputStream.skip(2);
         String name = inputStream.readString8(length);
         Extension extension = client.xServer.getExtensionByName(name);
-        Log.d("XServer", String.format("QueryExtension: name=%s present=%b opcode=%d", name, extension != null, extension != null ? extension.getMajorOpcode() : -1));
+
         try (XStreamLock lock = outputStream.lock()) {
             outputStream.writeByte(RESPONSE_CODE_SUCCESS);
             outputStream.writeByte((byte)0);

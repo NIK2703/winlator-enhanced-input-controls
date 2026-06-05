@@ -6,7 +6,7 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.Icon;
 import android.net.Uri;
-import android.util.Log;
+
 import android.view.ContextThemeWrapper;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -673,7 +673,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
     private void deleteOldFileIfExists(File oldFile) {
         if (oldFile.exists()) {
             if (!oldFile.delete()) {
-                Log.e("ShortcutSettingsDialog", "Failed to delete old file: " + oldFile.getPath());
+
             }
         }
     }
@@ -684,7 +684,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             fileField.setAccessible(true);
             fileField.set(shortcut, newFile);
         } catch (NoSuchFieldException | IllegalAccessException e) {
-            Log.e("ShortcutSettingsDialog", "Error updating shortcut file reference", e);
+
         }
     }
 

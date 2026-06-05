@@ -70,6 +70,7 @@ typedef struct {
 
     int x, y;
     float w, h;
+    float hw, hh;
     float scale;
     bool passthrough_touch;
     ActivationMode activation_mode;
@@ -100,10 +101,11 @@ typedef struct {
     int gesture_swipe_direction;
     bool gesture_swipe_triggered;
     bool gesture_timer_armed;
+    bool gesture_suppressed;
 
     // Auto-repeat (toggle primary binding at configured rate while held)
     bool auto_repeat;
-    int auto_repeat_rate_hz;
+    int auto_repeat_interval_ms;
     uint64_t auto_repeat_last_time;
     bool auto_repeat_primary_pressed;
 
@@ -116,6 +118,7 @@ typedef struct {
 typedef enum {
     GESTURE_STATE_IDLE,
     GESTURE_STATE_TAP_WAITING,
+    GESTURE_STATE_TOUCHING,
     GESTURE_STATE_DOUBLE_TAP_WAITING,
     GESTURE_STATE_LONG_PRESSING,
     GESTURE_STATE_DRAGGING
@@ -185,6 +188,10 @@ typedef struct {
     // Single-tap hold timer (touchscreen finger-down hold)
     int single_tap_hold_delay_ms;
     uint64_t single_tap_hold_timer;
+
+    // Deferred single-tap (replaces nanosleep)
+    bool single_tap_deferred;
+    uint64_t single_tap_deferred_time;
 
     // Cached GestureBindingSet fields (recomputed after bindings change, avoids rebuilding per call)
     bool cached_has_active_single_tap;
@@ -271,6 +278,8 @@ typedef struct {
     bool caps_has_double_tap;
     bool caps_has_long_press;
     bool caps_has_long_press_timer;
+    bool caps_has_track_hover_buttons;  // true if any element has ACTIVATION_TRACK or ACTIVATION_HOVER
+    bool caps_has_toggle_switch;         // true if any element has toggle_switch
 } TouchProcessorConfig;
 
 // Compute gesture capability flags from a TouchProcessorConfig
@@ -324,6 +333,7 @@ typedef enum {
     ACT_START_MOUSE_MOVE,
     ACT_STOP_MOUSE_MOVE,
     ACT_GAMEPAD_STATE,       // a0=button_index, a1=is_down
+    ACT_GAMEPAD_RELEASE,     // scheduled-action-only: gamepad button release
     ACT_GAMEPAD_AXIS         // a0=is_left (0=left,1=right), a1=axis_x, a2=axis_y
 } ActionType;
 

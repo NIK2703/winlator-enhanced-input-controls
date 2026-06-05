@@ -1,7 +1,7 @@
 package com.winlator.cmod.inputcontrols;
 
 import android.content.Context;
-import android.util.Log;
+
 
 import androidx.annotation.NonNull;
 
@@ -608,7 +608,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             }
         }
         catch (JSONException e) {
-            Log.w("ControlsProfile", "Failed to load touchscreenGestures", e);
+
         }
         gestureSettingsLoaded = true;
     }
@@ -674,7 +674,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 singleTapDelay = clamp(gestureData.getInt("singleTapDelay"), 0, 10);
         }
         catch (JSONException e) {
-            Log.w("ControlsProfile", "Failed to parse gesture field in touchscreenGestures", e);
+
         }
     }
 
@@ -735,7 +735,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 cursorSpeed = (float)gestureData.getDouble("cursorSpeed");
         }
         catch (JSONException e) {
-            Log.w("ControlsProfile", "Failed to parse touchpad gesture field", e);
+
         }
     }
 
@@ -799,7 +799,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 touchActivationMode = parseEnum(TouchActivationMode.class, gestureData.getString("touchActivationMode"), TouchActivationMode.LOCK);
         }
         catch (JSONException e) {
-            Log.w("ControlsProfile", "Failed to parse unified gesture field", e);
+
         }
     }
 
@@ -1110,7 +1110,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 if (elementJSONObject.has("dpadCornerRadius")) element.setDpadCornerRadius((float)elementJSONObject.getDouble("dpadCornerRadius"));
                 element.setToggleSwitch(elementJSONObject.getBoolean("toggleSwitch"));
                 if (elementJSONObject.has("autoRepeat")) element.setAutoRepeat(elementJSONObject.getBoolean("autoRepeat"));
-                if (elementJSONObject.has("autoRepeatRateHz")) element.setAutoRepeatRateHz(elementJSONObject.getInt("autoRepeatRateHz"));
+                if (elementJSONObject.has("autoRepeatIntervalMs"))
+                    element.setAutoRepeatIntervalMs(elementJSONObject.getInt("autoRepeatIntervalMs"));
+                else if (elementJSONObject.has("autoRepeatRateHz"))
+                    element.setAutoRepeatIntervalMs(1000 / elementJSONObject.getInt("autoRepeatRateHz"));
                 if (elementJSONObject.has("passthroughTouch")) element.setPassthroughTouch(elementJSONObject.getBoolean("passthroughTouch"));
                 if (elementJSONObject.has("opacity")) element.setOpacity((float)elementJSONObject.getDouble("opacity"));
                 element.setX((int)(elementJSONObject.getDouble("x") * inputControlsView.getMaxWidth()));

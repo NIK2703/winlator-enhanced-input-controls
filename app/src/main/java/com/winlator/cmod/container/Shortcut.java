@@ -3,7 +3,7 @@ package com.winlator.cmod.container;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Environment;
-import android.util.Log;
+
 
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.StringUtils;
@@ -247,7 +247,7 @@ public class Shortcut {
 
             return true;
         } catch (Exception e) {
-            Log.e("Shortcut", "Failed to clone shortcut to new container", e);
+
             return false;
         }
     }

@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project(Winlator)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wno-unused-function -Wimplicit-function-declaration")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-unused-function -Wimplicit-function-declaration")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fomit-frame-pointer -Wno-unused-function -Wimplicit-function-declaration")
+# LTO handled via INTERPROCEDURAL_OPTIMIZATION per-target below
+# (avoids clashing with system ld.gold which lacks LLVMgold.so)
 
 add_subdirectory(OpenXR-SDK)
 add_subdirectory(patchelf)
@@ -54,7 +57,7 @@ add_library(touch_processor SHARED
         winlator/element/range_button.c
 )
 
-target_compile_options(touch_processor PRIVATE -Wall -Wextra)
+target_compile_options(touch_processor PRIVATE -Wall -Wextra -ffast-math -funroll-loops -ftree-vectorize)
 set_source_files_properties(winlator/touch_processor.c PROPERTIES COMPILE_OPTIONS "-std=c11")
 set_source_files_properties(winlator/touch_processor_jni.cpp PROPERTIES COMPILE_OPTIONS "-std=c++17")
 target_link_libraries(touch_processor log android)
@@ -91,7 +94,8 @@ add_library(vulkan_renderer SHARED
         ${CMAKE_CURRENT_BINARY_DIR}/window_frag.h
 )
 
-target_compile_options(vulkan_renderer PRIVATE -Wall -Wextra -fvisibility=hidden -std=c++17)
+target_compile_options(vulkan_renderer PRIVATE -Wall -Wextra -fvisibility=hidden -std=c++17 -O3)
+# LTO disabled — NDK toolchain forces ld.gold which lacks LLVMgold.so
 
 target_link_libraries(vulkan_renderer
         log

@@ -6,7 +6,7 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.os.Handler;
-import android.util.Log;
+
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.PointerIcon;
@@ -139,22 +139,19 @@ public class TouchpadView extends View {
             switch (action) {
                 case MotionEvent.ACTION_DOWN:
                 case MotionEvent.ACTION_POINTER_DOWN: {
-                    nativeTouchProcessor.onFingerDown(pointerId, event.getX(actionIndex), event.getY(actionIndex));
+                    nativeTouchProcessor.onFingerDown(pointerId, event.getX(actionIndex), event.getY(actionIndex), event.getEventTime());
                     break;
                 }
                 case MotionEvent.ACTION_MOVE: {
                     for (int i = 0; i < event.getPointerCount(); i++) {
                         int pid = event.getPointerId(i);
-                        int idx = event.findPointerIndex(pid);
-                        if (idx >= 0) {
-                            nativeTouchProcessor.onFingerMove(pid, event.getX(idx), event.getY(idx));
-                        }
+                        nativeTouchProcessor.onFingerMove(pid, event.getX(i), event.getY(i), event.getEventTime());
                     }
                     break;
                 }
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_POINTER_UP: {
-                    nativeTouchProcessor.onFingerUp(pointerId, event.getX(actionIndex), event.getY(actionIndex));
+                    nativeTouchProcessor.onFingerUp(pointerId, event.getX(actionIndex), event.getY(actionIndex), event.getEventTime());
                     break;
                 }
                 case MotionEvent.ACTION_CANCEL: {
@@ -180,15 +177,15 @@ public class TouchpadView extends View {
 
         switch (action) {
             case MotionEvent.ACTION_HOVER_ENTER:
-                Log.d("StylusEvent", "Hover Enter");
+
                 break;
             case MotionEvent.ACTION_HOVER_MOVE:
-                Log.d("StylusEvent", "Hover Move: (" + event.getX() + ", " + event.getY() + ")");
+
                 float[] transformedPoint = XForm.transformPoint(xform, event.getX(), event.getY());
                 xServer.injectPointerMove((int) transformedPoint[0], (int) transformedPoint[1]);
                 break;
             case MotionEvent.ACTION_HOVER_EXIT:
-                Log.d("StylusEvent", "Hover Exit");
+
                 break;
             default:
                 return false;

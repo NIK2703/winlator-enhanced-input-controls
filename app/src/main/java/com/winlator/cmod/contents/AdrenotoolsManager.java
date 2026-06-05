@@ -4,7 +4,7 @@ import android.content.res.AssetManager;
 import android.net.Uri;
 
 import android.content.Context;
-import android.util.Log;
+
 
 import com.winlator.cmod.SettingsFragment;
 import com.winlator.cmod.container.Container;
@@ -88,9 +88,8 @@ public class AdrenotoolsManager {
         ContainerManager containerManager = new ContainerManager(mContext);
         for (Container container : containerManager.getContainers()) {
             HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(container.getGraphicsDriverConfig());
-            Log.d("AdrenotoolsManager", "Checking if container driver version " + config.get("version") + " matches " + getDriverName(adrenoToolsDriverId));
+
             if (config.get("version").contains(getDriverName(adrenoToolsDriverId))) {
-                Log.d("AdrenotoolsManager", "Found a match for container " + container.getName());
                 config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, mContext) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
                 container.setGraphicsDriverConfig(GraphicsDriverConfigDialog.toGraphicsDriverConfig(config));
                 container.saveData();
@@ -98,9 +97,7 @@ public class AdrenotoolsManager {
         }
         for (Shortcut shortcut : containerManager.loadShortcuts()) {
             HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(shortcut.getExtra("graphicsDriverConfig", shortcut.container.getGraphicsDriverConfig()));
-            Log.d("AdrenotoolsManager", "Checking if shortcut driver version " + config.get("version") + " matches " + getDriverName(adrenoToolsDriverId));
             if (config.get("version").contains(getDriverName(adrenoToolsDriverId))) {
-                Log.d("AdrenotoolsManager", "Found a match for shortcut " + shortcut.name);
                 config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, mContext) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
                 shortcut.putExtra("graphicsDriverConfig", GraphicsDriverConfigDialog.toGraphicsDriverConfig(config));
                 shortcut.saveData();
@@ -109,7 +106,6 @@ public class AdrenotoolsManager {
     }
     
     public void removeDriver(String adrenoToolsDriverId) {
-        Log.d("AdrenotoolsManager", "Removing driver " + adrenoToolsDriverId);
         File driverPath = new File(adrenotoolsContentDir, adrenoToolsDriverId);
         reloadContainers(adrenoToolsDriverId);
         FileUtils.delete(driverPath);
@@ -152,7 +148,6 @@ public class AdrenotoolsManager {
             return true;
 
         dst.mkdirs();
-        Log.d("AdrenotoolsManager", "Extracting " + src + " to " + dst.getAbsolutePath());
         hasExtracted = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, mContext, src, dst);
 
         if (!hasExtracted)
@@ -190,12 +185,10 @@ public class AdrenotoolsManager {
                 }
             }
             else {
-                Log.d("AdrenotoolsManager", "Failed to install driver, a valid driver has not been selected");
                 tmpDir.delete();
             }
         }
         catch (IOException e) {
-            Log.d("AdrenotoolsManager", "Failed to install driver, a valid driver has not been selected");
             tmpDir.delete();
         }
         

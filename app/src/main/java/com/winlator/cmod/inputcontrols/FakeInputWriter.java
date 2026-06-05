@@ -83,10 +83,8 @@ public class FakeInputWriter {
             raf.seek(raf.length());
             channel = raf.getChannel();
             isOpen = true;
-            Log.i(TAG, "Opened fake input: " + eventFile.getAbsolutePath());
             return true;
-        } catch (IOException e) {
-            Log.e(TAG, "Failed to open: " + e.getMessage());
+        } catch (IOException | SecurityException e) {
             return false;
         }
     }
@@ -168,10 +166,8 @@ public class FakeInputWriter {
             try {
                 channel.write(buffer);
             } catch (IOException e) {
-                Log.e(TAG, "Reset write error: " + e.getMessage());
             }
         }
-        Log.i(TAG, "Reset fake input to neutral state: " + eventFile.getAbsolutePath());
     }
 
 
@@ -185,7 +181,7 @@ public class FakeInputWriter {
         close();
         if (eventFile != null && eventFile.exists()) {
             boolean deleted = eventFile.delete();
-            Log.i(TAG, "Deleted fake input: " + eventFile.getAbsolutePath() + " (" + deleted + ")");
+
         }
     }
 
@@ -220,6 +216,12 @@ public class FakeInputWriter {
         if (!isOpen && !open())
             return;
 
+        Log.d("Winlator_FakeInput", "writeGamepadState slot="+eventFile.getName());
+        Log.d("Winlator_StickBinding", "FakeInputWriter.writeGamepadState thumbLX="+state.thumbLX+" ("+(int)(state.thumbLX*32767)+")"+
+                " thumbLY="+state.thumbLY+" ("+(int)(state.thumbLY*32767)+")"+
+                " thumbRX="+state.thumbRX+" ("+(int)(state.thumbRX*32767)+")"+
+                " thumbRY="+state.thumbRY+" ("+(int)(state.thumbRY*32767)+")"+
+                " buttons="+state.buttons);
         buffer.clear();
         hasChanges = false;
 
@@ -277,7 +279,7 @@ public class FakeInputWriter {
             try {
                 channel.write(buffer);
             } catch (IOException e) {
-                Log.e(TAG, "Write error: " + e.getMessage());
+
             }
         }
     }

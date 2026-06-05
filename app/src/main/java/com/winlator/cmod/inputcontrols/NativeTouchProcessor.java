@@ -1,23 +1,36 @@
 package com.winlator.cmod.inputcontrols;
 
+import android.os.Handler;
 import android.os.SystemClock;
+import android.util.Log;
 
+import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XKeycode;
 import com.winlator.cmod.xserver.XServer;
 
+import java.util.HashMap;
 import java.util.List;
 
-import com.winlator.cmod.inputcontrols.TouchActivationMode;
 import com.winlator.cmod.core.HapticUtils;
+import com.winlator.cmod.inputcontrols.TouchActivationMode;
 
 public class NativeTouchProcessor {
     private static final int BINDING_KEYBOARD_FIRST = 0x100;
     private static final int BINDING_KEYBOARD_LAST = 0x400;
     private static final int BINDING_GAMEPAD_BASE = 0x500;
     private static boolean loaded;
+    private static final XKeycode[] KEYCODES_BY_ID = new XKeycode[256];
+    private static final HashMap<Integer, XKeycode> keycodeMap = new HashMap<>();
+    static {
+        for (XKeycode kc : XKeycode.values()) {
+            if (kc.id >= 0 && kc.id < 256) KEYCODES_BY_ID[kc.id] = kc;
+            keycodeMap.put((int)kc.id, kc);
+        }
+    }
+    private static final Pointer.Button[] POINTER_BUTTONS = Pointer.Button.values();
 
     public static class TouchActionResult {
         public static final int ACT_NONE = 0;
@@ -38,7 +51,7 @@ public class NativeTouchProcessor {
 
         public int count;
         public int[] types;
-        public int[] intArgs; // 3 ints per action
+        public int[] intArgs;
     }
 
     public static class NativeConfig {
@@ -64,7 +77,6 @@ public class NativeTouchProcessor {
         public int cursorAccelerationThreshold;
         public float cursorAccelerationFactor;
 
-        // Touchscreen gesture bindings (12 lists, each as [type0, keycode0, type1, keycode1, ...])
         public int[] tsSingleTap;
         public int[] tsLongPress;
         public int[] tsDoubleTap;
@@ -76,7 +88,6 @@ public class NativeTouchProcessor {
         public int[] tsSingleTapDrag2nd;
         public int[] tsDoubleTapDrag2nd;
 
-        // Touchpad gesture bindings (12 lists)
         public int[] tpSingleTap;
         public int[] tpLongPress;
         public int[] tpDoubleTap;
@@ -100,17 +111,16 @@ public class NativeTouchProcessor {
         public float cornerRadius;
         public boolean passthroughTouch;
         public int activationMode;
-        public int[] bindingTypes; // [type0, keycode0, type1, keycode1, ...]
-        public int[] elementLongPress;   // [type0, keycode0, ...]
-        public int[] elementGesture;     // [type0, keycode0, ...]
+        public int[] bindingTypes;
+        public int[] elementLongPress;
+        public int[] elementGesture;
         public boolean toggleSwitch;
         public boolean autoRepeat;
-        public int autoRepeatRateHz = 10;
+        public int autoRepeatIntervalMs = 100;
         public float opacity;
         public int buttonLongPressHaptic = 1;
         public int buttonGestureHaptic = 1;
 
-        // Range button fields
         public int rangeOrdinal;
         public int rangeMax;
         public int bindingCount;
@@ -120,12 +130,37 @@ public class NativeTouchProcessor {
     private XServer xServer;
     private InputControlsView inputControlsView;
     private boolean running;
+    private static final String TAG = "NativeTouchProc";
+    private Handler handler;
+    private InputMode inputMode;
+    private boolean hapticEnabled;
+    private int cursorSpeed;
+    private int mouseMoveDx;
+    private int mouseMoveDy;
+    private int mouseMoveHold;
+    private Runnable mouseMoveRunnable;
+    private Runnable mouseMoveTask;
+    {
+        mouseMoveTask = () -> {
+            if (inputMode == InputMode.RELATIVE) {
+                xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, mouseMoveDx, mouseMoveDy, 0);
+            } else {
+                xServer.injectPointerMoveDelta(mouseMoveDx, mouseMoveDy);
+            }
+            handler.postDelayed(mouseMoveTask, 16);
+        };
+    }
+    private int elementCount;
+    private float[] outPositions;
+    private byte[] outActive;
 
     public NativeTouchProcessor() {
         try {
             System.loadLibrary("touch_processor");
             loaded = true;
         } catch (UnsatisfiedLinkError e) {
+            loaded = false;
+        } catch (Exception e) {
             loaded = false;
         }
     }
@@ -138,10 +173,10 @@ public class NativeTouchProcessor {
     // Native methods
     private static native void nativeInit(NativeConfig config);
     private static native void nativeSetElements(NativeElement[] elements);
-    private static native TouchActionResult nativeOnFingerDown(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
-    private static native TouchActionResult nativeOnFingerMove(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
-    private static native TouchActionResult nativeOnFingerUp(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
-    private static native TouchActionResult nativeTick(long timeMs, float[] outPositions, byte[] outActive);
+    private static native void nativeOnFingerDown(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
+    private static native void nativeOnFingerMove(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
+    private static native void nativeOnFingerUp(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
+    private static native void nativeTick(long timeMs, float[] outPositions, byte[] outActive);
     private static native void nativeReset();
     private static native boolean nativeIsPassthroughActive();
     private static native void nativeSetSnappingSize(float size);
@@ -151,25 +186,31 @@ public class NativeTouchProcessor {
     private static native void nativeSetXformScale(float scaleX, float scaleY);
     private static native void nativeSetViewOffset(float offsetX, float offsetY);
     private static native boolean nativeGetElementState(int elemIndex, float[] outXY);
-
     private static native boolean nativeHandleDownByMode(int ptrId, float x, float y, long timeMs);
     private static native boolean nativeHandleUpByMode(int ptrId, float x, float y, long timeMs);
     private static native void nativeHandleMoveByMode(int ptrId, float x, float y, long timeMs);
     private static native int nativeTrackedCount(int ptrId);
     private static native int nativeHoveredIndex(int ptrId);
+    private static native void nativeRegisterDispatcher(Object dispatcher);
 
     public void init(NativeConfig config) {
-        if (!loaded) return;
+        if (!loaded) {
+            return;
+        }
         nativeInit(config);
+        nativeRegisterDispatcher(this);
+        hapticEnabled = config.hapticEnabled;
     }
 
     public void updateConfig(NativeConfig config) {
         if (!loaded) return;
         nativeUpdateConfig(config);
+        hapticEnabled = config.hapticEnabled;
     }
 
     public void setElements(NativeElement[] elements) {
         if (!loaded) return;
+        elementCount = (elements != null) ? elements.length : 0;
         nativeSetElements(elements);
     }
 
@@ -199,18 +240,30 @@ public class NativeTouchProcessor {
     }
 
     public boolean handleDownByMode(int ptrId, float x, float y) {
+        return handleDownByMode(ptrId, x, y, SystemClock.uptimeMillis());
+    }
+
+    public boolean handleDownByMode(int ptrId, float x, float y, long eventTime) {
         if (!loaded) return false;
-        return nativeHandleDownByMode(ptrId, x, y, SystemClock.uptimeMillis());
+        return nativeHandleDownByMode(ptrId, x, y, eventTime);
     }
 
     public boolean handleUpByMode(int ptrId, float x, float y) {
+        return handleUpByMode(ptrId, x, y, SystemClock.uptimeMillis());
+    }
+
+    public boolean handleUpByMode(int ptrId, float x, float y, long eventTime) {
         if (!loaded) return false;
-        return nativeHandleUpByMode(ptrId, x, y, SystemClock.uptimeMillis());
+        return nativeHandleUpByMode(ptrId, x, y, eventTime);
     }
 
     public void handleMoveByMode(int ptrId, float x, float y) {
+        handleMoveByMode(ptrId, x, y, SystemClock.uptimeMillis());
+    }
+
+    public void handleMoveByMode(int ptrId, float x, float y, long eventTime) {
         if (!loaded) return;
-        nativeHandleMoveByMode(ptrId, x, y, SystemClock.uptimeMillis());
+        nativeHandleMoveByMode(ptrId, x, y, eventTime);
     }
 
     public int getTrackedCount(int ptrId) {
@@ -223,9 +276,6 @@ public class NativeTouchProcessor {
         return nativeHoveredIndex(ptrId);
     }
 
-    /**
-     * Build a NativeConfig from a ControlsProfile and screen dimensions.
-     */
     public static NativeConfig buildNativeConfig(ControlsProfile profile, int screenW, int screenH) {
         return buildNativeConfig(profile, screenW, screenH, 1.0f);
     }
@@ -233,18 +283,15 @@ public class NativeTouchProcessor {
     public static NativeConfig buildNativeConfig(ControlsProfile profile, int screenW, int screenH, float globalCursorSpeed) {
         NativeConfig c = new NativeConfig();
 
-        // Derive touchMode from MouseMode
         if (profile.getMouseMode() == com.winlator.cmod.inputcontrols.MouseMode.TOUCHSCREEN) {
-            c.touchMode = 1; // TOUCH_MODE_TOUCHSCREEN
+            c.touchMode = 1;
         } else {
-            c.touchMode = 0; // TOUCH_MODE_TOUCHPAD
+            c.touchMode = 0;
         }
         c.inputMode = profile.getInputMode() == com.winlator.cmod.inputcontrols.InputMode.RELATIVE ? 0 : 1;
-        // Unified gesture settings (shared between touchscreen and touchpad)
         c.longPressTimeoutMs = profile.getLongPressTimeout();
         c.doubleTapTimeoutMs = profile.getDoubleTapTimeout();
         c.dragThresholdPx = profile.getDragThreshold();
-        // Cursor speed is touchpad-only
         c.cursorSpeed = (int)(profile.getCursorSpeed() * globalCursorSpeed * 100);
         c.singleTapDelayMs = profile.getSingleTapDelay();
         c.doubleTapDistancePx = profile.getDoubleTapDistance();
@@ -258,9 +305,6 @@ public class NativeTouchProcessor {
         c.cursorAccelerationThreshold = 6;
         c.cursorAccelerationFactor = 1.25f;
 
-        // Unified gesture bindings — used for BOTH touchscreen and touchpad modes
-        // The C side separates ts/tp arrays, but we populate both from the same unified source.
-        // This ensures identical gesture behavior regardless of mode toggle.
         int[] unifiedSingleTap = bindingListToEncoded(profile.getGestureSingleTapAction());
         int[] unifiedLongPress = bindingListToEncoded(profile.getGestureLongPressAction());
         int[] unifiedDoubleTap = bindingListToEncoded(profile.getGestureDoubleTapAction());
@@ -297,9 +341,6 @@ public class NativeTouchProcessor {
         return c;
     }
 
-    /**
-     * Build a NativeElement[] from a list of ControlElements and a global activation mode.
-     */
     public static NativeElement[] buildNativeElements(List<ControlElement> elements, TouchActivationMode activationMode) {
         return buildNativeElements(elements, activationMode, null);
     }
@@ -323,14 +364,12 @@ public class NativeTouchProcessor {
             ne.activationMode = activationMode != null ? activationMode.ordinal() : 0;
             ne.toggleSwitch = ce.isToggleSwitch();
             ne.autoRepeat = ce.isAutoRepeat();
-            ne.autoRepeatRateHz = ce.getAutoRepeatRateHz();
+            ne.autoRepeatIntervalMs = ce.getAutoRepeatIntervalMs();
             ne.opacity = ce.getEffectiveOpacity();
 
-            // Per-element haptic settings from profile
             ne.buttonLongPressHaptic = p != null ? p.getButtonLongPressHaptic() : 1;
             ne.buttonGestureHaptic = p != null ? p.getButtonGestureHaptic() : 1;
 
-            // Range button fields
             if (ce.getType() == ControlElement.Type.RANGE_BUTTON) {
                 ne.rangeOrdinal = ce.getRange().ordinal();
                 ne.rangeMax = ce.getRange().max;
@@ -338,32 +377,30 @@ public class NativeTouchProcessor {
                 ne.orientation = ce.getOrientation();
             }
 
-            // Element-specific gesture bindings
             ne.elementLongPress = bindingListToEncoded(ce.getLongPressBindings());
             ne.elementGesture = bindingListToEncoded(ce.getGestureBindings());
 
-            // Encode up to 4 bindings as [type0, keycode0, type1, keycode1, ...]
             ne.bindingTypes = new int[ce.getBindingCount() * 2];
             for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
                 Binding b = ce.getBindingAt(j);
                 int typeVal;
                 int keycodeVal = 0;
                 if (b == null || b == Binding.NONE) {
-                    typeVal = 0; // BINDING_NONE
+                    typeVal = 0;
                 } else if (b.isGamepad()) {
                     int ordinal = b.ordinal() - Binding.GAMEPAD_BUTTON_A.ordinal();
                     typeVal = BINDING_GAMEPAD_BASE + ordinal;
                     keycodeVal = ordinal;
                 } else if (b == Binding.MOUSE_LEFT_BUTTON) {
-                    typeVal = 1; // BINDING_MOUSE_LEFT
+                    typeVal = 1;
                 } else if (b == Binding.MOUSE_RIGHT_BUTTON) {
-                    typeVal = 2; // BINDING_MOUSE_RIGHT
+                    typeVal = 2;
                 } else if (b == Binding.MOUSE_MIDDLE_BUTTON) {
-                    typeVal = 3; // BINDING_MOUSE_MIDDLE
+                    typeVal = 3;
                 } else if (b == Binding.MOUSE_SCROLL_UP) {
-                    typeVal = 6; // BINDING_MOUSE_SCROLL_UP
+                    typeVal = 6;
                 } else if (b == Binding.MOUSE_SCROLL_DOWN) {
-                    typeVal = 7; // BINDING_MOUSE_SCROLL_DOWN
+                    typeVal = 7;
                 } else if (b == Binding.MOUSE_MOVE_LEFT) {
                     typeVal = 8;
                 } else if (b == Binding.MOUSE_MOVE_RIGHT) {
@@ -381,7 +418,6 @@ public class NativeTouchProcessor {
                         typeVal = 0;
                     }
                 } else if (b.isKeyboard()) {
-                    // Keyboard key: encode as BINDING_KEYBOARD_FIRST + X11 keycode
                     typeVal = BINDING_KEYBOARD_FIRST + b.keycode.id;
                     keycodeVal = b.keycode.id;
                 } else {
@@ -395,12 +431,8 @@ public class NativeTouchProcessor {
         return arr;
     }
 
-    /**
-     * Convert a List<Binding> to an int[] encoded as [type0, keycode0, type1, keycode1, ...].
-     */
     private static int[] bindingListToEncoded(List<Binding> list) {
         if (list == null) return new int[0];
-        // Count non-NONE entries
         int count = 0;
         for (Binding b : list) {
             if (b != null && b != Binding.NONE) count++;
@@ -450,60 +482,44 @@ public class NativeTouchProcessor {
         return result;
     }
 
-    public void onFingerDown(int ptrId, float x, float y) {
+    public void onFingerDown(int ptrId, float x, float y, long eventTime) {
         if (!loaded || !running) return;
-        long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeOnFingerDown(ptrId, x, y, t, null, null);
-        executeResult(r);
+        nativeOnFingerDown(ptrId, x, y, eventTime, null, null);
     }
 
-    public void onFingerDown(int ptrId, float x, float y, float[] outPositions, byte[] outActive) {
+    public void onFingerDown(int ptrId, float x, float y, long eventTime, float[] outPositions, byte[] outActive) {
         if (!loaded || !running) return;
-        long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeOnFingerDown(ptrId, x, y, t, outPositions, outActive);
-        executeResult(r);
+        nativeOnFingerDown(ptrId, x, y, eventTime, outPositions, outActive);
     }
 
-    public void onFingerMove(int ptrId, float x, float y) {
+    public void onFingerMove(int ptrId, float x, float y, long eventTime) {
         if (!loaded || !running) return;
-        long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeOnFingerMove(ptrId, x, y, t, null, null);
-        executeResult(r);
+        nativeOnFingerMove(ptrId, x, y, eventTime, null, null);
     }
 
-    public void onFingerMove(int ptrId, float x, float y, float[] outPositions, byte[] outActive) {
+    public void onFingerMove(int ptrId, float x, float y, long eventTime, float[] outPositions, byte[] outActive) {
         if (!loaded || !running) return;
-        long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeOnFingerMove(ptrId, x, y, t, outPositions, outActive);
-        executeResult(r);
+        nativeOnFingerMove(ptrId, x, y, eventTime, outPositions, outActive);
     }
 
-    public void onFingerUp(int ptrId, float x, float y) {
+    public void onFingerUp(int ptrId, float x, float y, long eventTime) {
         if (!loaded || !running) return;
-        long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeOnFingerUp(ptrId, x, y, t, null, null);
-        executeResult(r);
+        nativeOnFingerUp(ptrId, x, y, eventTime, null, null);
     }
 
-    public void onFingerUp(int ptrId, float x, float y, float[] outPositions, byte[] outActive) {
+    public void onFingerUp(int ptrId, float x, float y, long eventTime, float[] outPositions, byte[] outActive) {
         if (!loaded || !running) return;
-        long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeOnFingerUp(ptrId, x, y, t, outPositions, outActive);
-        executeResult(r);
+        nativeOnFingerUp(ptrId, x, y, eventTime, outPositions, outActive);
     }
 
-    public void tick() {
+    public void tick(long eventTime) {
         if (!loaded || !running) return;
-        long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeTick(t, null, null);
-        executeResult(r);
+        nativeTick(eventTime, null, null);
     }
 
-    public void tick(float[] outPositions, byte[] outActive) {
+    public void tick(long eventTime, float[] outPositions, byte[] outActive) {
         if (!loaded || !running) return;
-        long t = SystemClock.uptimeMillis();
-        TouchActionResult r = nativeTick(t, outPositions, outActive);
-        executeResult(r);
+        nativeTick(eventTime, outPositions, outActive);
     }
 
     public void reset() {
@@ -516,113 +532,118 @@ public class NativeTouchProcessor {
         return nativeIsPassthroughActive();
     }
 
-    public void start() { running = true; }
-    public void stop() { running = false; }
+    public void start() {
+        running = true;
+    }
+    public void stop() {
+        running = false;
+    }
 
-    private void executeResult(TouchActionResult r) {
-        if (r == null || r.count <= 0) return;
-        if (xServer == null) return;
+    public void injectPointerMove(int x, int y) {
+        xServer.injectPointerMove(x, y);
+    }
 
-        for (int i = 0; i < r.count && i < r.types.length; i++) {
-            int type = r.types[i];
-            int a0 = r.intArgs[i * 3];
-            int a1 = r.intArgs[i * 3 + 1];
-            int a2 = r.intArgs[i * 3 + 2];
+    public void injectPointerMoveDelta(int dx, int dy) {
+        xServer.injectPointerMoveDelta(dx, dy);
+    }
 
+    public void injectPointerButtonPress(int button) {
+        xServer.injectPointerButtonPress(POINTER_BUTTONS[button]);
+    }
+
+    public void injectPointerButtonRelease(int button) {
+        xServer.injectPointerButtonRelease(POINTER_BUTTONS[button]);
+    }
+
+    public void injectKeyPress(int keycode, boolean isDown) {
+        if (keycode >= 0 && keycode < KEYCODES_BY_ID.length) {
+            XKeycode kc = KEYCODES_BY_ID[keycode];
+            if (kc != null) {
+                if (isDown) xServer.injectKeyPress(kc);
+                else xServer.injectKeyRelease(kc);
+            }
+        }
+    }
+
+    public void injectKeyRelease(int keycode, boolean isDown) {
+        injectKeyPress(keycode, isDown);
+    }
+
+    public void mouseEvent(int flags, int dx, int dy) {
+        xServer.getWinHandler().mouseEvent(flags, dx, dy, 0);
+    }
+
+    public void scrollEvent(int amount) {
+        if (amount != 0) xServer.injectScroll(amount);
+    }
+
+    public void hapticEvent(int effect) {
+        if (hapticEnabled && inputControlsView != null) {
+            HapticUtils.perform(inputControlsView.getContext(), effect);
+        }
+    }
+
+    public void setCursorSpeed(int speed) {
+        cursorSpeed = speed;
+    }
+
+    public void startMouseMove(int dx, int dy, int hold) {
+        if (mouseMoveRunnable != null) {
+            stopMouseMove();
+        }
+        mouseMoveDx = dx;
+        mouseMoveDy = dy;
+        mouseMoveHold = hold;
+        mouseMoveRunnable = mouseMoveTask;
+        handler.post(mouseMoveTask);
+    }
+
+    public void stopMouseMove() {
+        if (mouseMoveRunnable != null) {
+            handler.removeCallbacks(mouseMoveTask);
+            mouseMoveRunnable = null;
+        }
+    }
+
+    public void gamepadState(int btn, boolean isDown) {
+        Log.d("Winlator_StickBinding", "NTP.gamepadState btn="+btn+" isDown="+isDown);
+        if (xServer.getWinHandler() != null) {
+            xServer.getWinHandler().sendGamepadState(btn, isDown);
+        }
+    }
+
+    public void gamepadAxis(int isLeft, int axisX, int axisY) {
+        Log.d("Winlator_StickBinding", "NTP.gamepadAxis isLeft="+isLeft+" axisX="+axisX+" axisY="+axisY);
+        if (xServer.getWinHandler() != null) {
+            xServer.getWinHandler().sendGamepadAxis(isLeft != 0, axisX, axisY);
+        }
+    }
+
+    public void dispatchAllActions(int[] types, int[] intArgs, int count) {
+        for (int i = 0; i < count; i++) {
+            int type = types[i];
+            int a0 = intArgs[i * 3];
+            int a1 = intArgs[i * 3 + 1];
+            int a2 = intArgs[i * 3 + 2];
+            if (type == 13 || type == 14) {
+                Log.d("Winlator_StickBinding", "NTP.dispatchAllActions type="+type+" a0="+a0+" a1="+a1+" a2="+a2);
+            }
             switch (type) {
-                case TouchActionResult.ACT_POINTER_MOVE:
-                    xServer.injectPointerMove(a0, a1);
-                    break;
-                case TouchActionResult.ACT_POINTER_MOVE_DELTA:
-                    xServer.injectPointerMoveDelta(a0, a1);
-                    break;
-                case TouchActionResult.ACT_POINTER_BUTTON_PRESS:
-                    if (a0 >= 0 && a0 < Pointer.Button.values().length)
-                        xServer.injectPointerButtonPress(Pointer.Button.values()[a0]);
-                    break;
-                case TouchActionResult.ACT_POINTER_BUTTON_RELEASE:
-                    if (a0 >= 0 && a0 < Pointer.Button.values().length)
-                        xServer.injectPointerButtonRelease(Pointer.Button.values()[a0]);
-                    break;
-                case TouchActionResult.ACT_KEY_PRESS:
-                    for (XKeycode kc : XKeycode.values()) {
-                        if (kc.id == a0) { xServer.injectKeyPress(kc); break; }
-                    }
-                    break;
-                case TouchActionResult.ACT_KEY_RELEASE:
-                    for (XKeycode kc : XKeycode.values()) {
-                        if (kc.id == a0) { xServer.injectKeyRelease(kc); break; }
-                    }
-                    break;
-                case TouchActionResult.ACT_MOUSE_EVENT: {
-                    // Forward directly to WinHandler
-                    int flags = a0 != 0 ? a0 : MouseEventFlags.MOVE;
-                    if (xServer.getWinHandler() != null) {
-                        xServer.getWinHandler().mouseEvent(flags, a1, a2, 0);
-                    }
-                    break;
-                }
-                case TouchActionResult.ACT_SCROLL:
-                    // Native: -1 = scroll up, +1 = scroll down
-                    if (a0 < 0) {
-                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
-                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
-                    } else if (a0 > 0) {
-                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
-                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
-                    }
-                    break;
-                case TouchActionResult.ACT_HAPTIC:
-                    // Haptic feedback: forward to inputControlsView if available
-                    if (inputControlsView != null && inputControlsView.getTouchpadView() != null) {
-                        com.winlator.cmod.core.HapticUtils.perform(
-                            inputControlsView.getTouchpadView().getContext(), a0 != 0 ? a0 : 1);
-                    }
-                    break;
-                case TouchActionResult.ACT_SET_CURSOR_SPEED:
-                    // Cursor speed adjustment
-                    break;
-                case TouchActionResult.ACT_START_MOUSE_MOVE: {
-                    if (inputControlsView != null) {
-                        inputControlsView.startMouseMove(a0, a1, a2 != 0);
-                    }
-                    break;
-                }
-                case TouchActionResult.ACT_STOP_MOUSE_MOVE: {
-                    if (inputControlsView != null) {
-                        inputControlsView.stopMouseMove();
-                    }
-                    break;
-                }
-                case TouchActionResult.ACT_GAMEPAD_STATE: {
-                    if (inputControlsView != null && inputControlsView.getProfile() != null && xServer.getWinHandler() != null) {
-                        GamepadState state = inputControlsView.getProfile().getGamepadState();
-                        if (a1 != 0) {
-                            state.setPressed(a0, true);
-                        } else {
-                            state.setPressed(a0, false);
-                        }
-                        xServer.getWinHandler().sendGamepadState();
-                    }
-                    break;
-                }
-                case TouchActionResult.ACT_GAMEPAD_AXIS: {
-                    if (inputControlsView != null && inputControlsView.getProfile() != null && xServer.getWinHandler() != null) {
-                        GamepadState state = inputControlsView.getProfile().getGamepadState();
-                        boolean isLeft = a0 != 0;
-                        float axisX = a1 / 32767.0f;
-                        float axisY = a2 / 32767.0f;
-                        if (isLeft) {
-                            state.thumbLX = axisX;
-                            state.thumbLY = axisY;
-                        } else {
-                            state.thumbRX = axisX;
-                            state.thumbRY = axisY;
-                        }
-                        xServer.getWinHandler().sendGamepadState();
-                    }
-                    break;
-                }
+                case 0: break; // ACT_NONE
+                case 1: injectPointerMove(a0, a1); break;
+                case 2: injectPointerMoveDelta(a0, a1); break;
+                case 3: injectPointerButtonPress(a0); break;
+                case 4: injectPointerButtonRelease(a0); break;
+                case 5: injectKeyPress(a0, a1 != 0); break;
+                case 6: injectKeyRelease(a0, a1 != 0); break;
+                case 7: mouseEvent(a0, a1, a2); break;
+                case 8: scrollEvent(a0); break;
+                case 9: hapticEvent(a0); break;
+                case 10: setCursorSpeed(a0); break;
+                case 11: startMouseMove(a0, a1, a2); break;
+                case 12: stopMouseMove(); break;
+                case 13: gamepadState(a0, a1 != 0); break;
+                case 15: gamepadAxis(a0, a1, a2); break;
             }
         }
     }

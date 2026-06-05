@@ -111,7 +111,7 @@ public class ControlElement {
     private boolean selected = false;
     private boolean toggleSwitch = false;
     private boolean autoRepeat = false;
-    private int autoRepeatRateHz = 10;
+    private int autoRepeatIntervalMs = 100;
     private boolean passthroughTouch;
     private float opacity = -1f;
     private final Rect boundingBox = new Rect();
@@ -320,12 +320,12 @@ public class ControlElement {
         this.autoRepeat = autoRepeat;
     }
 
-    public int getAutoRepeatRateHz() {
-        return autoRepeatRateHz;
+    public int getAutoRepeatIntervalMs() {
+        return autoRepeatIntervalMs;
     }
 
-    public void setAutoRepeatRateHz(int autoRepeatRateHz) {
-        this.autoRepeatRateHz = autoRepeatRateHz;
+    public void setAutoRepeatIntervalMs(int autoRepeatIntervalMs) {
+        this.autoRepeatIntervalMs = autoRepeatIntervalMs;
     }
 
     public boolean isPassthroughTouch() {
@@ -816,7 +816,7 @@ public class ControlElement {
         try (FileOutputStream out = new FileOutputStream(new File(cacheDir(), key + ".png"))) {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
         } catch (Exception e) {
-            android.util.Log.w("ControlElement", "save cache " + key + " failed", e);
+
         }
     }
 
@@ -1696,7 +1696,7 @@ public class ControlElement {
             elementJSONObject.put("y", (float)y / inputControlsView.getMaxHeight());
             elementJSONObject.put("toggleSwitch", toggleSwitch);
             elementJSONObject.put("autoRepeat", autoRepeat);
-            elementJSONObject.put("autoRepeatRateHz", autoRepeatRateHz);
+            elementJSONObject.put("autoRepeatIntervalMs", autoRepeatIntervalMs);
             if (passthroughTouch) elementJSONObject.put("passthroughTouch", true);
             if (opacity >= 0) elementJSONObject.put("opacity", opacity);
             elementJSONObject.put("text", text);

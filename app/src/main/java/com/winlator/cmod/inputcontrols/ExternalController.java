@@ -2,6 +2,7 @@ package com.winlator.cmod.inputcontrols;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+
 import android.util.Log;
 import android.view.InputDevice;
 import android.view.KeyEvent;
@@ -232,6 +233,8 @@ public class ExternalController {
             int historySize = event.getHistorySize();
             for (int i = 0; i < historySize; i++) processJoystickInput(event, i);
             processJoystickInput(event, -1);
+            Log.d("Winlator_StickBinding", "updateStateFromMotionEvent: thumbLX="+state.thumbLX+" thumbLY="+state.thumbLY+" thumbRX="+state.thumbRX+" thumbRY="+state.thumbRY+
+                    " triggerL="+state.triggerL+" triggerR="+state.triggerR+" buttons="+state.buttons);
             return true;
         }
         return false;
@@ -304,9 +307,12 @@ public class ExternalController {
                     controller.setName(device.getName());
                     controller.deviceId = deviceIds[i];
                     return controller;
+                } else if (device != null) {
+                    Log.d("Winlator_StickBinding", "ExternalController.getController deviceId="+deviceId+" found="+device.getName()+" but isGameController=false virtual="+device.isVirtual()+" sources="+device.getSources());
                 }
             }
         }
+        Log.d("Winlator_StickBinding", "ExternalController.getController deviceId="+deviceId+" NOT_FOUND");
         return null;
     }
 
@@ -314,8 +320,10 @@ public class ExternalController {
         if (device == null) return false;
         if (device.getName() != null && device.getName().toLowerCase().contains("uinput-fpc")) return false;
         int sources = device.getSources();
-        return !device.isVirtual() && ((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+        boolean result = !device.isVirtual() && ((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
                 ((sources & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK && (sources & InputDevice.SOURCE_MOUSE) == 0));
+        Log.d("Winlator_StickBinding", "isGameController name="+device.getName()+" virtual="+device.isVirtual()+" sources="+sources+" SOURCE_GAMEPAD="+((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD)+" SOURCE_JOYSTICK="+((sources & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK)+" result="+result);
+        return result;
     }
 
 

@@ -1,74 +1,52 @@
+#include <android/log.h>
+#define LOG_TAG "Winlator_Shared"
+#include <android/log.h>
 #include "../touch_processor_internal.h"
 
-static void (*const element_down_handlers[])(TouchElement*, int, float, float, uint64_t, TouchActionResult*) = {
-    [ELEM_BUTTON] = element_button_down,
-    [ELEM_DPAD] = element_dpad_down,
-    [ELEM_STICK] = element_stick_down,
-    [ELEM_TRACKPAD] = element_trackpad_down,
-    [ELEM_RANGE_BUTTON] = element_range_button_down,
-};
-
-static void (*const element_move_handlers[])(TouchElement*, float, float, uint64_t, TouchActionResult*) = {
-    [ELEM_BUTTON] = element_button_move,
-    [ELEM_DPAD] = element_dpad_move,
-    [ELEM_STICK] = element_stick_move,
-    [ELEM_TRACKPAD] = element_trackpad_move,
-    [ELEM_RANGE_BUTTON] = element_range_button_move,
-};
-
-static void (*const element_up_handlers[])(TouchElement*, float, float, uint64_t, TouchActionResult*) = {
-    [ELEM_BUTTON] = element_button_up,
-    [ELEM_DPAD] = element_dpad_up,
-    [ELEM_STICK] = element_stick_up,
-    [ELEM_TRACKPAD] = element_trackpad_up,
-    [ELEM_RANGE_BUTTON] = element_range_button_up,
-};
+#define LOG_SHARED(...) __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Shared", __VA_ARGS__)
 
 bool point_in_element(float px, float py, const TouchElement* e) {
-    float hs = g_state.snapping_size;
-    float cx = e->x;
-    float cy = e->y;
-    float hw, hh;
-
-    switch (e->type) {
-        case ELEM_DPAD:
-            hw = hs * 7.0f * e->scale;
-            hh = hs * 7.0f * e->scale;
-            break;
-        case ELEM_STICK:
-        case ELEM_TRACKPAD:
-            hw = hs * 6.0f * e->scale;
-            hh = hs * 6.0f * e->scale;
-            break;
-        case ELEM_BUTTON:
-            if (e->shape == SHAPE_CIRCLE) {
-                hw = hs * 3.0f * e->scale;
-                hh = hs * 3.0f * e->scale;
-            } else {
-                hw = e->w * hs * 0.5f * e->scale;
-                hh = e->h * hs * 0.5f * e->scale;
-            }
-            break;
-        case ELEM_RANGE_BUTTON:
-            hw = hs * ((e->range_binding_count * 4) / 2) * e->scale;
-            hh = hs * 2.0f * e->scale;
-            if (e->range_orientation == 1) SWAP_F(hw, hh);
-            break;
-        default:
-            hw = e->w * hs * 0.5f * e->scale;
-            hh = e->h * hs * 0.5f * e->scale;
-            break;
-    }
-
-    bool hit = px >= cx - hw && px <= cx + hw && py >= cy - hh && py <= cy + hh;
-    
-    return hit;
+    return px >= e->x - e->hw && px <= e->x + e->hw &&
+           py >= e->y - e->hh && py <= e->y + e->hh;
 }
 
 TouchElement* hit_test_element(float x, float y) {
-    for (int i = g_state.element_count - 1; i >= 0; i--)
-        if (point_in_element(x, y, &g_state.elements[i]))
-            return &g_state.elements[i];
+    // Use spatial grid if available
+    if (g_state.grid_cell_w > 0.0f && g_state.grid_cell_h > 0.0f) {
+        // Early exit: point outside spatial grid bounds cannot hit any element
+        if (x < g_state.grid_min_x || x > g_state.grid_min_x + GRID_COLS * g_state.grid_cell_w ||
+            y < g_state.grid_min_y || y > g_state.grid_min_y + GRID_ROWS * g_state.grid_cell_h)
+            return NULL;
+
+        int col = (int)((x - g_state.grid_min_x) / g_state.grid_cell_w);
+        int row = (int)((y - g_state.grid_min_y) / g_state.grid_cell_h);
+        
+        if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
+            int min_c = col > 0 ? col - 1 : 0;
+            int max_c = col < GRID_COLS - 1 ? col + 1 : GRID_COLS - 1;
+            int min_r = row > 0 ? row - 1 : 0;
+            int max_r = row < GRID_ROWS - 1 ? row + 1 : GRID_ROWS - 1;
+            
+            for (int r = max_r; r >= min_r; r--) {
+                for (int c = max_c; c >= min_c; c--) {
+                    int cell = r * GRID_COLS + c;
+                    int cnt = g_state.spatial_grid_count[cell];
+                    for (int j = cnt - 1; j >= 0; j--) {
+                        TouchElement* e = &g_state.elements[g_state.spatial_grid[cell][j]];
+                        if (point_in_element(x, y, e))
+                            return e;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fallback: linear scan
+    for (int i = g_state.element_count - 1; i >= 0; i--) {
+        TouchElement* e = &g_state.elements[i];
+        if (point_in_element(x, y, e))
+            return e;
+    }
     return NULL;
 }
 
@@ -99,8 +77,41 @@ float cubic_bezier_interpolate(float x, float cpx1, float cpy1) {
     return x > 0 ? by : -by;
 }
 
+#define BEZIER_LUT_SIZE 256
+
+static float g_bezier_lut[BEZIER_LUT_SIZE + 1];
+
+void init_bezier_lut(void) {
+    for (int i = 0; i <= BEZIER_LUT_SIZE; i++) {
+        float x_target = (float)i / (float)BEZIER_LUT_SIZE;
+        float lo = 0.0f, hi = 1.0f;
+        for (int j = 0; j < 16; j++) {
+            float t = (lo + hi) * 0.5f;
+            float omt = 1.0f - t;
+            float bx = 3.0f * omt * omt * t * 0.075f + 3.0f * omt * t * t * 0.45f + t * t * t;
+            if (bx < x_target) lo = t;
+            else hi = t;
+        }
+        float t = (lo + hi) * 0.5f;
+        float omt = 1.0f - t;
+        float by = 3.0f * omt * omt * t * 0.95f + 3.0f * omt * t * t * 0.95f + t * t * t;
+        g_bezier_lut[i] = by;
+    }
+}
+
+// Eager init: constructor runs before any touch events
+__attribute__((constructor)) static void _auto_init_bezier(void) { init_bezier_lut(); }
+
 float cubic_bezier_interpolate_trackpad(float x) {
-    return cubic_bezier_interpolate(x, 0.075f, 0.95f);
+    float abs_x = fabsf(x);
+    if (abs_x <= 0.0001f) return 0.0f;
+    if (abs_x >= 1.0f) return x > 0 ? 1.0f : -1.0f;
+    float f = abs_x * (float)BEZIER_LUT_SIZE;
+    int idx = (int)f;
+    if (idx >= BEZIER_LUT_SIZE) return x > 0 ? 1.0f : -1.0f;
+    float frac = f - (float)idx;
+    float result = g_bezier_lut[idx] + frac * (g_bezier_lut[idx+1] - g_bezier_lut[idx]);
+    return x > 0 ? result : -result;
 }
 
 int detect_swipe_dir(float dx, float dy, float threshold) {
@@ -144,10 +155,13 @@ bool finger_has_engaged_element(int ptr_id) {
 }
 
 void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    LOG_SHARED("handle_element_down type=%d ptr=%d x=%.0f y=%.0f cur_ptr=%d engaged=%d b0=%d",
+        e->type, ptr_id, x, y, e->current_ptr_id, e->engaged, e->bindings[0].type);
     // Java ControlElement.handleTouchDown: if (currentPointerId == -1 && containsPoint(x, y))
     // containsPoint is checked by the caller; guard already-engaged elements here.
     if (e->current_ptr_id >= 0) {
-        
+        LOG_SHARED("  already engaged (ptr=%d), returning", e->current_ptr_id);
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN skip: already engaged ptr=%d type=%d", ptr_id, e->type);
         return;
     }
     e->current_ptr_id = ptr_id;
@@ -158,30 +172,68 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     e->visual_active = true;
     e->visual_x = x;
     e->visual_y = y;
+    g_state.visual_state_dirty = true;
     e->gesture_swipe_triggered = false;
     e->gesture_long_press_triggered = false;
     e->gesture_swipe_direction = -1;
     e->long_press_arm = false;
     e->gesture_timer_armed = false;
+    e->gesture_suppressed = false;
 
-    int idx = e->type;
-    if (idx >= 0 && idx < (int)(sizeof(element_down_handlers)/sizeof(element_down_handlers[0])) && element_down_handlers[idx])
-        element_down_handlers[idx](e, ptr_id, x, y, time_ms, result);
+    switch (e->type) {
+        case ELEM_BUTTON: element_button_down(e, ptr_id, x, y, time_ms, result); break;
+        case ELEM_DPAD: element_dpad_down(e, ptr_id, x, y, time_ms, result); break;
+        case ELEM_STICK: element_stick_down(e, ptr_id, x, y, time_ms, result); break;
+        case ELEM_TRACKPAD: element_trackpad_down(e, ptr_id, x, y, time_ms, result); break;
+        case ELEM_RANGE_BUTTON: element_range_button_down(e, ptr_id, x, y, time_ms, result); break;
+    }
+    LOG_SHARED("  after switch: result_count=%d", result->count);
 }
 
 void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     e->visual_active = true;
     e->visual_x = x;
     e->visual_y = y;
-    int idx = e->type;
-    if (idx >= 0 && idx < (int)(sizeof(element_move_handlers)/sizeof(element_move_handlers[0])) && element_move_handlers[idx])
-        element_move_handlers[idx](e, x, y, time_ms, result);
+    g_state.visual_state_dirty = true;
+    switch (e->type) {
+        case ELEM_BUTTON: element_button_move(e, x, y, time_ms, result); break;
+        case ELEM_DPAD: element_dpad_move(e, x, y, time_ms, result); break;
+        case ELEM_STICK: element_stick_move(e, x, y, time_ms, result); break;
+        case ELEM_TRACKPAD: element_trackpad_move(e, x, y, time_ms, result); break;
+        case ELEM_RANGE_BUTTON: element_range_button_move(e, x, y, time_ms, result); break;
+    }
+    // HOVER mode: non-toggle buttons are only visually active when finger is inside.
+    // This runs after element_button_move (which may return early on gesture trigger)
+    // and overrides any visual_active=true set above for non-hovered buttons.
+    if (e->type == ELEM_BUTTON && e->activation_mode == ACTIVATION_HOVER
+        && !e->toggle_switch && !point_in_element(x, y, e)) {
+        e->visual_active = false;
+    }
 }
 
 void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
-    int idx = e->type;
-    if (idx >= 0 && idx < (int)(sizeof(element_up_handlers)/sizeof(element_up_handlers[0])) && element_up_handlers[idx])
-        element_up_handlers[idx](e, x, y, time_ms, result);
+    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "UP type=%d ptr=%d lp_trig=%d swipe=%d b0=%d",
+        e->type, e->current_ptr_id, e->gesture_long_press_triggered, e->gesture_swipe_triggered, e->bindings[0].type);
+    switch (e->type) {
+        case ELEM_BUTTON: element_button_up(e, x, y, time_ms, result); break;
+        case ELEM_DPAD: element_dpad_up(e, x, y, time_ms, result); break;
+        case ELEM_STICK: element_stick_up(e, x, y, time_ms, result); break;
+        case ELEM_TRACKPAD: element_trackpad_up(e, x, y, time_ms, result); break;
+        case ELEM_RANGE_BUTTON: element_range_button_up(e, x, y, time_ms, result); break;
+    }
+    g_state.visual_state_dirty = true;
+}
+
+void suppress_element_gestures(TouchElement* e, TouchActionResult* result) {
+    LOG_SHARED("suppress_element_gestures type=%d b0=%d lp_arm=%d",
+        e->type, e->bindings[0].type, e->long_press_arm);
+    if (e->long_press_arm && e->bindings[0].type != BINDING_NONE)
+        press_binding(result, &e->bindings[0], true);
+    e->long_press_arm = false;
+    e->gesture_long_press_triggered = false;
+    e->gesture_swipe_triggered = false;
+    e->gesture_timer_armed = false;
+    e->gesture_suppressed = true;
 }
 
 void release_element_bindings(TouchElement* e, TouchActionResult* result) {
@@ -212,6 +264,7 @@ void release_element_bindings(TouchElement* e, TouchActionResult* result) {
     e->current_ptr_id = -1;
     e->engaged = false;
     e->visual_active = false;
+    g_state.visual_state_dirty = true;
 }
 
 void touch_finger_cache_bs(TouchFinger* f) {
@@ -224,5 +277,49 @@ void touch_finger_cache_bs(TouchFinger* f) {
     f->cached_has_active_double_tap_drag = bs.has_active_double_tap_drag;
     f->cached_can_hold_long_press = bs.can_hold_long_press;
     f->cached_has_long_press_timer = bs.has_long_press_timer;
+}
+
+void build_spatial_grid(void) {
+    if (g_state.element_count == 0) {
+        g_state.grid_cell_w = 0.0f;
+        return;
+    }
+    
+    float min_x = 1e9f, min_y = 1e9f, max_x = -1e9f, max_y = -1e9f;
+    for (int i = 0; i < g_state.element_count; i++) {
+        TouchElement* e = &g_state.elements[i];
+        float hw = e->hw;
+        float hh = e->hh;
+        
+        float x1 = (float)e->x - hw, y1 = (float)e->y - hh;
+        float x2 = (float)e->x + hw, y2 = (float)e->y + hh;
+        if (x1 < min_x) min_x = x1; if (y1 < min_y) min_y = y1;
+        if (x2 > max_x) max_x = x2; if (y2 > max_y) max_y = y2;
+    }
+    
+    float range_x = max_x - min_x;
+    float range_y = max_y - min_y;
+    if (range_x < 1.0f) range_x = 1.0f;
+    if (range_y < 1.0f) range_y = 1.0f;
+    
+    g_state.grid_min_x = min_x;
+    g_state.grid_min_y = min_y;
+    g_state.grid_cell_w = range_x / GRID_COLS;
+    g_state.grid_cell_h = range_y / GRID_ROWS;
+    
+    memset(g_state.spatial_grid_count, 0, sizeof(g_state.spatial_grid_count));
+    
+    for (int i = 0; i < g_state.element_count; i++) {
+        TouchElement* e = &g_state.elements[i];
+        int col = (int)(((float)e->x - min_x) / g_state.grid_cell_w);
+        int row = (int)(((float)e->y - min_y) / g_state.grid_cell_h);
+        if (col < 0) col = 0; if (col >= GRID_COLS) col = GRID_COLS - 1;
+        if (row < 0) row = 0; if (row >= GRID_ROWS) row = GRID_ROWS - 1;
+        int cell = row * GRID_COLS + col;
+        int cnt = g_state.spatial_grid_count[cell];
+        if (cnt < MAX_ELEMENTS)
+            g_state.spatial_grid[cell][cnt] = i;
+        g_state.spatial_grid_count[cell] = cnt + 1;
+    }
 }
 

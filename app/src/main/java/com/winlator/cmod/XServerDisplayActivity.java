@@ -15,7 +15,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
+
 import android.util.Log;
+import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -1612,7 +1615,7 @@ private void applySidebarSettings() {
             if (nativeTickRunnable == null) {
                 nativeTickRunnable = () -> {
                     if (nativeTouchProcessor != null) {
-                        nativeTouchProcessor.tick();
+                        nativeTouchProcessor.tick(SystemClock.uptimeMillis());
                         if (handler != null) {
                             handler.postDelayed(nativeTickRunnable, tickIntervalMs);
                         }
@@ -1635,7 +1638,7 @@ private void applySidebarSettings() {
                 }
 
                 List<ControlElement> elements = profile.getElements();
-                Log.d(TAG, "showInputControls (post): elements=" + (elements != null ? elements.size() : "null") + " snapSize=" + snapSize);
+
                 if (elements != null && !elements.isEmpty()) {
                     TouchActivationMode actMode = profile.getTouchActivationMode();
                     NativeTouchProcessor.NativeElement[] nativeElements =
@@ -1790,6 +1793,18 @@ private void applySidebarSettings() {
         boolean handledByWinHandler = false;
         boolean handledByTouchpadView = false;
 
+        Log.d("Winlator_StickBinding", "dispatchGenericMotionEvent deviceId="+event.getDeviceId()+
+                " src="+event.getSource()+" action="+event.getAction()+
+                " isFromJoystick="+event.isFromSource(InputDevice.SOURCE_JOYSTICK)+
+                " isFromGamepad="+event.isFromSource(InputDevice.SOURCE_GAMEPAD));
+
+        android.view.InputDevice dev = event.getDevice();
+        if (dev != null) {
+            Log.d("Winlator_StickBinding", "dispatchGenericMotionEvent deviceName="+dev.getName()+
+                    " descriptor="+dev.getDescriptor()+" vendor="+dev.getVendorId()+
+                    " isVirtual="+dev.isVirtual()+" sources="+dev.getSources());
+        }
+
         if (winHandler != null) {
             handledByWinHandler = winHandler.onGenericMotionEvent(event);
         }
@@ -1799,6 +1814,9 @@ private void applySidebarSettings() {
         }
 
         boolean handledBySuper = super.dispatchGenericMotionEvent(event);
+
+        Log.d("Winlator_StickBinding", "dispatchGenericMotionEvent result winHandler="+handledByWinHandler+
+                " touchpad="+handledByTouchpadView+" super="+handledBySuper);
 
         return handledByWinHandler || handledByTouchpadView || handledBySuper;
     }

@@ -1,12 +1,13 @@
 package com.winlator.cmod.xserver;
 
-import android.util.Log;
+
 
 import com.winlator.cmod.xconnector.Client;
 import com.winlator.cmod.xconnector.RequestHandler;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xconnector.XStreamLock;
+import com.winlator.cmod.xserver.errors.BadValue;
 import com.winlator.cmod.xserver.errors.XRequestError;
 import com.winlator.cmod.xserver.extensions.Extension;
 import com.winlator.cmod.xserver.requests.AtomRequests;
@@ -438,7 +439,7 @@ public class XClientRequestHandler implements RequestHandler {
                     try (XLock lock = client.xServer.lockAll()){
                         client.xServer.setGrabbed(true, client);
                         outputStream.writeSuccessReply(client.getSequenceNumber(), 0);
-                        Log.d("XClientRequestHandler", "X_GrabServer request handled successfully:" + outputStream.buffer.position());
+
                     }
                     break;
                 case ClientOpcodes.UNGRAB_SERVER:
@@ -447,7 +448,7 @@ public class XClientRequestHandler implements RequestHandler {
                             client.xServer.setGrabbed(false, null);
                         }
                         outputStream.writeSuccessReply(client.getSequenceNumber(), 0);
-                        Log.d("XClientRequestHandler", "X_UngrabServer request handled successfully:" + outputStream.buffer.position());
+
                     }
                     break;
                 default:
@@ -456,16 +457,14 @@ public class XClientRequestHandler implements RequestHandler {
                         if (extension != null)
                             extension.handleRequest(client, inputStream, outputStream);
                         else
-                            Log.w("XServer", String.format("handleNormalRequest: unhandled opcode=%d, requestData=%d, requestLength=%d", opcode, requestData, requestLength));
-
+                            throw new BadValue(opcode);
                     }
-                    else Log.w("XServer", String.format("handleNormalRequest: unsupported opcode " + opcode));
                     break;
             }
         }
         catch (XRequestError e) {
             client.skipRequest();
-            Log.e("XServer", String.format("handleNormalRequest: XRequestError for opcode=%d: %s", opcode, e));
+
             e.sendError(client, opcode);
         }
 

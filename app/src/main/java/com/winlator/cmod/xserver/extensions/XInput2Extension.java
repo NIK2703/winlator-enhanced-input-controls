@@ -2,7 +2,7 @@ package com.winlator.cmod.xserver.extensions;
 
 import static com.winlator.cmod.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
 
-import android.util.Log;
+
 
 import com.winlator.cmod.xserver.Bitmask;
 import com.winlator.cmod.xserver.Window;
@@ -329,8 +329,7 @@ public class XInput2Extension implements Extension {
                 queryDevice(client, inputStream, outputStream);
                 break;
             default:
-                Log.w("XServer", String.format("XInput2Extension: unhandled minor opcode=%d, requestData=%d, requestLength=%d",
-                        opcode, client.getRequestData(), client.getRemainingRequestLength()));
+
                 inputStream.skip(client.getRemainingRequestLength());
                 break;
         }

@@ -2,6 +2,7 @@ package com.winlator.cmod.xserver;
 
 import android.graphics.Rect;
 import android.util.Log;
+
 import android.util.SparseArray;
 
 import com.winlator.cmod.inputcontrols.InputMode;
@@ -48,7 +49,7 @@ public class XServer {
     private boolean simulateTouchScreen = false;
 
     public XServer(ScreenInfo screenInfo) {
-        Log.d("XServer", "Creating xServer " + screenInfo);
+
         this.screenInfo = screenInfo;
         for (Lockable lockable : Lockable.values()) locks.put(lockable, new ReentrantLock());
 
@@ -157,12 +158,14 @@ public class XServer {
     }
 
     public void injectPointerMove(int x, int y) {
+        Log.d("Winlator_XServer", "injectPointerMove x="+x+" y="+y);
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             pointer.setPosition(x, y);
         }
     }
 
     public void injectPointerMoveDelta(int dx, int dy) {
+        Log.d("Winlator_XServer", "injectPointerMoveDelta dx="+dx+" dy="+dy);
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             int minX = 0, minY = 0;
             int maxX = screenInfo.width - 1, maxY = screenInfo.height - 1;
@@ -213,6 +216,7 @@ public class XServer {
     }
 
     public void injectPointerButtonPress(Pointer.Button buttonCode) {
+        Log.d("Winlator_XServer", "injectPointerButtonPress button="+buttonCode);
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             pointer.setButton(buttonCode, true);
 
@@ -222,6 +226,7 @@ public class XServer {
     }
 
     public void injectPointerButtonRelease(Pointer.Button buttonCode) {
+        Log.d("Winlator_XServer", "injectPointerButtonRelease button="+buttonCode);
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             pointer.setButton(buttonCode, false);
 
@@ -230,17 +235,33 @@ public class XServer {
         }
     }
 
+    public void injectScroll(int direction) {
+        Log.d("Winlator_XServer", "injectScroll direction="+direction);
+        try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
+            Pointer.Button btn = direction < 0 ? Pointer.Button.BUTTON_SCROLL_UP : Pointer.Button.BUTTON_SCROLL_DOWN;
+            pointer.setButton(btn, true);
+            pointer.setButton(btn, false);
+            XInput2Extension xi2 = getExtension(XInput2Extension.MAJOR_OPCODE);
+            if (xi2 != null) {
+                xi2.emitRawButton(2, btn.code(), true);
+                xi2.emitRawButton(2, btn.code(), false);
+            }
+        }
+    }
+
     public void injectKeyPress(XKeycode xKeycode) {
         injectKeyPress(xKeycode, 0);
     }
 
     public void injectKeyPress(XKeycode xKeycode, int keysym) {
+        Log.d("Winlator_XServer", "injectKeyPress keycode="+xKeycode+" keysym="+keysym);
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             keyboard.setKeyPress(xKeycode.id, keysym);
         }
     }
 
     public void injectKeyRelease(XKeycode xKeycode) {
+        Log.d("Winlator_XServer", "injectKeyRelease keycode="+xKeycode);
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             keyboard.setKeyRelease(xKeycode.id);
         }

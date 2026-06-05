@@ -3,11 +3,14 @@
 static void dpad_normalize(float dx, float dy, float radius, float* out_nx, float* out_ny) {
     float dist = sqrtf(dx*dx + dy*dy);
     if (dist > radius) {
-        dx = dx / dist * radius;
-        dy = dy / dist * radius;
+        float inv_dist = 1.0f / dist;
+        *out_nx = dx * inv_dist;
+        *out_ny = dy * inv_dist;
+    } else {
+        float inv_radius = 1.0f / radius;
+        *out_nx = dx * inv_radius;
+        *out_ny = dy * inv_radius;
     }
-    *out_nx = fmaxf(-1.0f, fminf(1.0f, dx / radius));
-    *out_ny = fmaxf(-1.0f, fminf(1.0f, dy / radius));
 }
 
 static void dpad_update(TouchElement* e, float x, float y, TouchActionResult* result) {

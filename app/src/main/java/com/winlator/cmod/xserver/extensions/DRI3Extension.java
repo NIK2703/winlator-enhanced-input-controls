@@ -2,7 +2,6 @@ package com.winlator.cmod.xserver.extensions;
 
 import static com.winlator.cmod.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
 
-import android.util.Log;
 
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.renderer.GPUImage;

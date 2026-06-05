@@ -11,7 +11,7 @@ import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.system.ErrnoException;
 import android.system.Os;
-import android.util.Log;
+
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -166,7 +166,7 @@ public abstract class FileUtils {
             if (filenames != null) {
                 for (String filename : filenames) {
                     if (!copy(new File(srcFile, filename), new File(dstFile, filename), callback)) {
-                        Log.e(TAG, "Failed to copy directory: " + srcFile.getAbsolutePath());
+
                     }
                 }
             }
@@ -182,7 +182,7 @@ public abstract class FileUtils {
                 return dstFile.exists();
             } catch (IOException e) {
                 e.printStackTrace();
-                Log.e(TAG, "Failed to copy file: " + srcFile.getAbsolutePath() + " to " + dstFile.getAbsolutePath(), e);
+
                 return true;
             }
         }
@@ -341,17 +341,17 @@ public abstract class FileUtils {
     }
 
     public static String getFilePathFromUriUsingSAF(Context context, Uri uri) {
-        Log.d(TAG, "getFilePathFromUriUsingSAF called with URI: " + uri.toString());
+
 
         String documentId;
         try {
             documentId = DocumentsContract.getTreeDocumentId(uri);
         } catch (IllegalArgumentException e) {
-            Log.e(TAG, "Invalid URI: " + uri.toString(), e);
+
             return null;
         }
 
-        Log.d(TAG, "Document ID: " + documentId);
+
         String[] split = documentId.split(":");
         String type = split[0];
         String path = split.length > 1 ? split[1] : "";
@@ -359,7 +359,7 @@ public abstract class FileUtils {
         try {
             path = URLDecoder.decode(path, "UTF-8");
         } catch (UnsupportedEncodingException e) {
-            Log.e(TAG, "Error decoding path: " + path, e);
+
             return null;
         }
 
@@ -372,9 +372,7 @@ public abstract class FileUtils {
 
 
     public static String getFilePathFromUri(Context context, Uri uri) {
-        Log.d(TAG, "getFilePathFromUri called with URI: " + uri.toString());
         String filePath = getFilePathFromUriUsingSAF(context, uri);
-        Log.d(TAG, "File path obtained: " + filePath);
         return filePath;
     }
 
@@ -511,7 +509,7 @@ public abstract class FileUtils {
     }
 
     public static File getFileFromUri(Context context, Uri uri) {
-        Log.d(TAG, "getFileFromUri called with URI: " + uri.toString());
+
 
         String filePath = getFilePathFromUriUsingSAF(context, uri);
         if (filePath != null) {
@@ -531,7 +529,7 @@ public abstract class FileUtils {
                 return tempFile;
             }
         } catch (IOException e) {
-            Log.e(TAG, "Failed to open URI: " + uri.toString(), e);
+
         }
 
         return null;
@@ -556,7 +554,7 @@ public abstract class FileUtils {
             out.flush();
             return true;
         } catch (IOException e) {
-            Log.e(TAG, "Error saving bitmap to file: " + file.getAbsolutePath(), e);
+
             return false;
         }
     }
@@ -567,7 +565,7 @@ public abstract class FileUtils {
            file.write(data);
            return true;
         } catch (IOException e) {
-            Log.e(TAG, "Failed to write data " + data + " at " + position + " to " + filename);
+
             return false;
         }
     }

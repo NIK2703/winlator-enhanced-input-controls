@@ -1,0 +1,1646 @@
+--------- beginning of main
+06-05 06:56:22.939 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=0 auto=0 refrain=0
+06-05 06:56:22.939 D/Winlator_Button( 6628): DOWN fresh activate toggle: sel=1 refrain=1
+06-05 06:56:23.091 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:23.091 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.091 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.108 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:23.108 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.108 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.126 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:23.126 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.126 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.141 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.141 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.141 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.158 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.158 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.158 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.174 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.175 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.175 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.191 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.191 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.191 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.208 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.208 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.208 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.224 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.224 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.224 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.241 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.241 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.241 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.258 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.258 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.258 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.274 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.274 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.274 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.291 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.291 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.291 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.308 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.308 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.308 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.324 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.324 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.324 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.341 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.341 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.341 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.358 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.358 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.358 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.375 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.375 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.375 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.392 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.392 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.392 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.408 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.408 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.408 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.426 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.426 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.426 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.442 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.442 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.442 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.459 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.459 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.459 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.475 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.475 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.475 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.492 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.492 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.492 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.508 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.508 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.508 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.525 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.525 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.525 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.542 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:23.542 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.542 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.559 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:23.559 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.559 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.575 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:23.575 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.575 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.592 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:23.592 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.592 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.609 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:23.609 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.609 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.626 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.626 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.626 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.642 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.642 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.643 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.659 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.659 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.659 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.676 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.676 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.676 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.692 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.692 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.692 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.710 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.710 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.710 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.726 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.726 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.726 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.743 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.743 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.743 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.759 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.759 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.759 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.776 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.776 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.776 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.793 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.793 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.793 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.810 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.810 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.810 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.826 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.826 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.826 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.843 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.843 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.843 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.860 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.860 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.860 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.876 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.876 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.876 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.893 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.893 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.893 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.910 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.910 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.910 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.926 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.926 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.926 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.943 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.943 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.943 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.960 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.960 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.960 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.976 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.976 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.976 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:23.993 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:23.993 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:23.993 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.010 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.010 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.010 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.027 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.027 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.027 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.043 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.043 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.043 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.060 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.060 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.060 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.077 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.077 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.077 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.093 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.093 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.094 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.110 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.110 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.110 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.127 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.127 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.127 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.143 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.143 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.143 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.160 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.160 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.160 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.177 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.177 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.177 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.194 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.194 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.194 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.210 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.210 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.210 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.227 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.227 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.227 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.244 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.244 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.244 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.260 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.260 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.260 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.278 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.278 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.278 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.294 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.294 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.294 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.311 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.311 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.311 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.327 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.327 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.327 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.344 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.344 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.344 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.361 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.361 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.361 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.377 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.377 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.377 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.394 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.394 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.394 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.411 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.411 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.411 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.427 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.427 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.427 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.444 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.444 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.444 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.461 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.461 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.461 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.477 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.477 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.477 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.494 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.494 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.494 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.511 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.511 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.511 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.527 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.527 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.527 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.544 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.544 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.544 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.560 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.560 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.561 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.579 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.579 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.579 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.595 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:24.595 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.595 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.601 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:24.601 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:24.601 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.602 D/Winlator_Button( 6628): UP toggle: sel=1 vis=1 in=0 fresh=1
+06-05 06:56:24.645 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.662 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.678 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.695 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.711 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.728 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.745 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:24.752 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.163 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.179 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.196 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.213 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.230 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.246 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.263 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.279 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.296 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.313 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.329 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.347 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.363 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.380 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.396 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.413 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.429 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.446 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.463 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.480 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.496 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.513 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.530 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.547 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.563 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.580 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.597 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.613 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.630 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.647 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.664 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.680 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.698 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.714 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.731 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.747 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.764 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.781 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.797 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.814 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.831 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.848 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.864 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.881 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.898 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.914 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.931 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:25.948 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.965 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.982 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:25.999 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.014 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.032 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.048 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.065 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.081 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.099 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.115 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.131 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.148 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.165 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.183 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.199 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.215 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.232 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.249 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.265 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.282 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.299 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.315 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.332 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.348 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.366 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.382 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.398 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:26.415 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.432 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.448 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.466 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.483 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.499 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.516 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.532 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.549 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.566 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.583 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.599 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.616 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.632 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.650 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.667 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.671 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:26.999 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=0 auto=0 refrain=0
+06-05 06:56:26.999 D/Winlator_Button( 6628): DOWN fresh activate toggle: sel=1 refrain=1
+06-05 06:56:27.086 D/Winlator_Button( 6628): UP toggle: sel=1 vis=1 in=1 fresh=1
+06-05 06:56:27.393 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=1 auto=0 refrain=0
+06-05 06:56:27.393 D/Winlator_Button( 6628): DOWN TRACK/HOVER active toggle: keep active
+06-05 06:56:27.500 D/Winlator_Button( 6628): UP toggle: sel=1 vis=1 in=1 fresh=0
+06-05 06:56:27.500 D/Winlator_Button( 6628): UP toggle: DEACTIVATE (tap off)
+06-05 06:56:27.789 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=0 auto=0 refrain=0
+06-05 06:56:27.789 D/Winlator_Button( 6628): DOWN fresh activate toggle: sel=1 refrain=1
+06-05 06:56:27.878 D/Winlator_Button( 6628): UP toggle: sel=1 vis=1 in=1 fresh=1
+06-05 06:56:28.142 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=1 auto=0 refrain=0
+06-05 06:56:28.142 D/Winlator_Button( 6628): DOWN TRACK/HOVER active toggle: keep active
+06-05 06:56:28.219 D/Winlator_Button( 6628): UP toggle: sel=1 vis=1 in=1 fresh=0
+06-05 06:56:28.219 D/Winlator_Button( 6628): UP toggle: DEACTIVATE (tap off)
+06-05 06:56:28.517 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=0 auto=0 refrain=0
+06-05 06:56:28.517 D/Winlator_Button( 6628): DOWN fresh activate toggle: sel=1 refrain=1
+06-05 06:56:28.604 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:28.604 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.604 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.621 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:28.621 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.621 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.638 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.638 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.638 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.655 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.655 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.655 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.671 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.671 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.671 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.688 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.688 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.688 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.704 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.704 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.704 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.721 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.721 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.721 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.739 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.739 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.739 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.755 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.755 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.755 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.771 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.771 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.771 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.788 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.788 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.788 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.804 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.804 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.804 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.822 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.822 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.822 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.838 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.838 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.838 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.855 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.855 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.855 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.871 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.871 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.871 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.888 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.888 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.888 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.905 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.905 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.905 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.922 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.922 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.922 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.939 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.939 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.939 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.955 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.955 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.955 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.971 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.971 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.971 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:28.988 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:28.988 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:28.988 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.005 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.005 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.005 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.022 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.022 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.022 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.039 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.039 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.039 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.055 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.055 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.055 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.072 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.072 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.072 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.089 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.089 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.089 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.106 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.106 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.106 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.122 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.122 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.122 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.139 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.139 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.140 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.156 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.156 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.156 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.172 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.172 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.172 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.189 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.189 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.189 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.205 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.205 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.205 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.222 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.222 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.222 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.239 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.239 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.239 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.256 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.256 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.256 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.272 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.272 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.272 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.289 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.289 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.289 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.306 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.306 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.306 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.323 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.323 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.323 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.339 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.339 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.339 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.356 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.356 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.356 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.372 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.372 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.372 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.390 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.390 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.390 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.406 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.406 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.406 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.423 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.423 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.423 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.440 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.440 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.440 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.456 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.456 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.456 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.473 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.473 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.473 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.490 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.490 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.490 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.507 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.507 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.507 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.523 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.523 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.523 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.540 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.540 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.540 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.557 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.557 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.557 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.573 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.573 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.573 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.590 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.590 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.590 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.607 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.607 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.607 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.623 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.623 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.623 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.640 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.640 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.640 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.657 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.657 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.657 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.673 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.673 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.673 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.690 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.690 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.690 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.707 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.707 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.707 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.723 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.723 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.723 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.741 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.741 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.741 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.756 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.756 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.756 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.773 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.773 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.773 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.791 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.791 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.791 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.806 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.806 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.806 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.823 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.823 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.823 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.840 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.840 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.840 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.857 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.857 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.857 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.874 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.874 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.874 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.890 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.890 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.890 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.907 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.907 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.907 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.924 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.924 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.924 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.940 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.940 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.940 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.957 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:29.957 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.957 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.974 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.974 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.974 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:29.991 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:29.991 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:29.991 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.007 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.007 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.007 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.024 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.024 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.024 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.041 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.041 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.041 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.058 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.058 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.058 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.074 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.074 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.074 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.091 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.091 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.091 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.107 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.107 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.107 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.125 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.125 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.125 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.141 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.141 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.141 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.158 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.158 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.158 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.175 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.175 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.175 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.191 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.191 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.191 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.208 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.208 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.208 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.224 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.224 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.224 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.241 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.241 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.241 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.259 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.259 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.259 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.289 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:30.289 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:30.289 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.291 D/Winlator_Button( 6628): UP toggle: sel=1 vis=1 in=0 fresh=1
+06-05 06:56:30.609 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.626 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.644 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.659 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.676 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.693 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.710 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.726 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.742 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.759 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.776 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.792 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.809 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.826 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.843 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.860 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.876 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.893 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.910 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:30.926 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:30.943 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:30.959 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:30.976 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:30.993 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.010 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.026 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.043 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.060 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.077 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.093 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.110 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.127 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.144 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.160 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.177 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.194 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.210 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.227 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.244 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.260 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.277 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.294 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.310 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.327 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.344 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.361 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.377 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.394 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.411 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.427 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.444 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.461 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.478 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.495 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.511 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.527 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.544 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.561 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.578 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.595 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.611 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.628 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.644 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.662 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.678 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.695 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.711 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.729 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.745 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.762 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.779 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.795 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:31.812 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.829 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.845 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.862 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.878 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.895 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.912 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.929 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.945 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.962 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.979 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:31.995 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:32.012 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:32.030 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:32.045 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:32.063 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:32.079 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:32.096 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:32.112 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:32.129 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:32.146 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:32.163 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:32.826 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=0 auto=0 refrain=0
+06-05 06:56:32.826 D/Winlator_Button( 6628): DOWN fresh activate toggle: sel=1 refrain=1
+06-05 06:56:32.898 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:32.898 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:32.898 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:32.915 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:32.915 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:32.915 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:32.931 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:32.932 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:32.932 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:32.948 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:32.948 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:32.948 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:32.965 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:32.965 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:32.965 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:32.981 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:32.981 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:32.981 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:32.998 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:32.998 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:32.998 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.015 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.015 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.015 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.031 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.031 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.031 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.048 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.048 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.048 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.065 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.065 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.065 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.081 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.081 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.081 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.098 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.098 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.099 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.115 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.115 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.115 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.131 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.131 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.131 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.148 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.148 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.148 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.165 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.165 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.165 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.181 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.182 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.182 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.198 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.198 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.198 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.215 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.215 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.215 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.231 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.231 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.231 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.248 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.248 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.248 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.265 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.265 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.265 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.282 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.282 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.282 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.299 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.299 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.299 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.315 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.315 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.316 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.332 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.332 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.332 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.349 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.349 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.349 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.366 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.366 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.366 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.382 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.382 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.382 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.399 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.399 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.399 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.416 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.416 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.416 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.433 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.433 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.433 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.449 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.449 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.449 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.466 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.466 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.466 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.482 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.482 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.482 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.500 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.500 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.500 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.516 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.516 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.516 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.532 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.532 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.532 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.549 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.549 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.549 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.566 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.566 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.566 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.584 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.584 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.584 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.599 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.599 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.599 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.617 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.617 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.617 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.633 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.633 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.633 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.649 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.649 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.649 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.667 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.667 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.667 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.683 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.683 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.683 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.700 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.700 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.700 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.716 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.716 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.716 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.733 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.733 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.733 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.750 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.750 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.750 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.766 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.766 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.766 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.783 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.783 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.783 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.799 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.799 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.799 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.816 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.816 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.816 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.833 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:33.833 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.833 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.850 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.850 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.850 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.866 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.866 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.866 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.884 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.884 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.884 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.900 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.900 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.900 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.917 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.917 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.917 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.934 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.934 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.934 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.950 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.950 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.950 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.967 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.967 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.967 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:33.984 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:33.984 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:33.984 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.033 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.033 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.033 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.051 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.051 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.051 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.068 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.068 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.068 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.084 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.084 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.084 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.100 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.100 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.100 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.117 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.117 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.117 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.134 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.134 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.134 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.150 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:34.151 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.151 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.167 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:34.167 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.167 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.185 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:34.185 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.185 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.201 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:34.201 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.201 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.218 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:34.218 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.218 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.234 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:34.234 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.234 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.251 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:34.251 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.251 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.267 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=1
+06-05 06:56:34.268 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.268 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.285 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.285 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.285 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.301 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.301 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.301 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.318 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.318 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.318 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.335 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.335 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.335 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.351 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.351 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.351 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.368 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.368 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.368 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.385 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.385 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.385 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.402 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.402 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.402 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.419 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.419 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.419 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.425 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=1
+06-05 06:56:34.425 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:56:34.425 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.426 D/Winlator_Button( 6628): UP toggle: sel=1 vis=1 in=0 fresh=1
+06-05 06:56:34.869 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.886 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.903 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.919 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.935 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.952 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.969 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:34.986 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:35.003 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:35.020 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:35.037 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:35.054 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:35.070 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:35.087 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:35.102 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:35.120 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:56:35.136 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.153 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.169 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.186 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.203 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.220 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.237 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.253 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.270 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.287 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.304 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.320 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.337 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.353 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.371 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.387 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.404 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:56:35.411 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.047 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.063 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.080 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.096 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.113 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.129 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.147 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.163 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.180 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.196 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.213 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.230 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.246 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.263 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.279 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.296 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.313 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.330 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.346 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.364 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.381 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.397 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.414 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.431 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.447 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.464 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.481 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.498 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.515 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.531 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.547 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.564 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.582 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.598 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.614 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.632 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.648 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.664 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.681 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.699 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.714 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:14.732 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.748 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.764 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.781 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.798 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.814 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.831 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.848 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.865 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.882 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.899 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.915 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.932 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.948 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.965 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.982 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:14.998 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.015 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.032 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.049 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.065 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.082 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.099 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.115 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.133 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.149 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.166 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.182 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.199 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.215 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.232 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.250 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.266 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.283 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.300 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.316 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.333 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.349 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.366 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.383 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.399 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.409 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.690 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=1 auto=0 refrain=0
+06-05 06:57:15.690 D/Winlator_Button( 6628): DOWN TRACK/HOVER active toggle: keep active
+06-05 06:57:15.784 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=0
+06-05 06:57:15.784 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:57:15.784 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.800 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=0
+06-05 06:57:15.800 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:57:15.800 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.818 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=0
+06-05 06:57:15.818 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:57:15.818 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.834 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=0
+06-05 06:57:15.834 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:57:15.834 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.851 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=1 refrain=0
+06-05 06:57:15.851 D/Winlator_Button( 6628): MOVE toggle: result sel=1 vis=1
+06-05 06:57:15.851 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:15.867 D/Winlator_Button( 6628): MOVE toggle: sel=1 vis=1 in=0 refrain=0
+06-05 06:57:15.867 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:15.867 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.884 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:15.884 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:15.884 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.901 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:15.901 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:15.901 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.917 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:15.917 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:15.917 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.934 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:15.934 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:15.934 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.951 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:15.951 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:15.951 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.968 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:15.968 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:15.968 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:15.985 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:15.985 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:15.985 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.001 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.001 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.001 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.018 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.018 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.018 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.034 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.034 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.034 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.051 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.051 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.051 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.067 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.067 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.067 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.084 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.084 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.084 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.101 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.101 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.101 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.118 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.118 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.118 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.134 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.134 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.134 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.151 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.151 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.151 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.168 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.168 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.168 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.185 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.185 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.185 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.201 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.201 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.201 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.219 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.219 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.219 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.235 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.235 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.235 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.252 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.252 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.252 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.268 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.268 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.269 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.285 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.285 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.285 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.302 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.302 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.302 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.318 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.318 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.318 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.335 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.335 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.335 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.352 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.352 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.352 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.369 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.369 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.369 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.385 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.385 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.385 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.402 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.402 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.402 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.419 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.419 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.419 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.436 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.436 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.436 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.452 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.452 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.452 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.469 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.469 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.469 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.485 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.485 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.485 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.502 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.502 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.502 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.518 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.518 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.518 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.535 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.535 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.535 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.552 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.552 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.552 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.569 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.569 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.569 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.586 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.586 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.586 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.602 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.602 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.602 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.619 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.619 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.619 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.636 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.636 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.636 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.652 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.652 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.652 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.670 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.670 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.670 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.686 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.686 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.686 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.703 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.703 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.703 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.719 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.719 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.719 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.736 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:16.736 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.736 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.753 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.753 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.753 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.770 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.770 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.770 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.787 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.787 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.787 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.803 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.803 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.803 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.820 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.820 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.820 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.836 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.836 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.836 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.853 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.853 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.853 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.870 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.870 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.870 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.887 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.887 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.887 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.903 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.903 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.903 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.920 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.920 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.920 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.936 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.936 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.936 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.953 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.953 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.954 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.970 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.970 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.970 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:16.987 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:16.987 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:16.987 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.003 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:17.003 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.003 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.019 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:17.019 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.020 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.036 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:17.036 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.036 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.053 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:17.053 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.053 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.070 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:17.070 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.070 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.086 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:17.086 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.086 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.103 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:17.103 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.103 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.120 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:17.120 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.120 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.137 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:17.137 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.137 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.153 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:17.153 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.153 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.171 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:17.171 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.171 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.187 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:17.187 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.187 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.204 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:17.204 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.204 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.220 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:17.220 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.220 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.237 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=1 refrain=0
+06-05 06:57:17.238 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.238 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.254 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:17.254 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.254 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.271 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:17.271 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.271 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.288 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:17.288 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.288 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.304 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:17.304 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.304 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.321 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:17.321 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.321 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.324 D/Winlator_Button( 6628): MOVE toggle: sel=0 vis=1 in=0 refrain=0
+06-05 06:57:17.324 D/Winlator_Button( 6628): MOVE toggle: result sel=0 vis=0
+06-05 06:57:17.324 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:17.582 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=0 auto=0 refrain=0
+06-05 06:57:17.582 D/Winlator_Button( 6628): DOWN fresh activate toggle: sel=1 refrain=1
+06-05 06:57:17.732 D/Winlator_Button( 6628): UP toggle: sel=1 vis=1 in=1 fresh=1
+06-05 06:57:18.011 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=1 auto=0 refrain=0
+06-05 06:57:18.011 D/Winlator_Button( 6628): DOWN TRACK/HOVER active toggle: keep active
+06-05 06:57:18.103 D/Winlator_Button( 6628): UP toggle: sel=1 vis=1 in=1 fresh=0
+06-05 06:57:18.103 D/Winlator_Button( 6628): UP toggle: DEACTIVATE (tap off)
+06-05 06:57:18.416 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=0 auto=0 refrain=0
+06-05 06:57:18.416 D/Winlator_Button( 6628): DOWN fresh activate toggle: sel=1 refrain=1
+06-05 06:57:18.495 D/Winlator_Button( 6628): UP toggle: sel=1 vis=1 in=1 fresh=1
+06-05 06:57:18.766 D/Winlator_Button( 6628): DOWN toggle mode=2 sel=1 auto=0 refrain=0
+06-05 06:57:18.766 D/Winlator_Button( 6628): DOWN TRACK/HOVER active toggle: keep active
+06-05 06:57:18.843 D/Winlator_Button( 6628): UP toggle: sel=1 vis=1 in=1 fresh=0
+06-05 06:57:18.843 D/Winlator_Button( 6628): UP toggle: DEACTIVATE (tap off)
+06-05 06:57:19.226 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.242 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.259 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.275 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.292 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.309 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.325 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.342 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.359 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.375 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.392 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.409 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.425 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.442 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.459 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.475 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.492 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.509 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.526 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.543 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.560 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.576 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.593 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.610 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.626 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.643 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.660 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.677 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.693 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.710 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.727 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.743 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.760 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.778 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.794 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.811 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.827 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.843 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.860 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.877 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.893 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.910 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:19.927 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.944 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.960 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.977 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:19.994 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.011 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.027 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.044 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.061 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.077 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.094 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.111 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.128 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.144 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.161 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.178 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.194 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.211 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.228 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.244 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.261 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.278 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.295 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.312 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.328 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.345 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:20.361 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.379 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.395 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.412 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.429 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.445 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.462 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.478 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.495 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.512 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.529 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.545 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.562 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.579 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:20.589 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.196 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.213 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.230 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.247 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.263 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.280 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.297 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.313 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.331 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.347 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.364 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.380 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.397 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.414 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.430 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.447 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.464 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.480 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.497 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.514 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.531 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.547 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.564 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.581 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.598 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.614 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.631 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.648 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.665 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.683 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.698 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:21.715 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.731 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.748 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.765 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.782 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.798 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.815 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.832 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.848 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.865 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.882 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.899 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.915 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.932 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.949 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.965 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.982 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:21.998 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:22.015 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:22.031 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:22.048 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:22.065 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:22.083 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:22.099 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:22.115 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:22.133 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:22.149 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:22.166 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=1
+06-05 06:57:22.182 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.199 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.216 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.233 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.249 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.266 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.283 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.300 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.316 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.334 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.349 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.366 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.383 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.400 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.416 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.433 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.450 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.467 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0
+06-05 06:57:22.480 D/Winlator_Button( 6628): JNI_MOVE: elem=1 vis=0

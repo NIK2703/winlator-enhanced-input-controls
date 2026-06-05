@@ -146,18 +146,7 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
                 if (was_second_deferred) {
                     g_state.gesture_second_active = true;
                     f->is_second_finger = true;
-                    FingerBindings* fb = &f->bindings;
-                    fb->single_tap_count = g_state.cfg.ts_single_2nd_count;
-                    memcpy(fb->single_tap, g_state.cfg.ts_single_2nd, sizeof(g_state.cfg.ts_single_2nd));
-                    fb->long_press_count = 0;
-                    fb->double_tap_count = g_state.cfg.ts_double_2nd_count;
-                    memcpy(fb->double_tap, g_state.cfg.ts_double_2nd, sizeof(g_state.cfg.ts_double_2nd));
-                    fb->single_tap_drag_count = g_state.cfg.ts_single_drag_2nd_count;
-                    memcpy(fb->single_tap_drag, g_state.cfg.ts_single_drag_2nd, sizeof(g_state.cfg.ts_single_drag_2nd));
-                    fb->long_press_drag_count = 0;
-                    fb->double_tap_drag_count = g_state.cfg.ts_double_drag_2nd_count;
-                    memcpy(fb->double_tap_drag, g_state.cfg.ts_double_drag_2nd, sizeof(g_state.cfg.ts_double_drag_2nd));
-                    touch_finger_cache_bs(f);
+                    setup_second_finger_bindings(f);
                 }
             } else {
                 
@@ -168,18 +157,7 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
             // restore second-finger bindings (matches Java's post-double-tap-check fallthrough)
             g_state.gesture_second_active = true;
             f->is_second_finger = true;
-            FingerBindings* fb = &f->bindings;
-            fb->single_tap_count = g_state.cfg.ts_single_2nd_count;
-            memcpy(fb->single_tap, g_state.cfg.ts_single_2nd, sizeof(g_state.cfg.ts_single_2nd));
-            fb->long_press_count = 0;
-            fb->double_tap_count = g_state.cfg.ts_double_2nd_count;
-            memcpy(fb->double_tap, g_state.cfg.ts_double_2nd, sizeof(g_state.cfg.ts_double_2nd));
-            fb->single_tap_drag_count = g_state.cfg.ts_single_drag_2nd_count;
-            memcpy(fb->single_tap_drag, g_state.cfg.ts_single_drag_2nd, sizeof(g_state.cfg.ts_single_drag_2nd));
-            fb->long_press_drag_count = 0;
-            fb->double_tap_drag_count = g_state.cfg.ts_double_drag_2nd_count;
-            memcpy(fb->double_tap_drag, g_state.cfg.ts_double_drag_2nd, sizeof(g_state.cfg.ts_double_drag_2nd));
-            touch_finger_cache_bs(f);
+            setup_second_finger_bindings(f);
         }
 
         f->original_ptr_id = f->ptr_id;
@@ -269,9 +247,14 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
 }
 
 void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    int touch_mode = g_state.cfg.touch_mode;
+    bool caps_has_toggle_switch = g_state.cfg.caps_has_toggle_switch;
+    bool caps_has_track_hover_buttons = g_state.cfg.caps_has_track_hover_buttons;
+    int elem_count = g_state.element_count;
+
     // Java processElementsTouchMove: iterate ALL elements, each handleTouchMove checks pointerId==currentPointerId
     bool had_element_move = false;
-    for (int i = 0; i < g_state.element_count; i++) {
+    for (int i = 0; i < elem_count; i++) {
         TouchElement* e = &g_state.elements[i];
         if (e->engaged && e->current_ptr_id == f->ptr_id) {
             
@@ -280,10 +263,13 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
         }
     }
 
+    // Cache hit-test result: used across toggle, tracked, hover, and legacy paths
+    TouchElement* hit = hit_test_element(x, y);
+
     // Toggle switch slide-over: handle toggles under finger regardless of tb->count
     // (works even when finger starts on empty space)
     {
-        TouchElement* toggle_btn = hit_test_element(x, y);
+        TouchElement* toggle_btn = hit;
         if (toggle_btn && toggle_btn->type == ELEM_BUTTON && toggle_btn->toggle_switch) {
             ActivationMode mode = g_state.element_count > 0 ?
                 g_state.elements[0].activation_mode : ACTIVATION_LOCK;
@@ -300,11 +286,13 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                             release_binding(result, &toggle_btn->bindings[0]);
                         toggle_btn->selected = false;
                         toggle_btn->visual_active = false;
+                        g_state.visual_state_dirty = true;
                     } else {
                         if (toggle_btn->bindings[0].type != BINDING_NONE)
                             press_binding(result, &toggle_btn->bindings[0], true);
                         toggle_btn->selected = true;
                         toggle_btn->visual_active = true;
+                        g_state.visual_state_dirty = true;
                     }
                     toggle_btn->gesture_timer_armed = true;
                 }
@@ -326,7 +314,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
             if (first_idx >= 0 && first_idx < g_state.element_count) {
                 TouchElement* first = &g_state.elements[first_idx];
                 if (first->type == ELEM_BUTTON) {
-                    TouchElement* new_btn = hit_test_element(x, y);
+                    TouchElement* new_btn = hit;
                     if (new_btn && new_btn->type == ELEM_BUTTON) {
                         if (!new_btn->toggle_switch) {
                             bool already = false;
@@ -341,6 +329,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                                         if (new_btn->bindings[0].type != BINDING_NONE) {
                                             press_binding(result, &new_btn->bindings[0], true);
                                             new_btn->visual_active = true;
+                                            g_state.visual_state_dirty = true;
                                         }
                                     }
                                 }
@@ -356,7 +345,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                     if (first->activation_mode == ACTIVATION_HOVER) {
                         int hovered = g_state.hovered_element_per_ptr[pi];
                         TouchElement* prev = (hovered >= 0 && hovered < g_state.element_count) ? &g_state.elements[hovered] : NULL;
-                        TouchElement* curr = hit_test_element(x, y);
+                        TouchElement* curr = hit;
                         if (prev && (!curr || curr != prev) && !prev->toggle_switch)
                             release_element_bindings(prev, result);
                         if (curr && curr->type == ELEM_BUTTON && curr != prev) {
@@ -367,6 +356,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
                                     if (curr->bindings[0].type != BINDING_NONE) {
                                         press_binding(result, &curr->bindings[0], true);
                                         curr->visual_active = true;
+                                        g_state.visual_state_dirty = true;
                                     }
                                 }
                                 g_state.hovered_element_per_ptr[pi] = (int)(curr - g_state.elements);
@@ -401,7 +391,7 @@ void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms,
     }
 
     // Legacy path: check hit_test for elements not found via engaged iteration
-    TouchElement* elem = hit_test_element(x, y);
+    TouchElement* elem = hit;
     if (elem && elem->current_ptr_id == f->ptr_id) {
         handle_element_move(elem, x, y, time_ms, result);
         f->last_x = x;
@@ -512,6 +502,7 @@ void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, T
                         e->current_ptr_id = -1;
                         e->engaged = false;
                         e->visual_active = false;
+                        g_state.visual_state_dirty = true;
                     }
                 }
             }
@@ -523,6 +514,7 @@ void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, T
                 handle_element_up(e, x, y, time_ms, result);
                 if (!e->toggle_switch) {
                     e->visual_active = false;
+                    g_state.visual_state_dirty = true;
                 }
             }
             had_tracked = true;

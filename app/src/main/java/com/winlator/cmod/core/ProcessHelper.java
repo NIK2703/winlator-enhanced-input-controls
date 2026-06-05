@@ -1,7 +1,7 @@
 package com.winlator.cmod.core;
 
 import android.os.Process;
-import android.util.Log;
+
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -26,22 +26,18 @@ public abstract class ProcessHelper {
 
     public static void suspendProcess(int pid) {
         Process.sendSignal(pid, SIGSTOP);
-        Log.d("ProcessHelper", "Process suspended with pid: " + pid);
     }
 
     public static void resumeProcess(int pid) {
         Process.sendSignal(pid, SIGCONT);
-        Log.d("ProcessHelper", "Process resumed with pid: " + pid);
     }
 
     public static void terminateProcess(int pid) {
         Process.sendSignal(pid, SIGTERM);
-        Log.d("ProcessHelper", "Process terminated with pid: " + pid);
     }
 
     public static void killProcess(int pid) {
         Process.sendSignal(pid, SIGKILL);
-        Log.d("ProcessHelper", "Process killed with pid: " + pid);
     }
 
     public static void terminateAllWineProcesses() {
@@ -75,16 +71,13 @@ public abstract class ProcessHelper {
     }
 
     public static int exec(String command, String[] envp, File workingDir, Callback<Integer> terminationCallback) {
-        Log.d("ProcessHelper", "env: " + Arrays.toString(envp) + "\ncmd: " + command);
+
 
         EnvironmentManager.setEnvVars(envp);
 
         int pid = -1;
         try {
-            Log.d("ProcessHelper", "Splitting command: " + command);
             String[] splitCommand = splitCommand(command);
-            Log.d("ProcessHelper", "Split command result: " + Arrays.toString(splitCommand));
-            Log.d("ProcessHelper", "Starting process...");
             ProcessBuilder pb = new ProcessBuilder(splitCommand);
             pb.directory(workingDir);
             pb.environment().putAll(EnvironmentManager.getEnvVars());
@@ -95,12 +88,10 @@ public abstract class ProcessHelper {
             }
             java.lang.Process process = pb.start();
 
-            Log.d("ProcessHelper", "Accessing hidden field to get PID");
             Field pidField = process.getClass().getDeclaredField("pid");
             pidField.setAccessible(true);
             pid = pidField.getInt(process);
             pidField.setAccessible(false);
-            Log.d("ProcessHelper", "Process started with pid: " + pid);
 
             if (!debugCallbacks.isEmpty()) {
                 createDebugThread(process.getInputStream());
@@ -111,7 +102,7 @@ public abstract class ProcessHelper {
 
         }
         catch (Exception e) {
-            Log.e("ProcessHelper", "Error executing command: " + command, e);
+
         }
         return pid;
     }
@@ -130,7 +121,7 @@ public abstract class ProcessHelper {
                 }
             }
             catch (IOException e) {
-                Log.e("ProcessHelper", "Error in debug thread", e);
+
             }
         });
     }
@@ -144,7 +135,7 @@ public abstract class ProcessHelper {
                     terminationCallback.call(status);
                 }
                 catch (InterruptedException e) {
-                    Log.e("ProcessHelper", "Error waiting for process termination", e);
+
                 }
             }
         });
@@ -153,21 +144,21 @@ public abstract class ProcessHelper {
     public static void removeAllDebugCallbacks() {
         synchronized (debugCallbacks) {
             debugCallbacks.clear();
-            Log.d("ProcessHelper", "All debug callbacks removed");
+
         }
     }
 
     public static void addDebugCallback(Callback<String> callback) {
         synchronized (debugCallbacks) {
             if (!debugCallbacks.contains(callback)) debugCallbacks.add(callback);
-            Log.d("ProcessHelper", "Added debug callback: " + callback.toString());
+
         }
     }
 
     public static void removeDebugCallback(Callback<String> callback) {
         synchronized (debugCallbacks) {
             debugCallbacks.remove(callback);
-            Log.d("ProcessHelper", "Removed debug callback: " + callback.toString());
+
         }
     }
 

@@ -1,7 +1,7 @@
 package com.winlator.cmod.contentdialog;
 
 import android.app.Activity;
-import android.util.Log;
+
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;

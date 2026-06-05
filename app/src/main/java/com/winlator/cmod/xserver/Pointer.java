@@ -1,5 +1,7 @@
 package com.winlator.cmod.xserver;
 
+import android.util.Log;
+
 import com.winlator.cmod.math.Mathf;
 
 import java.util.ArrayList;
@@ -58,6 +60,7 @@ public class Pointer {
     }
 
     public void setPosition(int x, int y) {
+        Log.d("Winlator_Pointer", "setPosition x="+x+" y="+y+" (was "+this.x+","+this.y+")");
         setX(x);
         setY(y);
         triggerOnPointerMove(this.x, this.y);
@@ -69,6 +72,7 @@ public class Pointer {
 
     public void setButton(Button button, boolean pressed) {
         boolean oldPressed = isButtonPressed(button);
+        Log.d("Winlator_Pointer", "setButton button="+button+" pressed="+pressed+" old="+oldPressed);
         buttonMask.set(button.flag(), pressed);
         if (oldPressed != pressed) {
             if (pressed) {

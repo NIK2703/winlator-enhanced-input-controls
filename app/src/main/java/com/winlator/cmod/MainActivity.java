@@ -17,7 +17,7 @@ import android.text.Html;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ForegroundColorSpan;
-import android.util.Log;
+
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;

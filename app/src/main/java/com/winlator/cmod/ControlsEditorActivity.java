@@ -326,22 +326,24 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             updateLayout.run();
         });
 
-        final TextView tvRepeatRate = view.findViewById(R.id.TVRepeatRate);
+        TextView tvRepeatRate = view.findViewById(R.id.ETRepeatRate);
         SeekBar sbRepeatRate = view.findViewById(R.id.SBRepeatRate);
+        int progress = Math.round(element.getAutoRepeatIntervalMs() / 10.0f) - 1;
+        sbRepeatRate.setProgress(progress);
+        tvRepeatRate.setText(String.valueOf((progress + 1) * 10));
         sbRepeatRate.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvRepeatRate.setText(progress + " Hz");
+                int value = (progress + 1) * 10;
+                tvRepeatRate.setText(String.valueOf(value));
                 if (fromUser) {
-                    element.setAutoRepeatRateHz(progress);
+                    element.setAutoRepeatIntervalMs(value);
                     profile.save();
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
-        sbRepeatRate.setProgress(element.getAutoRepeatRateHz());
-        tvRepeatRate.setText(element.getAutoRepeatRateHz() + " Hz");
 
         final EditText etCustomText = view.findViewById(R.id.ETCustomText);
         etCustomText.setText(element.getText());

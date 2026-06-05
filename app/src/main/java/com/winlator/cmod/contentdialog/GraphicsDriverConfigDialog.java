@@ -2,7 +2,7 @@ package com.winlator.cmod.contentdialog;
 
 import android.content.Context;
 import android.os.Build;
-import android.util.Log;
+
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.AdapterView;
@@ -131,7 +131,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
                 "bcnEmulationType=" + selectedBCnEmulationType + ";" +
                 "bcnEmulationCache=" + isBCnCacheEnabled + ";" +
                 "gpuName=" + selectedGPUName;
-        Log.i(TAG, "Written config " + graphicsDriverConfig);
+
         return graphicsDriverConfig;
     }
 
@@ -202,7 +202,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
                 selectedVersion = sVersion.getSelectedItem().toString();
-                Log.d(TAG, "User selected version: " + selectedVersion);
+
             }
         });
 
@@ -358,8 +358,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         sVersion.setAdapter(wrapperAdapter);
         
         // We can start logging selected graphics driver and initial version
-        Log.d(TAG, "Graphics driver: " + graphicsDriver);
-        Log.d(TAG, "Initial version: " + initialVersion);
+
 
         loadGPUNameSpinner(context, sGPUName);
 
@@ -375,8 +374,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         AppUtils.setSpinnerSelectionFromValue(sBCnEmulationCache, bcnEmulationCache);
 
         // We can log the spinner values now
-        Log.d(TAG, "Spinner selected position: " + sVersion.getSelectedItemPosition());
-        Log.d(TAG, "Spinner selected value: " + sVersion.getSelectedItem());
+
     }
 
     private void setSpinnerSelectionWithFallback(Spinner spinner, String version, String graphicsDriver) {

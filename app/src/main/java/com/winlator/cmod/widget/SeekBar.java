@@ -9,7 +9,7 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.util.AttributeSet;
-import android.util.Log;
+
 
 import androidx.appcompat.widget.AppCompatImageView;
 import androidx.core.content.ContextCompat;
@@ -139,7 +139,7 @@ public class SeekBar extends AppCompatImageView {
     @Override
     protected synchronized void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        Log.d("SeekBar", "onDraw called with value: " + getValue());
+
 
         float centerY = getHeight() / 2.0f;
 

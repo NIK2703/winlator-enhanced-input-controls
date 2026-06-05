@@ -2,7 +2,7 @@ package com.winlator.cmod.core;
 
 import android.content.Context;
 import android.net.Uri;
-import android.util.Log;
+
 
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -253,7 +253,7 @@ public abstract class TarCompressorUtils {
                 }
 
                 if (entryName.contains("/tmp/")) {
-                    Log.d("RestoreOp", "Skipping tmp directory: " + entryName);
+
                     continue;
                 }
 
@@ -281,7 +281,7 @@ public abstract class TarCompressorUtils {
             }
             return true;
         } catch (IOException e) {
-            Log.e("RestoreOp", "Failed to extract tar file", e);
+
             return false;
         }
     }

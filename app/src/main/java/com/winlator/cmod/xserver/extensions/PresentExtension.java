@@ -70,7 +70,7 @@ public class PresentExtension implements Extension {
                     choreographer = android.view.Choreographer.getInstance();
                 }
             } catch (Exception ignored) {
-                android.util.Log.w("PresentExtension", "Choreographer unavailable, using CPU pacer");
+
             }
             if (choreographer == null) {
                 startCpuPacer();

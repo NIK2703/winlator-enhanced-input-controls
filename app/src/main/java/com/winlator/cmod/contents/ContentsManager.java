@@ -3,7 +3,7 @@ package com.winlator.cmod.contents;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
-import android.util.Log;
+
 
 import androidx.annotation.NonNull;
 
@@ -133,9 +133,7 @@ public class ContentsManager {
                         ContentProfile profile = readProfile(proFile);
                         if (profile != null) {
                             profiles.add(profile);
-                            Log.d("ContentsManager", "Local profile loaded: " + profile.verName);
                         } else {
-                            Log.w("ContentsManager", "Invalid local profile at: " + proFile.getAbsolutePath());
                         }
                     }
                 }
@@ -153,7 +151,6 @@ public class ContentsManager {
                         }
                         if (!exists) {
                             profiles.add(remote);
-                            Log.d("ContentsManager", "Remote profile added: " + remote.verName);
                         }
                     }
                 }

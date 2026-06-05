@@ -16,7 +16,7 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.Log;
+
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -439,7 +439,6 @@ public class BigPictureActivity extends AppCompatActivity {
                     if (mp3File.exists()) {
                         playMp3(mp3File);  // Pass the File object to playMp3 method
                     } else {
-                        Log.e("BigPictureActivity", "MP3 file not found: " + selectedMp3Path);
                         playDefaultMp3FromAssets();
                     }
                 } else {
@@ -746,25 +745,16 @@ public class BigPictureActivity extends AppCompatActivity {
 
     private void removeCustomCoverArt() {
         if (currentShortcut != null) {
-            Log.d("BigPictureActivity", "Removing cover art for shortcut: " + currentShortcut.name);
-            Log.d("BigPictureActivity", "Current custom cover art path: " + currentShortcut.getCustomCoverArtPath());
-
             currentShortcut.removeCustomCoverArt();
 
             File cachedFile = new File(getCacheDir(), "coverArtCache/" + currentShortcut.name + ".png");
             if (cachedFile.exists() && cachedFile.delete()) {
-                Log.d("BigPictureActivity", "Cached cover art deleted successfully.");
-            } else {
-                Log.e("BigPictureActivity", "Failed to delete cached cover art or it doesn't exist.");
             }
 
             coverArtView.setImageResource(R.drawable.icon_action_bar_import); // Default placeholder image
             coverArtView.setBackgroundColor(Color.parseColor("#99000000")); // Semi-transparent background
 
-            Log.d("BigPictureActivity", "Custom cover art removed and data saved.");
-
             loadShortcutData(currentShortcut);
-            Log.d("BigPictureActivity", "Shortcut data reloaded after removal.");
         }
     }
 
@@ -845,8 +835,6 @@ public class BigPictureActivity extends AppCompatActivity {
 
     public void loadShortcutData(Shortcut shortcut) {
         currentShortcut = shortcut;
-
-        Log.d("BigPictureActivity", "Loaded cover art path: " + shortcut.getCustomCoverArtPath());
 
         gameTitleView.setText(shortcut.name);
 
@@ -952,7 +940,6 @@ public class BigPictureActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<SteamGridSearchResponse> call, Throwable t) {
-                Log.e("SteamGridDB", "Failed to fetch game ID", t);
                 showCustomCoverArtUploadOption(shortcut);
             }
         });
@@ -1015,7 +1002,7 @@ public class BigPictureActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<SteamGridGridsResponse> call, Throwable t) {
-                Log.e("SteamGridDB", "Failed to fetch cover art", t);
+
             }
         });
     }
@@ -1124,7 +1111,7 @@ public class BigPictureActivity extends AppCompatActivity {
 
                 playMp3(musicFile);  // Pass the File object
             } else {
-                Log.e("BigPictureActivity", "Failed to copy the MP3 file.");
+
             }
         } else if (requestCode == REQUEST_CODE_UPLOAD_CUSTOM_COVER && data.getData() != null) {
             Uri selectedImageUri = data.getData();
@@ -1186,7 +1173,7 @@ public class BigPictureActivity extends AppCompatActivity {
                 backgroundView.setVisibility(View.VISIBLE);
                 backgroundView.setStaticWallpaper(wallpaper, mode);
             } else {
-                Log.e("BigPictureActivity", "Invalid wallpaper dimensions.");
+
             }
         }
     }
@@ -1471,7 +1458,7 @@ public class BigPictureActivity extends AppCompatActivity {
             return;
         }
 
-        Log.d("AnimationCheck", "Loaded " + bitmaps.size() + " PNG frames from folder.");
+
         TiledBackgroundView backgroundView = findViewById(R.id.parallaxBackgroundView);
         backgroundView.loadFramesFromBitmaps(bitmaps);  // A new method we’ll create below
     }

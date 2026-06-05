@@ -3,7 +3,7 @@ package com.winlator.cmod.xserver.requests;
 import static com.winlator.cmod.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
 
 import android.graphics.Rect;
-import android.util.Log;
+
 
 import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.xconnector.XInputStream;

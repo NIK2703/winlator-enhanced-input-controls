@@ -86,7 +86,7 @@ public class GPUImage extends Texture {
         final short size = 8;
         GPUImage gpuImage = new GPUImage(size, size);
         supported = gpuImage.hardwareBufferPtr != 0 && gpuImage.virtualData != null;
-        android.util.Log.d("GPUImage", "checkIsSupported: supported=" + supported);
+
         gpuImage.destroy();
     }
 

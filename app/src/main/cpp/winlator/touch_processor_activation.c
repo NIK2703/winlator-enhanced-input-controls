@@ -39,12 +39,14 @@ void activation_activate_at(float x, float y) {
             g_state.elements[i].visual_y = y;
         }
     }
+    g_state.visual_state_dirty = true;
 }
 
 void activation_deactivate_all(void) {
     for (int i = 0; i < g_state.element_count; i++) {
         g_state.elements[i].visual_active = false;
     }
+    g_state.visual_state_dirty = true;
 }
 
 int activation_tracked_count(int ptr_id) {
@@ -84,16 +86,19 @@ bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, Touc
         }
         case ACTIVATION_TRACK:
         case ACTIVATION_HOVER: {
-            // Non-button elements: handle directly
+            // Single pass: find non-button hit and button hit together
+            TouchElement* btn = NULL;
             for (int i = 0; i < g_state.element_count; i++) {
                 TouchElement* e = &g_state.elements[i];
-                if (e->type != ELEM_BUTTON && point_in_element(x, y, e)) {
+                if (!point_in_element(x, y, e)) continue;
+                if (e->type != ELEM_BUTTON) {
                     handle_element_down(e, ptr_id, x, y, time_ms, result);
                     handled = true;
+                } else if (!btn) {
+                    btn = e;
                 }
             }
             // Button at point: handle with tracking
-            TouchElement* btn = hit_test_element(x, y);
             if (btn && btn->type == ELEM_BUTTON) {
                 // In track/hover mode, skip OFF toggle switches to prevent accidental activation
                 bool skip_toggle = btn->toggle_switch && !btn->selected;
@@ -131,12 +136,6 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
     ActivationMode mode = g_state.element_count > 0 ?
         g_state.elements[0].activation_mode : ACTIVATION_LOCK;
 
-    // Check if our toggle's visual was modified
-    for (int i = 0; i < g_state.element_count; i++)
-        if (g_state.elements[i].toggle_switch && g_state.elements[i].current_ptr_id == ptr_id)
-            __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Button", "ACT_MOVE entry: elem=%d sel=%d vis=%d ptr=%d",
-                i, g_state.elements[i].selected, g_state.elements[i].visual_active, ptr_id);
-
     switch (mode) {
         case ACTIVATION_LOCK: {
             // Process all engaged elements touch move
@@ -167,11 +166,13 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
                                 release_binding(result, &btn->bindings[0]);
                             btn->selected = false;
                             btn->visual_active = false;
+                            g_state.visual_state_dirty = true;
                         } else {
                             if (btn->bindings[0].type != BINDING_NONE)
                                 press_binding(result, &btn->bindings[0], true);
                             btn->selected = true;
                             btn->visual_active = true;
+                            g_state.visual_state_dirty = true;
                         }
                     } else {
                         bool already = false;
@@ -184,6 +185,9 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
                         if (!already && tb->count < MAX_TRACKED_PER_POINTER) {
                             tb->element_indices[tb->count++] = (int)(btn - g_state.elements);
                             handle_element_down(btn, ptr_id, x, y, time_ms, result);
+                            if (tb->count > 1) {
+                                suppress_element_gestures(btn, result);
+                            }
                             if (tb->count == 2) {
                                 TouchElement* first = &g_state.elements[tb->element_indices[0]];
                                 first->long_press_arm = false;
@@ -224,11 +228,13 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
                                     release_binding(result, &btn->bindings[0]);
                                 btn->selected = false;
                                 btn->visual_active = false;
+                                g_state.visual_state_dirty = true;
                             } else {
                                 if (btn->bindings[0].type != BINDING_NONE)
                                     press_binding(result, &btn->bindings[0], true);
                                 btn->selected = true;
                                 btn->visual_active = true;
+                                g_state.visual_state_dirty = true;
                             }
                             g_state.hovered_element_per_ptr[pid_slot] = -1;
                         } else {
@@ -248,6 +254,9 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
                                 }
                             }
                             handle_element_down(btn, ptr_id, x, y, time_ms, result);
+                            if (tb->count > 1 || already) {
+                                suppress_element_gestures(btn, result);
+                            }
                             g_state.hovered_element_per_ptr[pid_slot] = curr_idx;
                         }
                     } else {
@@ -291,10 +300,7 @@ bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchA
                 tb->count = 0;
                 tb->ptr_id = -1;
                 handled = true;
-                // Clear hovered for this pointer in HOVER mode
-                if (mode == ACTIVATION_HOVER) {
-                    g_state.hovered_element_per_ptr[pid_slot] = -1;
-                }
+
             }
             break;
         }
@@ -311,4 +317,5 @@ void activation_reset(void) {
     for (int i = 0; i < g_state.element_count; i++) {
         g_state.elements[i].visual_active = false;
     }
+    g_state.visual_state_dirty = true;
 }

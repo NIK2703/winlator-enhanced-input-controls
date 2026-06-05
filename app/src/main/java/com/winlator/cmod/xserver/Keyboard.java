@@ -1,5 +1,6 @@
 package com.winlator.cmod.xserver;
 
+import android.util.Log;
 import android.view.KeyEvent;
 
 import androidx.collection.ArraySet;
@@ -46,6 +47,7 @@ public class Keyboard {
     }
 
     public void setKeyPress(byte keycode, int keysym) {
+        Log.d("Winlator_KB", "setKeyPress keycode="+keycode+" keysym="+keysym+" sticky="+isModifierSticky(keycode)+" contained="+pressedKeys.contains(keycode));
         if (isModifierSticky(keycode)) {
             if (pressedKeys.contains(keycode)) {
                 pressedKeys.remove(keycode);
@@ -66,6 +68,7 @@ public class Keyboard {
     }
 
     public void setKeyRelease(byte keycode) {
+        Log.d("Winlator_KB", "setKeyRelease keycode="+keycode+" sticky="+isModifierSticky(keycode)+" contained="+pressedKeys.contains(keycode));
         if (!isModifierSticky(keycode) && pressedKeys.contains(keycode)) {
             pressedKeys.remove(keycode);
             if (isModifier(keycode)) modifiersMask.unset(getModifierFlag(keycode));

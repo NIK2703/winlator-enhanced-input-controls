@@ -92,7 +92,6 @@ void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, 
 
     e->trackpad_last_x = x;
     e->trackpad_last_y = y;
-    e->trackpad_last_time = time_ms;
 }
 
 void element_trackpad_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {

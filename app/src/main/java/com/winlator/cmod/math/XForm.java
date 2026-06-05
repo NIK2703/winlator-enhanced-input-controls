@@ -94,8 +94,13 @@ public class XForm {
         return result;
     }
 
+    private static final ThreadLocal<float[]> tmpPoint = ThreadLocal.withInitial(() -> new float[2]);
+
     public static float[] transformPoint(float[] xform, float x, float y) {
-        return transformPoint(xform, x, y, new float[2]);
+        float[] result = tmpPoint.get();
+        result[0] = xform[0] * x + xform[2] * y + xform[4];
+        result[1] = xform[1] * x + xform[3] * y + xform[5];
+        return result;
     }
 
     public static float[] transformPoint(float[] xform, float x, float y, float[] result) {

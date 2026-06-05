@@ -189,7 +189,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                                         }
                                     }
                                 } catch (Exception e) {
-                                    android.util.Log.w("VulkanRenderer", "SC recreate failed on surface restore: " + e);
+
                                     synchronized (lock) {
                                         if (nativeHandle != 0) nativeInitScanout(nativeHandle);
                                     }
@@ -267,7 +267,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
             txn.apply();
             txn.close();
         } catch (Exception e) {
-            android.util.Log.w("VulkanRenderer", "Scanout color transform unavailable: " + e);
+
         }
     }
 
@@ -612,7 +612,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                             }
                         }
                     } catch (Exception e) {
-                        android.util.Log.w("VulkanRenderer", "Sibling SC failed, using child SC: " + e);
+
                         synchronized (lock) {
                             if (nativeHandle != 0) nativeInitScanout(nativeHandle);
                         }
@@ -642,8 +642,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         this.driverPath = driverPath;
         this.driverLibraryName = libraryName;
         this.nativeLibDir = nativeLibDir;
-        android.util.Log.d("Winlator_Renderer",
-            "setDriverInfo: path=" + driverPath + " lib=" + libraryName);
+
     }
 
     public void setVerboseLog(boolean v) {

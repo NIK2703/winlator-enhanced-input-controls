@@ -3,7 +3,7 @@ package com.winlator.cmod.container;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Log;
+
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.ContentsManager;
@@ -64,7 +64,6 @@ public class ContainerManager {
 
                     String rawConfig = FileUtils.readString(container.getConfigFile());
                     if (rawConfig == null || rawConfig.trim().isEmpty()) {
-                        Log.w("ContainerManager", "Skipping container with empty config: " + container.getConfigFile());
                         continue;
                     }
 
@@ -74,7 +73,8 @@ public class ContainerManager {
                     maxContainerId = Math.max(maxContainerId, container.id);
                 }
                 catch (NumberFormatException | JSONException e) {
-                    Log.e("ContainerManager", "Skipping invalid container directory: " + file.getName(), e);
+
+
                 }
             }
         }

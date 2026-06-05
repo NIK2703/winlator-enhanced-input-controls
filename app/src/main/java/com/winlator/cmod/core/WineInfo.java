@@ -3,7 +3,7 @@ package com.winlator.cmod.core;
 import android.content.Context;
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.util.Log;
+
 
 import androidx.annotation.NonNull;
 
@@ -119,7 +119,7 @@ public class WineInfo implements Parcelable {
         ImageFs imageFs = ImageFs.find(context);
         String path = "";
 
-        Log.d("WineInfo", "Creating WineInfo from identifier " + identifier);
+
 
         if (identifier.equals(MAIN_WINE_VERSION.identifier())) return new WineInfo(MAIN_WINE_VERSION.type, MAIN_WINE_VERSION.version, MAIN_WINE_VERSION.arch, imageFs.getRootDir().getPath() + "/opt/" + MAIN_WINE_VERSION.identifier());
 

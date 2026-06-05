@@ -6,7 +6,7 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.net.ConnectivityManager;
 import android.os.Process;
-import android.util.Log;
+
 
 import androidx.preference.PreferenceManager;
 
@@ -78,8 +78,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (shortcut != null)
             box64Version = shortcut.getExtra("box64Version", shortcut.container.getBox64Version());
 
-        Log.d("GuestProgramLauncherComponent", "box64Version: " + box64Version);
-
         File rootDir = imageFs.getRootDir();
 
         if (!box64Version.equals(container.getExtra("box64Version"))) {
@@ -110,9 +108,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (shortcut != null) {
             wowbox64Version = shortcut.getExtra("box64Version", shortcut.container.getBox64Version());
         }
-
-        Log.d("GuestProgramLauncherComponent", "box64Version in use: " + wowbox64Version);
-        Log.d("GuestProgramLauncherComponent", "fexcoreVersion in use: " + fexcoreVersion);
 
         if (!wowbox64Version.equals(container.getExtra("box64Version"))) {
             ContentProfile profile = contentsManager.getProfileByEntryName("wowbox64-" + wowbox64Version);
@@ -179,7 +174,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             output.append("Error running ldd: ").append(e.getMessage());
         }
 
-        Log.d("CurlDeps", output.toString()); // Log the full dependency output
         return output.toString();
     }
 
@@ -264,7 +258,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             envVars.put("BOX64_MMAP32", "0");
 
         if (envVars.get("BOX64_MMAP32").equals("1") && !wineInfo.isArm64EC()) {
-            Log.d("GuestProgramLauncherComponent", "Disabling map memory placed");
             envVars.put("WRAPPER_DISABLE_PLACED", "1");
         }
 
@@ -298,8 +291,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         String winePath = imageFs.getWinePath() + "/bin";
 
-        Log.d("GuestProgramLauncherComponent", "WinePath is " + winePath);
-
         envVars.put("PATH", winePath + ":" +
                 rootDir.getPath() + "/usr/bin");
 
@@ -325,23 +316,14 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         String nativeLibDir = environment.getContext().getApplicationInfo().nativeLibraryDir;
         File fakeinputSrc = new File(nativeLibDir, "libfakeinput.so");
 
-        Log.d("GuestLauncher", "nativeLibDir: " + nativeLibDir);
-        Log.d("GuestLauncher", "fakeinputSrc exists: " + fakeinputSrc.exists());
-        Log.d("GuestLauncher", "fakeinputDest: " + fakeinputDest.getAbsolutePath());
-
         try {
             if (fakeinputSrc.exists()) {
                 FileUtils.copy(fakeinputSrc, fakeinputDest);
-                Log.d("GuestLauncher", "Copied libfakeinput.so to imagefs");
             } else {
-                Log.e("GuestLauncher", "libfakeinput.so NOT FOUND in APK: " + fakeinputSrc.getAbsolutePath());
             }
         } catch (Exception e) {
-            Log.e("GuestLauncher", "Failed to copy libfakeinput.so: " + e.getMessage());
             e.printStackTrace();
         }
-
-        Log.d("GuestLauncher", "fakeinputDest exists after copy: " + fakeinputDest.exists());
         if (fakeinputDest.exists()) {
             if (!ld_preload.isEmpty()) ld_preload += ":";
             ld_preload += fakeinputDest.getAbsolutePath();
@@ -357,7 +339,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         envVars.put("FAKE_EVDEV_DIR", devInputDir.getAbsolutePath());
         envVars.put("FAKE_EVDEV_VIBRATION", "1");
 
-        Log.d("GuestLauncher", "Final LD_PRELOAD: " + ld_preload);
         envVars.put("LD_PRELOAD", ld_preload);
 
         if (this.envVars.has("MANGOHUD")) {

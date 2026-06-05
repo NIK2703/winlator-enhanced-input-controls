@@ -12,20 +12,35 @@ static void double_tap_confirm_internal(TouchActionResult* result) {
     }
     g_state.gesture_pending_deferred_double_count = 0;
 
+    bool has_dt = g_state.gesture_pending_double_count > 0;
     bool has_dt_drag = (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN)
         ? (g_state.cfg.ts_double_tap_drag_count > 0)
         : (g_state.cfg.tp_double_tap_drag_count > 0);
 
-    if (g_state.gesture_pending_double_count > 0) {
-        if (!has_dt_drag) {
+    if (has_dt) {
+        GesturePairPlan d_plan = gesture_decide_branch(
+            has_dt, has_dt_drag,
+            false, false,        // no competing gestures for D
+            true,                // D is always holdable
+            g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN,
+            false,               // main finger
+            0,                   // no hold delay for D
+            false                // is_single_tap_pair: D/Dd
+        );
+
+        if (d_plan.hold_now) {
             hold_actions(result, g_state.gesture_pending_double, g_state.gesture_pending_double_count);
-        } else {
+        } else if (d_plan.pulse_on_up) {
+            // Defer D to fire on finger-up (e.g. Dd exists, or TP D pulse)
             g_state.gesture_pending_deferred_double_count = g_state.gesture_pending_double_count;
             for (int _i = 0; _i < g_state.gesture_pending_double_count; _i++)
                 g_state.gesture_pending_deferred_double[_i] = g_state.gesture_pending_double[_i];
         }
         g_state.gesture_pending_double_count = 0;
+    } else {
+        // Zombie DTW for Dd-only: nothing to fire, but enable post-dtd drag
     }
+
     g_state.gesture_post_double_tap_drag = true;
 }
 
@@ -34,30 +49,27 @@ static void handle_ts_single_tap_hold(TouchFinger* f, TouchActionResult* result,
     if (g_state.cfg.touch_mode != TOUCH_MODE_TOUCHSCREEN) return;
     if (f->is_second_finger) return;
     if (g_state.gesture_is_action_held) return;
-    if (!f->cached_has_active_single_tap || f->cached_has_active_single_tap_drag) return;
+    if (!f->cached_has_active_single_tap) return;
 
-    bool has_dt = f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag;
-    bool has_lp = f->cached_has_long_press_timer;
-    if (has_dt) {
-        g_state.gesture_deferred_tap_count = 0;
-        for (int i = 0; i < f->bindings.single_tap_count && i < 8; i++)
-            g_state.gesture_deferred_tap[g_state.gesture_deferred_tap_count++] = f->bindings.single_tap[i];
-        g_state.gesture_pending_double_count = 0;
-        for (int i = 0; i < f->bindings.double_tap_count && i < 8; i++)
-            g_state.gesture_pending_double[g_state.gesture_pending_double_count++] = f->bindings.double_tap[i];
-        f->single_tap_hold_delay_ms = g_state.cfg.double_tap_timeout_ms;
-        f->single_tap_hold_timer = time_ms;
-    } else if (has_lp) {
-        if (!f->cached_has_active_long_press_drag) {
-            f->single_tap_hold_delay_ms = g_state.cfg.long_press_timeout_ms;
-            f->single_tap_hold_timer = time_ms;
-        }
-    } else if (g_state.cfg.single_tap_delay_ms > 0) {
-        f->single_tap_hold_delay_ms = g_state.cfg.single_tap_delay_ms;
-        f->single_tap_hold_timer = time_ms;
-    } else {
+    GesturePairPlan plan = gesture_decide_branch(
+        f->cached_has_active_single_tap,
+        f->cached_has_active_single_tap_drag,
+        f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag,
+        f->cached_has_long_press_timer,
+        true,   // can_hold: S is always holdable
+        true,   // is_ts
+        false,  // main finger
+        g_state.cfg.single_tap_delay_ms,
+        true    // is_single_tap_pair: S/Sd
+    );
+
+    if (plan.hold_now) {
         hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+    } else if (plan.hold_delay_ms > 0) {
+        f->single_tap_hold_delay_ms = plan.hold_delay_ms;
+        f->single_tap_hold_timer = time_ms;
     }
+    // press_on_drag and pulse_on_up deferred to check_start_drag / handle_tap_up
 }
 
 static inline void cleanup_main_finger(TouchFinger* f) {
@@ -175,25 +187,35 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
         }
         touch_finger_cache_bs(f);
 
-        // SDTW check
+        // SDTW check (second-finger D/Dd — uses its own bindings, just like
+        // first-finger D/Dd uses gesture_decide_branch for the non-drag/drag pair)
         if (g_state.second_double_tap_waiting) {
             g_state.second_double_tap_waiting = false;
             g_state.second_tap_fallback_count = 0;
             if (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag) {
-                if (f->cached_has_active_double_tap_drag) {
-                    // Drag movement triggers Dd via check_start_drag; UP without
-                    // drag fires DT pulse from pending_second_double.
+                GesturePairPlan d_plan = gesture_decide_branch(
+                    f->cached_has_active_double_tap,
+                    f->cached_has_active_double_tap_drag,
+                    false, false,        // no competing gestures for D
+                    true,                // D is always holdable
+                    g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN,
+                    f->is_second_finger,
+                    0,                   // no hold delay
+                    false                // is_single_tap_pair: D/Dd
+                );
+
+                if (d_plan.hold_now) {
+                    hold_actions(result, f->bindings.double_tap, f->bindings.double_tap_count);
+                } else if (d_plan.pulse_on_up) {
+                    // Defer D to fire on second-finger up; Dd drives via check_start_drag
                     g_state.pending_second_double_count = 0;
                     for (int _i = 0; _i < f->bindings.double_tap_count && _i < 8; _i++)
                         g_state.pending_second_double[_i] = f->bindings.double_tap[_i];
                     g_state.pending_second_double_count = f->bindings.double_tap_count;
                     g_state.gesture_post_double_tap_drag = true;
-                } else {
-                    hold_actions(result, f->bindings.double_tap, f->bindings.double_tap_count);
                 }
                 // SDTW confirmed DT/Dd — clear the ST fallback so it does not
-                // fire alongside DT on lift. ST-only stale SDTW falls through
-                // below to normal second-finger processing.
+                // fire alongside DT on lift.
                 g_state.second_tap_fallback_count = 0;
                 f->cached_has_long_press_timer = false;
                 f->down_time_ms = time_ms;
@@ -255,26 +277,29 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
             || f->bindings.single_tap_drag_count > 0
             || f->bindings.double_tap_drag_count > 0;
 
-        // ST handling for second finger:
-        // - Without STD: hold ST (immediate or delayed by DT timeout).
-        //   For TP mode, skip immediate hold — ST fires on UP via
-        //   second_tap_fallback (execute_actions = tap).
-        // - With STD: no hold — drag threshold crossing (first finger
-        //   movement for TS, aggregate for TP) activates SF STD via
-        //   check_start_drag in handler.c. If a finger lifts before
-        //   drag threshold, SF ST / DT / DTD handling applies via
-        //   second_tap_fallback / SDTW (touchpad_finger_up).
-        if (f->cached_has_active_single_tap && !f->cached_has_active_single_tap_drag) {
-            bool has_dt_or_dd = f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag;
-            if (!has_dt_or_dd) {
-                if (g_state.cfg.touch_mode != TOUCH_MODE_TOUCHPAD) {
-                    hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
-                } else {
-                }
-            } else {
-                f->single_tap_hold_delay_ms = g_state.cfg.double_tap_timeout_ms;
+        // ST handling for second finger using unified branch plan
+        // (matches one-finger logic via gesture_decide_branch)
+        if (f->cached_has_active_single_tap) {
+            GesturePairPlan plan = gesture_decide_branch(
+                f->cached_has_active_single_tap,
+                f->cached_has_active_single_tap_drag,
+                f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag,
+                false,  // no LP for second finger
+                true,   // can_hold: S is always holdable
+                g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN,
+                true,   // second finger
+                g_state.cfg.single_tap_delay_ms,
+                true    // is_single_tap_pair: S/Sd
+            );
+
+            if (plan.hold_now) {
+                hold_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+            } else if (plan.hold_delay_ms > 0) {
+                f->single_tap_hold_delay_ms = plan.hold_delay_ms;
                 f->single_tap_hold_timer = time_ms;
             }
+            // press_on_drag → check_start_drag handles threshold
+            // pulse_on_up → second_tap_fallback / SDTW handles on finger-up
         }
     }
 }
@@ -356,7 +381,8 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time
                 break;
             }
             handle_tap_up(f, result, time_ms);
-            if (!g_state.gesture_second_active || !g_state.gesture_is_action_held)
+            if (!g_state.gesture_second_active || !g_state.gesture_is_action_held
+                || g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD)
                 release_held_actions(result);
             g_state.gesture_main_ptr_id = -1;
             f->active = false;

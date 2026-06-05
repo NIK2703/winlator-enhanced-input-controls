@@ -17,7 +17,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.util.Log;
+
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -197,14 +197,13 @@ public class ShortcutsFragment extends Fragment {
                     int gameId = response.body().data.get(0).id;
                     fetchSteamGridCovers(gameId, destFile, onSuccess, onFail);
                 } else {
-                    Log.d(TAG, "SteamGridDB: sem resultado para '" + shortcut.name + "', usando fallback");
                     if (onFail != null) onFail.run();
                 }
             }
 
             @Override
             public void onFailure(Call<SteamGridSearchResponse> call, Throwable t) {
-                Log.e(TAG, "SteamGridDB search falhou: " + t.getMessage());
+
                 if (onFail != null) onFail.run();
             }
         });
@@ -234,14 +233,14 @@ public class ShortcutsFragment extends Fragment {
                     String url = response.body().data.get(0).url;
                     downloadAndSaveCover(url, destFile, onSuccess, onFail);
                 } else {
-                    Log.d(TAG, "SteamGridDB: nenhum grid encontrado para gameId=" + gameId);
+
                     if (onFail != null) onFail.run();
                 }
             }
 
             @Override
             public void onFailure(Call<SteamGridGridsResponse> call, Throwable t) {
-                Log.e(TAG, "SteamGridDB grids falhou: " + t.getMessage());
+
                 if (onFail != null) onFail.run();
             }
         });
@@ -262,10 +261,9 @@ public class ShortcutsFragment extends Fragment {
                     bmp.compress(Bitmap.CompressFormat.PNG, 100, fos);
                 }
                 bmp.recycle();
-                Log.d(TAG, "SteamGridDB cover salvo: " + destFile.getAbsolutePath());
                 if (onSuccess != null) onSuccess.run();
             } catch (Exception e) {
-                Log.e(TAG, "Falha ao baixar cover do SteamGridDB: " + e.getMessage());
+
                 if (onFail != null) onFail.run();
             }
         });
