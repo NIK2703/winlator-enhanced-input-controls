@@ -123,17 +123,23 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
         __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "MOVE toggle: sel=%d vis=%d in=%d refrain=%d",
             e->selected, e->visual_active, inside, e->auto_repeat_primary_pressed);
         if (e->selected) {
-            if (!inside) {
+            if (!inside && !e->auto_repeat_primary_pressed) {
                 if (e->bindings[0].type != BINDING_NONE)
                     release_binding(result, &e->bindings[0]);
                 e->selected = false;
-                e->auto_repeat_primary_pressed = false;
                 e->visual_active = false;
             } else {
                 e->visual_active = true;
             }
         } else {
-            e->visual_active = false;
+            if (inside) {
+                if (e->bindings[0].type != BINDING_NONE)
+                    press_binding(result, &e->bindings[0], true);
+                e->selected = true;
+                e->visual_active = true;
+            } else {
+                e->visual_active = false;
+            }
         }
         __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "MOVE toggle: result sel=%d vis=%d",
             e->selected, e->visual_active);
