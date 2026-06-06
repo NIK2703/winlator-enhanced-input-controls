@@ -105,13 +105,14 @@ public class ControlElement {
     private float cornerRadius = 0.6f;
     private float dpadCornerRadius = 0.6f;
     private List<List<Binding>> bindings = new ArrayList<>();
+    private List<List<Boolean>> bindingSticky = new ArrayList<>();
+    private boolean autoRepeat = false;
+    private int autoRepeatIntervalMs = 100;
     private float scale = 1.0f;
     private short x;
     private short y;
     private boolean selected = false;
     private boolean toggleSwitch = false;
-    private boolean autoRepeat = false;
-    private int autoRepeatIntervalMs = 100;
     private boolean passthroughTouch;
     private float opacity = -1f;
     private final Rect boundingBox = new Rect();
@@ -167,12 +168,16 @@ public class ControlElement {
         this.inputControlsView = inputControlsView;
         for (int i = 0; i < 4; i++) {
             bindings.add(new ArrayList<Binding>());
+            bindingSticky.add(new ArrayList<Boolean>());
         }
         refreshProfileCache();
     }
 
     private void reset() {
         for (List<Binding> seq : bindings) {
+            seq.clear();
+        }
+        for (List<Boolean> seq : bindingSticky) {
             seq.clear();
         }
         scroller = null;
@@ -231,6 +236,12 @@ public class ControlElement {
         }
         while (bindings.size() > bindingCount) {
             bindings.remove(bindings.size() - 1);
+        }
+        while (bindingSticky.size() < bindingCount) {
+            bindingSticky.add(new ArrayList<Boolean>());
+        }
+        while (bindingSticky.size() > bindingCount) {
+            bindingSticky.remove(bindingSticky.size() - 1);
         }
         states = new boolean[bindingCount];
         boundingBoxNeedsUpdate = true;
@@ -367,14 +378,25 @@ public class ControlElement {
         List<Binding> seq = bindings.get(index);
         seq.clear();
         seq.add(binding);
+        while (index >= bindingSticky.size()) {
+            bindingSticky.add(new ArrayList<Boolean>());
+        }
+        List<Boolean> stickySeq = bindingSticky.get(index);
+        stickySeq.clear();
+        stickySeq.add(false);
         markDisplayTextDirty();
         invalidateElementCache();
     }
 
     public void setBinding(Binding binding) {
-        for (List<Binding> seq : bindings) {
+        for (int i = 0; i < bindings.size(); i++) {
+            List<Binding> seq = bindings.get(i);
             seq.clear();
             seq.add(binding);
+        }
+        for (List<Boolean> seq : bindingSticky) {
+            seq.clear();
+            seq.add(false);
         }
         markDisplayTextDirty();
         invalidateElementCache();
@@ -392,6 +414,16 @@ public class ControlElement {
         List<Binding> seq = bindings.get(index);
         seq.clear();
         seq.addAll(sequence);
+        while (index >= bindingSticky.size()) {
+            bindingSticky.add(new ArrayList<Boolean>());
+        }
+        List<Boolean> stickySeq = bindingSticky.get(index);
+        while (stickySeq.size() < sequence.size()) {
+            stickySeq.add(false);
+        }
+        while (stickySeq.size() > sequence.size()) {
+            stickySeq.remove(stickySeq.size() - 1);
+        }
         invalidateElementCache();
     }
 
@@ -400,6 +432,10 @@ public class ControlElement {
             bindings.add(new ArrayList<Binding>());
         }
         bindings.get(index).add(binding);
+        while (index >= bindingSticky.size()) {
+            bindingSticky.add(new ArrayList<Boolean>());
+        }
+        bindingSticky.get(index).add(false);
         invalidateElementCache();
     }
 
@@ -408,9 +444,39 @@ public class ControlElement {
             List<Binding> seq = bindings.get(index);
             if (seqIndex >= 0 && seqIndex < seq.size()) {
                 seq.remove(seqIndex);
+                if (index < bindingSticky.size()) {
+                    List<Boolean> stickySeq = bindingSticky.get(index);
+                    if (seqIndex < stickySeq.size()) {
+                        stickySeq.remove(seqIndex);
+                    }
+                }
                 invalidateElementCache();
             }
         }
+    }
+
+    public boolean isBindingSticky(int slot, int index) {
+        if (slot >= bindingSticky.size()) return false;
+        List<Boolean> seq = bindingSticky.get(slot);
+        if (index >= seq.size()) return false;
+        Boolean val = seq.get(index);
+        return val != null && val;
+    }
+
+    public void setBindingSticky(int slot, int index, boolean sticky) {
+        while (slot >= bindingSticky.size()) {
+            bindingSticky.add(new ArrayList<Boolean>());
+        }
+        List<Boolean> seq = bindingSticky.get(slot);
+        while (index >= seq.size()) {
+            seq.add(false);
+        }
+        seq.set(index, sticky);
+    }
+
+    public List<Boolean> getBindingSticky(int slot) {
+        if (slot >= bindingSticky.size()) return Collections.emptyList();
+        return Collections.unmodifiableList(bindingSticky.get(slot));
     }
 
     public void setBindingAtSequenceIndex(int slotIndex, int seqIndex, Binding binding) {
@@ -1697,6 +1763,16 @@ public class ControlElement {
             elementJSONObject.put("toggleSwitch", toggleSwitch);
             elementJSONObject.put("autoRepeat", autoRepeat);
             elementJSONObject.put("autoRepeatIntervalMs", autoRepeatIntervalMs);
+
+            JSONArray stickyArray = new JSONArray();
+            for (List<Boolean> seq : bindingSticky) {
+                JSONArray seqArray = new JSONArray();
+                for (Boolean b : seq) {
+                    seqArray.put(b != null && b);
+                }
+                stickyArray.put(seqArray);
+            }
+            elementJSONObject.put("bindingSticky", stickyArray);
             if (passthroughTouch) elementJSONObject.put("passthroughTouch", true);
             if (opacity >= 0) elementJSONObject.put("opacity", opacity);
             elementJSONObject.put("text", text);

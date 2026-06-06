@@ -37,7 +37,7 @@ typedef enum {
 typedef struct {
     BindingType type;
     int keycode;  // X11 keycode for keyboard bindings
-    int modifiers; // modifier mask for keyboard bindings
+    int modifiers; // 1 = sticky (hold on press), 0 = tap (press+release)
 } TouchBinding;
 
 // --- Element types ---
@@ -94,6 +94,7 @@ typedef struct {
     int range_initial_kc;
     TouchBinding element_gesture[8];  int element_gesture_count;
 
+    int primary_sticky_mask;
     bool toggle_switch;
     bool selected;
     int button_long_press_haptic;
@@ -189,7 +190,6 @@ typedef struct {
     bool cached_has_active_single_tap_drag;
     bool cached_has_active_long_press_drag;
     bool cached_has_active_double_tap_drag;
-    bool cached_can_hold_long_press;
     bool cached_has_long_press_timer;
     bool cached_has_moved_beyond_threshold;
 } TouchFinger;

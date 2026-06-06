@@ -14,20 +14,18 @@ import android.view.ViewGroup;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
-import com.winlator.cmod.inputcontrols.Binding;
+import com.winlator.cmod.inputcontrols.BindPackage;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.MouseMode;
 import com.winlator.cmod.widget.NumberPicker;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
 public class GestureSettingsDialog {
     private final Context context;
     private final ControlsProfile profile;
     private OnSaveListener onSaveListener;
-    private final HashMap<String, List<Binding>> bindingValues = new HashMap<>();
+    private final HashMap<String, BindPackage> bindingValues = new HashMap<>();
 
     public interface OnSaveListener {
         void onSave(ControlsProfile profile);
@@ -178,30 +176,30 @@ public class GestureSettingsDialog {
         float speed = 0.25f + (sbCursorSpeed.getProgress() / 55.0f) * 2.75f;
         profile.setCursorSpeed(speed);
 
-        // Save gesture bindings
-        profile.setGestureSingleTapAction(bindingValues.getOrDefault("single", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setGestureSingleTapDragAction(bindingValues.getOrDefault("single_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setGestureLongPressAction(bindingValues.getOrDefault("long", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setGestureLongPressDragAction(bindingValues.getOrDefault("long_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setGestureDoubleTapAction(bindingValues.getOrDefault("double", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setGestureDoubleTapDragAction(bindingValues.getOrDefault("double_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setGestureSingleTap2ndFingerAction(bindingValues.getOrDefault("single_2nd", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setGestureSingleTap2ndFingerDragAction(bindingValues.getOrDefault("single_2nd_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setGestureDoubleTap2ndFingerAction(bindingValues.getOrDefault("double_2nd", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
-        profile.setGestureDoubleTap2ndFingerDragAction(bindingValues.getOrDefault("double_2nd_drag", new ArrayList<>(java.util.Collections.singletonList(Binding.NONE))));
+        // Save gesture bindings (BindPackage includes sticky flags)
+        profile.setGestureSingleTapAction(bindingValues.get("single"));
+        profile.setGestureSingleTapDragAction(bindingValues.get("single_drag"));
+        profile.setGestureLongPressAction(bindingValues.get("long"));
+        profile.setGestureLongPressDragAction(bindingValues.get("long_drag"));
+        profile.setGestureDoubleTapAction(bindingValues.get("double"));
+        profile.setGestureDoubleTapDragAction(bindingValues.get("double_drag"));
+        profile.setGestureSingleTap2ndFingerAction(bindingValues.get("single_2nd"));
+        profile.setGestureSingleTap2ndFingerDragAction(bindingValues.get("single_2nd_drag"));
+        profile.setGestureDoubleTap2ndFingerAction(bindingValues.get("double_2nd"));
+        profile.setGestureDoubleTap2ndFingerDragAction(bindingValues.get("double_2nd_drag"));
 
         profile.save();
         if (onSaveListener != null) onSaveListener.onSave(profile);
     }
 
-    private void addBindingSection(LinearLayout container, String key, String label, List<Binding> current) {
-        addBindingSection(container, key, label, current, 0);
+    private void addBindingSection(LinearLayout container, String key, String label, BindPackage bp) {
+        addBindingSection(container, key, label, bp, 0);
     }
 
-    private void addBindingSection(LinearLayout container, String key, String label, List<Binding> current, int helpTextResId) {
-        bindingValues.put(key, new ArrayList<>(current));
-        List<Binding> seq = bindingValues.get(key);
-        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(context, label, helpTextResId, seq, () -> {});
+    private void addBindingSection(LinearLayout container, String key, String label, BindPackage bp, int helpTextResId) {
+        BindPackage stored = new BindPackage(bp);
+        bindingValues.put(key, stored);
+        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(context, label, helpTextResId, stored, () -> {});
         container.addView(section);
     }
 }

@@ -50,6 +50,16 @@ struct CachedFieldIDs {
     jfieldID tpDoubleTap2nd;
     jfieldID tpSingleTapDrag2nd;
     jfieldID tpDoubleTapDrag2nd;
+    jfieldID stSingleTap;
+    jfieldID stLongPress;
+    jfieldID stDoubleTap;
+    jfieldID stSingleTapDrag;
+    jfieldID stLongPressDrag;
+    jfieldID stDoubleTapDrag;
+    jfieldID stSingleTap2nd;
+    jfieldID stDoubleTap2nd;
+    jfieldID stSingleTapDrag2nd;
+    jfieldID stDoubleTapDrag2nd;
 };
 
 static CachedFieldIDs g_config;
@@ -72,6 +82,7 @@ struct CachedElementFieldIDs {
     jfieldID elementLongPress;
     jfieldID elementGesture;
     jfieldID bindingTypes;
+    jfieldID bindingSticky;
     jfieldID rangeOrdinal;
     jfieldID rangeMax;
     jfieldID bindingCount;
@@ -366,6 +377,16 @@ static void nativeInit(JNIEnv* env, jclass clazz, jobject config) {
         g_config.tpDoubleTap2nd = env->GetFieldID(cls, "tpDoubleTap2nd", "[I");
         g_config.tpSingleTapDrag2nd = env->GetFieldID(cls, "tpSingleTapDrag2nd", "[I");
         g_config.tpDoubleTapDrag2nd = env->GetFieldID(cls, "tpDoubleTapDrag2nd", "[I");
+        g_config.stSingleTap = env->GetFieldID(cls, "stSingleTap", "I");
+        g_config.stLongPress = env->GetFieldID(cls, "stLongPress", "I");
+        g_config.stDoubleTap = env->GetFieldID(cls, "stDoubleTap", "I");
+        g_config.stSingleTapDrag = env->GetFieldID(cls, "stSingleTapDrag", "I");
+        g_config.stLongPressDrag = env->GetFieldID(cls, "stLongPressDrag", "I");
+        g_config.stDoubleTapDrag = env->GetFieldID(cls, "stDoubleTapDrag", "I");
+        g_config.stSingleTap2nd = env->GetFieldID(cls, "stSingleTap2nd", "I");
+        g_config.stDoubleTap2nd = env->GetFieldID(cls, "stDoubleTap2nd", "I");
+        g_config.stSingleTapDrag2nd = env->GetFieldID(cls, "stSingleTapDrag2nd", "I");
+        g_config.stDoubleTapDrag2nd = env->GetFieldID(cls, "stDoubleTapDrag2nd", "I");
         env->DeleteLocalRef(cls);
         g_config_cached = true;
     }
@@ -419,6 +440,34 @@ static void nativeInit(JNIEnv* env, jclass clazz, jobject config) {
     READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTapDrag2nd, c.tp_single_drag_2nd, c.tp_single_drag_2nd_count);
     READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTapDrag2nd, c.tp_double_drag_2nd, c.tp_double_drag_2nd_count);
 
+    // Apply sticky bitmasks to TouchBinding.modifiers (1=hold, 0=tap)
+#define APPLY_STICKY(arr, cnt, sid) do { \
+    int _st = env->GetIntField(config, g_config.sid); \
+    for (int _i = 0; _i < (cnt); _i++) if (_st & (1 << _i)) (arr)[_i].modifiers = 1; \
+} while(0)
+    APPLY_STICKY(c.ts_single_tap, c.ts_single_tap_count, stSingleTap);
+    APPLY_STICKY(c.ts_long_press, c.ts_long_press_count, stLongPress);
+    APPLY_STICKY(c.ts_double_tap, c.ts_double_tap_count, stDoubleTap);
+    APPLY_STICKY(c.ts_single_tap_drag, c.ts_single_tap_drag_count, stSingleTapDrag);
+    APPLY_STICKY(c.ts_long_press_drag, c.ts_long_press_drag_count, stLongPressDrag);
+    APPLY_STICKY(c.ts_double_tap_drag, c.ts_double_tap_drag_count, stDoubleTapDrag);
+    APPLY_STICKY(c.ts_single_2nd, c.ts_single_2nd_count, stSingleTap2nd);
+    APPLY_STICKY(c.ts_double_2nd, c.ts_double_2nd_count, stDoubleTap2nd);
+    APPLY_STICKY(c.ts_single_drag_2nd, c.ts_single_drag_2nd_count, stSingleTapDrag2nd);
+    APPLY_STICKY(c.ts_double_drag_2nd, c.ts_double_drag_2nd_count, stDoubleTapDrag2nd);
+
+    APPLY_STICKY(c.tp_single_tap, c.tp_single_tap_count, stSingleTap);
+    APPLY_STICKY(c.tp_long_press, c.tp_long_press_count, stLongPress);
+    APPLY_STICKY(c.tp_double_tap, c.tp_double_tap_count, stDoubleTap);
+    APPLY_STICKY(c.tp_single_tap_drag, c.tp_single_tap_drag_count, stSingleTapDrag);
+    APPLY_STICKY(c.tp_long_press_drag, c.tp_long_press_drag_count, stLongPressDrag);
+    APPLY_STICKY(c.tp_double_tap_drag, c.tp_double_tap_drag_count, stDoubleTapDrag);
+    APPLY_STICKY(c.tp_single_2nd, c.tp_single_2nd_count, stSingleTap2nd);
+    APPLY_STICKY(c.tp_double_2nd, c.tp_double_2nd_count, stDoubleTap2nd);
+    APPLY_STICKY(c.tp_single_drag_2nd, c.tp_single_drag_2nd_count, stSingleTapDrag2nd);
+    APPLY_STICKY(c.tp_double_drag_2nd, c.tp_double_drag_2nd_count, stDoubleTapDrag2nd);
+#undef APPLY_STICKY
+
     touch_processor_init(&c);
 }
 
@@ -443,6 +492,7 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
         g_elem.elementLongPress = env->GetFieldID(ec, "elementLongPress", "[I");
         g_elem.elementGesture = env->GetFieldID(ec, "elementGesture", "[I");
         g_elem.bindingTypes = env->GetFieldID(ec, "bindingTypes", "[I");
+        g_elem.bindingSticky = env->GetFieldID(ec, "bindingSticky", "[I");
         g_elem.rangeOrdinal = env->GetFieldID(ec, "rangeOrdinal", "I");
         g_elem.rangeMax = env->GetFieldID(ec, "rangeMax", "I");
         g_elem.bindingCount = env->GetFieldID(ec, "bindingCount", "I");
@@ -506,6 +556,22 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
                 elems[i].bindings[j].keycode = 0;
             }
             env->ReleaseIntArrayElements(bindingTypes, bt, JNI_ABORT);
+        }
+
+        {
+            jintArray stickyArr = (jintArray)env->GetObjectField(je, g_elem.bindingSticky);
+            if (stickyArr) {
+                jint* sticky = env->GetIntArrayElements(stickyArr, NULL);
+                jsize stickyLen = env->GetArrayLength(stickyArr);
+                int mask = 0;
+                for (int j = 0; j < stickyLen && j < 4; j++) {
+                    if (sticky[j] != 0) mask |= (1 << j);
+                }
+                elems[i].primary_sticky_mask = mask;
+                env->ReleaseIntArrayElements(stickyArr, sticky, JNI_ABORT);
+            } else {
+                elems[i].primary_sticky_mask = 0;
+            }
         }
 
         elems[i].current_ptr_id = -1;
@@ -615,6 +681,33 @@ static void nativeUpdateConfig(JNIEnv* env, jclass clazz, jobject config) {
     READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTap2nd, c.tp_double_2nd, c.tp_double_2nd_count);
     READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTapDrag2nd, c.tp_single_drag_2nd, c.tp_single_drag_2nd_count);
     READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTapDrag2nd, c.tp_double_drag_2nd, c.tp_double_drag_2nd_count);
+
+#define APPLY_STICKY(arr, cnt, sid) do { \
+    int _st = env->GetIntField(config, g_config.sid); \
+    for (int _i = 0; _i < (cnt); _i++) if (_st & (1 << _i)) (arr)[_i].modifiers = 1; \
+} while(0)
+    APPLY_STICKY(c.ts_single_tap, c.ts_single_tap_count, stSingleTap);
+    APPLY_STICKY(c.ts_long_press, c.ts_long_press_count, stLongPress);
+    APPLY_STICKY(c.ts_double_tap, c.ts_double_tap_count, stDoubleTap);
+    APPLY_STICKY(c.ts_single_tap_drag, c.ts_single_tap_drag_count, stSingleTapDrag);
+    APPLY_STICKY(c.ts_long_press_drag, c.ts_long_press_drag_count, stLongPressDrag);
+    APPLY_STICKY(c.ts_double_tap_drag, c.ts_double_tap_drag_count, stDoubleTapDrag);
+    APPLY_STICKY(c.ts_single_2nd, c.ts_single_2nd_count, stSingleTap2nd);
+    APPLY_STICKY(c.ts_double_2nd, c.ts_double_2nd_count, stDoubleTap2nd);
+    APPLY_STICKY(c.ts_single_drag_2nd, c.ts_single_drag_2nd_count, stSingleTapDrag2nd);
+    APPLY_STICKY(c.ts_double_drag_2nd, c.ts_double_drag_2nd_count, stDoubleTapDrag2nd);
+
+    APPLY_STICKY(c.tp_single_tap, c.tp_single_tap_count, stSingleTap);
+    APPLY_STICKY(c.tp_long_press, c.tp_long_press_count, stLongPress);
+    APPLY_STICKY(c.tp_double_tap, c.tp_double_tap_count, stDoubleTap);
+    APPLY_STICKY(c.tp_single_tap_drag, c.tp_single_tap_drag_count, stSingleTapDrag);
+    APPLY_STICKY(c.tp_long_press_drag, c.tp_long_press_drag_count, stLongPressDrag);
+    APPLY_STICKY(c.tp_double_tap_drag, c.tp_double_tap_drag_count, stDoubleTapDrag);
+    APPLY_STICKY(c.tp_single_2nd, c.tp_single_2nd_count, stSingleTap2nd);
+    APPLY_STICKY(c.tp_double_2nd, c.tp_double_2nd_count, stDoubleTap2nd);
+    APPLY_STICKY(c.tp_single_drag_2nd, c.tp_single_drag_2nd_count, stSingleTapDrag2nd);
+    APPLY_STICKY(c.tp_double_drag_2nd, c.tp_double_drag_2nd_count, stDoubleTapDrag2nd);
+#undef APPLY_STICKY
 
     touch_processor_update_config(&c);
 }

@@ -101,7 +101,7 @@ void element_trackpad_up(TouchElement* e, float x, float y, uint64_t time_ms, To
     for (int i = 0; i < 4; i++) {
         if (e->petal_active[i]) {
             e->petal_active[i] = false;
-            if (e->bindings[i].type != BINDING_NONE)
+            if (e->bindings[i].type != BINDING_NONE && !(e->primary_sticky_mask & (1 << i)))
                 release_binding(result, &e->bindings[i]);
         }
     }

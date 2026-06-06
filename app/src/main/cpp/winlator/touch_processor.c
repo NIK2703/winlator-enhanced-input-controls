@@ -163,7 +163,6 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
         f->cached_has_active_single_tap_drag = false;
         f->cached_has_active_long_press_drag = false;
         f->cached_has_active_double_tap_drag = false;
-        f->cached_can_hold_long_press = false;
         f->cached_has_long_press_timer = false;
         f->cached_has_moved_beyond_threshold = false;
         f->single_tap_deferred = false;
@@ -283,6 +282,8 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
                 (unsigned long long)elapsed, g_state.cfg.long_press_delay_ms, e->long_press_arm);
             if (elapsed >= g_state.cfg.long_press_delay_ms) {
                 e->gesture_long_press_triggered = true;
+                e->visual_active = true;
+                g_state.visual_state_dirty = true;
                 e->long_press_arm = false;
                 for (int k = 0; k < e->element_long_press_count; k++)
                     if (is_modifier_binding(&e->element_long_press[k]))
@@ -302,6 +303,8 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
         {
             if (time_ms - e->down_time_ms >= GESTURE_TIMER_MS) {
                 e->gesture_swipe_triggered = true;
+                e->visual_active = true;
+                g_state.visual_state_dirty = true;
                 e->gesture_timer_armed = false;
                 for (int k = 0; k < e->element_gesture_count; k++)
                     if (is_modifier_binding(&e->element_gesture[k]))

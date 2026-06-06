@@ -48,15 +48,4 @@
         android:layout_height="wrap_content"
         android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/BTSelectNone"
-        android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:gravity="center"
-        android:text="None"
-        android:textColor="#888888"
-        android:textSize="14sp"
-        android:background="?android:attr/selectableItemBackground"
-        android:layout_marginTop="4dp" />
-
 </LinearLayout>

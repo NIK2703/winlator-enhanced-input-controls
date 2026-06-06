@@ -277,8 +277,8 @@ static inline bool is_right_stick_binding(const TouchElement* e) {
 void add_action(TouchActionResult* r, ActionType type, int a0, int a1, int a2);
 void release_held_actions(TouchActionResult* result);
 bool is_modifier_binding(const TouchBinding* b);
-void hold_actions(TouchActionResult* result, const TouchBinding* actions, int count);
 void execute_actions(TouchActionResult* result, const TouchBinding* actions, int count);
+void execute_actions_hold(TouchActionResult* result, const TouchBinding* actions, int count);
 void release_binding(TouchActionResult* result, const TouchBinding* b);
 void press_binding(TouchActionResult* result, const TouchBinding* b, bool hold);
 

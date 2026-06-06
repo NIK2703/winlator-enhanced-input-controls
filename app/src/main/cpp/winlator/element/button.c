@@ -57,9 +57,19 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN arm_lp=%d has_lp=%d tog=%d lp_cnt=%d lp0=%d",
         arm_lp, has_lp, e->toggle_switch, e->element_long_press_count,
         e->element_long_press[0].type);
-    if (arm_lp) return;
+    if (arm_lp) {
+        if (!has_primary) {
+            e->visual_active = false;
+        }
+        return;
+    }
 
     if (has_primary) {
+        // Release previously sticky-held bindings before re-pressing
+        for (int k = 0; k < 4; k++)
+            if (e->bindings[k].type != BINDING_NONE && (e->primary_sticky_mask & (1 << k)))
+                release_binding(result, &e->bindings[k]);
+
         press_binding(result, &e->bindings[0], true);
         if (e->toggle_switch && (e->activation_mode == ACTIVATION_TRACK || e->activation_mode == ACTIVATION_HOVER)) {
             e->selected = true;
@@ -284,12 +294,12 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     } else {
         bool has_lp = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
         if (has_lp && !e->gesture_long_press_triggered) {
-            if (has_primary) {
+            if (has_primary && !(e->primary_sticky_mask & 1)) {
                 press_binding(result, &e->bindings[0], true);
                 release_binding(result, &e->bindings[0]);
             }
         } else {
-            if (has_primary)
+            if (has_primary && !(e->primary_sticky_mask & 1))
                 release_binding(result, &e->bindings[0]);
         }
     }

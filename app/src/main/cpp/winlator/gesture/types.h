@@ -11,7 +11,6 @@ typedef struct {
     bool has_active_single_tap_drag;
     bool has_active_long_press_drag;
     bool has_active_double_tap_drag;
-    bool can_hold_long_press;
     bool has_long_press_timer;
 
 } GestureBindingSet;
@@ -25,13 +24,6 @@ static inline GestureBindingSet gesture_build_binding_set(const FingerBindings* 
     s.has_active_single_tap_drag = fb->single_tap_drag_count > 0;
     s.has_active_long_press_drag = fb->long_press_drag_count > 0;
     s.has_active_double_tap_drag = fb->double_tap_drag_count > 0;
-    s.can_hold_long_press = false;
-    if (s.has_active_long_press) {
-        int t = fb->long_press[0].type;
-        bool has_non_holdable = (t == BINDING_MOUSE_SCROLL_UP || t == BINDING_MOUSE_SCROLL_DOWN
-                              || (t >= BINDING_MOUSE_MOVE_LEFT && t <= BINDING_MOUSE_MOVE_DOWN));
-        s.can_hold_long_press = !has_non_holdable;
-    }
     s.has_long_press_timer = s.has_active_long_press || s.has_active_long_press_drag;
     return s;
 }
@@ -39,10 +31,10 @@ static inline GestureBindingSet gesture_build_binding_set(const FingerBindings* 
 // ---- Unified gesture pair branching ----
 
 // Describes how a non-drag/drag gesture pair should behave.
+// Hold vs tap is determined per-binding by TouchBinding.modifiers (sticky flag).
 typedef struct {
-    int  hold_delay_ms;     // > 0: start timer; on expiry: hold (press)
-    bool hold_now;          // true: hold_actions immediately (finger-down/trigger)
-    bool pulse_on_up;       // true: on finger-up execute (down+up) the non-drag binding
+    int  hold_delay_ms;     // > 0: start timer; on expiry: execute
+    bool pulse_on_up;       // true: on finger-up execute the non-drag binding
     bool press_on_drag;     // true: on drag threshold crossing, press down non-drag (then release on up)
     bool drag_available;    // true: drag variant exists
 } GesturePairPlan;
@@ -52,7 +44,6 @@ typedef struct {
     bool has_xd;
     bool has_competing_dt;
     bool has_competing_lp;
-    bool can_hold_x;
     bool is_ts;
     bool is_second;
     int  hold_delay_ms;
@@ -63,54 +54,38 @@ typedef struct {
 static inline GestureBranchParams gesture_branch_params(
     bool has_x, bool has_xd,
     bool has_competing_dt, bool has_competing_lp,
-    bool can_hold_x, bool is_ts, bool is_second,
+    bool is_ts, bool is_second,
     int hold_delay_ms, bool is_single_tap_pair
 ) {
     GestureBranchParams p;
     p.has_x = has_x; p.has_xd = has_xd;
     p.has_competing_dt = has_competing_dt; p.has_competing_lp = has_competing_lp;
-    p.can_hold_x = can_hold_x; p.is_ts = is_ts; p.is_second = is_second;
+    p.is_ts = is_ts; p.is_second = is_second;
     p.hold_delay_ms = hold_delay_ms; p.is_single_tap_pair = is_single_tap_pair;
     return p;
 }
 
 // Unified decision for ANY non-drag/drag gesture pair.
-// Used for S/Sd, D/Dd, L/Ld — both one-finger and two-finger variants.
-//
-// When competing gestures exist for a pair (only relevant for S/Sd),
-// the non-drag action is deferred: fired on drag threshold crossing
-// (press down, release on up) or on trigger-release timeout (pulse).
-// Without competition, non-holdable actions pulse on trigger;
-// holdable actions hold immediately (or after a delay in TS mode).
-// When both non-drag and drag variants exist, non-drag falls back
-// to pulse on trigger-up, while drag drives on threshold.
+// When competing gestures exist for a pair, the non-drag action is deferred:
+// fired on drag threshold crossing or on trigger-release timeout (pulse).
+// Without competition, the action fires immediately (or after hold_delay_ms in TS).
+// Hold vs tap is determined per-binding by TouchBinding.modifiers.
 static inline GesturePairPlan gesture_decide_branch(GestureBranchParams bp) {
     GesturePairPlan p = {0};
     p.drag_available = bp.has_xd;
 
     if (!bp.has_x) return p;
 
-    // Only non-drag variant
     if (bp.has_x && !bp.has_xd) {
         if (bp.has_competing_dt || bp.has_competing_lp) {
             p.press_on_drag = true;
             p.pulse_on_up = true;
-        } else if (bp.can_hold_x) {
-            if (bp.is_ts) {
-                if (bp.hold_delay_ms > 0 && !bp.is_second) {
-                    p.hold_delay_ms = bp.hold_delay_ms;
-                } else {
-                    p.hold_now = true;
-                }
-            } else if (bp.is_single_tap_pair && !bp.is_second) {
-                p.pulse_on_up = true;
-            } else if (bp.is_single_tap_pair) {
-                p.hold_now = true;
-            } else {
-                p.hold_now = true;
-            }
-        } else {
+        } else if (bp.is_ts && bp.hold_delay_ms > 0 && !bp.is_second) {
+            p.hold_delay_ms = bp.hold_delay_ms;
+        } else if (bp.is_single_tap_pair && !bp.is_second) {
             p.pulse_on_up = true;
+        } else {
+            // execute immediately
         }
         return p;
     }

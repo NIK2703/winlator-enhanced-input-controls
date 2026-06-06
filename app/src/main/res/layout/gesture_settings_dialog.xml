@@ -10,23 +10,31 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Input Mode"
-            android:textStyle="bold"
-            android:textSize="16sp"
-            android:textColor="@color/colorPrimary" />
-
-        <View style="@style/HorizontalLine" />
-
-        <Spinner
-            android:id="@+id/SPInputMode"
-            style="@style/ComboBox"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:spinnerMode="dialog" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Input Mode"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="@color/colorPrimary" />
+
+            <Spinner
+                android:id="@+id/SPInputMode"
+                style="@style/ComboBox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:spinnerMode="dialog" />
+        </LinearLayout>
+
+        <View style="@style/HorizontalLine" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -39,101 +47,128 @@
 
         <View style="@style/HorizontalLine" />
 
-        <TextView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Long Press Timeout (ms)"
-            android:layout_marginTop="8dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
 
-        <com.winlator.cmod.widget.NumberPicker
-            android:id="@+id/NPLongPressTimeout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:minValue="50"
-            app:maxValue="500"
-            app:step="10"
-            app:value="200" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Long Press Timeout (ms)" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Double Tap Timeout (ms)"
-            android:layout_marginTop="8dp" />
+            <com.winlator.cmod.widget.NumberPicker
+                android:id="@+id/NPLongPressTimeout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:minValue="50"
+                app:maxValue="500"
+                app:step="10"
+                app:value="200" />
+        </LinearLayout>
 
-        <com.winlator.cmod.widget.NumberPicker
-            android:id="@+id/NPDoubleTapTimeout"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:minValue="50"
-            app:maxValue="500"
-            app:step="10"
-            app:value="150" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Drag Threshold (px)"
-            android:layout_marginTop="8dp" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Double Tap Timeout (ms)" />
 
-        <com.winlator.cmod.widget.NumberPicker
-            android:id="@+id/NPDragThreshold"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:minValue="0"
-            app:maxValue="30"
-            app:step="1"
-            app:value="10" />
+            <com.winlator.cmod.widget.NumberPicker
+                android:id="@+id/NPDoubleTapTimeout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:minValue="50"
+                app:maxValue="500"
+                app:step="10"
+                app:value="150" />
+        </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Single Tap Delay (ms)"
-            android:layout_marginTop="8dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
 
-        <com.winlator.cmod.widget.NumberPicker
-            android:id="@+id/NPSingleTapDelay"
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Drag Threshold (px)" />
+
+            <com.winlator.cmod.widget.NumberPicker
+                android:id="@+id/NPDragThreshold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:minValue="0"
+                app:maxValue="30"
+                app:step="1"
+                app:value="10" />
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:minValue="0"
-            app:maxValue="10"
-            app:step="1"
-            app:value="0" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Single Tap Delay (ms)" />
+
+            <com.winlator.cmod.widget.NumberPicker
+                android:id="@+id/NPSingleTapDelay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:minValue="0"
+                app:maxValue="10"
+                app:step="1"
+                app:value="0" />
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/LLCursorSpeed"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
 
             <TextView
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="Cursor Speed"
-                android:layout_marginTop="8dp" />
+                android:layout_weight="1"
+                android:text="Cursor Speed" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
+            <SeekBar
+                android:id="@+id/SBCursorSpeed"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:layout_weight="2"
+                android:max="55"
+                android:progress="15" />
 
-                <SeekBar
-                    android:id="@+id/SBCursorSpeed"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:max="55"
-                    android:progress="15" />
-
-                <TextView
-                    android:id="@+id/TVCursorSpeed"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="100%"
-                    android:minWidth="48dp"
-                    android:gravity="end"
-                    android:layout_marginStart="8dp" />
-            </LinearLayout>
+            <TextView
+                android:id="@+id/TVCursorSpeed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="100%"
+                android:minWidth="48dp"
+                android:gravity="end"
+                android:layout_marginStart="8dp" />
         </LinearLayout>
 
         <TextView

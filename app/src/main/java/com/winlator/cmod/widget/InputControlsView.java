@@ -496,6 +496,13 @@ public class InputControlsView extends View {
         invalidate();
     }
 
+    public void tick(long timeMs) {
+        if (nativeTouchProcessor != null && visualPositions != null && visualActive != null) {
+            nativeTouchProcessor.tick(timeMs, visualPositions, visualActive);
+            applyVisualStates();
+        }
+    }
+
     public XServer getXServer() {
         return xServer;
     }

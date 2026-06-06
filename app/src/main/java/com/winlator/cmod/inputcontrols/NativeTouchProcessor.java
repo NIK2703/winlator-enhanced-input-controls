@@ -98,6 +98,19 @@ public class NativeTouchProcessor {
         public int[] tpDoubleTap2nd;
         public int[] tpSingleTapDrag2nd;
         public int[] tpDoubleTapDrag2nd;
+
+        // Per-section sticky bitmasks for gesture bindings.
+        // Bit i is set if the i-th non-NONE binding in the section is sticky (pinned).
+        public int stSingleTap;
+        public int stLongPress;
+        public int stDoubleTap;
+        public int stSingleTapDrag;
+        public int stLongPressDrag;
+        public int stDoubleTapDrag;
+        public int stSingleTap2nd;
+        public int stDoubleTap2nd;
+        public int stSingleTapDrag2nd;
+        public int stDoubleTapDrag2nd;
     }
 
     public static class NativeElement {
@@ -125,6 +138,7 @@ public class NativeTouchProcessor {
         public int rangeMax;
         public int bindingCount;
         public int orientation;
+        public int[] bindingSticky;
     }
 
     private XServer xServer;
@@ -305,38 +319,39 @@ public class NativeTouchProcessor {
         c.cursorAccelerationThreshold = 6;
         c.cursorAccelerationFactor = 1.25f;
 
-        int[] unifiedSingleTap = bindingListToEncoded(profile.getGestureSingleTapAction());
-        int[] unifiedLongPress = bindingListToEncoded(profile.getGestureLongPressAction());
-        int[] unifiedDoubleTap = bindingListToEncoded(profile.getGestureDoubleTapAction());
-        int[] unifiedSingleTapDrag = bindingListToEncoded(profile.getGestureSingleTapDragAction());
-        int[] unifiedLongPressDrag = bindingListToEncoded(profile.getGestureLongPressDragAction());
-        int[] unifiedDoubleTapDrag = bindingListToEncoded(profile.getGestureDoubleTapDragAction());
-        int[] unifiedSingleTap2nd = bindingListToEncoded(profile.getGestureSingleTap2ndFingerAction());
-        int[] unifiedDoubleTap2nd = bindingListToEncoded(profile.getGestureDoubleTap2ndFingerAction());
-        int[] unifiedSingleTapDrag2nd = bindingListToEncoded(profile.getGestureSingleTap2ndFingerDragAction());
-        int[] unifiedDoubleTapDrag2nd = bindingListToEncoded(profile.getGestureDoubleTap2ndFingerDragAction());
+        c.tsSingleTap = profile.getGestureSingleTapAction().encode();
+        c.tsLongPress = profile.getGestureLongPressAction().encode();
+        c.tsDoubleTap = profile.getGestureDoubleTapAction().encode();
+        c.tsSingleTapDrag = profile.getGestureSingleTapDragAction().encode();
+        c.tsLongPressDrag = profile.getGestureLongPressDragAction().encode();
+        c.tsDoubleTapDrag = profile.getGestureDoubleTapDragAction().encode();
+        c.tsSingleTap2nd = profile.getGestureSingleTap2ndFingerAction().encode();
+        c.tsDoubleTap2nd = profile.getGestureDoubleTap2ndFingerAction().encode();
+        c.tsSingleTapDrag2nd = profile.getGestureSingleTap2ndFingerDragAction().encode();
+        c.tsDoubleTapDrag2nd = profile.getGestureDoubleTap2ndFingerDragAction().encode();
 
-        c.tsSingleTap = unifiedSingleTap;
-        c.tsLongPress = unifiedLongPress;
-        c.tsDoubleTap = unifiedDoubleTap;
-        c.tsSingleTapDrag = unifiedSingleTapDrag;
-        c.tsLongPressDrag = unifiedLongPressDrag;
-        c.tsDoubleTapDrag = unifiedDoubleTapDrag;
-        c.tsSingleTap2nd = unifiedSingleTap2nd;
-        c.tsDoubleTap2nd = unifiedDoubleTap2nd;
-        c.tsSingleTapDrag2nd = unifiedSingleTapDrag2nd;
-        c.tsDoubleTapDrag2nd = unifiedDoubleTapDrag2nd;
+        c.tpSingleTap = c.tsSingleTap;
+        c.tpLongPress = c.tsLongPress;
+        c.tpDoubleTap = c.tsDoubleTap;
+        c.tpSingleTapDrag = c.tsSingleTapDrag;
+        c.tpLongPressDrag = c.tsLongPressDrag;
+        c.tpDoubleTapDrag = c.tsDoubleTapDrag;
+        c.tpSingleTap2nd = c.tsSingleTap2nd;
+        c.tpDoubleTap2nd = c.tsDoubleTap2nd;
+        c.tpSingleTapDrag2nd = c.tsSingleTapDrag2nd;
+        c.tpDoubleTapDrag2nd = c.tsDoubleTapDrag2nd;
 
-        c.tpSingleTap = unifiedSingleTap;
-        c.tpLongPress = unifiedLongPress;
-        c.tpDoubleTap = unifiedDoubleTap;
-        c.tpSingleTapDrag = unifiedSingleTapDrag;
-        c.tpLongPressDrag = unifiedLongPressDrag;
-        c.tpDoubleTapDrag = unifiedDoubleTapDrag;
-        c.tpSingleTap2nd = unifiedSingleTap2nd;
-        c.tpDoubleTap2nd = unifiedDoubleTap2nd;
-        c.tpSingleTapDrag2nd = unifiedSingleTapDrag2nd;
-        c.tpDoubleTapDrag2nd = unifiedDoubleTapDrag2nd;
+        // Sticky bitmasks from BindPackage
+        c.stSingleTap = profile.getGestureSingleTapAction().encodeStickyBitmask();
+        c.stLongPress = profile.getGestureLongPressAction().encodeStickyBitmask();
+        c.stDoubleTap = profile.getGestureDoubleTapAction().encodeStickyBitmask();
+        c.stSingleTapDrag = profile.getGestureSingleTapDragAction().encodeStickyBitmask();
+        c.stLongPressDrag = profile.getGestureLongPressDragAction().encodeStickyBitmask();
+        c.stDoubleTapDrag = profile.getGestureDoubleTapDragAction().encodeStickyBitmask();
+        c.stSingleTap2nd = profile.getGestureSingleTap2ndFingerAction().encodeStickyBitmask();
+        c.stDoubleTap2nd = profile.getGestureDoubleTap2ndFingerAction().encodeStickyBitmask();
+        c.stSingleTapDrag2nd = profile.getGestureSingleTap2ndFingerDragAction().encodeStickyBitmask();
+        c.stDoubleTapDrag2nd = profile.getGestureDoubleTap2ndFingerDragAction().encodeStickyBitmask();
 
         return c;
     }
@@ -425,6 +440,10 @@ public class NativeTouchProcessor {
                 }
                 ne.bindingTypes[j * 2] = typeVal;
                 ne.bindingTypes[j * 2 + 1] = keycodeVal;
+            }
+            ne.bindingSticky = new int[ce.getBindingCount()];
+            for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
+                ne.bindingSticky[j] = ce.isBindingSticky(j, 0) ? 1 : 0;
             }
             arr[i] = ne;
         }

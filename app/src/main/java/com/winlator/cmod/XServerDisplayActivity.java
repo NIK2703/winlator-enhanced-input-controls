@@ -1615,7 +1615,7 @@ private void applySidebarSettings() {
             if (nativeTickRunnable == null) {
                 nativeTickRunnable = () -> {
                     if (nativeTouchProcessor != null) {
-                        nativeTouchProcessor.tick(SystemClock.uptimeMillis());
+                        inputControlsView.tick(SystemClock.uptimeMillis());
                         if (handler != null) {
                             handler.postDelayed(nativeTickRunnable, tickIntervalMs);
                         }

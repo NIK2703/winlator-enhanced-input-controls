@@ -28,6 +28,7 @@ import androidx.preference.PreferenceManager;
 import com.winlator.cmod.R;
 import com.winlator.cmod.contentdialog.ContentDialog;
 
+import com.winlator.cmod.inputcontrols.BindPackage;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
@@ -437,9 +438,12 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
     }
 
     private void loadBindingSection(final ControlElement element, LinearLayout container, final int index, int titleResId) {
-        List<Binding> seq = new ArrayList<>(element.getBindingSequence(index));
-        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, getString(titleResId), 0, seq, () -> {
-            element.setBindingSequence(index, seq);
+        BindPackage bp = new BindPackage(element.getBindingSequence(index), element.getBindingSticky(index));
+        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, getString(titleResId), 0, bp, () -> {
+            element.setBindingSequence(index, new ArrayList<>(bp.getBindings()));
+            List<Boolean> flags = bp.getStickyFlags();
+            for (int i = 0; i < flags.size(); i++)
+                element.setBindingSticky(index, i, flags.get(i));
             profile.save();
             inputControlsView.invalidate();
         });
@@ -447,9 +451,9 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
     }
 
     private void loadLongPressBindingSection(final ControlElement element, LinearLayout container) {
-        List<Binding> seq = new ArrayList<>(element.getLongPressBindings());
-        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Long Press", 0, seq, () -> {
-            element.setLongPressBindings(seq);
+        BindPackage bp = new BindPackage(element.getLongPressBindings());
+        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Long Press", 0, bp, () -> {
+            element.setLongPressBindings(new ArrayList<>(bp.getBindings()));
             profile.save();
             inputControlsView.invalidate();
         });
@@ -457,9 +461,9 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
     }
 
     private void loadGestureBindingSection(final ControlElement element, LinearLayout container) {
-        List<Binding> seq = new ArrayList<>(element.getGestureBindings());
-        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Gesture", 0, seq, () -> {
-            element.setGestureBindings(seq);
+        BindPackage bp = new BindPackage(element.getGestureBindings());
+        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Gesture", 0, bp, () -> {
+            element.setGestureBindings(new ArrayList<>(bp.getBindings()));
             profile.save();
             inputControlsView.invalidate();
         });

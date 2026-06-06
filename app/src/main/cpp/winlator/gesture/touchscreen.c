@@ -99,7 +99,7 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
                     if (g_state.cfg.ts_double_tap_drag_count == 0) {
                         // Mirror Java handleDoubleTapConfirmed:
                         // executeActionsAndHold(pendingDoubleTapAction) — press + hold
-                        hold_actions(result, g_state.gesture_pending_double, g_state.gesture_pending_double_count);
+                        execute_actions(result, g_state.gesture_pending_double, g_state.gesture_pending_double_count);
                     } else {
                         
                         g_state.gesture_pending_deferred_double_count = g_state.gesture_pending_double_count;
@@ -196,7 +196,7 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
                 if (g_state.gesture_pending_double_count > 0) {
                     if (!has_dt_drag) {
                         // Java: executeActionsAndHold(pendingDoubleTapAction) — press + hold
-                        hold_actions(result, g_state.gesture_pending_double, g_state.gesture_pending_double_count);
+                        execute_actions(result, g_state.gesture_pending_double, g_state.gesture_pending_double_count);
                     } else {
                         // Java: keep pendingDoubleTapAction for later handling
                         // (discarded on drag start, executed on finger-up via handleTapUp)
@@ -591,7 +591,7 @@ void handle_touchscreen_up(TouchFinger* f, float x, float y, uint64_t time_ms, T
         }
         release_held_actions(result);
         if (main && main->pending_resume_action_count > 0) {
-            hold_actions(result, main->pending_resume_action, main->pending_resume_action_count);
+            execute_actions_hold(result, main->pending_resume_action, main->pending_resume_action_count);
             main->pending_resume_action_count = 0;
             main->state = GESTURE_STATE_DRAGGING;
         }

@@ -239,7 +239,7 @@ void suppress_element_gestures(TouchElement* e, TouchActionResult* result) {
 }
 
 void release_element_bindings(TouchElement* e, TouchActionResult* result) {
-    if (e->bindings[0].type != BINDING_NONE)
+    if (e->bindings[0].type != BINDING_NONE && !(e->primary_sticky_mask & 1))
         release_binding(result, &e->bindings[0]);
     if (e->gesture_swipe_triggered)
         release_bindings_list(result, e->element_gesture, e->element_gesture_count);
@@ -263,7 +263,6 @@ void touch_finger_cache_bs(TouchFinger* f) {
     f->cached_has_active_single_tap_drag = bs.has_active_single_tap_drag;
     f->cached_has_active_long_press_drag = bs.has_active_long_press_drag;
     f->cached_has_active_double_tap_drag = bs.has_active_double_tap_drag;
-    f->cached_can_hold_long_press = bs.can_hold_long_press;
     f->cached_has_long_press_timer = bs.has_long_press_timer;
 }
 

@@ -13,10 +13,19 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileOutputStream;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class ControlsProfile implements Comparable<ControlsProfile> {
     public final int id;
@@ -73,18 +82,17 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private List<Binding> touchpadDoubleTap2ndFingerDragAction = new ArrayList<>();
 
 
-    // === Unified gesture bindings (replace both ts and tp) ===
-    // These are the primary storage. Old ts/tp fields delegate to these.
-    private List<Binding> gestureSingleTapAction = new ArrayList<>();
-    private List<Binding> gestureLongPressAction = new ArrayList<>();
-    private List<Binding> gestureDoubleTapAction = new ArrayList<>();
-    private List<Binding> gestureSingleTap2ndFingerAction = new ArrayList<>();
-    private List<Binding> gestureDoubleTap2ndFingerAction = new ArrayList<>();
-    private List<Binding> gestureSingleTapDragAction = new ArrayList<>();
-    private List<Binding> gestureLongPressDragAction = new ArrayList<>();
-    private List<Binding> gestureDoubleTapDragAction = new ArrayList<>();
-    private List<Binding> gestureSingleTap2ndFingerDragAction = new ArrayList<>();
-    private List<Binding> gestureDoubleTap2ndFingerDragAction = new ArrayList<>();
+    // === Unified gesture bindings (primary storage) ===
+    private BindPackage gestureSingleTapAction = BindPackage.fromSingle(Binding.MOUSE_LEFT_BUTTON);
+    private BindPackage gestureLongPressAction = BindPackage.fromSingle(Binding.MOUSE_RIGHT_BUTTON);
+    private BindPackage gestureDoubleTapAction = new BindPackage();
+    private BindPackage gestureSingleTap2ndFingerAction = BindPackage.fromSingle(Binding.MOUSE_RIGHT_BUTTON);
+    private BindPackage gestureDoubleTap2ndFingerAction = new BindPackage();
+    private BindPackage gestureSingleTapDragAction = new BindPackage();
+    private BindPackage gestureLongPressDragAction = BindPackage.fromSingle(Binding.MOUSE_LEFT_BUTTON);
+    private BindPackage gestureDoubleTapDragAction = new BindPackage();
+    private BindPackage gestureSingleTap2ndFingerDragAction = new BindPackage();
+    private BindPackage gestureDoubleTap2ndFingerDragAction = new BindPackage();
 
     private boolean gestureSettingsLoaded = false;
 
@@ -519,42 +527,47 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setTouchpadDoubleTap2ndFingerDragAction(Binding binding) { this.touchpadDoubleTap2ndFingerDragAction.clear(); this.touchpadDoubleTap2ndFingerDragAction.add(binding); }
     public void setTouchpadDoubleTap2ndFingerDragAction(List<Binding> bindings) { this.touchpadDoubleTap2ndFingerDragAction.clear(); this.touchpadDoubleTap2ndFingerDragAction.addAll(bindings); }
 
-    // === Unified gesture binding getters/setters (replaces separate ts/tp) ===
+    // === Unified gesture binding getters/setters (primary storage) ===
 
-    private void initGestureFromBinding(List<Binding> dst, List<Binding> src) {
-        dst.clear();
-        dst.addAll(src);
-    }
+    public BindPackage getGestureSingleTapAction() { ensureGestureSettingsLoaded(); return gestureSingleTapAction; }
+    public void setGestureSingleTapAction(BindPackage bp) { this.gestureSingleTapAction = new BindPackage(bp); }
+    public void setGestureSingleTapAction(List<Binding> bindings) { this.gestureSingleTapAction = new BindPackage(bindings); }
 
-    public List<Binding> getGestureSingleTapAction() { ensureGestureSettingsLoaded(); return gestureSingleTapAction; }
-    public void setGestureSingleTapAction(List<Binding> bindings) { initGestureFromBinding(this.gestureSingleTapAction, bindings); }
+    public BindPackage getGestureLongPressAction() { ensureGestureSettingsLoaded(); return gestureLongPressAction; }
+    public void setGestureLongPressAction(BindPackage bp) { this.gestureLongPressAction = new BindPackage(bp); }
+    public void setGestureLongPressAction(List<Binding> bindings) { this.gestureLongPressAction = new BindPackage(bindings); }
 
-    public List<Binding> getGestureLongPressAction() { ensureGestureSettingsLoaded(); return gestureLongPressAction; }
-    public void setGestureLongPressAction(List<Binding> bindings) { initGestureFromBinding(this.gestureLongPressAction, bindings); }
+    public BindPackage getGestureDoubleTapAction() { ensureGestureSettingsLoaded(); return gestureDoubleTapAction; }
+    public void setGestureDoubleTapAction(BindPackage bp) { this.gestureDoubleTapAction = new BindPackage(bp); }
+    public void setGestureDoubleTapAction(List<Binding> bindings) { this.gestureDoubleTapAction = new BindPackage(bindings); }
 
-    public List<Binding> getGestureDoubleTapAction() { ensureGestureSettingsLoaded(); return gestureDoubleTapAction; }
-    public void setGestureDoubleTapAction(List<Binding> bindings) { initGestureFromBinding(this.gestureDoubleTapAction, bindings); }
+    public BindPackage getGestureSingleTap2ndFingerAction() { ensureGestureSettingsLoaded(); return gestureSingleTap2ndFingerAction; }
+    public void setGestureSingleTap2ndFingerAction(BindPackage bp) { this.gestureSingleTap2ndFingerAction = new BindPackage(bp); }
+    public void setGestureSingleTap2ndFingerAction(List<Binding> bindings) { this.gestureSingleTap2ndFingerAction = new BindPackage(bindings); }
 
-    public List<Binding> getGestureSingleTap2ndFingerAction() { ensureGestureSettingsLoaded(); return gestureSingleTap2ndFingerAction; }
-    public void setGestureSingleTap2ndFingerAction(List<Binding> bindings) { initGestureFromBinding(this.gestureSingleTap2ndFingerAction, bindings); }
+    public BindPackage getGestureDoubleTap2ndFingerAction() { ensureGestureSettingsLoaded(); return gestureDoubleTap2ndFingerAction; }
+    public void setGestureDoubleTap2ndFingerAction(BindPackage bp) { this.gestureDoubleTap2ndFingerAction = new BindPackage(bp); }
+    public void setGestureDoubleTap2ndFingerAction(List<Binding> bindings) { this.gestureDoubleTap2ndFingerAction = new BindPackage(bindings); }
 
-    public List<Binding> getGestureDoubleTap2ndFingerAction() { ensureGestureSettingsLoaded(); return gestureDoubleTap2ndFingerAction; }
-    public void setGestureDoubleTap2ndFingerAction(List<Binding> bindings) { initGestureFromBinding(this.gestureDoubleTap2ndFingerAction, bindings); }
+    public BindPackage getGestureSingleTapDragAction() { ensureGestureSettingsLoaded(); return gestureSingleTapDragAction; }
+    public void setGestureSingleTapDragAction(BindPackage bp) { this.gestureSingleTapDragAction = new BindPackage(bp); }
+    public void setGestureSingleTapDragAction(List<Binding> bindings) { this.gestureSingleTapDragAction = new BindPackage(bindings); }
 
-    public List<Binding> getGestureSingleTapDragAction() { ensureGestureSettingsLoaded(); return gestureSingleTapDragAction; }
-    public void setGestureSingleTapDragAction(List<Binding> bindings) { initGestureFromBinding(this.gestureSingleTapDragAction, bindings); }
+    public BindPackage getGestureLongPressDragAction() { ensureGestureSettingsLoaded(); return gestureLongPressDragAction; }
+    public void setGestureLongPressDragAction(BindPackage bp) { this.gestureLongPressDragAction = new BindPackage(bp); }
+    public void setGestureLongPressDragAction(List<Binding> bindings) { this.gestureLongPressDragAction = new BindPackage(bindings); }
 
-    public List<Binding> getGestureLongPressDragAction() { ensureGestureSettingsLoaded(); return gestureLongPressDragAction; }
-    public void setGestureLongPressDragAction(List<Binding> bindings) { initGestureFromBinding(this.gestureLongPressDragAction, bindings); }
+    public BindPackage getGestureDoubleTapDragAction() { ensureGestureSettingsLoaded(); return gestureDoubleTapDragAction; }
+    public void setGestureDoubleTapDragAction(BindPackage bp) { this.gestureDoubleTapDragAction = new BindPackage(bp); }
+    public void setGestureDoubleTapDragAction(List<Binding> bindings) { this.gestureDoubleTapDragAction = new BindPackage(bindings); }
 
-    public List<Binding> getGestureDoubleTapDragAction() { ensureGestureSettingsLoaded(); return gestureDoubleTapDragAction; }
-    public void setGestureDoubleTapDragAction(List<Binding> bindings) { initGestureFromBinding(this.gestureDoubleTapDragAction, bindings); }
+    public BindPackage getGestureSingleTap2ndFingerDragAction() { ensureGestureSettingsLoaded(); return gestureSingleTap2ndFingerDragAction; }
+    public void setGestureSingleTap2ndFingerDragAction(BindPackage bp) { this.gestureSingleTap2ndFingerDragAction = new BindPackage(bp); }
+    public void setGestureSingleTap2ndFingerDragAction(List<Binding> bindings) { this.gestureSingleTap2ndFingerDragAction = new BindPackage(bindings); }
 
-    public List<Binding> getGestureSingleTap2ndFingerDragAction() { ensureGestureSettingsLoaded(); return gestureSingleTap2ndFingerDragAction; }
-    public void setGestureSingleTap2ndFingerDragAction(List<Binding> bindings) { initGestureFromBinding(this.gestureSingleTap2ndFingerDragAction, bindings); }
-
-    public List<Binding> getGestureDoubleTap2ndFingerDragAction() { ensureGestureSettingsLoaded(); return gestureDoubleTap2ndFingerDragAction; }
-    public void setGestureDoubleTap2ndFingerDragAction(List<Binding> bindings) { initGestureFromBinding(this.gestureDoubleTap2ndFingerDragAction, bindings); }
+    public BindPackage getGestureDoubleTap2ndFingerDragAction() { ensureGestureSettingsLoaded(); return gestureDoubleTap2ndFingerDragAction; }
+    public void setGestureDoubleTap2ndFingerDragAction(BindPackage bp) { this.gestureDoubleTap2ndFingerDragAction = new BindPackage(bp); }
+    public void setGestureDoubleTap2ndFingerDragAction(List<Binding> bindings) { this.gestureDoubleTap2ndFingerDragAction = new BindPackage(bindings); }
 
     private void ensureGestureSettingsLoaded() {
         if (gestureSettingsLoaded) return;
@@ -749,41 +762,109 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (gestureData.has("dragMode"))
                 dragMode = parseEnum(DragMode.class, gestureData.getString("dragMode"), DragMode.AUTO);
 
-            // Unified gesture bindings (primary)
-            if (gestureData.has("singleTapAction")) setGestureSingleTapAction(parseGestureBindingList(gestureData, "singleTapAction", Binding.MOUSE_LEFT_BUTTON));
-            if (gestureData.has("longPressAction")) setGestureLongPressAction(parseGestureBindingList(gestureData, "longPressAction", Binding.MOUSE_RIGHT_BUTTON));
-            if (gestureData.has("doubleTapAction")) setGestureDoubleTapAction(parseGestureBindingList(gestureData, "doubleTapAction", Binding.NONE));
-            if (gestureData.has("singleTap2ndFingerAction")) setGestureSingleTap2ndFingerAction(parseGestureBindingList(gestureData, "singleTap2ndFingerAction", Binding.MOUSE_RIGHT_BUTTON));
-            if (gestureData.has("doubleTap2ndFingerAction")) setGestureDoubleTap2ndFingerAction(parseGestureBindingList(gestureData, "doubleTap2ndFingerAction", Binding.NONE));
-            if (gestureData.has("singleTapDragAction")) setGestureSingleTapDragAction(parseGestureBindingList(gestureData, "singleTapDragAction", Binding.NONE));
-            if (gestureData.has("longPressDragAction")) setGestureLongPressDragAction(parseGestureBindingList(gestureData, "longPressDragAction", Binding.NONE));
-            if (gestureData.has("doubleTapDragAction")) setGestureDoubleTapDragAction(parseGestureBindingList(gestureData, "doubleTapDragAction", Binding.NONE));
-            if (gestureData.has("singleTap2ndFingerDragAction")) setGestureSingleTap2ndFingerDragAction(parseGestureBindingList(gestureData, "singleTap2ndFingerDragAction", Binding.NONE));
-            if (gestureData.has("doubleTap2ndFingerDragAction")) setGestureDoubleTap2ndFingerDragAction(parseGestureBindingList(gestureData, "doubleTap2ndFingerDragAction", Binding.NONE));
+            // Parse per-section sticky flags (legacy separate storage)
+            Map<String, List<Boolean>> stickyMap = new HashMap<>();
+            if (gestureData.has("bindingSticky")) {
+                JSONObject stickyObj = gestureData.getJSONObject("bindingSticky");
+                java.util.Iterator<String> it = stickyObj.keys();
+                while (it.hasNext()) {
+                    String key = it.next();
+                    JSONArray arr = stickyObj.getJSONArray(key);
+                    List<Boolean> flags = new ArrayList<>();
+                    for (int i = 0; i < arr.length(); i++) flags.add(arr.getInt(i) != 0);
+                    stickyMap.put(key, flags);
+                }
+            }
+
+            // Mapping from gesture data field name to sticky section key
+            String[][] fieldToKey = {
+                {"singleTapAction", "single"},
+                {"longPressAction", "long"},
+                {"doubleTapAction", "double"},
+                {"singleTap2ndFingerAction", "single_2nd"},
+                {"doubleTap2ndFingerAction", "double_2nd"},
+                {"singleTapDragAction", "single_drag"},
+                {"longPressDragAction", "long_drag"},
+                {"doubleTapDragAction", "double_drag"},
+                {"singleTap2ndFingerDragAction", "single_2nd_drag"},
+                {"doubleTap2ndFingerDragAction", "double_2nd_drag"},
+            };
+
+            Binding[] defaults = {
+                Binding.MOUSE_LEFT_BUTTON, Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
+                Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
+                Binding.NONE, Binding.MOUSE_LEFT_BUTTON, Binding.NONE,
+                Binding.NONE, Binding.NONE,
+            };
+
+            BindPackage[] targets = {
+                gestureSingleTapAction, gestureLongPressAction, gestureDoubleTapAction,
+                gestureSingleTap2ndFingerAction, gestureDoubleTap2ndFingerAction,
+                gestureSingleTapDragAction, gestureLongPressDragAction, gestureDoubleTapDragAction,
+                gestureSingleTap2ndFingerDragAction, gestureDoubleTap2ndFingerDragAction,
+            };
+
+            for (int i = 0; i < fieldToKey.length; i++) {
+                String field = fieldToKey[i][0];
+                String key = fieldToKey[i][1];
+                Binding def = defaults[i];
+                if (gestureData.has(field)) {
+                    List<Binding> bindings = parseGestureBindingList(gestureData, field, def);
+                    List<Boolean> sticky = stickyMap.containsKey(key) ? stickyMap.get(key) : new ArrayList<Boolean>();
+                    targets[i].clear();
+                    for (int j = 0; j < bindings.size(); j++) {
+                        targets[i].add(bindings.get(j));
+                        if (j < sticky.size() && sticky.get(j) != null && sticky.get(j)) {
+                            targets[i].setSticky(j, true);
+                        }
+                    }
+                    targets[i].sync();
+                }
+            }
 
             // Also populate old ts fields for backward compat
-            if (gestureData.has("singleTapAction")) setSingleTapAction(parseGestureBindingList(gestureData, "singleTapAction", Binding.MOUSE_LEFT_BUTTON));
-            if (gestureData.has("longPressAction")) setLongPressAction(parseGestureBindingList(gestureData, "longPressAction", Binding.MOUSE_RIGHT_BUTTON));
-            if (gestureData.has("doubleTapAction")) setDoubleTapAction(parseGestureBindingList(gestureData, "doubleTapAction", Binding.NONE));
-            if (gestureData.has("singleTap2ndFingerAction")) setSingleTap2ndFingerAction(parseGestureBindingList(gestureData, "singleTap2ndFingerAction", Binding.MOUSE_RIGHT_BUTTON));
-            if (gestureData.has("doubleTap2ndFingerAction")) setDoubleTap2ndFingerAction(parseGestureBindingList(gestureData, "doubleTap2ndFingerAction", Binding.NONE));
-            if (gestureData.has("singleTapDragAction")) setSingleTapDragAction(parseGestureBindingList(gestureData, "singleTapDragAction", Binding.NONE));
-            if (gestureData.has("longPressDragAction")) setLongPressDragAction(parseGestureBindingList(gestureData, "longPressDragAction", Binding.NONE));
-            if (gestureData.has("doubleTapDragAction")) setDoubleTapDragAction(parseGestureBindingList(gestureData, "doubleTapDragAction", Binding.NONE));
-            if (gestureData.has("singleTap2ndFingerDragAction")) setSingleTap2ndFingerDragAction(parseGestureBindingList(gestureData, "singleTap2ndFingerDragAction", Binding.NONE));
-            if (gestureData.has("doubleTap2ndFingerDragAction")) setDoubleTap2ndFingerDragAction(parseGestureBindingList(gestureData, "doubleTap2ndFingerDragAction", Binding.NONE));
+            List<Binding> legacy = gestureSingleTapAction.getBindings();
+            if (gestureData.has("singleTapAction") && !legacy.isEmpty()) setSingleTapAction(legacy);
+            legacy = gestureLongPressAction.getBindings();
+            if (gestureData.has("longPressAction") && !legacy.isEmpty()) setLongPressAction(legacy);
+            legacy = gestureDoubleTapAction.getBindings();
+            if (gestureData.has("doubleTapAction") && !legacy.isEmpty()) setDoubleTapAction(legacy);
+            legacy = gestureSingleTap2ndFingerAction.getBindings();
+            if (gestureData.has("singleTap2ndFingerAction") && !legacy.isEmpty()) setSingleTap2ndFingerAction(legacy);
+            legacy = gestureDoubleTap2ndFingerAction.getBindings();
+            if (gestureData.has("doubleTap2ndFingerAction") && !legacy.isEmpty()) setDoubleTap2ndFingerAction(legacy);
+            legacy = gestureSingleTapDragAction.getBindings();
+            if (gestureData.has("singleTapDragAction") && !legacy.isEmpty()) setSingleTapDragAction(legacy);
+            legacy = gestureLongPressDragAction.getBindings();
+            if (gestureData.has("longPressDragAction") && !legacy.isEmpty()) setLongPressDragAction(legacy);
+            legacy = gestureDoubleTapDragAction.getBindings();
+            if (gestureData.has("doubleTapDragAction") && !legacy.isEmpty()) setDoubleTapDragAction(legacy);
+            legacy = gestureSingleTap2ndFingerDragAction.getBindings();
+            if (gestureData.has("singleTap2ndFingerDragAction") && !legacy.isEmpty()) setSingleTap2ndFingerDragAction(legacy);
+            legacy = gestureDoubleTap2ndFingerDragAction.getBindings();
+            if (gestureData.has("doubleTap2ndFingerDragAction") && !legacy.isEmpty()) setDoubleTap2ndFingerDragAction(legacy);
 
             // Also populate old tp fields for backward compat
-            if (gestureData.has("singleTapAction")) setTouchpadSingleTapAction(parseGestureBindingList(gestureData, "singleTapAction", Binding.MOUSE_LEFT_BUTTON));
-            if (gestureData.has("longPressAction")) setTouchpadLongPressAction(parseGestureBindingList(gestureData, "longPressAction", Binding.MOUSE_RIGHT_BUTTON));
-            if (gestureData.has("doubleTapAction")) setTouchpadDoubleTapAction(parseGestureBindingList(gestureData, "doubleTapAction", Binding.NONE));
-            if (gestureData.has("singleTap2ndFingerAction")) setTouchpadSingleTap2ndFingerAction(parseGestureBindingList(gestureData, "singleTap2ndFingerAction", Binding.MOUSE_RIGHT_BUTTON));
-            if (gestureData.has("doubleTap2ndFingerAction")) setTouchpadDoubleTap2ndFingerAction(parseGestureBindingList(gestureData, "doubleTap2ndFingerAction", Binding.NONE));
-            if (gestureData.has("singleTapDragAction")) setTouchpadSingleTapDragAction(parseGestureBindingList(gestureData, "singleTapDragAction", Binding.NONE));
-            if (gestureData.has("longPressDragAction")) setTouchpadLongPressDragAction(parseGestureBindingList(gestureData, "longPressDragAction", Binding.NONE));
-            if (gestureData.has("doubleTapDragAction")) setTouchpadDoubleTapDragAction(parseGestureBindingList(gestureData, "doubleTapDragAction", Binding.NONE));
-            if (gestureData.has("singleTap2ndFingerDragAction")) setTouchpadSingleTap2ndFingerDragAction(parseGestureBindingList(gestureData, "singleTap2ndFingerDragAction", Binding.NONE));
-            if (gestureData.has("doubleTap2ndFingerDragAction")) setTouchpadDoubleTap2ndFingerDragAction(parseGestureBindingList(gestureData, "doubleTap2ndFingerDragAction", Binding.NONE));
+            legacy = gestureSingleTapAction.getBindings();
+            if (gestureData.has("singleTapAction") && !legacy.isEmpty()) setTouchpadSingleTapAction(legacy);
+            legacy = gestureLongPressAction.getBindings();
+            if (gestureData.has("longPressAction") && !legacy.isEmpty()) setTouchpadLongPressAction(legacy);
+            legacy = gestureDoubleTapAction.getBindings();
+            if (gestureData.has("doubleTapAction") && !legacy.isEmpty()) setTouchpadDoubleTapAction(legacy);
+            legacy = gestureSingleTap2ndFingerAction.getBindings();
+            if (gestureData.has("singleTap2ndFingerAction") && !legacy.isEmpty()) setTouchpadSingleTap2ndFingerAction(legacy);
+            legacy = gestureDoubleTap2ndFingerAction.getBindings();
+            if (gestureData.has("doubleTap2ndFingerAction") && !legacy.isEmpty()) setTouchpadDoubleTap2ndFingerAction(legacy);
+            legacy = gestureSingleTapDragAction.getBindings();
+            if (gestureData.has("singleTapDragAction") && !legacy.isEmpty()) setTouchpadSingleTapDragAction(legacy);
+            legacy = gestureLongPressDragAction.getBindings();
+            if (gestureData.has("longPressDragAction") && !legacy.isEmpty()) setTouchpadLongPressDragAction(legacy);
+            legacy = gestureDoubleTapDragAction.getBindings();
+            if (gestureData.has("doubleTapDragAction") && !legacy.isEmpty()) setTouchpadDoubleTapDragAction(legacy);
+            legacy = gestureSingleTap2ndFingerDragAction.getBindings();
+            if (gestureData.has("singleTap2ndFingerDragAction") && !legacy.isEmpty()) setTouchpadSingleTap2ndFingerDragAction(legacy);
+            legacy = gestureDoubleTap2ndFingerDragAction.getBindings();
+            if (gestureData.has("doubleTap2ndFingerDragAction") && !legacy.isEmpty()) setTouchpadDoubleTap2ndFingerDragAction(legacy);
 
             if (gestureData.has("doubleTapTimeout"))
                 doubleTapTimeout = clamp(gestureData.getInt("doubleTapTimeout"), 50, 500);
@@ -912,22 +993,43 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             unifiedGestureData.put("mouseMode", mouseMode.name());
             unifiedGestureData.put("inputMode", inputMode.name());
             unifiedGestureData.put("dragMode", dragMode.name());
-            unifiedGestureData.put("singleTapAction", bindingListToJSONArray(gestureSingleTapAction));
-            unifiedGestureData.put("longPressAction", bindingListToJSONArray(gestureLongPressAction));
-            unifiedGestureData.put("doubleTapAction", bindingListToJSONArray(gestureDoubleTapAction));
-            unifiedGestureData.put("singleTap2ndFingerAction", bindingListToJSONArray(gestureSingleTap2ndFingerAction));
-            unifiedGestureData.put("doubleTap2ndFingerAction", bindingListToJSONArray(gestureDoubleTap2ndFingerAction));
-            unifiedGestureData.put("singleTapDragAction", bindingListToJSONArray(gestureSingleTapDragAction));
-            unifiedGestureData.put("longPressDragAction", bindingListToJSONArray(gestureLongPressDragAction));
-            unifiedGestureData.put("doubleTapDragAction", bindingListToJSONArray(gestureDoubleTapDragAction));
-            unifiedGestureData.put("singleTap2ndFingerDragAction", bindingListToJSONArray(gestureSingleTap2ndFingerDragAction));
-            unifiedGestureData.put("doubleTap2ndFingerDragAction", bindingListToJSONArray(gestureDoubleTap2ndFingerDragAction));
+            unifiedGestureData.put("singleTapAction", gestureSingleTapAction.toJSONArray());
+            unifiedGestureData.put("longPressAction", gestureLongPressAction.toJSONArray());
+            unifiedGestureData.put("doubleTapAction", gestureDoubleTapAction.toJSONArray());
+            unifiedGestureData.put("singleTap2ndFingerAction", gestureSingleTap2ndFingerAction.toJSONArray());
+            unifiedGestureData.put("doubleTap2ndFingerAction", gestureDoubleTap2ndFingerAction.toJSONArray());
+            unifiedGestureData.put("singleTapDragAction", gestureSingleTapDragAction.toJSONArray());
+            unifiedGestureData.put("longPressDragAction", gestureLongPressDragAction.toJSONArray());
+            unifiedGestureData.put("doubleTapDragAction", gestureDoubleTapDragAction.toJSONArray());
+            unifiedGestureData.put("singleTap2ndFingerDragAction", gestureSingleTap2ndFingerDragAction.toJSONArray());
+            unifiedGestureData.put("doubleTap2ndFingerDragAction", gestureDoubleTap2ndFingerDragAction.toJSONArray());
             unifiedGestureData.put("doubleTapTimeout", doubleTapTimeout);
             unifiedGestureData.put("longPressTimeout", longPressTimeout);
             unifiedGestureData.put("dragThreshold", dragThreshold);
             unifiedGestureData.put("singleTapDelay", singleTapDelay);
             unifiedGestureData.put("cursorSpeed", Float.valueOf(cursorSpeed));
             unifiedGestureData.put("touchActivationMode", touchActivationMode.name());
+            // Save per-section sticky flags
+            {
+                BindPackage[] bps = {
+                    gestureSingleTapAction, gestureLongPressAction, gestureDoubleTapAction,
+                    gestureSingleTap2ndFingerAction, gestureDoubleTap2ndFingerAction,
+                    gestureSingleTapDragAction, gestureLongPressDragAction, gestureDoubleTapDragAction,
+                    gestureSingleTap2ndFingerDragAction, gestureDoubleTap2ndFingerDragAction,
+                };
+                String[] keys = {
+                    "single", "long", "double",
+                    "single_2nd", "double_2nd",
+                    "single_drag", "long_drag", "double_drag",
+                    "single_2nd_drag", "double_2nd_drag",
+                };
+                JSONObject stickyObj = new JSONObject();
+                for (int i = 0; i < bps.length; i++) {
+                    JSONArray arr = bps[i].stickyToJSONArray();
+                    if (arr.length() > 0) stickyObj.put(keys[i], arr);
+                }
+                if (stickyObj.length() > 0) unifiedGestureData.put("bindingSticky", stickyObj);
+            }
             data.put("gestureSettings", unifiedGestureData);
 
             // Legacy format: touchscreenGestures (populated from unified)
@@ -936,16 +1038,16 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 gestureData.put("mouseMode", mouseMode.name());
                 gestureData.put("inputMode", inputMode.name());
                 gestureData.put("dragMode", dragMode.name());
-                gestureData.put("singleTapAction", bindingListToJSONArray(gestureSingleTapAction));
-                gestureData.put("longPressAction", bindingListToJSONArray(gestureLongPressAction));
-                gestureData.put("doubleTapAction", bindingListToJSONArray(gestureDoubleTapAction));
-                gestureData.put("singleTap2ndFingerAction", bindingListToJSONArray(gestureSingleTap2ndFingerAction));
-                gestureData.put("doubleTap2ndFingerAction", bindingListToJSONArray(gestureDoubleTap2ndFingerAction));
-                gestureData.put("singleTapDragAction", bindingListToJSONArray(gestureSingleTapDragAction));
-                gestureData.put("longPressDragAction", bindingListToJSONArray(gestureLongPressDragAction));
-                gestureData.put("doubleTapDragAction", bindingListToJSONArray(gestureDoubleTapDragAction));
-                gestureData.put("singleTap2ndFingerDragAction", bindingListToJSONArray(gestureSingleTap2ndFingerDragAction));
-                gestureData.put("doubleTap2ndFingerDragAction", bindingListToJSONArray(gestureDoubleTap2ndFingerDragAction));
+                gestureData.put("singleTapAction", gestureSingleTapAction.toJSONArray());
+                gestureData.put("longPressAction", gestureLongPressAction.toJSONArray());
+                gestureData.put("doubleTapAction", gestureDoubleTapAction.toJSONArray());
+                gestureData.put("singleTap2ndFingerAction", gestureSingleTap2ndFingerAction.toJSONArray());
+                gestureData.put("doubleTap2ndFingerAction", gestureDoubleTap2ndFingerAction.toJSONArray());
+                gestureData.put("singleTapDragAction", gestureSingleTapDragAction.toJSONArray());
+                gestureData.put("longPressDragAction", gestureLongPressDragAction.toJSONArray());
+                gestureData.put("doubleTapDragAction", gestureDoubleTapDragAction.toJSONArray());
+                gestureData.put("singleTap2ndFingerDragAction", gestureSingleTap2ndFingerDragAction.toJSONArray());
+                gestureData.put("doubleTap2ndFingerDragAction", gestureDoubleTap2ndFingerDragAction.toJSONArray());
                 gestureData.put("doubleTapTimeout", doubleTapTimeout);
                 gestureData.put("longPressTimeout", longPressTimeout);
                 gestureData.put("touchActivationMode", touchActivationMode.name());
@@ -956,16 +1058,16 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             // Legacy format: touchpadGestures (also populated from unified)
             {
                 JSONObject touchpadGestureData = new JSONObject();
-                touchpadGestureData.put("singleTapAction", bindingListToJSONArray(gestureSingleTapAction));
-                touchpadGestureData.put("longPressAction", bindingListToJSONArray(gestureLongPressAction));
-                touchpadGestureData.put("doubleTapAction", bindingListToJSONArray(gestureDoubleTapAction));
-                touchpadGestureData.put("singleTap2ndFingerAction", bindingListToJSONArray(gestureSingleTap2ndFingerAction));
-                touchpadGestureData.put("doubleTap2ndFingerAction", bindingListToJSONArray(gestureDoubleTap2ndFingerAction));
-                touchpadGestureData.put("singleTapDragAction", bindingListToJSONArray(gestureSingleTapDragAction));
-                touchpadGestureData.put("longPressDragAction", bindingListToJSONArray(gestureLongPressDragAction));
-                touchpadGestureData.put("doubleTapDragAction", bindingListToJSONArray(gestureDoubleTapDragAction));
-                touchpadGestureData.put("singleTap2ndFingerDragAction", bindingListToJSONArray(gestureSingleTap2ndFingerDragAction));
-                touchpadGestureData.put("doubleTap2ndFingerDragAction", bindingListToJSONArray(gestureDoubleTap2ndFingerDragAction));
+                touchpadGestureData.put("singleTapAction", gestureSingleTapAction.toJSONArray());
+                touchpadGestureData.put("longPressAction", gestureLongPressAction.toJSONArray());
+                touchpadGestureData.put("doubleTapAction", gestureDoubleTapAction.toJSONArray());
+                touchpadGestureData.put("singleTap2ndFingerAction", gestureSingleTap2ndFingerAction.toJSONArray());
+                touchpadGestureData.put("doubleTap2ndFingerAction", gestureDoubleTap2ndFingerAction.toJSONArray());
+                touchpadGestureData.put("singleTapDragAction", gestureSingleTapDragAction.toJSONArray());
+                touchpadGestureData.put("longPressDragAction", gestureLongPressDragAction.toJSONArray());
+                touchpadGestureData.put("doubleTapDragAction", gestureDoubleTapDragAction.toJSONArray());
+                touchpadGestureData.put("singleTap2ndFingerDragAction", gestureSingleTap2ndFingerDragAction.toJSONArray());
+                touchpadGestureData.put("doubleTap2ndFingerDragAction", gestureDoubleTap2ndFingerDragAction.toJSONArray());
                 touchpadGestureData.put("doubleTapTimeout", doubleTapTimeout);
                 touchpadGestureData.put("longPressTimeout", longPressTimeout);
                 touchpadGestureData.put("dragThreshold", dragThreshold);
@@ -1163,6 +1265,16 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                         gList.add(Binding.fromString(gArray.getString(k)));
                     }
                     element.setGestureBindings(gList);
+                }
+
+                if (elementJSONObject.has("bindingSticky")) {
+                    JSONArray stickyArray = elementJSONObject.getJSONArray("bindingSticky");
+                    for (int j = 0; j < stickyArray.length(); j++) {
+                        JSONArray seqArray = stickyArray.getJSONArray(j);
+                        for (int k = 0; k < seqArray.length(); k++) {
+                            element.setBindingSticky(j, k, seqArray.getBoolean(k));
+                        }
+                    }
                 }
 
                 if (!virtualGamepad && hasGamepadBinding) virtualGamepad = true;

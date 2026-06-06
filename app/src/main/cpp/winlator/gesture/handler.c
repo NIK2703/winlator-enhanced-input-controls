@@ -667,7 +667,7 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
             TouchFinger* main = find_finger(g_state.gesture_main_ptr_id);
             touchpad_finger_up(f, result, time_ms);
             if (main && main->pending_resume_action_count > 0) {
-                hold_actions(result, main->pending_resume_action, main->pending_resume_action_count);
+                execute_actions_hold(result, main->pending_resume_action, main->pending_resume_action_count);
                 main->pending_resume_action_count = 0;
                 main->state = GESTURE_STATE_DRAGGING;
             }
