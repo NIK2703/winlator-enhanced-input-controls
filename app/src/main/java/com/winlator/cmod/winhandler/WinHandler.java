@@ -746,8 +746,12 @@ public class WinHandler {
         ControlsProfile profile = activity.getInputControlsView().getProfile();
         if (profile != null) {
             GamepadState state = profile.getGamepadState();
-            state.setPressed(btn, isDown);
-            Log.d("Winlator_StickBinding", "WinHandler.sendGamepadState(btn) btn="+btn+" isDown="+isDown+" state.buttons="+state.buttons);
+            if (btn >= 20 && btn <= 23) {
+                state.dpad[btn - 20] = isDown;
+            } else {
+                state.setPressed(btn, isDown);
+            }
+            Log.d("Winlator_StickBinding", "WinHandler.sendGamepadState(btn) btn="+btn+" isDown="+isDown+" state.buttons="+state.buttons+" dpad="+state.dpad[0]+","+state.dpad[1]+","+state.dpad[2]+","+state.dpad[3]);
             sendGamepadState();
         }
     }

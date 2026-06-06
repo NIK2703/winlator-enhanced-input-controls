@@ -1,6 +1,7 @@
 package com.winlator.cmod.inputcontrols;
 
 import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -50,7 +51,8 @@ public class NativeTouchProcessor {
         public static final int ACT_START_MOUSE_MOVE = 11;
         public static final int ACT_STOP_MOUSE_MOVE = 12;
         public static final int ACT_GAMEPAD_STATE = 13;
-        public static final int ACT_GAMEPAD_AXIS = 14;
+        public static final int ACT_GAMEPAD_RELEASE = 14;
+        public static final int ACT_GAMEPAD_AXIS = 15;
 
         public int count;
         public int[] types;
@@ -173,6 +175,7 @@ public class NativeTouchProcessor {
     private int elementCount;
 
     public NativeTouchProcessor() {
+        this.handler = new Handler(Looper.getMainLooper());
         try {
             System.loadLibrary("touch_processor");
             loaded = true;
@@ -658,7 +661,8 @@ public class NativeTouchProcessor {
                 case 11: startMouseMove(a0, a1, a2); break;
                 case 12: stopMouseMove(); break;
                 case 13: gamepadState(a0, a1 != 0); break;
-                case 14: gamepadAxis(a0, a1, a2); break;
+                case 14: break; // ACT_GAMEPAD_RELEASE - handled natively
+                case 15: gamepadAxis(a0, a1, a2); break;
             }
         }
     }

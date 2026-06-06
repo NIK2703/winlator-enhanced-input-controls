@@ -271,6 +271,7 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
 
 bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     bool handled = false;
+    int pid_slot = (uint32_t)ptr_id % MAX_FINGERS;
     ActivationMode mode = g_state.element_count > 0 ?
         g_state.elements[0].activation_mode : ACTIVATION_LOCK;
 
@@ -288,7 +289,6 @@ bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchA
         }
         case ACTIVATION_TRACK: {
             // Deactivate all tracked buttons for this pointer
-            int pid_slot = (uint32_t)ptr_id % MAX_FINGERS;
             TrackedButtons* tb = &g_state.tracked[pid_slot];
             if (tb->ptr_id == ptr_id) {
                 for (int j = 0; j < tb->count; j++) {
@@ -300,11 +300,11 @@ bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchA
                 tb->count = 0;
                 tb->ptr_id = -1;
                 handled = true;
-
             }
             break;
         }
     }
+    g_state.hovered_element_per_ptr[pid_slot] = -1;
     return handled;
 }
 

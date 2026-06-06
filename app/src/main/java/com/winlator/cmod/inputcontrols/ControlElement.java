@@ -72,12 +72,14 @@ public class ControlElement {
         }
     }
     public enum Range {
-        FROM_A_TO_Z(26), FROM_0_TO_9(10), FROM_F1_TO_F12(12), FROM_NP0_TO_NP9(10);
+        FROM_A_TO_Z(26, 38), FROM_0_TO_9(10, 10), FROM_F1_TO_F12(12, 67), FROM_NP0_TO_NP9(10, 87);
         public final byte max;
         public final String[] texts;
+        public final int initialKc;
 
-        Range(int max) {
+        Range(int max, int initialKc) {
             this.max = (byte)max;
+            this.initialKc = initialKc;
             this.texts = new String[max];
             for (int i = 0; i < max; i++) {
                 switch (ordinal()) {

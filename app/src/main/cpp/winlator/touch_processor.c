@@ -447,6 +447,7 @@ void touch_processor_reset(void) {
         g_state.elements[i].range_pending_tap_release = false;
         g_state.elements[i].range_tap_release_time = 0;
         g_state.elements[i].range_current_offset = 0;
+        g_state.elements[i].range_scroll_offset = 0;
         g_state.elements[i].range_last_position = 0;
         g_state.elements[i].down_x = 0;
         g_state.elements[i].down_y = 0;
