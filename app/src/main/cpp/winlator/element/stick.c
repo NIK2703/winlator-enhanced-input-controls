@@ -39,10 +39,10 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
     //    fminf(dist * inv_dist, 1.0f));
 
     if (is_gamepad_binding(&e->bindings[0])) {
-        float mag = fminf(dist * inv_dist, 1.0f);
+        float mag = fminf(dist / radius, 1.0f);
         float axis_x = 0, axis_y = 0;
         if (mag > STICK_DEAD_ZONE) {
-            float scaled = fminf(fmaxf(0.0f, mag - 0.01f) * STICK_SENSITIVITY, 1.0f);
+            float scaled = fminf(fmaxf((mag - STICK_DEAD_ZONE) / (1.0f - STICK_DEAD_ZONE), 0.0f), 1.0f);
             axis_x = nx * scaled;
             axis_y = ny * scaled;
         }

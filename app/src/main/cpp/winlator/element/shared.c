@@ -1,11 +1,11 @@
-#include <android/log.h>
-#define LOG_TAG "Winlator_Shared"
-#include <android/log.h>
 #include "../touch_processor_internal.h"
 
-#define LOG_SHARED(...) __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Shared", __VA_ARGS__)
-
 bool point_in_element(float px, float py, const TouchElement* e) {
+    if (e->shape == SHAPE_CIRCLE) {
+        float dx = px - (float)e->x;
+        float dy = py - (float)e->y;
+        return (dx * dx + dy * dy) <= (e->hw * e->hw);
+    }
     return px >= e->x - e->hw && px <= e->x + e->hw &&
            py >= e->y - e->hh && py <= e->y + e->hh;
 }
@@ -304,9 +304,10 @@ void build_spatial_grid(void) {
         if (row < 0) row = 0; if (row >= GRID_ROWS) row = GRID_ROWS - 1;
         int cell = row * GRID_COLS + col;
         int cnt = g_state.spatial_grid_count[cell];
-        if (cnt < MAX_ELEMENTS)
+        if (cnt < MAX_ELEMENTS) {
             g_state.spatial_grid[cell][cnt] = i;
-        g_state.spatial_grid_count[cell] = cnt + 1;
+            g_state.spatial_grid_count[cell] = cnt + 1;
+        }
     }
 }
 

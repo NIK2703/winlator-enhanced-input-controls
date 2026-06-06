@@ -227,17 +227,11 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
                 bool inside = point_in_element(x, y, e);
                 bool was_fresh = e->auto_repeat_primary_pressed;
                 e->auto_repeat_primary_pressed = false;
-                if (inside && !was_fresh) {
-                    if (has_primary)
-                        release_binding(result, &e->bindings[0]);
-                    e->selected = false;
-                    e->visual_active = false;
-                } else if (!inside) {
-                    if (has_primary)
-                        release_binding(result, &e->bindings[0]);
-                    e->selected = false;
-                    e->visual_active = false;
+                if (has_primary) {
+                    release_binding(result, &e->bindings[0]);
                 }
+                e->selected = false;
+                e->visual_active = false;
             } else {
                 e->auto_repeat_primary_pressed = false;
             }

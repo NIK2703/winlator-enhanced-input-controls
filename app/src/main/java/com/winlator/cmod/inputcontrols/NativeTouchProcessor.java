@@ -7,11 +7,13 @@ import android.util.Log;
 import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.winhandler.MouseEventFlags;
+import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XKeycode;
 import com.winlator.cmod.xserver.XServer;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.List;
 
@@ -157,8 +159,10 @@ public class NativeTouchProcessor {
     private Runnable mouseMoveTask;
     {
         mouseMoveTask = () -> {
+            if (xServer == null) return;
             if (inputMode == InputMode.RELATIVE) {
-                xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, mouseMoveDx, mouseMoveDy, 0);
+                WinHandler wh = xServer.getWinHandler();
+                if (wh != null) wh.mouseEvent(MouseEventFlags.MOVE, mouseMoveDx, mouseMoveDy, 0);
             } else {
                 xServer.injectPointerMoveDelta(mouseMoveDx, mouseMoveDy);
             }
@@ -215,6 +219,7 @@ public class NativeTouchProcessor {
         nativeInit(config);
         nativeRegisterDispatcher(this);
         visualBuffer = nativeGetVisualBuffer();
+        if (visualBuffer != null) visualBuffer.order(ByteOrder.LITTLE_ENDIAN);
         hapticEnabled = config.hapticEnabled;
     }
 
@@ -571,7 +576,12 @@ public class NativeTouchProcessor {
     }
 
     public void injectKeyRelease(int keycode, boolean isDown) {
-        injectKeyPress(keycode, isDown);
+        if (keycode >= 0 && keycode < KEYCODES_BY_ID.length) {
+            XKeycode kc = KEYCODES_BY_ID[keycode];
+            if (kc != null) {
+                xServer.injectKeyRelease(kc);
+            }
+        }
     }
 
     public void mouseEvent(int flags, int dx, int dy) {
@@ -648,7 +658,7 @@ public class NativeTouchProcessor {
                 case 11: startMouseMove(a0, a1, a2); break;
                 case 12: stopMouseMove(); break;
                 case 13: gamepadState(a0, a1 != 0); break;
-                case 15: gamepadAxis(a0, a1, a2); break;
+                case 14: gamepadAxis(a0, a1, a2); break;
             }
         }
     }

@@ -95,6 +95,24 @@ struct CachedFieldIDs {
     jfieldID stDoubleTapDrag2nd;
 };
 
+#define JNI_CHECK(env, msg) do { \
+    if ((env)->ExceptionCheck()) { \
+        (env)->ExceptionDescribe(); \
+        (env)->ExceptionClear(); \
+        __android_log_print(ANDROID_LOG_ERROR, "Winlator_JNI", "JNI exception: %s", msg); \
+        return; \
+    } \
+} while(0)
+
+#define JNI_CHECK_INT(env, msg, retval) do { \
+    if ((env)->ExceptionCheck()) { \
+        (env)->ExceptionDescribe(); \
+        (env)->ExceptionClear(); \
+        __android_log_print(ANDROID_LOG_ERROR, "Winlator_JNI", "JNI exception: %s", msg); \
+        return retval; \
+    } \
+} while(0)
+
 static CachedFieldIDs g_config;
 static bool g_config_cached = false;
 
@@ -344,58 +362,59 @@ void touch_processor_set_view_offset(float offset_x, float offset_y) {
 static void nativeInit(JNIEnv* env, jclass clazz, jobject config) {
     if (!g_config_cached) {
         jclass cls = env->GetObjectClass(config);
+        if (!cls) { __android_log_print(ANDROID_LOG_ERROR, "Winlator_JNI", "nativeInit: GetObjectClass failed"); return; }
         g_config.configClass = (jclass)env->NewGlobalRef(cls);
-        g_config.touchMode = env->GetFieldID(cls, "touchMode", "I");
-        g_config.inputMode = env->GetFieldID(cls, "inputMode", "I");
-        g_config.longPressTimeoutMs = env->GetFieldID(cls, "longPressTimeoutMs", "I");
-        g_config.doubleTapTimeoutMs = env->GetFieldID(cls, "doubleTapTimeoutMs", "I");
-        g_config.singleTapDelayMs = env->GetFieldID(cls, "singleTapDelayMs", "I");
-        g_config.dragThresholdPx = env->GetFieldID(cls, "dragThresholdPx", "I");
-        g_config.doubleTapDistancePx = env->GetFieldID(cls, "doubleTapDistancePx", "I");
-        g_config.bindingDelayMs = env->GetFieldID(cls, "bindingDelayMs", "I");
-        g_config.longPressDelayMs = env->GetFieldID(cls, "longPressDelayMs", "I");
-        g_config.cursorSpeed = env->GetFieldID(cls, "cursorSpeed", "I");
-        g_config.gestureThresholdPx = env->GetFieldID(cls, "gestureThresholdPx", "I");
-        g_config.cursorAccelerationThreshold = env->GetFieldID(cls, "cursorAccelerationThreshold", "I");
-        g_config.cursorAccelerationFactor = env->GetFieldID(cls, "cursorAccelerationFactor", "F");
-        g_config.screenW = env->GetFieldID(cls, "screenW", "I");
-        g_config.screenH = env->GetFieldID(cls, "screenH", "I");
-        g_config.xformScaleX = env->GetFieldID(cls, "xformScaleX", "F");
-        g_config.xformScaleY = env->GetFieldID(cls, "xformScaleY", "F");
-        g_config.viewOffsetX = env->GetFieldID(cls, "viewOffsetX", "F");
-        g_config.viewOffsetY = env->GetFieldID(cls, "viewOffsetY", "F");
-        g_config.gestureLongPressHaptic = env->GetFieldID(cls, "gestureLongPressHaptic", "I");
-        g_config.hapticEnabled = env->GetFieldID(cls, "hapticEnabled", "Z");
-        g_config.tsSingleTap = env->GetFieldID(cls, "tsSingleTap", "[I");
-        g_config.tsLongPress = env->GetFieldID(cls, "tsLongPress", "[I");
-        g_config.tsDoubleTap = env->GetFieldID(cls, "tsDoubleTap", "[I");
-        g_config.tsSingleTapDrag = env->GetFieldID(cls, "tsSingleTapDrag", "[I");
-        g_config.tsLongPressDrag = env->GetFieldID(cls, "tsLongPressDrag", "[I");
-        g_config.tsDoubleTapDrag = env->GetFieldID(cls, "tsDoubleTapDrag", "[I");
-        g_config.tsSingleTap2nd = env->GetFieldID(cls, "tsSingleTap2nd", "[I");
-        g_config.tsDoubleTap2nd = env->GetFieldID(cls, "tsDoubleTap2nd", "[I");
-        g_config.tsSingleTapDrag2nd = env->GetFieldID(cls, "tsSingleTapDrag2nd", "[I");
-        g_config.tsDoubleTapDrag2nd = env->GetFieldID(cls, "tsDoubleTapDrag2nd", "[I");
-        g_config.tpSingleTap = env->GetFieldID(cls, "tpSingleTap", "[I");
-        g_config.tpLongPress = env->GetFieldID(cls, "tpLongPress", "[I");
-        g_config.tpDoubleTap = env->GetFieldID(cls, "tpDoubleTap", "[I");
-        g_config.tpSingleTapDrag = env->GetFieldID(cls, "tpSingleTapDrag", "[I");
-        g_config.tpLongPressDrag = env->GetFieldID(cls, "tpLongPressDrag", "[I");
-        g_config.tpDoubleTapDrag = env->GetFieldID(cls, "tpDoubleTapDrag", "[I");
-        g_config.tpSingleTap2nd = env->GetFieldID(cls, "tpSingleTap2nd", "[I");
-        g_config.tpDoubleTap2nd = env->GetFieldID(cls, "tpDoubleTap2nd", "[I");
-        g_config.tpSingleTapDrag2nd = env->GetFieldID(cls, "tpSingleTapDrag2nd", "[I");
-        g_config.tpDoubleTapDrag2nd = env->GetFieldID(cls, "tpDoubleTapDrag2nd", "[I");
-        g_config.stSingleTap = env->GetFieldID(cls, "stSingleTap", "I");
-        g_config.stLongPress = env->GetFieldID(cls, "stLongPress", "I");
-        g_config.stDoubleTap = env->GetFieldID(cls, "stDoubleTap", "I");
-        g_config.stSingleTapDrag = env->GetFieldID(cls, "stSingleTapDrag", "I");
-        g_config.stLongPressDrag = env->GetFieldID(cls, "stLongPressDrag", "I");
-        g_config.stDoubleTapDrag = env->GetFieldID(cls, "stDoubleTapDrag", "I");
-        g_config.stSingleTap2nd = env->GetFieldID(cls, "stSingleTap2nd", "I");
-        g_config.stDoubleTap2nd = env->GetFieldID(cls, "stDoubleTap2nd", "I");
-        g_config.stSingleTapDrag2nd = env->GetFieldID(cls, "stSingleTapDrag2nd", "I");
-        g_config.stDoubleTapDrag2nd = env->GetFieldID(cls, "stDoubleTapDrag2nd", "I");
+        g_config.touchMode = env->GetFieldID(cls, "touchMode", "I"); JNI_CHECK(env, "touchMode");
+        g_config.inputMode = env->GetFieldID(cls, "inputMode", "I"); JNI_CHECK(env, "inputMode");
+        g_config.longPressTimeoutMs = env->GetFieldID(cls, "longPressTimeoutMs", "I"); JNI_CHECK(env, "longPressTimeoutMs");
+        g_config.doubleTapTimeoutMs = env->GetFieldID(cls, "doubleTapTimeoutMs", "I"); JNI_CHECK(env, "doubleTapTimeoutMs");
+        g_config.singleTapDelayMs = env->GetFieldID(cls, "singleTapDelayMs", "I"); JNI_CHECK(env, "singleTapDelayMs");
+        g_config.dragThresholdPx = env->GetFieldID(cls, "dragThresholdPx", "I"); JNI_CHECK(env, "dragThresholdPx");
+        g_config.doubleTapDistancePx = env->GetFieldID(cls, "doubleTapDistancePx", "I"); JNI_CHECK(env, "doubleTapDistancePx");
+        g_config.bindingDelayMs = env->GetFieldID(cls, "bindingDelayMs", "I"); JNI_CHECK(env, "bindingDelayMs");
+        g_config.longPressDelayMs = env->GetFieldID(cls, "longPressDelayMs", "I"); JNI_CHECK(env, "longPressDelayMs");
+        g_config.cursorSpeed = env->GetFieldID(cls, "cursorSpeed", "I"); JNI_CHECK(env, "cursorSpeed");
+        g_config.gestureThresholdPx = env->GetFieldID(cls, "gestureThresholdPx", "I"); JNI_CHECK(env, "gestureThresholdPx");
+        g_config.cursorAccelerationThreshold = env->GetFieldID(cls, "cursorAccelerationThreshold", "I"); JNI_CHECK(env, "cursorAccelerationThreshold");
+        g_config.cursorAccelerationFactor = env->GetFieldID(cls, "cursorAccelerationFactor", "F"); JNI_CHECK(env, "cursorAccelerationFactor");
+        g_config.screenW = env->GetFieldID(cls, "screenW", "I"); JNI_CHECK(env, "screenW");
+        g_config.screenH = env->GetFieldID(cls, "screenH", "I"); JNI_CHECK(env, "screenH");
+        g_config.xformScaleX = env->GetFieldID(cls, "xformScaleX", "F"); JNI_CHECK(env, "xformScaleX");
+        g_config.xformScaleY = env->GetFieldID(cls, "xformScaleY", "F"); JNI_CHECK(env, "xformScaleY");
+        g_config.viewOffsetX = env->GetFieldID(cls, "viewOffsetX", "F"); JNI_CHECK(env, "viewOffsetX");
+        g_config.viewOffsetY = env->GetFieldID(cls, "viewOffsetY", "F"); JNI_CHECK(env, "viewOffsetY");
+        g_config.gestureLongPressHaptic = env->GetFieldID(cls, "gestureLongPressHaptic", "I"); JNI_CHECK(env, "gestureLongPressHaptic");
+        g_config.hapticEnabled = env->GetFieldID(cls, "hapticEnabled", "Z"); JNI_CHECK(env, "hapticEnabled");
+        g_config.tsSingleTap = env->GetFieldID(cls, "tsSingleTap", "[I"); JNI_CHECK(env, "tsSingleTap");
+        g_config.tsLongPress = env->GetFieldID(cls, "tsLongPress", "[I"); JNI_CHECK(env, "tsLongPress");
+        g_config.tsDoubleTap = env->GetFieldID(cls, "tsDoubleTap", "[I"); JNI_CHECK(env, "tsDoubleTap");
+        g_config.tsSingleTapDrag = env->GetFieldID(cls, "tsSingleTapDrag", "[I"); JNI_CHECK(env, "tsSingleTapDrag");
+        g_config.tsLongPressDrag = env->GetFieldID(cls, "tsLongPressDrag", "[I"); JNI_CHECK(env, "tsLongPressDrag");
+        g_config.tsDoubleTapDrag = env->GetFieldID(cls, "tsDoubleTapDrag", "[I"); JNI_CHECK(env, "tsDoubleTapDrag");
+        g_config.tsSingleTap2nd = env->GetFieldID(cls, "tsSingleTap2nd", "[I"); JNI_CHECK(env, "tsSingleTap2nd");
+        g_config.tsDoubleTap2nd = env->GetFieldID(cls, "tsDoubleTap2nd", "[I"); JNI_CHECK(env, "tsDoubleTap2nd");
+        g_config.tsSingleTapDrag2nd = env->GetFieldID(cls, "tsSingleTapDrag2nd", "[I"); JNI_CHECK(env, "tsSingleTapDrag2nd");
+        g_config.tsDoubleTapDrag2nd = env->GetFieldID(cls, "tsDoubleTapDrag2nd", "[I"); JNI_CHECK(env, "tsDoubleTapDrag2nd");
+        g_config.tpSingleTap = env->GetFieldID(cls, "tpSingleTap", "[I"); JNI_CHECK(env, "tpSingleTap");
+        g_config.tpLongPress = env->GetFieldID(cls, "tpLongPress", "[I"); JNI_CHECK(env, "tpLongPress");
+        g_config.tpDoubleTap = env->GetFieldID(cls, "tpDoubleTap", "[I"); JNI_CHECK(env, "tpDoubleTap");
+        g_config.tpSingleTapDrag = env->GetFieldID(cls, "tpSingleTapDrag", "[I"); JNI_CHECK(env, "tpSingleTapDrag");
+        g_config.tpLongPressDrag = env->GetFieldID(cls, "tpLongPressDrag", "[I"); JNI_CHECK(env, "tpLongPressDrag");
+        g_config.tpDoubleTapDrag = env->GetFieldID(cls, "tpDoubleTapDrag", "[I"); JNI_CHECK(env, "tpDoubleTapDrag");
+        g_config.tpSingleTap2nd = env->GetFieldID(cls, "tpSingleTap2nd", "[I"); JNI_CHECK(env, "tpSingleTap2nd");
+        g_config.tpDoubleTap2nd = env->GetFieldID(cls, "tpDoubleTap2nd", "[I"); JNI_CHECK(env, "tpDoubleTap2nd");
+        g_config.tpSingleTapDrag2nd = env->GetFieldID(cls, "tpSingleTapDrag2nd", "[I"); JNI_CHECK(env, "tpSingleTapDrag2nd");
+        g_config.tpDoubleTapDrag2nd = env->GetFieldID(cls, "tpDoubleTapDrag2nd", "[I"); JNI_CHECK(env, "tpDoubleTapDrag2nd");
+        g_config.stSingleTap = env->GetFieldID(cls, "stSingleTap", "I"); JNI_CHECK(env, "stSingleTap");
+        g_config.stLongPress = env->GetFieldID(cls, "stLongPress", "I"); JNI_CHECK(env, "stLongPress");
+        g_config.stDoubleTap = env->GetFieldID(cls, "stDoubleTap", "I"); JNI_CHECK(env, "stDoubleTap");
+        g_config.stSingleTapDrag = env->GetFieldID(cls, "stSingleTapDrag", "I"); JNI_CHECK(env, "stSingleTapDrag");
+        g_config.stLongPressDrag = env->GetFieldID(cls, "stLongPressDrag", "I"); JNI_CHECK(env, "stLongPressDrag");
+        g_config.stDoubleTapDrag = env->GetFieldID(cls, "stDoubleTapDrag", "I"); JNI_CHECK(env, "stDoubleTapDrag");
+        g_config.stSingleTap2nd = env->GetFieldID(cls, "stSingleTap2nd", "I"); JNI_CHECK(env, "stSingleTap2nd");
+        g_config.stDoubleTap2nd = env->GetFieldID(cls, "stDoubleTap2nd", "I"); JNI_CHECK(env, "stDoubleTap2nd");
+        g_config.stSingleTapDrag2nd = env->GetFieldID(cls, "stSingleTapDrag2nd", "I"); JNI_CHECK(env, "stSingleTapDrag2nd");
+        g_config.stDoubleTapDrag2nd = env->GetFieldID(cls, "stDoubleTapDrag2nd", "I"); JNI_CHECK(env, "stDoubleTapDrag2nd");
         env->DeleteLocalRef(cls);
         g_config_cached = true;
     }

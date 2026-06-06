@@ -24,8 +24,6 @@ static int schedule_action(TouchBinding binding, int action_type, uint64_t delay
 
 void add_action(TouchActionResult* r, ActionType type, int a0, int a1, int a2) {
     if (r->count >= 32) return;
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Exec", "add_action type=%d a0=%d a1=%d a2=%d count=%d",
-        type, a0, a1, a2, r->count);
     r->actions[r->count].type = type;
     switch (type) {
         case ACT_POINTER_MOVE: r->actions[r->count].pointer_move.x = a0; r->actions[r->count].pointer_move.y = a1; break;
@@ -68,10 +66,15 @@ void release_held_actions(TouchActionResult* result) {
     g_state.gesture_is_action_held = false;
 }
 
+// Keyboard modifier keycodes (X11): 0x25=Left Shift, 0x32=Left Ctrl, 0x40=Left Alt
+#define MOD_KEYCODE_SHIFT 0x25
+#define MOD_KEYCODE_CTRL  0x32
+#define MOD_KEYCODE_ALT   0x40
+
 bool is_modifier_binding(const TouchBinding* b) {
     if (is_keyboard_binding(b)) {
         int kc = b->keycode;
-        return kc == 0x25 || kc == 0x32 || kc == 0x40;
+        return kc == MOD_KEYCODE_SHIFT || kc == MOD_KEYCODE_CTRL || kc == MOD_KEYCODE_ALT;
     }
     return false;
 }
@@ -198,9 +201,6 @@ static int pointer_button_idx(const TouchBinding* b) {
 
 void release_binding(TouchActionResult* result, const TouchBinding* b) {
     if (b->type == BINDING_NONE) return;
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Exec", "release_binding type=%d keycode=0x%x",
-        b->type, b->keycode);
-    
     if (is_gamepad_binding(b)) {
         add_action(result, ACT_GAMEPAD_STATE, b->type - BINDING_GAMEPAD_BASE, 0, 0);
     } else if (is_keyboard_binding(b)) {
@@ -215,9 +215,6 @@ void release_binding(TouchActionResult* result, const TouchBinding* b) {
 
 void press_binding(TouchActionResult* result, const TouchBinding* b, bool hold) {
     if (b->type == BINDING_NONE) return;
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Exec", "press_binding type=%d keycode=0x%x hold=%d",
-        b->type, b->keycode, hold);
-
     if (is_gamepad_binding(b)) {
         int btn_idx = b->type - BINDING_GAMEPAD_BASE;
         add_action(result, ACT_GAMEPAD_STATE, btn_idx, 1, 0);

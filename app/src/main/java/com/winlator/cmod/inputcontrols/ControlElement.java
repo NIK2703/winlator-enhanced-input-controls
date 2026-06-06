@@ -39,7 +39,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ControlElement {
     public static final float STICK_DEAD_ZONE = 0.15f;
@@ -94,7 +96,13 @@ public class ControlElement {
             return names;
         }
     }
-    private static final HashMap<String, Bitmap> sharedPool = new HashMap<>();
+    private static final int SHARED_POOL_MAX_SIZE = 64;
+    private static final LinkedHashMap<String, Bitmap> sharedPool = new LinkedHashMap<String, Bitmap>(SHARED_POOL_MAX_SIZE + 1, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Bitmap> eldest) {
+            return size() > SHARED_POOL_MAX_SIZE;
+        }
+    };
     private static final Xfermode XFERMODE_CLEAR = new PorterDuffXfermode(PorterDuff.Mode.CLEAR);
     private static final Xfermode XFERMODE_DST_OUT = new PorterDuffXfermode(PorterDuff.Mode.DST_OUT);
     private final InputControlsView inputControlsView;
@@ -1810,7 +1818,9 @@ public class ControlElement {
     }
 
     public boolean containsPoint(float x, float y) {
-        return getBoundingBox().contains((int)(x + 0.5f), (int)(y + 0.5f));
+        Rect box = getBoundingBox();
+        return x >= box.left - 0.5f && x <= box.right + 0.5f &&
+               y >= box.top - 0.5f && y <= box.bottom + 0.5f;
     }
 
     /**

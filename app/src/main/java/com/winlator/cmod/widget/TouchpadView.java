@@ -61,7 +61,7 @@ public class TouchpadView extends View {
         setOnGenericMotionListener(new OnGenericMotionListener() {
             @Override
             public boolean onGenericMotion(View v, MotionEvent event) {
-                if (event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) {
+                if (event.getPointerCount() > 0 && event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) {
                     return handleStylusHoverEvent(event);
                 }
                 return false;
@@ -126,7 +126,7 @@ public class TouchpadView extends View {
 
         resetTouchscreenTimeout();
 
-        int toolType = event.getToolType(0);
+        int toolType = event.getPointerCount() > 0 ? event.getToolType(0) : MotionEvent.TOOL_TYPE_FINGER;
         if (toolType == MotionEvent.TOOL_TYPE_STYLUS) {
             return handleStylusEvent(event);
         }

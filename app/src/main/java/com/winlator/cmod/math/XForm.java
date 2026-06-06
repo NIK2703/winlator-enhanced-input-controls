@@ -1,7 +1,7 @@
 package com.winlator.cmod.math;
 
 public class XForm {
-    private static final float[] tmpXForm = XForm.getInstance();
+    private static final ThreadLocal<float[]> tmpXForm = ThreadLocal.withInitial(() -> new float[6]);
 
     public static float[] getInstance() {
         return identity(new float[6]);
@@ -66,16 +66,16 @@ public class XForm {
         );
     }
 
-    public static synchronized float[] translate(float[] xform, float x, float y) {
-        return multiply(xform, xform, makeTranslation(tmpXForm, x, y));
+    public static float[] translate(float[] xform, float x, float y) {
+        return multiply(xform, xform, makeTranslation(tmpXForm.get(), x, y));
     }
 
-    public static synchronized float[] scale(float[] xform, float x, float y) {
-        return multiply(xform, xform, makeScale(tmpXForm, x, y));
+    public static float[] scale(float[] xform, float x, float y) {
+        return multiply(xform, xform, makeScale(tmpXForm.get(), x, y));
     }
 
-    public static synchronized float[] rotate(float[] xform, float angle) {
-        return multiply(xform, xform, makeRotation(tmpXForm, angle));
+    public static float[] rotate(float[] xform, float angle) {
+        return multiply(xform, xform, makeRotation(tmpXForm.get(), angle));
     }
 
     public static float[] multiply(float[] result, float[] ta, float[] tb) {

@@ -1,5 +1,7 @@
 package com.winlator.cmod.xserver.events;
 
+import android.os.SystemClock;
+
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xconnector.XStreamLock;
 import com.winlator.cmod.xserver.Window;
@@ -12,17 +14,20 @@ public class XIRawMotionNotify extends Event {
 
     private final byte extensionOpcode;
     private final int deviceId;
-    private final double[] valuators;
+    private final double[] rawValues;
+    private final double[] deltaValues;
     private final int valuatorMask;
 
     public XIRawMotionNotify(int deviceId,
                              byte extensionOpcode,
-                             double[] valuators,
+                             double[] rawValues,
+                             double[] deltaValues,
                              int valuatorMask) {
         super(GENERIC_EVENT_CODE);
         this.deviceId = deviceId;
         this.extensionOpcode = extensionOpcode;
-        this.valuators = valuators;
+        this.rawValues = rawValues;
+        this.deltaValues = deltaValues;
         this.valuatorMask = valuatorMask;
     }
 
@@ -32,7 +37,7 @@ public class XIRawMotionNotify extends Event {
 
             short maskLenUnits = 1;
 
-            int numAxes = valuators.length;
+            int numAxes = rawValues.length;
             int payloadBytes =
                 4 +                   
                 (numAxes * 8) +       
@@ -46,7 +51,7 @@ public class XIRawMotionNotify extends Event {
             outputStream.writeInt(payloadLengthUnits);       
             outputStream.writeShort(XI_RAWMOTION_EVTYPE);    
             outputStream.writeShort((short) deviceId);      
-            outputStream.writeInt((int) System.currentTimeMillis()); 
+            outputStream.writeInt((int) SystemClock.uptimeMillis()); 
             outputStream.writeInt(0);                       
             outputStream.writeShort((short) deviceId);    
             outputStream.writeShort(maskLenUnits);           
@@ -55,11 +60,11 @@ public class XIRawMotionNotify extends Event {
 
             outputStream.writeInt(valuatorMask);
 
-            for (double v : valuators) {
+            for (double v : rawValues) {
                 outputStream.writeFP3232(v);
             }
 
-            for (double v : valuators) {
+            for (double v : deltaValues) {
                 outputStream.writeFP3232(v);
             }
         }

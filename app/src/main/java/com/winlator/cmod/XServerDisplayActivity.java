@@ -22,6 +22,7 @@ import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewTreeObserver;
 
 import java.util.List;
 import android.view.ViewGroup;
@@ -1627,33 +1628,49 @@ private void applySidebarSettings() {
 
             // Defer element loading & param setting until view is laid out (needs dimensions)
             inputControlsView.post(() -> {
-                int viewWidth = inputControlsView.getWidth();
-                int snapSize = viewWidth > 0 ? viewWidth / 100 :
-                               xServer.screenInfo.width / 100;
-                if (snapSize <= 0) snapSize = 10;
-                inputControlsView.setSnappingSize(snapSize);
-
-                if (!profile.isElementsLoaded()) {
-                    profile.loadElements(inputControlsView);
+                if (inputControlsView.getWidth() <= 0) {
+                    // View not laid out yet — use layout listener to run after measure/layout/draw
+                    inputControlsView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                        @Override
+                        public void onGlobalLayout() {
+                            if (inputControlsView.getWidth() <= 0) return;
+                            inputControlsView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                            doElementSetup(profile);
+                        }
+                    });
+                    return;
                 }
-
-                List<ControlElement> elements = profile.getElements();
-
-                if (elements != null && !elements.isEmpty()) {
-                    TouchActivationMode actMode = profile.getTouchActivationMode();
-                    NativeTouchProcessor.NativeElement[] nativeElements =
-                        NativeTouchProcessor.buildNativeElements(elements, actMode, profile);
-                    nativeTouchProcessor.setElements(nativeElements);
-                }
-
-                nativeTouchProcessor.setSnappingSize(snapSize);
-                nativeTouchProcessor.setResolutionScale(touchpadView.getResolutionScale());
-                nativeTouchProcessor.setSimTouchScreen(touchpadView.isSimTouchScreen());
+                doElementSetup(profile);
             });
         }
 
         inputControlsView.invalidate();
         winHandler.sendGamepadState();
+    }
+
+    private void doElementSetup(ControlsProfile profile) {
+        int viewWidth = inputControlsView.getWidth();
+        int snapSize = viewWidth > 0 ? viewWidth / 100 :
+                       xServer.screenInfo.width / 100;
+        if (snapSize <= 0) snapSize = 10;
+        inputControlsView.setSnappingSize(snapSize);
+
+        if (!profile.isElementsLoaded()) {
+            profile.loadElements(inputControlsView);
+        }
+
+        List<ControlElement> elements = profile.getElements();
+
+        if (elements != null && !elements.isEmpty()) {
+            TouchActivationMode actMode = profile.getTouchActivationMode();
+            NativeTouchProcessor.NativeElement[] nativeElements =
+                NativeTouchProcessor.buildNativeElements(elements, actMode, profile);
+            nativeTouchProcessor.setElements(nativeElements);
+        }
+
+        nativeTouchProcessor.setSnappingSize(snapSize);
+        nativeTouchProcessor.setResolutionScale(touchpadView.getResolutionScale());
+        nativeTouchProcessor.setSimTouchScreen(touchpadView.isSimTouchScreen());
     }
 
     private void hideInputControls() {
@@ -1825,7 +1842,7 @@ private void applySidebarSettings() {
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             if (event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_MODE || event.getKeyCode() == KeyEvent.KEYCODE_HOME || event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_SELECT) {
-                boolean handled = inputControlsView.onKeyEvent(event) || (winHandler != null && winHandler.onKeyEvent(event)) && (xServer != null && xServer.keyboard.onKeyEvent(event));
+                boolean handled = (inputControlsView.onKeyEvent(event) || (winHandler != null && winHandler.onKeyEvent(event))) && (xServer != null && xServer.keyboard.onKeyEvent(event));
                 return true;
             }
         }

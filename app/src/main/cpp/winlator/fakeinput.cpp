@@ -27,11 +27,13 @@
 #include <sys/inotify.h>
 #include <sys/syscall.h>
 #include <sys/sysmacros.h>
+#include <poll.h>
 #include <linux/input.h>
 
 #define EXPORT __attribute__((visibility("default"))) extern "C"
 
 std::unordered_map<int, const char *> controller_map;
+static std::mutex controller_map_mutex;
 static bool initialized = false;
 static const char *hook_dir = nullptr;
 static bool vibration_enabled = true;
@@ -134,8 +136,10 @@ const char *get_event(const char *pathname) {
 
 __attribute__((visibility("hidden")))
 int get_event_number(const char *event) {
-    int event_number = atoi(event + strlen(event) - 1);
-    return event_number;
+    const char *p = event;
+    while (*p && !(*p >= '0' && *p <= '9')) p++;
+    if (!*p) return 0;
+    return atoi(p);
 }
 
 EXPORT int open(const char *pathname, int flags, ...) {
@@ -176,7 +180,10 @@ EXPORT int open(const char *pathname, int flags, ...) {
 
 	if (isFromInput) {
 		Logger::log("Adding controller, fd %d event %s\n", fd, get_event(pathname));
-		controller_map[fd] = strdup(get_event(pathname));
+		{
+		    std::lock_guard<std::mutex> lock(controller_map_mutex);
+		    controller_map[fd] = strdup(get_event(pathname));
+		}
     }
 	    
 	return fd;
@@ -220,7 +227,10 @@ EXPORT int openat(int dirfd, const char *pathname, int flags, ...) {
 
     if (isFromInput) {
         Logger::log("Adding controller, fd %d event %s\n", fd, get_event(pathname));
-        controller_map[fd] = strdup(get_event(pathname));
+        {
+            std::lock_guard<std::mutex> lock(controller_map_mutex);
+            controller_map[fd] = strdup(get_event(pathname));
+        }
     }
 
     return fd;
@@ -259,9 +269,12 @@ EXPORT int fstat(int fd, struct stat *buf) {
 
     int ret = my_fstat(fd, buf);
 
-    auto controller = controller_map.find(fd);
-    if (controller != controller_map.end()) {
-    	buf->st_rdev = makedev(1, get_event_number(controller->second));
+    {
+        std::lock_guard<std::mutex> lock(controller_map_mutex);
+        auto controller = controller_map.find(fd);
+        if (controller != controller_map.end()) {
+            buf->st_rdev = makedev(1, get_event_number(controller->second));
+        }
     }
 
     return ret;
@@ -304,15 +317,20 @@ EXPORT int ioctl(int fd, int op, ...) {
 	argp = va_arg(va, void *);
 	va_end(va);
 
-	auto controller = controller_map.find(fd);
-	if (controller == controller_map.end()) {
-		return syscall(SYS_ioctl, fd, op, argp);
-	}
+    const char *event;
+    int event_number;
+    {
+        std::lock_guard<std::mutex> lock(controller_map_mutex);
+        auto controller = controller_map.find(fd);
+        if (controller == controller_map.end()) {
+            return syscall(SYS_ioctl, fd, op, argp);
+        }
+        event = controller->second;
+        event_number = get_event_number(event);
+    }
 
 	int type = (op >> 8 & 0xFF);
 	int number = (op >> 0 & 0xFF);
-	const char *event = controller->second;
-	int event_number = get_event_number(event);
 
     if (type == 0x45 && number == 0x1) {
         Logger::log("Hooking ioctl EVIOCGVERSION for event %s\n", event);
@@ -478,20 +496,27 @@ EXPORT int close(int fd) {
 	if (!my_close)
 		*(void **)&my_close = dlsym(RTLD_NEXT, "close");
 
-	auto controller = controller_map.find(fd);
-	if (controller != controller_map.end()) {
-	    Logger::log("Removing controller, fd %d event %s\n", controller->first, controller->second);
-	    free((void *)controller->second);
-		controller_map.erase(fd);
+	{
+	    std::lock_guard<std::mutex> lock(controller_map_mutex);
+	    auto controller = controller_map.find(fd);
+	    if (controller != controller_map.end()) {
+	        Logger::log("Removing controller, fd %d event %s\n", controller->first, controller->second);
+	        free((void *)controller->second);
+		    controller_map.erase(fd);
+	    }
 	}
 
 	return my_close(fd);
 }
 
 EXPORT ssize_t read(int fd, void *buf, size_t count) {
-    auto controller = controller_map.find(fd);
+    bool is_controller = false;
+    {
+        std::lock_guard<std::mutex> lock(controller_map_mutex);
+        is_controller = controller_map.find(fd) != controller_map.end();
+    }
     
-    if (controller != controller_map.end()) {
+    if (is_controller) {
         ssize_t bytes_read = 0;
         int flags = fcntl(fd, F_GETFL);
         bool isNonBlock = flags & O_NONBLOCK;
@@ -512,7 +537,13 @@ EXPORT ssize_t read(int fd, void *buf, size_t count) {
             	errno = EINTR;
             	return bytes_read;
             }
-            usleep(1000); // yield to prevent 100% CPU lockup
+            struct pollfd pfd = {fd, POLLIN, 0};
+            int pret = poll(&pfd, 1, 100);
+            if (pret < 0) {
+                if (errno == EINTR) { bytes_read = -1; errno = EINTR; return bytes_read; }
+                break;
+            }
+            if (pret == 0) continue;
             bytes_read = syscall(SYS_read, fd, buf, count);
         }
         
@@ -547,11 +578,17 @@ EXPORT ssize_t write(int fd, const void *buf, size_t count) {
   if (!my_write)
     *(void **)&my_write = dlsym(RTLD_NEXT, "write");
 
-  auto controller = controller_map.find(fd);
-  if (controller != controller_map.end()) {
+  const char *event = nullptr;
+  {
+      std::lock_guard<std::mutex> lock(controller_map_mutex);
+      auto controller = controller_map.find(fd);
+      if (controller != controller_map.end())
+          event = controller->second;
+  }
+  if (event != nullptr) {
     if (count == sizeof(struct input_event)) {
       const struct input_event *ev = (const struct input_event *)buf;
-      uint16_t slot = (uint16_t)get_event_number(controller->second);
+      uint16_t slot = (uint16_t)get_event_number(event);
       check_ff_event(ev, slot);
       // EV_FF events are FF control commands sent by Wine to the fake device.
       // Writing them to the fake evdev file causes Wine to read them back as
@@ -565,9 +602,15 @@ EXPORT ssize_t write(int fd, const void *buf, size_t count) {
 }
 
 EXPORT ssize_t writev(int fd, const struct iovec *iov, int iovcnt) {
-  auto controller = controller_map.find(fd);
-  if (controller != controller_map.end()) {
-    uint16_t slot = (uint16_t)get_event_number(controller->second);
+  const char *event = nullptr;
+  {
+      std::lock_guard<std::mutex> lock(controller_map_mutex);
+      auto controller = controller_map.find(fd);
+      if (controller != controller_map.end())
+          event = controller->second;
+  }
+  if (event != nullptr) {
+    uint16_t slot = (uint16_t)get_event_number(event);
     // Separate FF control events from regular input events.
     // FF events must not be written to the fake evdev file (see write() above).
     struct iovec filtered[iovcnt];

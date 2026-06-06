@@ -25,8 +25,8 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     if (g_state.cfg.cursor_acceleration_factor <= 0.0f) g_state.cfg.cursor_acceleration_factor = 1.25f;
     if (g_state.cfg.xform_scale_x <= 0.0f) g_state.cfg.xform_scale_x = 1.0f;
     if (g_state.cfg.xform_scale_y <= 0.0f) g_state.cfg.xform_scale_y = 1.0f;
-    compute_gesture_caps(&g_state.cfg);
     g_state.cfg.bindings_generation = 1;
+    compute_gesture_caps(&g_state.cfg);
     extern void init_bezier_lut(void);
     init_bezier_lut();
 }
@@ -383,11 +383,26 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
 }
 
 void touch_processor_reset(void) {
+    // Save config/geometry before memset
     int saved_element_count = g_state.element_count;
+    float saved_snapping_size = g_state.snapping_size;
+    float saved_resolution_scale = g_state.resolution_scale;
+    int saved_button_count = g_state.button_count;
+    int saved_range_count = g_state.range_count;
+    TouchElement saved_elements[MAX_ELEMENTS];
+    memcpy(saved_elements, g_state.elements, sizeof(g_state.elements));
+
     memset(&g_state, 0, sizeof(g_state));
-    g_state.button_count = 0;
-    g_state.range_count = 0;
+
+    // Restore config/geometry
     g_state.element_count = saved_element_count;
+    g_state.snapping_size = saved_snapping_size;
+    g_state.resolution_scale = saved_resolution_scale;
+    g_state.button_count = saved_button_count;
+    g_state.range_count = saved_range_count;
+    memcpy(g_state.elements, saved_elements, sizeof(g_state.elements));
+
+    // Reset runtime state only
     g_state.main_ptr_id = -1;
     g_state.gesture_main_ptr_id = -1;
     g_state.gesture_second_ptr_id = -1;
@@ -397,11 +412,54 @@ void touch_processor_reset(void) {
     g_state.pending_right_release_ptr_id = -1;
     g_state.sim_click_ptr_id = -1;
     for (int i = 0; i < MAX_FINGERS; i++) g_state.hovered_element_per_ptr[i] = -1;
+    g_state.free_finger_hint = 0;
+    for (int i = 0; i < MAX_FINGERS; i++) g_state.fingers[i].active = false;
+    for (int i = 0; i < MAX_FINGERS; i++) g_state.finger_by_ptr_id[i] = NULL;
+    g_state.active_finger_count = 0;
+    g_state.passthrough_active = false;
+    g_state.sim_continue_click = false;
+    g_state.sim_click_press_time = 0;
+    g_state.sim_click_release_time = 0;
+    g_state.pending_left_release_time = 0;
+    g_state.pending_right_release_time = 0;
+    g_state.pointer_left_enabled = true;
+    g_state.pointer_right_enabled = true;
+    g_state.scroll_accum_y = 0;
+
     for (int i = 0; i < g_state.element_count; i++) {
         g_state.elements[i].current_ptr_id = -1;
+        g_state.elements[i].engaged = false;
         g_state.elements[i].visual_active = false;
         g_state.elements[i].visual_x = g_state.elements[i].x;
         g_state.elements[i].visual_y = g_state.elements[i].y;
+        g_state.elements[i].down_time_ms = 0;
+        g_state.elements[i].long_press_arm = false;
+        g_state.elements[i].gesture_long_press_triggered = false;
+        g_state.elements[i].gesture_swipe_triggered = false;
+        g_state.elements[i].gesture_swipe_direction = -1;
+        g_state.elements[i].gesture_timer_armed = false;
+        g_state.elements[i].gesture_suppressed = false;
+        g_state.elements[i].auto_repeat_last_time = 0;
+        g_state.elements[i].auto_repeat_primary_pressed = false;
+        g_state.elements[i].range_scrolling = false;
+        g_state.elements[i].range_has_binding = false;
+        g_state.elements[i].range_hold_pressed = false;
+        g_state.elements[i].range_pending_tap_release = false;
+        g_state.elements[i].range_tap_release_time = 0;
+        g_state.elements[i].range_current_offset = 0;
+        g_state.elements[i].range_last_position = 0;
+        g_state.elements[i].down_x = 0;
+        g_state.elements[i].down_y = 0;
+        g_state.elements[i].stick_value_x = 0;
+        g_state.elements[i].stick_value_y = 0;
+        g_state.elements[i].trackpad_last_x = 0;
+        g_state.elements[i].trackpad_last_y = 0;
+        g_state.elements[i].trackpad_vel_x = 0;
+        g_state.elements[i].trackpad_vel_y = 0;
+        g_state.elements[i].trackpad_last_time = 0;
+        g_state.elements[i].selected = false;
+        for (int p = 0; p < MAX_PETALS; p++)
+            g_state.elements[i].petal_active[p] = false;
     }
     g_state.visual_state_dirty = true;
     activation_reset();

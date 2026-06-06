@@ -131,7 +131,7 @@ public enum Binding {
             case "KEY_MINUS": return "-";
             case "KEY_KP_ADD": return "+";
             case "KEY_GRAVE": return "`";
-            default: return name.replaceAll("^(MOUSE_)|(KEY_)|(GAMEPAD_)", "").replace("KP_", "NUMPAD_").replace("_", " ");
+            default: return name.replaceAll("^(MOUSE_|KEY_|GAMEPAD_)", "").replace("KP_", "NUMPAD_").replace("_", " ");
         }
     }
 

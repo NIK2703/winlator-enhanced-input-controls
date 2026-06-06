@@ -1,5 +1,7 @@
 package com.winlator.cmod.xserver.events;
 
+import android.os.SystemClock;
+
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xconnector.XStreamLock;
 import com.winlator.cmod.xserver.Window;
@@ -32,7 +34,7 @@ public class XIRawButtonPressNotify extends Event {
 
             outputStream.writeShort(XI_RAWBUTTONPRESS_EVTYPE);     
             outputStream.writeShort((short) deviceId);             
-            outputStream.writeInt((int) System.currentTimeMillis());
+            outputStream.writeInt((int) SystemClock.uptimeMillis());
             outputStream.writeInt(buttonNumber);                   
             outputStream.writeShort((short) deviceId);             
             outputStream.writeShort((short) 0);                  

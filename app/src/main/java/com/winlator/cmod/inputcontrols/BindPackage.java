@@ -52,7 +52,10 @@ public class BindPackage {
     }
 
     public boolean isEmpty() {
-        return bindings.isEmpty() || (bindings.size() == 1 && bindings.get(0) == Binding.NONE);
+        for (Binding b : bindings) {
+            if (b != null && b != Binding.NONE) return false;
+        }
+        return true;
     }
 
     public void clear() {

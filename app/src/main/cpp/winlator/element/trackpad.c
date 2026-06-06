@@ -18,7 +18,7 @@ void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, 
     TouchProcessorState* s = &g_state;
     float dx = x - e->trackpad_last_x;
     float dy = y - e->trackpad_last_y;
-    if (fabsf(dx) < 0.0001f && fabsf(dy) < 0.0001f) return;
+    if (fabsf(dx) < 1.0f && fabsf(dy) < 1.0f) return;
 
     // Apply xform scale: maps view-pixels to Wine-screen-pixels (Java computeDeltaPoint)
     dx *= s->cfg.xform_scale_x;
@@ -26,11 +26,12 @@ void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, 
 
     if (is_gamepad_binding(&e->bindings[0])) {
         // Java: TRACKPAD_ACCELERATION_THRESHOLD=4, STICK_SENSITIVITY=2.0f
+        float abs_dx = fabsf(dx), abs_dy = fabsf(dy);
         float value_x = dx, value_y = dy;
-        if (fabsf(value_x) > TP_ACCEL_THRESHOLD)
-            value_x *= STICK_SENSITIVITY;
-        if (fabsf(value_y) > TP_ACCEL_THRESHOLD)
-            value_y *= STICK_SENSITIVITY;
+        if (abs_dx > TP_ACCEL_THRESHOLD)
+            value_x *= 1.0f + (STICK_SENSITIVITY - 1.0f) * (abs_dx - TP_ACCEL_THRESHOLD) / (abs_dx + TP_ACCEL_THRESHOLD);
+        if (abs_dy > TP_ACCEL_THRESHOLD)
+            value_y *= 1.0f + (STICK_SENSITIVITY - 1.0f) * (abs_dy - TP_ACCEL_THRESHOLD) / (abs_dy + TP_ACCEL_THRESHOLD);
 
         // Normalize by TRACKPAD_MAX_SPEED and clamp to [-1, 1]
         float nx = fminf(1.0f, fabsf(value_x / TRACKPAD_MAX_SPEED));
@@ -57,11 +58,12 @@ void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, 
         bool states[4] = {raw_up, raw_right, raw_down, raw_left};
 
         // Java: TouchpadView.CURSOR_ACCELERATION_THRESHOLD=6, CURSOR_ACCELERATION=1.25f
+        float abs_dx = fabsf(dx), abs_dy = fabsf(dy);
         float value_x = dx, value_y = dy;
-        if (fabsf(value_x) > TP_CURSOR_ACCEL_THRESHOLD)
-            value_x *= TP_CURSOR_ACCEL;
-        if (fabsf(value_y) > TP_CURSOR_ACCEL_THRESHOLD)
-            value_y *= TP_CURSOR_ACCEL;
+        if (abs_dx > TP_CURSOR_ACCEL_THRESHOLD)
+            value_x *= 1.0f + (TP_CURSOR_ACCEL - 1.0f) * fminf((abs_dx - TP_CURSOR_ACCEL_THRESHOLD) / TP_CURSOR_ACCEL_THRESHOLD, 1.0f);
+        if (abs_dy > TP_CURSOR_ACCEL_THRESHOLD)
+            value_y *= 1.0f + (TP_CURSOR_ACCEL - 1.0f) * fminf((abs_dy - TP_CURSOR_ACCEL_THRESHOLD) / TP_CURSOR_ACCEL_THRESHOLD, 1.0f);
 
         int cursor_dx = 0, cursor_dy = 0;
         for (int i = 0; i < 4; i++) {
@@ -70,9 +72,9 @@ void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, 
 
             if (is_mouse_move_binding(b)) {
                 float value = (i == 1 || i == 3) ? value_x : value_y;
-                // Java Mathf.roundPoint: (int)(x <= 0 ? floor(x) : ceil(x))
-                if (i == 1 || i == 3) cursor_dx = (int)(value <= 0 ? floorf(value) : ceilf(value));
-                if (i == 0 || i == 2) cursor_dy = (int)(value <= 0 ? floorf(value) : ceilf(value));
+                int delta = (int)(value <= 0 ? floorf(value) : ceilf(value));
+                if (i == 1 || i == 3) cursor_dx += delta;
+                if (i == 0 || i == 2) cursor_dy += delta;
                 continue;
             }
 

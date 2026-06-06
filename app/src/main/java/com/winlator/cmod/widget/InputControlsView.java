@@ -218,7 +218,13 @@ public class InputControlsView extends View {
             return;
         }
 
-        snappingSize = width / 100;
+        int newSnapSize = width / 100;
+        if (newSnapSize != snappingSize) {
+            snappingSize = newSnapSize;
+            if (nativeTouchProcessor != null) {
+                nativeTouchProcessor.setSnappingSize(snappingSize);
+            }
+        }
         readyToDraw = true;
 
         if (editMode) {
@@ -538,13 +544,19 @@ public class InputControlsView extends View {
         mouseMoveTimer.schedule(new TimerTask() {
             @Override
             public void run() {
-                if (mouseMoveOffset.x != 0 || mouseMoveOffset.y != 0) {
-                    if (inputMode == InputMode.RELATIVE)
-                        winHandler.mouseEvent(MouseEventFlags.MOVE, (int) (mouseMoveOffset.x * cursorSpeed * 10), (int) (mouseMoveOffset.y * cursorSpeed * 10), 0);
-                    else
+                PointF offset;
+                synchronized (InputControlsView.this) {
+                    offset = new PointF(mouseMoveOffset.x, mouseMoveOffset.y);
+                }
+                if (offset.x != 0 || offset.y != 0) {
+                    if (inputMode == InputMode.RELATIVE) {
+                        WinHandler wh = xServer != null ? xServer.getWinHandler() : null;
+                        if (wh != null)
+                            wh.mouseEvent(MouseEventFlags.MOVE, (int) (offset.x * cursorSpeed * 10), (int) (offset.y * cursorSpeed * 10), 0);
+                    } else if (xServer != null)
                         xServer.injectPointerMoveDelta(
-                            (int) (mouseMoveOffset.x * cursorSpeed * 10),
-                            (int) (mouseMoveOffset.y * cursorSpeed * 10)
+                            (int) (offset.x * cursorSpeed * 10),
+                            (int) (offset.y * cursorSpeed * 10)
                     );
                 }
             }

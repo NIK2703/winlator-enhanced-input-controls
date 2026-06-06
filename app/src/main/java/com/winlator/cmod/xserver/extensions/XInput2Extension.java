@@ -367,6 +367,7 @@ public class XInput2Extension implements Extension {
 
     private void sendXIRawMotionToClient(XClient client, int deviceId, double deltaX, double deltaY) throws IOException {
         client.sendEvent(new XIRawMotionNotify(deviceId, MAJOR_OPCODE,
+                new double[] {0.0, 0.0},
                 new double[] {deltaX, deltaY},
                 RawMotion_XY_MASK
         ));

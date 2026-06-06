@@ -4,7 +4,7 @@
 
 static void range_compute_sizes(const TouchElement* e, float* out_cw, float* out_ch, float* out_element_size) {
     TouchProcessorState* s = &g_state;
-    float hs = s->snapping_size;
+    float hs = s->snapping_size > 0.0f ? s->snapping_size : 1.0f;
     *out_cw = hs * (e->range_binding_count * 2) * e->scale;
     *out_ch = hs * 2.0f * e->scale;
     if (e->range_orientation == 1) SWAP_F(*out_cw, *out_ch);
@@ -68,8 +68,11 @@ void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_
         float scroll_size = element_size * (float)e->range_max;
 
         e->range_current_offset += delta;
-        e->range_scroll_offset = -fmodf(e->range_current_offset, scroll_size);
-        if (e->range_scroll_offset < 0) e->range_scroll_offset += scroll_size;
+        if (scroll_size > 0.0f) {
+            e->range_current_offset = fmodf(e->range_current_offset, scroll_size);
+            if (e->range_current_offset < 0) e->range_current_offset += scroll_size;
+        }
+        e->range_scroll_offset = -e->range_current_offset;
         e->range_last_position = pos;
         s->visual_state_dirty = true;
     }
