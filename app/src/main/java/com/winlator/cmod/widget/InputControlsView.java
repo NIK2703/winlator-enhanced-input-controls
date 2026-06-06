@@ -40,6 +40,8 @@ import com.winlator.cmod.inputcontrols.NativeTouchProcessor;
 import com.winlator.cmod.inputcontrols.ExternalControllerBinding;
 import com.winlator.cmod.inputcontrols.GamepadState;
 import com.winlator.cmod.math.Mathf;
+
+import java.nio.ByteBuffer;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.Pointer;
@@ -74,8 +76,7 @@ public class InputControlsView extends View {
     private TouchpadView touchpadView;
     private XServer xServer;
     private NativeTouchProcessor nativeTouchProcessor;
-    private float[] visualPositions;
-    private byte[] visualActive;
+    private static final int VISUAL_STRIDE = 32;
     private final Bitmap[] icons = new Bitmap[40];
     private Timer mouseMoveTimer;
     private final PointF mouseMoveOffset = new PointF();
@@ -476,30 +477,33 @@ public class InputControlsView extends View {
         this.nativeTouchProcessor = p;
     }
 
-    private void applyVisualStates() {
+    private void syncVisualStates() {
         if (profile == null) return;
+        ByteBuffer buf = nativeTouchProcessor.getVisualBuffer();
+        if (buf == null) return;
         List<ControlElement> elements = profile.getElements();
         int count = elements.size();
-        for (int i = 0; i < count && i * 5 + 4 < visualActive.length && i * 3 + 2 < visualPositions.length; i++) {
+        for (int i = 0; i < count; i++) {
+            int base = i * VISUAL_STRIDE;
             ControlElement e = elements.get(i);
             e.syncVisualState(
-                visualActive[i * 5] != 0,
-                visualPositions[i * 3],
-                visualPositions[i * 3 + 1],
-                visualActive[i * 5 + 1] != 0,
-                visualActive[i * 5 + 2] != 0,
-                visualActive[i * 5 + 3] != 0,
-                visualActive[i * 5 + 4] != 0,
-                visualPositions[i * 3 + 2]
+                buf.getInt(base + 8) != 0,
+                buf.getFloat(base),
+                buf.getFloat(base + 4),
+                buf.getInt(base + 12) != 0,
+                buf.getInt(base + 16) != 0,
+                buf.getInt(base + 20) != 0,
+                buf.getInt(base + 24) != 0,
+                buf.getFloat(base + 28)
             );
         }
         invalidate();
     }
 
     public void tick(long timeMs) {
-        if (nativeTouchProcessor != null && visualPositions != null && visualActive != null) {
-            nativeTouchProcessor.tick(timeMs, visualPositions, visualActive);
-            applyVisualStates();
+        if (nativeTouchProcessor != null) {
+            nativeTouchProcessor.tick(timeMs);
+            syncVisualStates();
         }
     }
 
@@ -668,34 +672,29 @@ public class InputControlsView extends View {
             int action = event.getActionMasked();
             int actionIndex = event.getActionIndex();
             int pointerId = event.getPointerId(actionIndex);
-            int elemCount = profile != null ? profile.getElements().size() : 0;
-            if (visualPositions == null || visualPositions.length < elemCount * 3 + 16) {
-                visualPositions = new float[elemCount * 3 + 16];
-                visualActive = new byte[elemCount * 5 + 32];
-            }
             switch (action) {
                 case MotionEvent.ACTION_DOWN:
                 case MotionEvent.ACTION_POINTER_DOWN: {
                     float x = event.getX(actionIndex);
                     float y = event.getY(actionIndex);
-                    nativeTouchProcessor.onFingerDown(pointerId, x, y, event.getEventTime(), visualPositions, visualActive);
-                    applyVisualStates();
+                    nativeTouchProcessor.onFingerDown(pointerId, x, y, event.getEventTime());
+                    syncVisualStates();
                     return true;
                 }
                 case MotionEvent.ACTION_MOVE: {
                     for (int i = 0; i < event.getPointerCount(); i++) {
                         int pid = event.getPointerId(i);
-                        nativeTouchProcessor.onFingerMove(pid, event.getX(i), event.getY(i), event.getEventTime(), visualPositions, visualActive);
+                        nativeTouchProcessor.onFingerMove(pid, event.getX(i), event.getY(i), event.getEventTime());
                     }
-                    applyVisualStates();
+                    syncVisualStates();
                     return true;
                 }
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_POINTER_UP: {
                     float x = event.getX(actionIndex);
                     float y = event.getY(actionIndex);
-                    nativeTouchProcessor.onFingerUp(pointerId, x, y, event.getEventTime(), visualPositions, visualActive);
-                    applyVisualStates();
+                    nativeTouchProcessor.onFingerUp(pointerId, x, y, event.getEventTime());
+                    syncVisualStates();
                     return true;
                 }
                 case MotionEvent.ACTION_CANCEL: {

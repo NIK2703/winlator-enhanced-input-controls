@@ -11,6 +11,7 @@ import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XKeycode;
 import com.winlator.cmod.xserver.XServer;
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 
@@ -164,9 +165,8 @@ public class NativeTouchProcessor {
             handler.postDelayed(mouseMoveTask, 16);
         };
     }
+    private ByteBuffer visualBuffer;
     private int elementCount;
-    private float[] outPositions;
-    private byte[] outActive;
 
     public NativeTouchProcessor() {
         try {
@@ -187,11 +187,12 @@ public class NativeTouchProcessor {
     // Native methods
     private static native void nativeInit(NativeConfig config);
     private static native void nativeSetElements(NativeElement[] elements);
-    private static native void nativeOnFingerDown(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
-    private static native void nativeOnFingerMove(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
-    private static native void nativeOnFingerUp(int ptrId, float x, float y, long timeMs, float[] outPositions, byte[] outActive);
-    private static native void nativeTick(long timeMs, float[] outPositions, byte[] outActive);
+    private static native void nativeOnFingerDown(int ptrId, float x, float y, long timeMs);
+    private static native void nativeOnFingerMove(int ptrId, float x, float y, long timeMs);
+    private static native void nativeOnFingerUp(int ptrId, float x, float y, long timeMs);
+    private static native void nativeTick(long timeMs);
     private static native void nativeReset();
+    private static native ByteBuffer nativeGetVisualBuffer();
     private static native boolean nativeIsPassthroughActive();
     private static native void nativeSetSnappingSize(float size);
     private static native void nativeSetResolutionScale(float scale);
@@ -213,6 +214,7 @@ public class NativeTouchProcessor {
         }
         nativeInit(config);
         nativeRegisterDispatcher(this);
+        visualBuffer = nativeGetVisualBuffer();
         hapticEnabled = config.hapticEnabled;
     }
 
@@ -503,42 +505,26 @@ public class NativeTouchProcessor {
 
     public void onFingerDown(int ptrId, float x, float y, long eventTime) {
         if (!loaded || !running) return;
-        nativeOnFingerDown(ptrId, x, y, eventTime, null, null);
-    }
-
-    public void onFingerDown(int ptrId, float x, float y, long eventTime, float[] outPositions, byte[] outActive) {
-        if (!loaded || !running) return;
-        nativeOnFingerDown(ptrId, x, y, eventTime, outPositions, outActive);
+        nativeOnFingerDown(ptrId, x, y, eventTime);
     }
 
     public void onFingerMove(int ptrId, float x, float y, long eventTime) {
         if (!loaded || !running) return;
-        nativeOnFingerMove(ptrId, x, y, eventTime, null, null);
-    }
-
-    public void onFingerMove(int ptrId, float x, float y, long eventTime, float[] outPositions, byte[] outActive) {
-        if (!loaded || !running) return;
-        nativeOnFingerMove(ptrId, x, y, eventTime, outPositions, outActive);
+        nativeOnFingerMove(ptrId, x, y, eventTime);
     }
 
     public void onFingerUp(int ptrId, float x, float y, long eventTime) {
         if (!loaded || !running) return;
-        nativeOnFingerUp(ptrId, x, y, eventTime, null, null);
-    }
-
-    public void onFingerUp(int ptrId, float x, float y, long eventTime, float[] outPositions, byte[] outActive) {
-        if (!loaded || !running) return;
-        nativeOnFingerUp(ptrId, x, y, eventTime, outPositions, outActive);
+        nativeOnFingerUp(ptrId, x, y, eventTime);
     }
 
     public void tick(long eventTime) {
         if (!loaded || !running) return;
-        nativeTick(eventTime, null, null);
+        nativeTick(eventTime);
     }
 
-    public void tick(long eventTime, float[] outPositions, byte[] outActive) {
-        if (!loaded || !running) return;
-        nativeTick(eventTime, outPositions, outActive);
+    public ByteBuffer getVisualBuffer() {
+        return visualBuffer;
     }
 
     public void reset() {

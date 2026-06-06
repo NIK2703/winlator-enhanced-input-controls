@@ -7,6 +7,39 @@
 
 static JavaVM* g_jvm = NULL;
 
+// --- Native visual state buffer (zero-copy, no JNI array ops) ---
+// Packed layout per element — directly mappable to Java ByteBuffer
+#pragma pack(push, 1)
+typedef struct {
+    float visual_x;
+    float visual_y;
+    int32_t visual_active;       // 0 or 1
+    int32_t petal_active[4];     // 0 or 1 each
+    float range_scroll_offset;
+} VisualStateEntry;
+#pragma pack(pop)
+
+#define VISUAL_STRIDE ((int)sizeof(VisualStateEntry))
+
+static VisualStateEntry g_visual_buffer[MAX_ELEMENTS];
+static jobject g_visual_buffer_ref = NULL;
+
+static void visual_state_flush(void) {
+    if (!g_state.visual_state_dirty) return;
+    g_state.visual_state_dirty = false;
+    int n = g_state.element_count;
+    for (int i = 0; i < n; i++) {
+        g_visual_buffer[i].visual_x = g_state.elements[i].visual_x;
+        g_visual_buffer[i].visual_y = g_state.elements[i].visual_y;
+        g_visual_buffer[i].visual_active = g_state.elements[i].visual_active ? 1 : 0;
+        g_visual_buffer[i].petal_active[0] = g_state.elements[i].petal_active[0] ? 1 : 0;
+        g_visual_buffer[i].petal_active[1] = g_state.elements[i].petal_active[1] ? 1 : 0;
+        g_visual_buffer[i].petal_active[2] = g_state.elements[i].petal_active[2] ? 1 : 0;
+        g_visual_buffer[i].petal_active[3] = g_state.elements[i].petal_active[3] ? 1 : 0;
+        g_visual_buffer[i].range_scroll_offset = g_state.elements[i].range_scroll_offset;
+    }
+}
+
 struct CachedFieldIDs {
     jclass configClass;
     jfieldID touchMode;
@@ -132,31 +165,7 @@ static int read_binding_list(JNIEnv* env, jintArray arr, TouchBinding* dst, int 
     count = read_binding_list(env, _arr, dst, 8); \
 } while(0)
 
-static int fill_visual_state(JNIEnv* env, jfloatArray outPositions, jbyteArray outActive) {
-    if (!g_state.visual_state_dirty) return g_state.element_count;
-    if (outPositions == NULL || outActive == NULL) return g_state.element_count;
-    jfloat* pos = env->GetFloatArrayElements(outPositions, NULL);
-    jbyte* act = env->GetByteArrayElements(outActive, NULL);
-    int count = g_state.element_count;
-    int maxPos = env->GetArrayLength(outPositions) / 3;
-    int maxAct = env->GetArrayLength(outActive) / 5;
-    int limit = count < maxPos ? (count < maxAct ? count : maxAct) : (maxPos < maxAct ? maxPos : maxAct);
-    for (int i = 0; i < limit; i++) {
-        pos[i * 3] = g_state.elements[i].visual_x;
-        pos[i * 3 + 1] = g_state.elements[i].visual_y;
-        pos[i * 3 + 2] = g_state.elements[i].range_scroll_offset;
-        int base = i * 5;
-        act[base] = g_state.elements[i].visual_active ? 1 : 0;
-        act[base + 1] = g_state.elements[i].petal_active[0] ? 1 : 0;
-        act[base + 2] = g_state.elements[i].petal_active[1] ? 1 : 0;
-        act[base + 3] = g_state.elements[i].petal_active[2] ? 1 : 0;
-        act[base + 4] = g_state.elements[i].petal_active[3] ? 1 : 0;
-    }
-    env->ReleaseFloatArrayElements(outPositions, pos, 0);
-    env->ReleaseByteArrayElements(outActive, act, 0);
-    g_state.visual_state_dirty = false;
-    return count;
-}
+
 
 static void dispatch_actions(JNIEnv* env, const TouchActionResult* r) {
     if (!g_dispatch_obj || !r) {
@@ -597,35 +606,43 @@ static void nativeSetSimTouchScreen(JNIEnv* env, jclass clazz, jboolean enabled)
 }
 
 static void nativeOnFingerDown(JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y,
-                                jlong timeMs, jfloatArray outPositions, jbyteArray outActive) {
+                                jlong timeMs) {
     TouchActionResult r = touch_processor_on_finger_down(ptrId, x, y, (uint64_t)timeMs);
-    fill_visual_state(env, outPositions, outActive);
+    visual_state_flush();
     dispatch_actions_batch(env, &r);
 }
 
 static void nativeOnFingerMove(JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y,
-                                jlong timeMs, jfloatArray outPositions, jbyteArray outActive) {
+                                jlong timeMs) {
     TouchActionResult r = touch_processor_on_finger_move(ptrId, x, y, (uint64_t)timeMs);
-    fill_visual_state(env, outPositions, outActive);
+    visual_state_flush();
     dispatch_actions_batch(env, &r);
 }
 
 static void nativeOnFingerUp(JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y,
-                              jlong timeMs, jfloatArray outPositions, jbyteArray outActive) {
+                              jlong timeMs) {
     TouchActionResult r = touch_processor_on_finger_up(ptrId, x, y, (uint64_t)timeMs);
-    fill_visual_state(env, outPositions, outActive);
+    visual_state_flush();
     dispatch_actions_batch(env, &r);
 }
 
-static void nativeTick(JNIEnv* env, jclass clazz,
-    jlong timeMs, jfloatArray outPositions, jbyteArray outActive) {
+static void nativeTick(JNIEnv* env, jclass clazz, jlong timeMs) {
     TouchActionResult r = touch_processor_tick((uint64_t)timeMs);
-    fill_visual_state(env, outPositions, outActive);
+    visual_state_flush();
     dispatch_actions_batch(env, &r);
 }
 
 static void nativeReset(JNIEnv* env, jclass clazz) {
     touch_processor_reset();
+    memset(g_visual_buffer, 0, sizeof(g_visual_buffer));
+}
+
+static jobject nativeGetVisualBuffer(JNIEnv* env, jclass clazz) {
+    if (g_visual_buffer_ref == NULL) {
+        g_visual_buffer_ref = env->NewGlobalRef(
+            env->NewDirectByteBuffer(g_visual_buffer, sizeof(g_visual_buffer)));
+    }
+    return g_visual_buffer_ref;
 }
 
 static jboolean nativeIsPassthroughActive(JNIEnv* env, jclass clazz) {
@@ -793,14 +810,15 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     JNINativeMethod methods[] = {
         {"nativeInit", "(Lcom/winlator/cmod/inputcontrols/NativeTouchProcessor$NativeConfig;)V", (void*)nativeInit},
         {"nativeSetElements", "([Lcom/winlator/cmod/inputcontrols/NativeTouchProcessor$NativeElement;)V", (void*)nativeSetElements},
-        {"nativeOnFingerDown", "(IFFJ[F[B)V", (void*)nativeOnFingerDown},
-        {"nativeOnFingerMove", "(IFFJ[F[B)V", (void*)nativeOnFingerMove},
-        {"nativeOnFingerUp", "(IFFJ[F[B)V", (void*)nativeOnFingerUp},
-        {"nativeTick", "(J[F[B)V", (void*)nativeTick},
+        {"nativeOnFingerDown", "(IFFJ)V", (void*)nativeOnFingerDown},
+        {"nativeOnFingerMove", "(IFFJ)V", (void*)nativeOnFingerMove},
+        {"nativeOnFingerUp", "(IFFJ)V", (void*)nativeOnFingerUp},
+        {"nativeTick", "(J)V", (void*)nativeTick},
         {"nativeHandleDownByMode", "(IFFJ)Z", (void*)nativeHandleDownByMode},
         {"nativeHandleUpByMode", "(IFFJ)Z", (void*)nativeHandleUpByMode},
         {"nativeHandleMoveByMode", "(IFFJ)V", (void*)nativeHandleMoveByMode},
         {"nativeReset", "()V", (void*)nativeReset},
+        {"nativeGetVisualBuffer", "()Ljava/nio/ByteBuffer;", (void*)nativeGetVisualBuffer},
         {"nativeIsPassthroughActive", "()Z", (void*)nativeIsPassthroughActive},
         {"nativeSetSnappingSize", "(F)V", (void*)nativeSetSnappingSize},
         {"nativeSetResolutionScale", "(F)V", (void*)nativeSetResolutionScale},
