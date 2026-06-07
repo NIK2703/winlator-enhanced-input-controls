@@ -148,34 +148,6 @@ extern TouchProcessorState g_state;
 // Forward declarations
 void touch_finger_cache_bs(TouchFinger* f);
 
-static inline void setup_second_finger_bindings(TouchFinger* f) {
-    FingerBindings* fb = &f->bindings;
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
-        fb->single_tap = g_state.cfg.ts_single_2nd;        fb->single_tap_count = g_state.cfg.ts_single_2nd_count;
-        fb->long_press = NULL;                              fb->long_press_count = 0;
-        fb->double_tap = g_state.cfg.ts_double_2nd;        fb->double_tap_count = g_state.cfg.ts_double_2nd_count;
-        fb->single_tap_drag = g_state.cfg.ts_single_drag_2nd; fb->single_tap_drag_count = g_state.cfg.ts_single_drag_2nd_count;
-        fb->long_press_drag = NULL;                         fb->long_press_drag_count = 0;
-        fb->double_tap_drag = g_state.cfg.ts_double_drag_2nd; fb->double_tap_drag_count = g_state.cfg.ts_double_drag_2nd_count;
-        fb->single_tap_2nd = NULL;                          fb->single_tap_2nd_count = 0;
-        fb->double_tap_2nd = NULL;                          fb->double_tap_2nd_count = 0;
-        fb->single_tap_drag_2nd = NULL;                     fb->single_tap_drag_2nd_count = 0;
-        fb->double_tap_drag_2nd = NULL;                     fb->double_tap_drag_2nd_count = 0;
-    } else {
-        fb->single_tap = g_state.cfg.tp_single_2nd;        fb->single_tap_count = g_state.cfg.tp_single_2nd_count;
-        fb->long_press = NULL;                              fb->long_press_count = 0;
-        fb->double_tap = g_state.cfg.tp_double_2nd;        fb->double_tap_count = g_state.cfg.tp_double_2nd_count;
-        fb->single_tap_drag = NULL;                         fb->single_tap_drag_count = 0;
-        fb->long_press_drag = NULL;                         fb->long_press_drag_count = 0;
-        fb->double_tap_drag = g_state.cfg.tp_double_drag_2nd; fb->double_tap_drag_count = g_state.cfg.tp_double_drag_2nd_count;
-        fb->single_tap_2nd = NULL;                          fb->single_tap_2nd_count = 0;
-        fb->double_tap_2nd = NULL;                          fb->double_tap_2nd_count = 0;
-        fb->single_tap_drag_2nd = NULL;                     fb->single_tap_drag_2nd_count = 0;
-        fb->double_tap_drag_2nd = NULL;                     fb->double_tap_drag_2nd_count = 0;
-    }
-    touch_finger_cache_bs(f);
-}
-
 // --- Inline helpers ---
 
 static inline uint64_t now_ms(void) {
@@ -212,19 +184,99 @@ static inline int active_finger_count(void) {
     return g_state.active_finger_count;
 }
 
-// Macro to assign finger binding pointers from config (no memcpy — bindings are read-only during a gesture session).
-// fb: FingerBindings* pointer, cfg: TouchProcessorConfig*, pfx: config prefix (ts or tp).
-#define COPY_FINGER_BINDINGS(fb_, cfg_, pfx_) { \
-    (fb_)->single_tap = (cfg_)->pfx_##_single_tap;       (fb_)->single_tap_count = (cfg_)->pfx_##_single_tap_count; \
-    (fb_)->long_press = (cfg_)->pfx_##_long_press;        (fb_)->long_press_count = (cfg_)->pfx_##_long_press_count; \
-    (fb_)->double_tap = (cfg_)->pfx_##_double_tap;        (fb_)->double_tap_count = (cfg_)->pfx_##_double_tap_count; \
-    (fb_)->single_tap_drag = (cfg_)->pfx_##_single_tap_drag;   (fb_)->single_tap_drag_count = (cfg_)->pfx_##_single_tap_drag_count; \
-    (fb_)->long_press_drag = (cfg_)->pfx_##_long_press_drag;   (fb_)->long_press_drag_count = (cfg_)->pfx_##_long_press_drag_count; \
-    (fb_)->double_tap_drag = (cfg_)->pfx_##_double_tap_drag;   (fb_)->double_tap_drag_count = (cfg_)->pfx_##_double_tap_drag_count; \
-    (fb_)->single_tap_2nd = (cfg_)->pfx_##_single_2nd;         (fb_)->single_tap_2nd_count = (cfg_)->pfx_##_single_2nd_count; \
-    (fb_)->double_tap_2nd = (cfg_)->pfx_##_double_2nd;         (fb_)->double_tap_2nd_count = (cfg_)->pfx_##_double_2nd_count; \
-    (fb_)->single_tap_drag_2nd = (cfg_)->pfx_##_single_drag_2nd;  (fb_)->single_tap_drag_2nd_count = (cfg_)->pfx_##_single_drag_2nd_count; \
-    (fb_)->double_tap_drag_2nd = (cfg_)->pfx_##_double_drag_2nd;  (fb_)->double_tap_drag_2nd_count = (cfg_)->pfx_##_double_drag_2nd_count; \
+// GestureModeBindings — mode-agnostic view of all binding arrays.
+// This is the single point where TS/TP config branching is resolved.
+typedef struct {
+    const TouchBinding* single_tap;         int single_tap_count;
+    const TouchBinding* long_press;         int long_press_count;
+    const TouchBinding* double_tap;         int double_tap_count;
+    const TouchBinding* single_tap_drag;    int single_tap_drag_count;
+    const TouchBinding* long_press_drag;    int long_press_drag_count;
+    const TouchBinding* double_tap_drag;    int double_tap_drag_count;
+    const TouchBinding* single_2nd;         int single_2nd_count;
+    const TouchBinding* double_2nd;         int double_2nd_count;
+    const TouchBinding* single_drag_2nd;    int single_drag_2nd_count;
+    const TouchBinding* double_drag_2nd;    int double_drag_2nd_count;
+} GestureModeBindings;
+
+// SINGLE place where TS vs TP binding selection happens.
+static inline GestureModeBindings get_mode_bindings(void) {
+    GestureModeBindings b;
+    const TouchProcessorConfig* c = &g_state.cfg;
+    if (c->touch_mode == TOUCH_MODE_TOUCHSCREEN) {
+        b.single_tap        = c->ts_single_tap;        b.single_tap_count        = c->ts_single_tap_count;
+        b.long_press        = c->ts_long_press;        b.long_press_count        = c->ts_long_press_count;
+        b.double_tap        = c->ts_double_tap;        b.double_tap_count        = c->ts_double_tap_count;
+        b.single_tap_drag   = c->ts_single_tap_drag;   b.single_tap_drag_count   = c->ts_single_tap_drag_count;
+        b.long_press_drag   = c->ts_long_press_drag;   b.long_press_drag_count   = c->ts_long_press_drag_count;
+        b.double_tap_drag   = c->ts_double_tap_drag;   b.double_tap_drag_count   = c->ts_double_tap_drag_count;
+        b.single_2nd        = c->ts_single_2nd;        b.single_2nd_count        = c->ts_single_2nd_count;
+        b.double_2nd        = c->ts_double_2nd;        b.double_2nd_count        = c->ts_double_2nd_count;
+        b.single_drag_2nd   = c->ts_single_drag_2nd;   b.single_drag_2nd_count   = c->ts_single_drag_2nd_count;
+        b.double_drag_2nd   = c->ts_double_drag_2nd;   b.double_drag_2nd_count   = c->ts_double_drag_2nd_count;
+    } else {
+        b.single_tap        = c->tp_single_tap;        b.single_tap_count        = c->tp_single_tap_count;
+        b.long_press        = c->tp_long_press;        b.long_press_count        = c->tp_long_press_count;
+        b.double_tap        = c->tp_double_tap;        b.double_tap_count        = c->tp_double_tap_count;
+        b.single_tap_drag   = c->tp_single_tap_drag;   b.single_tap_drag_count   = c->tp_single_tap_drag_count;
+        b.long_press_drag   = c->tp_long_press_drag;   b.long_press_drag_count   = c->tp_long_press_drag_count;
+        b.double_tap_drag   = c->tp_double_tap_drag;   b.double_tap_drag_count   = c->tp_double_tap_drag_count;
+        b.single_2nd        = c->tp_single_2nd;        b.single_2nd_count        = c->tp_single_2nd_count;
+        b.double_2nd        = c->tp_double_2nd;        b.double_2nd_count        = c->tp_double_2nd_count;
+        b.single_drag_2nd   = c->tp_single_drag_2nd;   b.single_drag_2nd_count   = c->tp_single_drag_2nd_count;
+        b.double_drag_2nd   = c->tp_double_drag_2nd;   b.double_drag_2nd_count   = c->tp_double_drag_2nd_count;
+    }
+    return b;
+}
+
+// Copy main-finger bindings from mode bindings (zeroes second-finger slots).
+#define COPY_FROM_MODE_BINDINGS(fb_, mb_) { \
+    (fb_)->single_tap = (mb_).single_tap;            (fb_)->single_tap_count = (mb_).single_tap_count; \
+    (fb_)->long_press = (mb_).long_press;            (fb_)->long_press_count = (mb_).long_press_count; \
+    (fb_)->double_tap = (mb_).double_tap;            (fb_)->double_tap_count = (mb_).double_tap_count; \
+    (fb_)->single_tap_drag = (mb_).single_tap_drag;  (fb_)->single_tap_drag_count = (mb_).single_tap_drag_count; \
+    (fb_)->long_press_drag = (mb_).long_press_drag;  (fb_)->long_press_drag_count = (mb_).long_press_drag_count; \
+    (fb_)->double_tap_drag = (mb_).double_tap_drag;  (fb_)->double_tap_drag_count = (mb_).double_tap_drag_count; \
+    (fb_)->single_tap_2nd = NULL;  (fb_)->single_tap_2nd_count = 0; \
+    (fb_)->double_tap_2nd = NULL;  (fb_)->double_tap_2nd_count = 0; \
+    (fb_)->single_tap_drag_2nd = NULL; (fb_)->single_tap_drag_2nd_count = 0; \
+    (fb_)->double_tap_drag_2nd = NULL; (fb_)->double_tap_drag_2nd_count = 0; \
+}
+
+// Copy second-finger bindings from mode bindings (2nd variants map to primary slots).
+#define COPY_FROM_MODE_BINDINGS_2ND(fb_, mb_) { \
+    (fb_)->single_tap = (mb_).single_2nd;          (fb_)->single_tap_count = (mb_).single_2nd_count; \
+    (fb_)->long_press = NULL;                      (fb_)->long_press_count = 0; \
+    (fb_)->double_tap = (mb_).double_2nd;          (fb_)->double_tap_count = (mb_).double_2nd_count; \
+    (fb_)->single_tap_drag = (mb_).single_drag_2nd; (fb_)->single_tap_drag_count = (mb_).single_drag_2nd_count; \
+    (fb_)->long_press_drag = NULL;                 (fb_)->long_press_drag_count = 0; \
+    (fb_)->double_tap_drag = (mb_).double_drag_2nd; (fb_)->double_tap_drag_count = (mb_).double_drag_2nd_count; \
+    (fb_)->single_tap_2nd = NULL; (fb_)->single_tap_2nd_count = 0; \
+    (fb_)->double_tap_2nd = NULL; (fb_)->double_tap_2nd_count = 0; \
+    (fb_)->single_tap_drag_2nd = NULL; (fb_)->single_tap_drag_2nd_count = 0; \
+    (fb_)->double_tap_drag_2nd = NULL; (fb_)->double_tap_drag_2nd_count = 0; \
+}
+
+// Set up bindings for a main finger from the active mode, zeroing single-tap-drag for TP.
+static inline void setup_main_finger_bindings(FingerBindings* fb) {
+    GestureModeBindings mb = get_mode_bindings();
+    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD) {
+        mb.single_tap_drag = NULL; mb.single_tap_drag_count = 0;
+        mb.single_drag_2nd = NULL; mb.single_drag_2nd_count = 0;
+    }
+    COPY_FROM_MODE_BINDINGS(fb, mb);
+}
+
+// Set up second-finger bindings: 2nd variants map to primary FingerBindings slots.
+static inline void setup_second_finger_bindings(TouchFinger* f) {
+    FingerBindings* fb = &f->bindings;
+    GestureModeBindings mb = get_mode_bindings();
+    COPY_FROM_MODE_BINDINGS_2ND(fb, mb);
+    // TP second finger has no independent single-tap-drag.
+    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD) {
+        fb->single_tap_drag = NULL; fb->single_tap_drag_count = 0;
+    }
+    touch_finger_cache_bs(f);
 }
 
 // --- Cleanup helpers (reduce repetitive zeroing patterns) ---
@@ -243,6 +295,12 @@ static inline void gesture_clear_second_finger_state(void) {
     g_state.second_tap_fallback_count = 0;
     g_state.second_double_tap_waiting = false;
     g_state.pending_second_double_count = 0;
+}
+
+// Enter second-finger double-tap waiting (SDTW) — analogous to first-finger DT_WAITING.
+static inline void enter_sdtw(uint64_t time_ms) {
+    g_state.second_double_tap_waiting = true;
+    g_state.second_tap_fallback_time = time_ms;
 }
 
 static inline bool finger_has_gesture(const TouchFinger* f) {
@@ -324,7 +382,7 @@ int range_keycode(int ordinal, int index);
 
 // Gesture — base (maps to GestureHandler.java)
 void on_drag_start(TouchFinger* f);
-void double_tap_confirm_internal(TouchActionResult* result);
+void double_tap_confirm_internal(TouchActionResult* result, const FingerBindings* fb);
 
 static inline void release_bindings_list(TouchActionResult* result, TouchBinding* bindings, int count) {
     for (int k = count - 1; k >= 0; k--)

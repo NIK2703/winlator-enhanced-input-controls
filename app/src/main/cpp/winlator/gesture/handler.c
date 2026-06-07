@@ -115,7 +115,7 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
         // DT waiting check
         if (g_state.gesture_double_tap_waiting) {
             if (gesture_is_within_tap_distance(f->x, f->y)) {
-                double_tap_confirm_internal(result);
+                double_tap_confirm_internal(result, &f->bindings);
                 f->state = GESTURE_STATE_TAP_WAITING;
                 f->cached_has_long_press_timer = false;
                 f->single_tap_hold_delay_ms = 0;
@@ -187,9 +187,9 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN && is_second) {
         if (g_state.gesture_double_tap_waiting) {
             if (gesture_is_within_tap_distance(f->x, f->y)) {
-                double_tap_confirm_internal(result);
-                g_state.gesture_second_active = false;
                 TouchFinger* _mf = find_finger(g_state.gesture_main_ptr_id);
+                double_tap_confirm_internal(result, _mf ? &_mf->bindings : &f->bindings);
+                g_state.gesture_second_active = false;
                 if (_mf) {
                     _mf->state = GESTURE_STATE_TAP_WAITING;
                     _mf->cached_has_long_press_timer = false;

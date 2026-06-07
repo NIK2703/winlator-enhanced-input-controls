@@ -102,5 +102,15 @@ bool gesture_is_within_tap_distance(float x, float y);
 void gesture_cancel_double_tap_wait(TouchActionResult* result);
 void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* result);
 void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms);
+void double_tap_confirm_internal(TouchActionResult* result, const FingerBindings* fb);
+
+// Unified tap execution helpers (shared across base.c, entry.c, handler.c)
+void execute_tap_on_finger_down(TouchFinger* f, TouchActionResult* result,
+    uint64_t time_ms, GesturePairPlan plan, bool force_hold);
+bool confirm_double_tap(TouchActionResult* result,
+    GesturePairPlan d_plan,
+    const TouchBinding* src, int src_count,
+    TouchBinding* dst, int* dst_count, int dst_max,
+    bool has_dt_drag, bool* out_post_dtd);
 
 #endif // TOUCH_PROCESSOR_GESTURE_TYPES_H

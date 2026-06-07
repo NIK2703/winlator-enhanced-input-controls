@@ -247,7 +247,6 @@ void handle_touchscreen_down(TouchFinger* f, float x, float y, uint64_t time_ms,
 }
 
 void handle_touchscreen_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
-    int touch_mode = g_state.cfg.touch_mode;
     bool caps_has_toggle_switch = g_state.cfg.caps_has_toggle_switch;
     bool caps_has_track_hover_buttons = g_state.cfg.caps_has_track_hover_buttons;
     int elem_count = g_state.element_count;

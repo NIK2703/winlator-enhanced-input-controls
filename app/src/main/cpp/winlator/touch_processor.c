@@ -40,13 +40,7 @@ void touch_processor_update_config(const TouchProcessorConfig* config) {
         TouchFinger* f = &g_state.fingers[i];
         if (!f->active) continue;
         FingerBindings* fb = &f->bindings;
-        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
-            COPY_FINGER_BINDINGS(fb, &g_state.cfg, ts)
-        } else {
-            COPY_FINGER_BINDINGS(fb, &g_state.cfg, tp)
-            fb->single_tap_drag_count = 0;
-            fb->single_tap_drag_2nd_count = 0;
-        }
+        setup_main_finger_bindings(fb);
         f->bindings_generation = g_state.cfg.bindings_generation;
         touch_finger_cache_bs(f);
     }
@@ -185,13 +179,7 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     // Copy all 12 FingerBindings lists from config
     FingerBindings* fb = &f->bindings;
     if (f->bindings_generation != g_state.cfg.bindings_generation) {
-        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
-            COPY_FINGER_BINDINGS(fb, &g_state.cfg, ts)
-        } else {
-            COPY_FINGER_BINDINGS(fb, &g_state.cfg, tp)
-            fb->single_tap_drag_count = 0;
-            fb->single_tap_drag_2nd_count = 0;
-        }
+        setup_main_finger_bindings(fb);
         f->bindings_generation = g_state.cfg.bindings_generation;
     }
     touch_finger_cache_bs(f);
