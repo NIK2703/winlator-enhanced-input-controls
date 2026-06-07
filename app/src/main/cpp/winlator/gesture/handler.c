@@ -118,6 +118,9 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                 double_tap_confirm_internal(result);
                 f->state = GESTURE_STATE_TAP_WAITING;
                 f->cached_has_long_press_timer = false;
+                f->single_tap_hold_delay_ms = 0;
+                f->single_tap_hold_timer = 0;
+                f->cached_has_moved_beyond_threshold = false;
                 g_state.gesture_main_ptr_id = f->ptr_id;
 
                 // pointer switch — original main finger lifting
@@ -190,6 +193,9 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                 if (_mf) {
                     _mf->state = GESTURE_STATE_TAP_WAITING;
                     _mf->cached_has_long_press_timer = false;
+                    _mf->single_tap_hold_delay_ms = 0;
+                    _mf->single_tap_hold_timer = 0;
+                    _mf->cached_has_moved_beyond_threshold = false;
                     _mf->down_x = _mf->x;
                     _mf->down_y = _mf->y;
                 }

@@ -28,7 +28,7 @@ void double_tap_confirm_internal(TouchActionResult* result) {
             false
         ));
 
-        if (d_plan.hold_delay_ms > 0 || d_plan.pulse_on_up) {
+        if (d_plan.hold_delay_ms > 0 || d_plan.pulse_on_up || !has_dt_drag) {
             g_state.gesture_pending_deferred_double_count = g_state.gesture_pending_double_count;
             for (int _i = 0; _i < g_state.gesture_pending_double_count; _i++)
                 g_state.gesture_pending_deferred_double[_i] = g_state.gesture_pending_double[_i];
@@ -36,11 +36,9 @@ void double_tap_confirm_internal(TouchActionResult* result) {
             execute_actions(result, g_state.gesture_pending_double, g_state.gesture_pending_double_count);
         }
         g_state.gesture_pending_double_count = 0;
-    } else {
-        // Zombie DTW for Dd-only: nothing to fire, but enable post-dtd drag
     }
 
-    g_state.gesture_post_double_tap_drag = true;
+    g_state.gesture_post_double_tap_drag = has_dt || has_dt_drag;
 }
 
 // ---- TS finger-down pre-hold ----
@@ -67,7 +65,7 @@ static void handle_ts_single_tap_hold(TouchFinger* f, TouchActionResult* result,
     } else if (plan.pulse_on_up || plan.press_on_drag) {
         // deferred to check_start_drag / handle_tap_up
     } else {
-        execute_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+        execute_actions_hold(result, f->bindings.single_tap, f->bindings.single_tap_count);
     }
 }
 
@@ -114,6 +112,9 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
             if (dx <= g_state.cfg.double_tap_distance_px && dy <= g_state.cfg.double_tap_distance_px) {
                 double_tap_confirm_internal(result);
                 f->cached_has_long_press_timer = false;
+                f->single_tap_hold_delay_ms = 0;
+                f->single_tap_hold_timer = 0;
+                f->cached_has_moved_beyond_threshold = false;
                 f->state = GESTURE_STATE_TAP_WAITING;
                 return;
             } else {
@@ -193,12 +194,14 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
                     if (_mf->active && _mf->ptr_id == g_state.gesture_main_ptr_id) {
                         _mf->state = GESTURE_STATE_TAP_WAITING;
                         _mf->cached_has_long_press_timer = false;
+                        _mf->single_tap_hold_delay_ms = 0;
+                        _mf->single_tap_hold_timer = 0;
+                        _mf->cached_has_moved_beyond_threshold = false;
                         _mf->down_x = _mf->x;
                         _mf->down_y = _mf->y;
                         break;
                     }
                 }
-                g_state.gesture_post_double_tap_drag = true;
                 g_state.gesture_second_active = false;
                 g_state.gesture_second_ptr_id = -1;
                 f->state = GESTURE_STATE_IDLE;

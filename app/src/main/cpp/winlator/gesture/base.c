@@ -55,9 +55,8 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         gesture_clear_pending_long_press();
         if (f->cached_has_active_long_press_drag) {
             drag_binding = fb->long_press_drag; drag_count = fb->long_press_drag_count;
-        } else if (f->cached_has_active_long_press) {
-            drag_binding = fb->long_press; drag_count = fb->long_press_count;
         } else {
+            f->state = GESTURE_STATE_DRAGGING;
             return;
         }
     } else if (g_state.gesture_post_double_tap_drag) {
@@ -89,6 +88,8 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
             if (!resolve_drag_fallback(&drag_binding, &drag_count, dd, dd_c, dt, dt_c, st, st_c)) {
                 g_state.gesture_post_double_tap_drag = false; return;
             }
+            if (drag_binding == dt)
+                g_state.gesture_pending_deferred_double_count = 0;
         }
         g_state.gesture_post_double_tap_drag = false;
         gesture_clear_deferred_tap();
@@ -139,7 +140,8 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
             drag_binding = fb->single_tap_drag; drag_count = fb->single_tap_drag_count;
         } else if (f->cached_has_active_single_tap
                    && (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag
-                       || f->cached_has_long_press_timer)) {
+                       || f->cached_has_long_press_timer)
+                   && !g_state.gesture_is_action_held) {
             // press_on_drag: S without Sd + competing D/Dd or L/Ld
             drag_binding = fb->single_tap; drag_count = fb->single_tap_count;
         } else {

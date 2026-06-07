@@ -82,9 +82,8 @@ static inline GesturePairPlan gesture_decide_branch(GestureBranchParams bp) {
             p.pulse_on_up = true;
         } else if (bp.is_ts && bp.hold_delay_ms > 0 && !bp.is_second) {
             p.hold_delay_ms = bp.hold_delay_ms;
-        } else if (bp.is_single_tap_pair && !bp.is_second) {
-            p.pulse_on_up = true;
         } else {
+            // S-only, no competition, no hold: execute immediately (caller will hold)
             // execute immediately
         }
         return p;
