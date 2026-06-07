@@ -40,6 +40,25 @@ typedef struct {
     int modifiers; // 1 = sticky (hold on press), 0 = tap (press+release)
 } TouchBinding;
 
+typedef enum {
+    GESTURE_SINGLE_TAP,
+    GESTURE_LONG_PRESS,
+    GESTURE_DOUBLE_TAP,
+    GESTURE_SINGLE_TAP_DRAG,
+    GESTURE_LONG_PRESS_DRAG,
+    GESTURE_DOUBLE_TAP_DRAG,
+    GESTURE_SINGLE_2ND,
+    GESTURE_DOUBLE_2ND,
+    GESTURE_SINGLE_DRAG_2ND,
+    GESTURE_DOUBLE_DRAG_2ND,
+    GESTURE_TYPE_COUNT
+} GestureType;
+
+typedef struct {
+    TouchBinding arr[8];
+    int count;
+} GestureBindingSlot;
+
 // --- Element types ---
 typedef enum {
     ELEM_BUTTON, ELEM_DPAD, ELEM_RANGE_BUTTON, ELEM_STICK, ELEM_TRACKPAD
@@ -55,31 +74,47 @@ typedef enum {
 
 // --- Element state ---
 typedef struct {
+    // --- HOT fields (accessed on every touch event) ---
     ElementType type;
     ElementShape shape;
+    ActivationMode activation_mode;
     int current_ptr_id;
-    uint64_t down_time_ms;
     bool engaged;
-    bool long_press_arm;
-    bool gesture_long_press_triggered;
-    int range_ordinal;
-    int range_index;
-    int element_long_press_count;
-    TouchBinding element_long_press[8];
+    bool passthrough_touch;
+    bool toggle_switch;
+    bool gesture_suppressed;
+    bool auto_repeat;
+    int x, y;
+    float hw, hh;
+    float w, h;
+    float scale;
     TouchBinding bindings[4];
 
-    int x, y;
-    float w, h;
-    float hw, hh;
-    float scale;
-    bool passthrough_touch;
-    ActivationMode activation_mode;
+    // --- WARM fields (gesture/timer paths) ---
+    bool long_press_arm;
+    bool gesture_long_press_triggered;
+    bool gesture_swipe_triggered;
+    bool gesture_timer_armed;
+    int gesture_swipe_direction;
+    int primary_sticky_mask;
+    bool selected;
+    int button_long_press_haptic;
+    int button_gesture_haptic;
+    int auto_repeat_interval_ms;
+    uint64_t auto_repeat_last_time;
+    bool auto_repeat_primary_pressed;
+    uint64_t down_time_ms;
     float down_x, down_y;
-    bool petal_active[MAX_PETALS];
-    float stick_value_x, stick_value_y;
-    float trackpad_last_x, trackpad_last_y;
-    float trackpad_vel_x, trackpad_vel_y;
-    uint64_t trackpad_last_time;
+
+    // --- Element long-press and gesture bindings ---
+    int element_long_press_count;
+    TouchBinding element_long_press[8];
+    int element_gesture_count;
+    TouchBinding element_gesture[8];
+
+    // --- Range button state ---
+    int range_ordinal;
+    int range_index;
     int range_max;
     int range_binding_count;
     int range_orientation;
@@ -92,27 +127,24 @@ typedef struct {
     bool range_pending_tap_release;
     uint64_t range_tap_release_time;
     int range_initial_kc;
-    TouchBinding element_gesture[8];  int element_gesture_count;
 
-    int primary_sticky_mask;
-    bool toggle_switch;
-    bool selected;
-    int button_long_press_haptic;
-    int button_gesture_haptic;
-    int gesture_swipe_direction;
-    bool gesture_swipe_triggered;
-    bool gesture_timer_armed;
-    bool gesture_suppressed;
+    // --- Stick/trackpad state ---
+    bool petal_active[MAX_PETALS];
+    float stick_value_x, stick_value_y;
+    float trackpad_last_x, trackpad_last_y;
+    float trackpad_vel_x, trackpad_vel_y;
+    uint64_t trackpad_last_time;
 
-    // Auto-repeat (toggle primary binding at configured rate while held)
-    bool auto_repeat;
-    int auto_repeat_interval_ms;
-    uint64_t auto_repeat_last_time;
-    bool auto_repeat_primary_pressed;
-
+    // --- Render state (cold, accessed only during visual sync) ---
     bool visual_active;
     float visual_x;
     float visual_y;
+    float opacity;
+    float corner_radius;
+    uint32_t color_primary;
+    uint32_t color_secondary;
+    float stroke_width;
+    int fill_alpha_inactive;
 } TouchElement;
 
 // --- Gesture handler types ---
@@ -235,31 +267,16 @@ typedef struct {
     int gesture_long_press_haptic;
     bool haptic_enabled;
 
-    // Gesture bindings — touchscreen
-    TouchBinding ts_single_tap[8];       int ts_single_tap_count;
-    TouchBinding ts_long_press[8];       int ts_long_press_count;
-    TouchBinding ts_double_tap[8];       int ts_double_tap_count;
-    TouchBinding ts_single_tap_drag[8];  int ts_single_tap_drag_count;
-    TouchBinding ts_long_press_drag[8];  int ts_long_press_drag_count;
-    TouchBinding ts_double_tap_drag[8];  int ts_double_tap_drag_count;
-    // Second finger
-    TouchBinding ts_single_2nd[8];       int ts_single_2nd_count;
-    TouchBinding ts_double_2nd[8];       int ts_double_2nd_count;
-    TouchBinding ts_single_drag_2nd[8];  int ts_single_drag_2nd_count;
-    TouchBinding ts_double_drag_2nd[8];  int ts_double_drag_2nd_count;
-
-    // Gesture bindings — touchpad
-    TouchBinding tp_single_tap[8];       int tp_single_tap_count;
-    TouchBinding tp_long_press[8];       int tp_long_press_count;
-    TouchBinding tp_double_tap[8];       int tp_double_tap_count;
-    TouchBinding tp_single_tap_drag[8];  int tp_single_tap_drag_count;
-    TouchBinding tp_long_press_drag[8];  int tp_long_press_drag_count;
-    TouchBinding tp_double_tap_drag[8];  int tp_double_tap_drag_count;
-    TouchBinding tp_single_2nd[8];       int tp_single_2nd_count;
-    TouchBinding tp_double_2nd[8];       int tp_double_2nd_count;
-    TouchBinding tp_single_drag_2nd[8];  int tp_single_drag_2nd_count;
-    TouchBinding tp_double_drag_2nd[8];  int tp_double_drag_2nd_count;
+    // Gesture bindings — indexed by GestureType
+    GestureBindingSlot ts[GESTURE_TYPE_COUNT];
+    GestureBindingSlot tp[GESTURE_TYPE_COUNT];
     uint32_t bindings_generation;
+
+    // Render config (shared across all elements)
+    uint32_t color_primary;       // default 0xFFFFFFFF (white)
+    uint32_t color_secondary;     // default 0xFF0277BD (blue)
+    float stroke_width_default;   // default 0.2f
+    int fill_alpha_inactive_default; // default 50
 
     // Pre-computed gesture capability flags (set by compute_gesture_caps)
     bool caps_has_gesture_bindings;
@@ -273,40 +290,31 @@ typedef struct {
 
 // Compute gesture capability flags from a TouchProcessorConfig
 static inline void compute_gesture_caps(TouchProcessorConfig* cfg) {
-    bool has_ts = cfg->ts_single_tap_count > 0 || cfg->ts_long_press_count > 0 ||
-                  cfg->ts_double_tap_count > 0 || cfg->ts_single_tap_drag_count > 0 ||
-                  cfg->ts_long_press_drag_count > 0 || cfg->ts_double_tap_drag_count > 0 ||
-                  cfg->ts_single_2nd_count > 0 || cfg->ts_double_2nd_count > 0 ||
-                  cfg->ts_single_drag_2nd_count > 0 || cfg->ts_double_drag_2nd_count > 0;
-    bool has_tp = cfg->tp_single_tap_count > 0 || cfg->tp_long_press_count > 0 ||
-                  cfg->tp_double_tap_count > 0 || cfg->tp_single_tap_drag_count > 0 ||
-                  cfg->tp_long_press_drag_count > 0 || cfg->tp_double_tap_drag_count > 0 ||
-                  cfg->tp_single_2nd_count > 0 || cfg->tp_double_2nd_count > 0 ||
-                  cfg->tp_single_drag_2nd_count > 0 || cfg->tp_double_drag_2nd_count > 0;
-    cfg->caps_has_gesture_bindings = has_ts || has_tp;
-    cfg->caps_has_drag_bindings = cfg->ts_single_tap_drag_count > 0 ||
-                                  cfg->ts_long_press_drag_count > 0 ||
-                                  cfg->ts_double_tap_drag_count > 0 ||
-                                  cfg->ts_single_drag_2nd_count > 0 ||
-                                  cfg->ts_double_drag_2nd_count > 0 ||
-                                  cfg->tp_single_tap_drag_count > 0 ||
-                                  cfg->tp_long_press_drag_count > 0 ||
-                                  cfg->tp_double_tap_drag_count > 0 ||
-                                  cfg->tp_single_drag_2nd_count > 0 ||
-                                  cfg->tp_double_drag_2nd_count > 0;
-    cfg->caps_has_double_tap = cfg->ts_double_tap_count > 0 ||
-                               cfg->ts_double_2nd_count > 0 ||
-                               cfg->tp_double_tap_count > 0 ||
-                               cfg->tp_double_2nd_count > 0 ||
-                               cfg->ts_double_tap_drag_count > 0 ||
-                               cfg->ts_double_drag_2nd_count > 0 ||
-                               cfg->tp_double_tap_drag_count > 0 ||
-                               cfg->tp_double_drag_2nd_count > 0;
-    cfg->caps_has_long_press = cfg->ts_long_press_count > 0 ||
-                               cfg->tp_long_press_count > 0;
-    cfg->caps_has_long_press_timer = cfg->caps_has_long_press ||
-                                     cfg->ts_long_press_drag_count > 0 ||
-                                     cfg->tp_long_press_drag_count > 0;
+    cfg->caps_has_gesture_bindings = false;
+    cfg->caps_has_drag_bindings = false;
+    cfg->caps_has_double_tap = false;
+    cfg->caps_has_long_press = false;
+    cfg->caps_has_long_press_timer = false;
+
+    for (int m = 0; m < 2; m++) {
+        GestureBindingSlot* slots = (m == 0) ? cfg->ts : cfg->tp;
+        for (int g = 0; g < GESTURE_TYPE_COUNT; g++) {
+            if (slots[g].count > 0) {
+                cfg->caps_has_gesture_bindings = true;
+                if (g == GESTURE_SINGLE_TAP_DRAG || g == GESTURE_LONG_PRESS_DRAG ||
+                    g == GESTURE_DOUBLE_TAP_DRAG || g == GESTURE_SINGLE_DRAG_2ND ||
+                    g == GESTURE_DOUBLE_DRAG_2ND)
+                    cfg->caps_has_drag_bindings = true;
+                if (g == GESTURE_DOUBLE_TAP || g == GESTURE_DOUBLE_2ND ||
+                    g == GESTURE_DOUBLE_TAP_DRAG || g == GESTURE_DOUBLE_DRAG_2ND)
+                    cfg->caps_has_double_tap = true;
+                if (g == GESTURE_LONG_PRESS)
+                    cfg->caps_has_long_press = true;
+                if (g == GESTURE_LONG_PRESS || g == GESTURE_LONG_PRESS_DRAG)
+                    cfg->caps_has_long_press_timer = true;
+            }
+        }
+    }
 }
 
 // --- Output actions ---

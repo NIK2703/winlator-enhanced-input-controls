@@ -16,8 +16,9 @@ VulkanRendererContext::VulkanRendererContext(ANativeWindow* win, int cW, int cH,
     createInstance(); createSurface(); pickPhysicalDevice(); createLogicalDevice();
     createSwapchain(); createRenderPass(); createDSLayout();
     createPipeline(false, pipeline); createCursorPipeline();
+    createElementOverlayPipeline();
     createFramebuffers(); createCmdPool(); createSampler();
-    createWinTexPool(); createCursorDS(); createCmdBufs(); createSyncObjects();
+    createWinTexPool(); createCursorDS(); createElementOverlayDS(); createCmdBufs(); createSyncObjects();
     VkFenceCreateInfo ofi{}; ofi.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO; ofi.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     if (vk_.CreateFence(device, &ofi, nullptr, &oneTimeFence) != VK_SUCCESS) {
         throw std::runtime_error("oneTimeFence");
@@ -34,11 +35,13 @@ VulkanRendererContext::~VulkanRendererContext() {
     for (auto& [id, wt] : texMap) destroyWinTex(wt);
     texMap.clear();
     cleanupSwapchain(); cleanupCursorTex();
+    cleanupElementOverlay();
     cleanupAllAHBCache();
     vk_.DestroySampler(device, sampler, nullptr);
     vk_.DestroyDescriptorPool(device, winTexPool, nullptr);
     if (cursorPool != VK_NULL_HANDLE) vk_.DestroyDescriptorPool(device, cursorPool, nullptr);
     if (cursorPipe != VK_NULL_HANDLE) vk_.DestroyPipeline(device, cursorPipe, nullptr);
+    if (elementOverlayPipe != VK_NULL_HANDLE) vk_.DestroyPipeline(device, elementOverlayPipe, nullptr);
     vk_.DestroyPipeline(device, pipeline, nullptr);
     vk_.DestroyPipelineLayout(device, pipeLayout, nullptr);
     vk_.DestroyDescriptorSetLayout(device, dsLayout, nullptr);
@@ -420,6 +423,173 @@ void VulkanRendererContext::createCursorDS() {
     ai.descriptorPool=cursorPool; ai.descriptorSetCount=1; ai.pSetLayouts=&dsLayout;
     vk_.AllocateDescriptorSets(device,&ai,&cursorDS);
 }
+void VulkanRendererContext::createElementOverlayPipeline() {
+    createPipeline(true, elementOverlayPipe);
+}
+
+void VulkanRendererContext::createElementOverlayDS() {
+    VkDescriptorPoolSize ps{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1};
+    VkDescriptorPoolCreateInfo ci{};
+    ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    ci.poolSizeCount = 1;
+    ci.pPoolSizes = &ps;
+    ci.maxSets = 1;
+    if (vk_.CreateDescriptorPool(device, &ci, nullptr, &elementOverlayPool) != VK_SUCCESS) {
+        RLOG_E("createElementOverlayDS: pool failed");
+        return;
+    }
+    VkDescriptorSetAllocateInfo ai{};
+    ai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    ai.descriptorPool = elementOverlayPool;
+    ai.descriptorSetCount = 1;
+    ai.pSetLayouts = &dsLayout;
+    if (vk_.AllocateDescriptorSets(device, &ai, &elementOverlayDS) != VK_SUCCESS) {
+        RLOG_E("createElementOverlayDS: allocate failed");
+    }
+}
+
+void VulkanRendererContext::ensureElementOverlayTex(int w, int h) {
+    if (elementOverlayW == w && elementOverlayH == h && elementOverlayImg != VK_NULL_HANDLE)
+        return;
+    if (elementOverlayImg != VK_NULL_HANDLE) {
+        vk_.DeviceWaitIdle(device);
+        cleanupElementOverlay();
+    }
+    elementOverlayW = w;
+    elementOverlayH = h;
+
+    VkImageCreateInfo ii{};
+    ii.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    ii.imageType = VK_IMAGE_TYPE_2D;
+    ii.format = VK_FORMAT_R8G8B8A8_UNORM;
+    ii.extent = {(uint32_t)w, (uint32_t)h, 1};
+    ii.mipLevels = 1;
+    ii.arrayLayers = 1;
+    ii.samples = VK_SAMPLE_COUNT_1_BIT;
+    ii.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ii.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    ii.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (vk_.CreateImage(device, &ii, nullptr, &elementOverlayImg) != VK_SUCCESS) {
+        RLOG_E("ensureElementOverlayTex: create image failed");
+        return;
+    }
+
+    VkMemoryRequirements mr;
+    vk_.GetImageMemoryRequirements(device, elementOverlayImg, &mr);
+    VkMemoryAllocateInfo ai{};
+    ai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    ai.allocationSize = mr.size;
+    ai.memoryTypeIndex = findMemType(mr.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (vk_.AllocateMemory(device, &ai, nullptr, &elementOverlayMem) != VK_SUCCESS) {
+        RLOG_E("ensureElementOverlayTex: alloc mem failed");
+        return;
+    }
+    vk_.BindImageMemory(device, elementOverlayImg, elementOverlayMem, 0);
+
+    VkImageViewCreateInfo ivi{};
+    ivi.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    ivi.image = elementOverlayImg;
+    ivi.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ivi.format = VK_FORMAT_R8G8B8A8_UNORM;
+    ivi.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    if (vk_.CreateImageView(device, &ivi, nullptr, &elementOverlayView) != VK_SUCCESS) {
+        RLOG_E("ensureElementOverlayTex: create view failed");
+        return;
+    }
+
+    VkDescriptorImageInfo di{};
+    di.sampler = sampler;
+    di.imageView = elementOverlayView;
+    di.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    VkWriteDescriptorSet wd{};
+    wd.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    wd.dstSet = elementOverlayDS;
+    wd.dstBinding = 0;
+    wd.descriptorCount = 1;
+    wd.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    wd.pImageInfo = &di;
+    vk_.UpdateDescriptorSets(device, 1, &wd, 0, nullptr);
+
+    // Transition image to SHADER_READ_ONLY initially
+    VkCommandBuffer cmd = beginOneTime();
+    VkImageMemoryBarrier b{};
+    b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    b.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    b.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    b.srcQueueFamilyIndex = b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    b.image = elementOverlayImg;
+    b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    b.srcAccessMask = 0;
+    b.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vk_.CmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        0, 0, nullptr, 0, nullptr, 1, &b);
+    endOneTime(cmd);
+    RLOG("ensureElementOverlayTex: %dx%d created", w, h);
+}
+
+void VulkanRendererContext::ensureElementOverlayStaging(VkDeviceSize sz) {
+    if (elementOverlayStgC >= sz && elementOverlayStg != VK_NULL_HANDLE) return;
+    if (elementOverlayStg != VK_NULL_HANDLE) {
+        vk_.DestroyBuffer(device, elementOverlayStg, nullptr);
+        vk_.FreeMemory(device, elementOverlayStgM, nullptr);
+        elementOverlayStg = VK_NULL_HANDLE;
+        elementOverlayStgM = VK_NULL_HANDLE;
+        elementOverlayStgP = nullptr;
+        elementOverlayStgC = 0;
+    }
+    createBuffer(sz,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        elementOverlayStg, elementOverlayStgM);
+    vk_.MapMemory(device, elementOverlayStgM, 0, sz, 0, &elementOverlayStgP);
+    elementOverlayStgC = sz;
+    RLOG("ensureElementOverlayStaging: %zu bytes", (size_t)sz);
+}
+
+void VulkanRendererContext::cleanupElementOverlay() {
+    if (elementOverlayStg != VK_NULL_HANDLE) {
+        vk_.DestroyBuffer(device, elementOverlayStg, nullptr);
+        vk_.FreeMemory(device, elementOverlayStgM, nullptr);
+        elementOverlayStg = VK_NULL_HANDLE;
+        elementOverlayStgM = VK_NULL_HANDLE;
+        elementOverlayStgP = nullptr;
+        elementOverlayStgC = 0;
+    }
+    if (elementOverlayView != VK_NULL_HANDLE) {
+        vk_.DestroyImageView(device, elementOverlayView, nullptr);
+        elementOverlayView = VK_NULL_HANDLE;
+    }
+    if (elementOverlayImg != VK_NULL_HANDLE) {
+        vk_.DestroyImage(device, elementOverlayImg, nullptr);
+        elementOverlayImg = VK_NULL_HANDLE;
+    }
+    if (elementOverlayMem != VK_NULL_HANDLE) {
+        vk_.FreeMemory(device, elementOverlayMem, nullptr);
+        elementOverlayMem = VK_NULL_HANDLE;
+    }
+    if (elementOverlayPool != VK_NULL_HANDLE) {
+        vk_.DestroyDescriptorPool(device, elementOverlayPool, nullptr);
+        elementOverlayPool = VK_NULL_HANDLE;
+        elementOverlayDS = VK_NULL_HANDLE;
+    }
+    elementOverlayW = 0;
+    elementOverlayH = 0;
+    RLOG("cleanupElementOverlay done");
+}
+
+void VulkanRendererContext::updateElementOverlay(void* pixels, int w, int h) {
+    if (w <= 0 || h <= 0 || !pixels) return;
+    ensureElementOverlayTex(w, h);
+    if (elementOverlayImg == VK_NULL_HANDLE) return;
+    VkDeviceSize sz = (VkDeviceSize)w * h * 4;
+    ensureElementOverlayStaging(sz);
+    memcpy(elementOverlayStgP, pixels, (size_t)sz);
+    elementOverlayDirty.store(true);
+}
+
 void VulkanRendererContext::createCmdBufs() {
     cmdBufs.resize(MAX_FRAMES_IN_FLIGHT);
     VkCommandBufferAllocateInfo ai{}; ai.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -755,6 +925,40 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
         b.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT; b.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
         postOptimal.push_back(b);
     }
+
+    // --- ELEMENT OVERLAY UPLOAD (if dirty) ---
+    bool hasElemOverlayCopy = elementOverlayDirty.load() &&
+        elementOverlayImg != VK_NULL_HANDLE &&
+        elementOverlayStg != VK_NULL_HANDLE &&
+        elementOverlayW > 0 && elementOverlayH > 0;
+    if (hasElemOverlayCopy) {
+        elementOverlayDirty.store(false);
+        VkImageMemoryBarrier b{}; b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        b.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        b.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        b.srcQueueFamilyIndex = b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        b.image = elementOverlayImg;
+        b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        b.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        b.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        vk_.CmdPipelineBarrier(cb,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0, 0, nullptr, 0, nullptr, 1, &b);
+
+        VkBufferImageCopy r{};
+        r.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        r.imageExtent = {(uint32_t)elementOverlayW, (uint32_t)elementOverlayH, 1};
+        vk_.CmdCopyBufferToImage(cb, elementOverlayStg, elementOverlayImg,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &r);
+
+        b.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        b.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        b.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        b.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        postOptimal.push_back(b);
+    }
+
     if (!postOptimal.empty())
         vk_.CmdPipelineBarrier(cb,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             0,0,nullptr,0,nullptr,(uint32_t)postOptimal.size(),postOptimal.data());
@@ -799,6 +1003,27 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
         vk_.CmdPushConstants(cb,pipeLayout,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(cpc),&cpc);
         vk_.CmdDraw(cb,4,1,0,0);
     }
+
+    // --- ELEMENT OVERLAY DRAW (full-screen, with blending) ---
+    if (elementOverlayImg != VK_NULL_HANDLE && elementOverlayDS != VK_NULL_HANDLE) {
+        vk_.CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, elementOverlayPipe);
+        vk_.CmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeLayout, 0, 1, &elementOverlayDS, 0, nullptr);
+
+        WindowPushConstants epc{};
+        epc.ndcX0 = -1.0f;
+        epc.ndcY0 = -1.0f;
+        epc.ndcX1 = 1.0f;
+        epc.ndcY1 = 1.0f;
+        epc.effectId = 0;
+        epc.sharpness = 0.5f;
+        epc.resW = (float)elementOverlayW;
+        epc.resH = (float)elementOverlayH;
+        vk_.CmdPushConstants(cb, pipeLayout,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            0, sizeof(epc), &epc);
+        vk_.CmdDraw(cb, 4, 1, 0, 0);
+    }
+
     vk_.CmdEndRenderPass(cb);
     VkResult endStatus = vk_.EndCommandBuffer(cb);
     if (endStatus!=VK_SUCCESS) {
@@ -812,13 +1037,20 @@ void VulkanRendererContext::renderLoop() {
 
     while (isRunning) {
         { std::unique_lock<std::mutex> lk(dirtyMutex);
-          dirtyCV.wait_for(lk,std::chrono::milliseconds(2),[this]{
-              return !isRunning||(!surfaceDetached.load()&&(needsRender.load()||fbResized.load()))||cursorMoved.load(); }); }
+          dirtyCV.wait(lk,[this]{
+              return !isRunning||vsyncSignaled.load()||
+                  (!surfaceDetached.load()&&(needsRender.load()||fbResized.load()))||
+                  cursorMoved.load(); }); }
         if (!isRunning) break;
 
         if (swapchain == VK_NULL_HANDLE || cmdBufs.empty()) continue;
         try { renderFrame(); } catch(...) {}
     }
+}
+
+void VulkanRendererContext::onVsync() {
+    vsyncSignaled.store(true, std::memory_order_release);
+    dirtyCV.notify_one();
 }
 
 void VulkanRendererContext::flushDeleteQueue() {
@@ -841,6 +1073,7 @@ void VulkanRendererContext::flushDeleteQueue() {
 void VulkanRendererContext::renderFrame() {
     std::shared_lock<std::shared_mutex> frameLock(frameMutex);
 
+    vsyncSignaled.store(false,std::memory_order_relaxed);
     needsRender.store(false,std::memory_order_relaxed);
     cursorMoved.store(false,std::memory_order_relaxed);
     if (surfaceDetached.load(std::memory_order_acquire)) return;

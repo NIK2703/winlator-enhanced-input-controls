@@ -56,6 +56,16 @@
                 android:src="@drawable/icon_star_outline" />
         </LinearLayout>
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textStyle="bold"
+            android:text="@string/visual_style"
+            android:textColor="@color/colorPrimary"
+            android:layout_marginTop="8dp" />
+
+        <View style="@style/HorizontalLine" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -66,7 +76,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/overlay_opacity"/>
+                android:text="@string/overlay_opacity"
+                android:textColor="@color/material_grey_600"/>
 
             <TextView
                 android:id="@+id/TVUiOpacity"
@@ -91,7 +102,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Stroke Width"/>
+                android:text="Stroke Width"
+                android:textColor="@color/material_grey_600"/>
 
             <TextView
                 android:id="@+id/TVStrokeWidth"
@@ -115,7 +127,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Inactive Fill Alpha"/>
+                android:text="Inactive Fill Alpha"
+                android:textColor="@color/material_grey_600"/>
 
             <TextView
                 android:id="@+id/TVFillAlphaInactive"
@@ -139,7 +152,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Corner Radius"/>
+                android:text="Corner Radius"
+                android:textColor="@color/material_grey_600"/>
 
             <TextView
                 android:id="@+id/TVCornerRadius"
@@ -151,8 +165,10 @@
             android:id="@+id/SBCornerRadius"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:max="100"
+            android:max="20"
             android:progress="8" />
+
+        <View style="@style/HorizontalLine" />
 
         <LinearLayout
             android:layout_width="match_parent"

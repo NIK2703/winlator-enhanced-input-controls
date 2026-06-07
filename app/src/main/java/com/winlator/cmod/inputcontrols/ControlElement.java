@@ -182,6 +182,7 @@ public class ControlElement {
             bindings.add(new ArrayList<Binding>());
             bindingSticky.add(new ArrayList<Boolean>());
         }
+        currentPosition = new PointF();
         refreshProfileCache();
     }
 
@@ -780,6 +781,8 @@ public class ControlElement {
     }
 
     public void invalidateElementCachesKeepDisk() {
+        refreshProfileCache();
+        dpadPathEffect = null;
         cacheCombined = null;
         cacheFill = null;
         dpadPetalStroke = null;
@@ -899,6 +902,7 @@ public class ControlElement {
     }
 
     private void saveToDisk(String key, Bitmap bitmap) {
+        if (com.winlator.cmod.widget.InputControlsView.skipDiskCache) return;
         try (FileOutputStream out = new FileOutputStream(new File(cacheDir(), key + ".png"))) {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
         } catch (Exception e) {
@@ -1275,7 +1279,7 @@ public class ControlElement {
             }
 
             // 2. Fill under shape (non-engaged, non-BUTTON) — subtle background wash
-            if (type != Type.TRACKPAD && type != Type.STICK && type != Type.BUTTON) {
+            if (type != Type.TRACKPAD && type != Type.STICK && type != Type.BUTTON && type != Type.RANGE_BUTTON) {
                 int targetAlpha = fillAlphaInactive();
                 if (targetAlpha > 0) {
                     ensureFillCache();
@@ -1849,7 +1853,6 @@ public class ControlElement {
             states[2] = petalDown;
             states[3] = petalLeft;
         }
-        if (currentPosition == null) currentPosition = new android.graphics.PointF();
         currentPosition.set(posX, posY);
         if (type == Type.RANGE_BUTTON && scroller != null) {
             scroller.updateVisualState(active, posX, posY, rangeScrollOffset);
@@ -1857,9 +1860,6 @@ public class ControlElement {
     }
 
     public PointF getCurrentPosition() {
-        if (currentPosition == null) {
-            currentPosition = new PointF(x, y); // Initialize to the center (same as outer circle)
-        }
         return currentPosition;
     }
 

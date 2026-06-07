@@ -1,13 +1,15 @@
 package com.winlator.cmod.xserver.events;
 
 import com.winlator.cmod.xconnector.XOutputStream;
-import com.winlator.cmod.xconnector.XStreamLock;
 import com.winlator.cmod.xserver.Bitmask;
 import com.winlator.cmod.xserver.Window;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 public class InputDeviceEvent extends Event {
+    private static final ByteBuffer eventBuf = ByteBuffer.allocateDirect(32);
+
     private final byte detail;
     private final int timestamp;
     private final Window root;
@@ -35,21 +37,23 @@ public class InputDeviceEvent extends Event {
 
     @Override
     public void send(short sequenceNumber, XOutputStream outputStream) throws IOException {
-        try (XStreamLock lock = outputStream.lock()) {
-            outputStream.writeByte(code);
-            outputStream.writeByte(detail);
-            outputStream.writeShort(sequenceNumber);
-            outputStream.writeInt(timestamp);
-            outputStream.writeInt(root.id);
-            outputStream.writeInt(event.id);
-            outputStream.writeInt(child != null ? child.id : 0);
-            outputStream.writeShort(rootX);
-            outputStream.writeShort(rootY);
-            outputStream.writeShort(eventX);
-            outputStream.writeShort(eventY);
-            outputStream.writeShort((short)state.getBits());
-            outputStream.writeByte((byte)1);
-            outputStream.writeByte((byte)0);
-        }
+        eventBuf.clear();
+        eventBuf.order(outputStream.buffer.order());
+        eventBuf.put((byte)code);
+        eventBuf.put(detail);
+        eventBuf.putShort(sequenceNumber);
+        eventBuf.putInt(timestamp);
+        eventBuf.putInt(root.id);
+        eventBuf.putInt(event.id);
+        eventBuf.putInt(child != null ? child.id : 0);
+        eventBuf.putShort(rootX);
+        eventBuf.putShort(rootY);
+        eventBuf.putShort(eventX);
+        eventBuf.putShort(eventY);
+        eventBuf.putShort((short)state.getBits());
+        eventBuf.put((byte)1);
+        eventBuf.put((byte)0);
+        eventBuf.flip();
+        outputStream.clientSocket.write(eventBuf);
     }
 }

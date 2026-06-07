@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:background="@color/content_dialog_background_dark">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Profile Settings"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="@color/colorPrimary"
+            android:layout_marginBottom="8dp" />
+
+        <View style="@style/VerticalLine" android:layout_marginVertical="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Overlay Opacity"
+                android:textColor="@color/material_grey_600" />
+
+            <TextView
+                android:id="@+id/TVPopupOpacity"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/SBPopupOpacity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:min="10"
+            android:max="100" />
+
+        <View style="@style/VerticalLine" android:layout_marginVertical="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Stroke Width"
+                android:textColor="@color/material_grey_600" />
+
+            <TextView
+                android:id="@+id/TVPopupStrokeWidth"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/SBPopupStrokeWidth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="45" />
+
+        <View style="@style/VerticalLine" android:layout_marginVertical="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Inactive Fill Alpha"
+                android:textColor="@color/material_grey_600" />
+
+            <TextView
+                android:id="@+id/TVPopupFillAlpha"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/SBPopupFillAlpha"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="64" />
+
+        <View style="@style/VerticalLine" android:layout_marginVertical="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Corner Radius"
+                android:textColor="@color/material_grey_600" />
+
+            <TextView
+                android:id="@+id/TVPopupCornerRadius"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/SBPopupCornerRadius"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="20" />
+
+    </LinearLayout>
+</ScrollView>

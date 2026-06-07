@@ -31,6 +31,14 @@ static inline void start_drag_no_binding(TouchFinger* f) {
     f->state = GESTURE_STATE_DRAGGING;
 }
 
+static bool bindings_equal(const TouchBinding* a, int a_count, const TouchBinding* b, int b_count) {
+    if (a_count != b_count) return false;
+    for (int i = 0; i < a_count; i++)
+        if (a[i].type != b[i].type || a[i].keycode != b[i].keycode)
+            return false;
+    return true;
+}
+
 // Full drag start with binding: compare against currently-held actions,
 // release old if different, hold new, then transition.
 static inline void start_drag_with_binding(TouchFinger* f,
@@ -39,15 +47,8 @@ static inline void start_drag_with_binding(TouchFinger* f,
 {
     bool same_as_held = g_state.gesture_is_action_held;
     if (same_as_held && drag_binding && g_state.gesture_held_count > 0) {
-        same_as_held = (drag_count == g_state.gesture_held_count);
-        if (same_as_held) {
-            for (int _i = 0; _i < drag_count && _i < g_state.gesture_held_count; _i++) {
-                if (drag_binding[_i].type != g_state.gesture_held_actions[_i].type ||
-                    drag_binding[_i].keycode != g_state.gesture_held_actions[_i].keycode) {
-                    same_as_held = false; break;
-                }
-            }
-        }
+        same_as_held = bindings_equal(drag_binding, drag_count,
+                        g_state.gesture_held_actions, g_state.gesture_held_count);
     }
     if (!same_as_held) {
         release_held_actions(result);
@@ -149,8 +150,8 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         const TouchBinding* sd = f->bindings.single_tap_drag;
         int sd_count = f->bindings.single_tap_drag_count;
         if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD) {
-            sd = g_state.cfg.tp_single_drag_2nd;
-            sd_count = g_state.cfg.tp_single_drag_2nd_count;
+            sd = g_state.cfg.tp[GESTURE_SINGLE_DRAG_2ND].arr;
+            sd_count = g_state.cfg.tp[GESTURE_SINGLE_DRAG_2ND].count;
         }
         if (!resolve_drag_binding(
                 sd, sd_count,
@@ -299,12 +300,12 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
         TouchFinger* f = &g_state.fingers[i];
         if (!f->active || !f->single_tap_deferred) {
             if (f->single_tap_deferred && !f->active)
-                __android_log_print(ANDROID_LOG_WARN, LOG_TAG, "gesture_tick: deferred tap SKIPPED finger[%d] active=%d ptr=%d",
+                TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "gesture_tick: deferred tap SKIPPED finger[%d] active=%d ptr=%d",
                     i, f->active, f->ptr_id);
             continue;
         }
         if (time_ms >= f->single_tap_deferred_time) {
-            __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "gesture_tick: processing deferred tap finger[%d] ptr=%d",
+            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "gesture_tick: processing deferred tap finger[%d] ptr=%d",
                 i, f->ptr_id);
             f->single_tap_deferred = false;
             handle_tap_up_impl(f, result, time_ms);

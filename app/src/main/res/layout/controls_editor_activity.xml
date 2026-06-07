@@ -61,5 +61,12 @@
             style="@style/ToolButton"
             android:src="@drawable/icon_settings"  />
 
+        <View style="@style/VerticalLine" />
+
+        <ImageButton
+            android:id="@+id/BTProfileSettings"
+            style="@style/ToolButton"
+            android:src="@drawable/icon_edit"  />
+
     </LinearLayout>
 </FrameLayout>

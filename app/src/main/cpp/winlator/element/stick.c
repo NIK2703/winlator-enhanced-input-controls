@@ -2,6 +2,7 @@
 #include <android/log.h>
 
 void element_stick_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Stick", "DOWN idx=%d type=%d ptr_id=%d x=%f y=%f", (int)(e - g_state.elements), e->type, ptr_id, x, y);
     (void)ptr_id;
     for (int i = 0; i < 4; i++) e->petal_active[i] = false;
     // Java ControlElement.handleTouchDown delegates immediately to handleTouchMove,
@@ -25,15 +26,17 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
         ny = dy * inv_dist;
         e->visual_x = e->x + dx * clamped;
         e->visual_y = e->y + dy * clamped;
+        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Stick", "MOVE clamped idx=%d type=%d radius=%f visual_x=%f visual_y=%f", (int)(e - g_state.elements), e->type, radius, e->visual_x, e->visual_y);
     } else {
         float inv_radius = 1.0f / radius;
         nx = dx * inv_radius;
         ny = dy * inv_radius;
         e->visual_x = e->x + dx;
         e->visual_y = e->y + dy;
+        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Stick", "MOVE inside idx=%d type=%d visual_x=%f visual_y=%f", (int)(e - g_state.elements), e->type, e->visual_x, e->visual_y);
     }
 
-    //__android_log_print(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
+    //TP_LOG(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
     //    "stick_move dist=%f nx=%f ny=%f bind0_type=0x%x is_gamepad=%d mag=%f",
     //    dist, nx, ny, e->bindings[0].type, is_gamepad_binding(&e->bindings[0]),
     //    fminf(dist * inv_dist, 1.0f));
@@ -48,13 +51,14 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
         }
         e->stick_value_x = axis_x;
         e->stick_value_y = axis_y;
+        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Stick", "MOVE values idx=%d type=%d stick_value_x=%f stick_value_y=%f", (int)(e - g_state.elements), e->type, e->stick_value_x, e->stick_value_y);
         int is_left = !is_right_stick_binding(e);
-        //__android_log_print(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
+        //TP_LOG(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
         //    "stick_move GAMEPAD AXIS is_left=%d axis_x=%f axis_y=%f",
         //    is_left, axis_x, axis_y);
         add_action(result, ACT_GAMEPAD_AXIS, is_left, (int)(axis_x * 32767), (int)(axis_y * 32767));
     } else {
-        //__android_log_print(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
+        //TP_LOG(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
         //    "stick_move PETAL mode bind0=0x%x bind1=0x%x bind2=0x%x bind3=0x%x",
         //    e->bindings[0].type, e->bindings[1].type, e->bindings[2].type, e->bindings[3].type);
         element_set_petals(e, nx, ny, STICK_DEAD_ZONE, result);
@@ -65,6 +69,7 @@ void element_stick_up(TouchElement* e, float x, float y, uint64_t time_ms, Touch
     (void)x; (void)y; (void)time_ms;
     e->visual_x = e->x;
     e->visual_y = e->y;
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Stick", "UP center idx=%d type=%d center_x=%f center_y=%f", (int)(e - g_state.elements), e->type, e->x, e->y);
     e->stick_value_x = 0;
     e->stick_value_y = 0;
     for (int i = 0; i < 4; i++) {

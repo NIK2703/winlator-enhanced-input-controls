@@ -205,6 +205,7 @@ public class InputControlsFragment extends Fragment {
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
         sbUiOpacity.setProgress((int)(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY) * 100));
+        sbUiOpacity.setSecondaryProgress((int)(InputControlsView.DEFAULT_OVERLAY_OPACITY * 100));
 
         tvBindingDelay = view.findViewById(R.id.TVBindingDelay);
         sbBindingDelay = view.findViewById(R.id.SBBindingDelay);
@@ -226,6 +227,7 @@ public class InputControlsFragment extends Fragment {
         if (currentProfile != null) {
             sbBindingDelay.setProgress(currentProfile.getBindingDelay());
         }
+        sbBindingDelay.setSecondaryProgress(0);
 
         tvLongPressDelay = view.findViewById(R.id.TVLongPressDelay);
         sbLongPressDelay = view.findViewById(R.id.SBLongPressDelay);
@@ -250,6 +252,7 @@ public class InputControlsFragment extends Fragment {
         sbLongPressDelay.post(() -> {
             int delay = currentProfile != null ? currentProfile.getLongPressDelay() : 50;
             sbLongPressDelay.setProgress(delay);
+            sbLongPressDelay.setSecondaryProgress(200);
             tvLongPressDelay.setText(delay + " ms");
         });
 
@@ -283,6 +286,7 @@ public class InputControlsFragment extends Fragment {
         sbGestureThreshold.post(() -> {
             int threshold = currentProfile != null ? currentProfile.getGestureThreshold() : 20;
             sbGestureThreshold.setProgress(threshold - 10);
+            sbGestureThreshold.setSecondaryProgress(10);
             tvGestureThreshold.setText(threshold + " px");
         });
 
@@ -304,6 +308,7 @@ public class InputControlsFragment extends Fragment {
         sbDoubleTapDistance.post(() -> {
             int distance = currentProfile != null ? currentProfile.getDoubleTapDistance() : 50;
             sbDoubleTapDistance.setProgress(distance - 10);
+            sbDoubleTapDistance.setSecondaryProgress(40);
             tvDoubleTapDistance.setText(distance + " px");
         });
 
@@ -325,6 +330,7 @@ public class InputControlsFragment extends Fragment {
         sbStrokeWidth.post(() -> {
             float sw = currentProfile != null ? currentProfile.getStrokeWidth() : 0.2f;
             sbStrokeWidth.setProgress(Math.round((sw - 0.05f) * 100));
+            sbStrokeWidth.setSecondaryProgress(15);
             tvStrokeWidth.setText(String.format("%.2fx", sw));
         });
 
@@ -345,6 +351,7 @@ public class InputControlsFragment extends Fragment {
         sbFillAlphaInactive.post(() -> {
             int fa = currentProfile != null ? currentProfile.getFillAlphaInactive() : 50;
             sbFillAlphaInactive.setProgress(fa);
+            sbFillAlphaInactive.setSecondaryProgress(50);
             tvFillAlphaInactive.setText(String.valueOf(fa));
         });
 
@@ -366,6 +373,7 @@ public class InputControlsFragment extends Fragment {
         sbCornerRadius.post(() -> {
             float cr = currentProfile != null ? currentProfile.getCornerRadius() : 0.8f;
             sbCornerRadius.setProgress(Math.round(cr * 10));
+            sbCornerRadius.setSecondaryProgress(8);
             tvCornerRadius.setText(String.format("%.1f", cr));
         });
 

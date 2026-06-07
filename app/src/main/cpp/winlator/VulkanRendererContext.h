@@ -130,6 +130,7 @@ public:
     void updateWindowContentAHB(int64_t id, AHardwareBuffer* ahb, short w, short h, int x, int y);
     void updateCursorImage(void* pixels, short w, short h, short hotX, short hotY);
     void setCursorVisible(bool visible);
+    void updateElementOverlay(void* pixels, int w, int h);
     void setRenderList(const int64_t* ids, const int* xs, const int* ys, int count);
     void removeWindow(int64_t id);
     void clearBackbuffer() {}
@@ -169,6 +170,7 @@ public:
     void setSwapRB(bool enabled);
     void setEffect(int effectId, float sharpness);
     void setPresentMode(VkPresentModeKHR mode);
+    void onVsync();
 
 private:
     struct WinTex {
@@ -220,7 +222,7 @@ private:
     float activeSharpness = 1.0f;
     float maxAnisotropy           = 1.0f;
     bool  cubicSupported          = false;
-    VkPresentModeKHR requestedPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+    VkPresentModeKHR requestedPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
     uint32_t graphicsQueueFamilyIndex = 0;
     std::vector<VkPresentModeKHR> availablePresentModes;
 
@@ -277,6 +279,21 @@ private:
     std::atomic<bool> isCursorImageDirty{false};
     std::atomic<bool> cursorMoved{false};
 
+    // Element overlay (full-screen composited on top of everything)
+    VkImage         elementOverlayImg   = VK_NULL_HANDLE;
+    VkDeviceMemory  elementOverlayMem   = VK_NULL_HANDLE;
+    VkImageView     elementOverlayView  = VK_NULL_HANDLE;
+    VkDescriptorPool elementOverlayPool = VK_NULL_HANDLE;
+    VkDescriptorSet  elementOverlayDS   = VK_NULL_HANDLE;
+    VkPipeline       elementOverlayPipe = VK_NULL_HANDLE;
+    VkBuffer         elementOverlayStg  = VK_NULL_HANDLE;
+    VkDeviceMemory   elementOverlayStgM = VK_NULL_HANDLE;
+    void*            elementOverlayStgP = nullptr;
+    VkDeviceSize     elementOverlayStgC = 0;
+    int              elementOverlayW = 0;
+    int              elementOverlayH = 0;
+    std::atomic<bool> elementOverlayDirty{false};
+
     VkImage         cursorImg   = VK_NULL_HANDLE;
     VkDeviceMemory  cursorMem   = VK_NULL_HANDLE;
     VkImageView     cursorView  = VK_NULL_HANDLE;
@@ -323,6 +340,7 @@ private:
     VkDescriptorPool winTexPool = VK_NULL_HANDLE;
 
     std::atomic<bool> needsRender{false};
+    std::atomic<bool> vsyncSignaled{false};
     std::thread       renderThread;
     std::atomic<bool> isRunning{false};
     std::atomic<bool> fbResized{false};
@@ -358,6 +376,13 @@ private:
     void  ensureCursorTex(short w, short h);
     void  cleanupCursorTex();
     void  ensureCursorStaging(VkDeviceSize sz);
+
+    // Element overlay
+    void  createElementOverlayPipeline();
+    void  createElementOverlayDS();
+    void  ensureElementOverlayTex(int w, int h);
+    void  ensureElementOverlayStaging(VkDeviceSize sz);
+    void  cleanupElementOverlay();
 
     void recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
         const std::vector<DrawEntry>& draws,

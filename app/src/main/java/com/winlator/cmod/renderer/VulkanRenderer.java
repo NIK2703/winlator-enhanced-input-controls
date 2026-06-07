@@ -35,6 +35,11 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     public final XServerView xServerView;
     private final XServer xServer;
     private long nativeHandle = 0;
+
+    public long getNativeHandle() {
+        return nativeHandle;
+    }
+
     private final Object lock = new Object();
 
     public final ViewTransformation viewTransformation = new ViewTransformation();
@@ -97,6 +102,10 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private native void nativeSetCursorVisible(long handle, boolean visible);
     private native void nativeUpdateCursorImage(long handle, java.nio.ByteBuffer pixels,
         short width, short height, short hotX, short hotY);
+    private native void nativeUpdateElementOverlay(long handle, java.nio.ByteBuffer pixels, int width, int height);
+    public void updateElementOverlay(long handle, java.nio.ByteBuffer pixels, int width, int height) {
+        nativeUpdateElementOverlay(handle, pixels, width, height);
+    }
     private native void nativeSetRenderList(long handle, long[] ids, int[] xs, int[] ys, int count);
     private native void nativeRemoveWindow(long handle, long id);
 
@@ -117,8 +126,19 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private native void nativeSetSwapRB(long handle, boolean enabled);
     private native void nativeSetPresentMode(long handle, int mode);
     private native void nativeSetEffect(long handle, int effectId, float sharpness);
+    private native void nativeOnVsync(long handle, long frameTimeNs);
 
     private static volatile boolean gpuImageChecked = false;
+    private volatile boolean vsyncRunning = false;
+
+    private final android.view.Choreographer.FrameCallback vsyncRenderCallback = new android.view.Choreographer.FrameCallback() {
+        @Override
+        public void doFrame(long frameTimeNs) {
+            long h = nativeHandle;
+            if (h != 0) nativeOnVsync(h, frameTimeNs);
+            if (vsyncRunning) android.view.Choreographer.getInstance().postFrameCallback(this);
+        }
+    };
 
     private long did(Drawable d) {
         return drawableIds.computeIfAbsent(d, k -> ID_GEN.getAndIncrement());
@@ -208,7 +228,14 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 }
             }
             initComplete = true;
-            xServerView.queueEvent(this::updateScene);
+            xServerView.queueEvent(() -> {
+                updateScene();
+                if (!vsyncRunning) {
+                    vsyncRunning = true;
+                    new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                        android.view.Choreographer.getInstance().postFrameCallback(vsyncRenderCallback));
+                }
+            });
         });
     }
 
@@ -222,6 +249,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     public void onSurfaceDestroyed() {
         initComplete = false;
+        vsyncRunning = false;
         if (initExecutor != null) {
             initExecutor.shutdownNow();
             try { initExecutor.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS); }

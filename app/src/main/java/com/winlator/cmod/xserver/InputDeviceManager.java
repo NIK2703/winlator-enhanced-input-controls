@@ -273,36 +273,36 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
     }
 
     private Bitmask createPointerEventMask() {
-        Bitmask eventMask = new Bitmask();
-        eventMask.set(Event.POINTER_MOTION);
+        reusableEventMask.clear();
+        reusableEventMask.set(Event.POINTER_MOTION);
 
         Bitmask buttonMask = xServer.pointer.getButtonMask();
         if (!buttonMask.isEmpty()) {
-            eventMask.set(Event.BUTTON_MOTION);
+            reusableEventMask.set(Event.BUTTON_MOTION);
 
             if (buttonMask.isSet(Pointer.Button.BUTTON_LEFT.flag())) {
-                eventMask.set(Event.BUTTON1_MOTION);
+                reusableEventMask.set(Event.BUTTON1_MOTION);
             }
             if (buttonMask.isSet(Pointer.Button.BUTTON_MIDDLE.flag())) {
-                eventMask.set(Event.BUTTON2_MOTION);
+                reusableEventMask.set(Event.BUTTON2_MOTION);
             }
             if (buttonMask.isSet(Pointer.Button.BUTTON_RIGHT.flag())) {
-                eventMask.set(Event.BUTTON3_MOTION);
+                reusableEventMask.set(Event.BUTTON3_MOTION);
             }
             if (buttonMask.isSet(Pointer.Button.BUTTON_SCROLL_UP.flag())) {
-                eventMask.set(Event.BUTTON4_MOTION);
+                reusableEventMask.set(Event.BUTTON4_MOTION);
             }
             if (buttonMask.isSet(Pointer.Button.BUTTON_SCROLL_DOWN.flag())) {
-                eventMask.set(Event.BUTTON5_MOTION);
+                reusableEventMask.set(Event.BUTTON5_MOTION);
             }
         }
-        return eventMask;
+        return reusableEventMask;
     }
 
     public Bitmask getKeyButMask() {
-        Bitmask keyButMask = new Bitmask();
-        keyButMask.join(xServer.pointer.getButtonMask());
-        keyButMask.join(xServer.keyboard.getModifiersMask());
-        return keyButMask;
+        reusableKeyButMask.clear();
+        reusableKeyButMask.join(xServer.pointer.getButtonMask());
+        reusableKeyButMask.join(xServer.keyboard.getModifiersMask());
+        return reusableKeyButMask;
     }
 }

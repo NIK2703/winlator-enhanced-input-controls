@@ -6,7 +6,7 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     (void)ptr_id; (void)x; (void)y; (void)time_ms;
     TouchProcessorState* s = &g_state;
     bool has_primary = e->bindings[0].type != BINDING_NONE;
-    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN ptr=%d b0=%d tog=%d auto=%d arm=%d lp_cnt=%d delay=%d",
+    TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN ptr=%d b0=%d tog=%d auto=%d arm=%d lp_cnt=%d delay=%d",
         ptr_id, e->bindings[0].type, e->toggle_switch, e->auto_repeat,
         e->long_press_arm, e->element_long_press_count, s->cfg.long_press_delay_ms);
 
@@ -18,6 +18,7 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
             e->auto_repeat_primary_pressed = false;
             e->selected = false;
             e->visual_active = false;
+            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (toggle_auto_deselect)", (int)(e - g_state.elements), e->bindings[0].type);
         } else {
             if (has_primary) {
                 press_binding(result, &e->bindings[0], true);
@@ -54,12 +55,13 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     bool has_lp = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
     bool arm_lp = has_lp && !e->toggle_switch;
     e->long_press_arm = arm_lp;
-    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN arm_lp=%d has_lp=%d tog=%d lp_cnt=%d lp0=%d",
+    TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN arm_lp=%d has_lp=%d tog=%d lp_cnt=%d lp0=%d",
         arm_lp, has_lp, e->toggle_switch, e->element_long_press_count,
         e->element_long_press[0].type);
     if (arm_lp) {
         if (!has_primary) {
             e->visual_active = false;
+            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (arm_lp_no_primary)", (int)(e - g_state.elements), e->bindings[0].type);
         }
         return;
     }
@@ -81,6 +83,7 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
             e->gesture_timer_armed = true;
         } else {
             e->visual_active = false;
+            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (no_primary_no_gesture)", (int)(e - g_state.elements), e->bindings[0].type);
         }
     }
 }
@@ -93,7 +96,7 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
     float dy = y - e->down_y;
     if (dx == 0.0f && dy == 0.0f) return;
     bool inside = point_in_element(x, y, e);
-    //__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "MOVE arm=%d lp_trig=%d inside=%d b0=%d",
+    //TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "MOVE arm=%d lp_trig=%d inside=%d b0=%d",
     //    e->long_press_arm, e->gesture_long_press_triggered, inside, e->bindings[0].type);
 
     // Java: gesture binding check — hasGestureBinding() && !gestureTriggered && !longPressTriggered
@@ -120,6 +123,7 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
     // Auto-repeat toggle: latched state (visual = selected)
     if (e->toggle_switch && e->auto_repeat) {
         e->visual_active = e->selected;
+        TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=%d (toggle_auto_latch)", (int)(e - g_state.elements), e->bindings[0].type, e->selected);
         return;
     }
 
@@ -131,8 +135,10 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
                     release_binding(result, &e->bindings[0]);
                 e->selected = false;
                 e->visual_active = false;
+                TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (toggle_track_left)", (int)(e - g_state.elements), e->bindings[0].type);
             } else {
                 e->visual_active = true;
+                TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=1 (toggle_track_inside_sel)", (int)(e - g_state.elements), e->bindings[0].type);
             }
         } else {
             if (inside) {
@@ -140,8 +146,10 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
                     press_binding(result, &e->bindings[0], true);
                 e->selected = true;
                 e->visual_active = true;
+                TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=1 (toggle_reenter)", (int)(e - g_state.elements), e->bindings[0].type);
             } else {
                 e->visual_active = false;
+                TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (toggle_track_outside_notsel)", (int)(e - g_state.elements), e->bindings[0].type);
             }
         }
         return;
@@ -163,6 +171,7 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
         }
         if (!inside) {
             e->visual_active = false;
+            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (auto_repeat_left)", (int)(e - g_state.elements), e->bindings[0].type);
         }
         return;
     }
@@ -182,6 +191,7 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
         && !e->gesture_long_press_triggered
         && !e->gesture_timer_armed) {
         e->visual_active = false;
+        TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (none_primary)", (int)(e - g_state.elements), e->bindings[0].type);
     }
 
     // HOVER mode: non-toggle buttons are only visually active when finger is inside.
@@ -192,6 +202,7 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
     // earlier move should not keep a visually non-hovered button illuminated.
     if (e->activation_mode == ACTIVATION_HOVER && !e->toggle_switch && !inside) {
         e->visual_active = false;
+        TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (hover_outside)", (int)(e - g_state.elements), e->bindings[0].type);
     }
 }
 
@@ -224,6 +235,7 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
                 }
                 e->selected = false;
                 e->visual_active = false;
+                TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_up[%d] type=%d visual=0 (toggle_deselect)", (int)(e - g_state.elements), e->bindings[0].type);
             } else {
                 e->auto_repeat_primary_pressed = false;
             }
@@ -243,7 +255,7 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
         goto cleanup;
     }
 
-    //__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "UP lp_trig=%d swipe_trig=%d has_lp=%d b0=%d elapsed=%llu",
+    //TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "UP lp_trig=%d swipe_trig=%d has_lp=%d b0=%d elapsed=%llu",
     //    e->gesture_long_press_triggered, e->gesture_swipe_triggered,
     //    e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE,
     //    e->bindings[0].type, (unsigned long long)(time_ms - e->down_time_ms));

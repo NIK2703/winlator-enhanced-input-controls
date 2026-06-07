@@ -16,6 +16,13 @@ typedef struct {
     int32_t visual_active;       // 0 or 1
     int32_t petal_active[4];     // 0 or 1 each
     float range_scroll_offset;
+    // --- Render fields (Phase 1: native rendering support) ---
+    float opacity;
+    float corner_radius;
+    uint32_t color_primary;
+    uint32_t color_secondary;
+    float stroke_width;
+    int32_t fill_alpha_inactive;
 } VisualStateEntry;
 #pragma pack(pop)
 
@@ -28,6 +35,7 @@ static void visual_state_flush(void) {
     if (!g_state.visual_state_dirty) return;
     g_state.visual_state_dirty = false;
     int n = g_state.element_count;
+    int active_count = 0;
     for (int i = 0; i < n; i++) {
         g_visual_buffer[i].visual_x = g_state.elements[i].visual_x;
         g_visual_buffer[i].visual_y = g_state.elements[i].visual_y;
@@ -37,7 +45,47 @@ static void visual_state_flush(void) {
         g_visual_buffer[i].petal_active[2] = g_state.elements[i].petal_active[2] ? 1 : 0;
         g_visual_buffer[i].petal_active[3] = g_state.elements[i].petal_active[3] ? 1 : 0;
         g_visual_buffer[i].range_scroll_offset = g_state.elements[i].range_scroll_offset;
+        // --- Render fields ---
+        g_visual_buffer[i].opacity = g_state.elements[i].opacity;
+        g_visual_buffer[i].corner_radius = g_state.elements[i].corner_radius;
+        g_visual_buffer[i].color_primary = g_state.elements[i].color_primary;
+        g_visual_buffer[i].color_secondary = g_state.elements[i].color_secondary;
+        g_visual_buffer[i].stroke_width = g_state.elements[i].stroke_width;
+        g_visual_buffer[i].fill_alpha_inactive = g_state.elements[i].fill_alpha_inactive;
+
+        if (g_state.elements[i].visual_active) {
+            active_count++;
+            TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "flush[%d] type=%d active=1 pos=(%.0f,%.0f)", i, (int)g_state.elements[i].type, g_state.elements[i].visual_x, g_state.elements[i].visual_y);
+        }
     }
+    if (active_count > 0 || g_state.element_count > 0) {
+        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "flush: total=%d active=%d dirty=0", n, active_count);
+    }
+}
+
+// Bulk write all elements' visual state into Java arrays (1 JNI call replaces N×8 ByteBuffer reads)
+static jint nativeSyncVisualState(JNIEnv* env, jclass clazz, jfloatArray positions, jintArray states, jfloatArray scrollOffsets) {
+    int n = g_state.element_count;
+    jfloat* pos = env->GetFloatArrayElements(positions, NULL);
+    jint* st = env->GetIntArrayElements(states, NULL);
+    jfloat* scroll = scrollOffsets ? env->GetFloatArrayElements(scrollOffsets, NULL) : NULL;
+    int max = env->GetArrayLength(positions) / 2;
+    if (n > max) n = max;
+    for (int i = 0; i < n; i++) {
+        pos[i*2] = g_state.elements[i].visual_x;
+        pos[i*2+1] = g_state.elements[i].visual_y;
+        int flags = g_state.elements[i].visual_active ? 1 : 0;
+        if (g_state.elements[i].petal_active[0]) flags |= 2;
+        if (g_state.elements[i].petal_active[1]) flags |= 4;
+        if (g_state.elements[i].petal_active[2]) flags |= 8;
+        if (g_state.elements[i].petal_active[3]) flags |= 16;
+        st[i] = flags;
+        if (scroll) scroll[i] = g_state.elements[i].range_scroll_offset;
+    }
+    env->ReleaseFloatArrayElements(positions, pos, 0);
+    env->ReleaseIntArrayElements(states, st, 0);
+    if (scroll) env->ReleaseFloatArrayElements(scrollOffsets, scroll, 0);
+    return (jint)n;
 }
 
 struct CachedFieldIDs {
@@ -93,13 +141,19 @@ struct CachedFieldIDs {
     jfieldID stDoubleTap2nd;
     jfieldID stSingleTapDrag2nd;
     jfieldID stDoubleTapDrag2nd;
+
+    // Render config fields
+    jfieldID colorPrimary;
+    jfieldID colorSecondary;
+    jfieldID strokeWidthDefault;
+    jfieldID fillAlphaInactiveDefault;
 };
 
 #define JNI_CHECK(env, msg) do { \
     if ((env)->ExceptionCheck()) { \
         (env)->ExceptionDescribe(); \
         (env)->ExceptionClear(); \
-        __android_log_print(ANDROID_LOG_ERROR, "Winlator_JNI", "JNI exception: %s", msg); \
+        TP_LOG(ANDROID_LOG_ERROR, "Winlator_JNI", "JNI exception: %s", msg); \
         return; \
     } \
 } while(0)
@@ -108,7 +162,7 @@ struct CachedFieldIDs {
     if ((env)->ExceptionCheck()) { \
         (env)->ExceptionDescribe(); \
         (env)->ExceptionClear(); \
-        __android_log_print(ANDROID_LOG_ERROR, "Winlator_JNI", "JNI exception: %s", msg); \
+        TP_LOG(ANDROID_LOG_ERROR, "Winlator_JNI", "JNI exception: %s", msg); \
         return retval; \
     } \
 } while(0)
@@ -140,12 +194,33 @@ struct CachedElementFieldIDs {
     jfieldID orientation;
     jfieldID buttonLongPressHaptic;
     jfieldID buttonGestureHaptic;
+    // Render fields
+    jfieldID cornerRadius;
+    jfieldID opacity;
 };
 
 static CachedElementFieldIDs g_elem;
 
 static jobject g_dispatch_obj = NULL;
 static jmethodID g_dispatchAllActions;
+static jmethodID g_injectPointerMove;
+static jmethodID g_injectPointerMoveDelta;
+static jmethodID g_injectPointerButtonPress;
+static jmethodID g_injectPointerButtonRelease;
+static jmethodID g_injectKeyPress;
+static jmethodID g_injectKeyRelease;
+static jmethodID g_mouseEvent;
+static jmethodID g_scrollEvent;
+static jmethodID g_hapticEvent;
+static jmethodID g_setCursorSpeed;
+static jmethodID g_startMouseMove;
+static jmethodID g_stopMouseMove;
+static jmethodID g_gamepadState;
+static jmethodID g_gamepadAxis;
+static jintArray g_dispatch_packed = NULL;  // pre-allocated, reused for fallback only
+static int g_dispatch_count = 0;
+#define DISPATCH_MAX_ACTIONS 32
+#define DISPATCH_PACKED_SIZE (DISPATCH_MAX_ACTIONS * 4)
 
 
 
@@ -164,111 +239,108 @@ static int read_binding_list(JNIEnv* env, jintArray arr, TouchBinding* dst, int 
     return count;
 }
 
-#define READ_CACHED_BINDING_LIST(env, config, fieldId, dst, count) do { \
-    jintArray _arr = (jintArray)env->GetObjectField(config, fieldId); \
-    count = read_binding_list(env, _arr, dst, 8); \
-} while(0)
-
-
 
 static void dispatch_actions_batch(JNIEnv* env, const TouchActionResult* r) {
-    if (!g_dispatch_obj || !r || r->count == 0) {
+    if (!g_dispatch_obj || !r || r->count == 0 || !g_dispatch_packed) {
+        g_dispatch_count = 0;
         return;
     }
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_JNI", "dispatch_actions_batch: count=%d", r->count);
-    for (int i = 0; i < r->count; i++) {
-        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_JNI", "  action[%d]: type=%d args=%d,%d,%d",
-            i, r->actions[i].type,
-            r->actions[i].pointer_move.x,
-            r->actions[i].pointer_delta.dx,
-            r->actions[i].pointer_delta.dy);
-    }
+    int n = r->count;
+    if (n > DISPATCH_MAX_ACTIONS) n = DISPATCH_MAX_ACTIONS;
 
-    jint typeBuf[32];
-    jint argBuf[32 * 3];
-
-    for (int i = 0; i < r->count; i++) {
-        typeBuf[i] = (jint)r->actions[i].type;
-        switch (r->actions[i].type) {
+    int packed[DISPATCH_PACKED_SIZE];
+    for (int i = 0; i < n; i++) {
+        int base = i * 4;
+        int type = (int)r->actions[i].type;
+        packed[base] = type;
+        switch (type) {
             case ACT_POINTER_MOVE:
-                argBuf[i * 3] = r->actions[i].pointer_move.x;
-                argBuf[i * 3 + 1] = r->actions[i].pointer_move.y;
-                argBuf[i * 3 + 2] = 0;
+                packed[base+1] = r->actions[i].pointer_move.x;
+                packed[base+2] = r->actions[i].pointer_move.y;
+                packed[base+3] = 0;
                 break;
             case ACT_POINTER_MOVE_DELTA:
-                argBuf[i * 3] = r->actions[i].pointer_delta.dx;
-                argBuf[i * 3 + 1] = r->actions[i].pointer_delta.dy;
-                argBuf[i * 3 + 2] = 0;
+                packed[base+1] = r->actions[i].pointer_delta.dx;
+                packed[base+2] = r->actions[i].pointer_delta.dy;
+                packed[base+3] = 0;
                 break;
             case ACT_POINTER_BUTTON_PRESS:
+                packed[base+1] = r->actions[i].pointer_button.button;
+                packed[base+2] = 0;
+                packed[base+3] = 0;
+                break;
             case ACT_POINTER_BUTTON_RELEASE:
-                argBuf[i * 3] = r->actions[i].pointer_button.button;
-                argBuf[i * 3 + 1] = 0;
-                argBuf[i * 3 + 2] = 0;
+                packed[base+1] = r->actions[i].pointer_button.button;
+                packed[base+2] = 0;
+                packed[base+3] = 0;
                 break;
             case ACT_KEY_PRESS:
+                packed[base+1] = r->actions[i].key.keycode;
+                packed[base+2] = r->actions[i].key.is_down ? 1 : 0;
+                packed[base+3] = 0;
+                break;
             case ACT_KEY_RELEASE:
-                argBuf[i * 3] = r->actions[i].key.keycode;
-                argBuf[i * 3 + 1] = r->actions[i].key.is_down ? 1 : 0;
-                argBuf[i * 3 + 2] = 0;
+                packed[base+1] = r->actions[i].key.keycode;
+                packed[base+2] = r->actions[i].key.is_down ? 1 : 0;
+                packed[base+3] = 0;
                 break;
             case ACT_MOUSE_EVENT:
-                argBuf[i * 3] = r->actions[i].mouse_event.flags;
-                argBuf[i * 3 + 1] = r->actions[i].mouse_event.dx;
-                argBuf[i * 3 + 2] = r->actions[i].mouse_event.dy;
+                packed[base+1] = r->actions[i].mouse_event.flags;
+                packed[base+2] = r->actions[i].mouse_event.dx;
+                packed[base+3] = r->actions[i].mouse_event.dy;
                 break;
             case ACT_SCROLL:
-                argBuf[i * 3] = r->actions[i].scroll.amount;
-                argBuf[i * 3 + 1] = 0;
-                argBuf[i * 3 + 2] = 0;
+                packed[base+1] = r->actions[i].scroll.amount;
+                packed[base+2] = 0;
+                packed[base+3] = 0;
                 break;
             case ACT_HAPTIC:
-                argBuf[i * 3] = r->actions[i].haptic.effect;
-                argBuf[i * 3 + 1] = 0;
-                argBuf[i * 3 + 2] = 0;
+                packed[base+1] = r->actions[i].haptic.effect;
+                packed[base+2] = 0;
+                packed[base+3] = 0;
                 break;
             case ACT_SET_CURSOR_SPEED:
-                argBuf[i * 3] = r->actions[i].cursor_speed.speed;
-                argBuf[i * 3 + 1] = 0;
-                argBuf[i * 3 + 2] = 0;
+                packed[base+1] = r->actions[i].cursor_speed.speed;
+                packed[base+2] = 0;
+                packed[base+3] = 0;
                 break;
             case ACT_START_MOUSE_MOVE:
-                argBuf[i * 3] = r->actions[i].mouse_move.dx;
-                argBuf[i * 3 + 1] = r->actions[i].mouse_move.dy;
-                argBuf[i * 3 + 2] = r->actions[i].mouse_move.hold;
+                packed[base+1] = r->actions[i].mouse_move.dx;
+                packed[base+2] = r->actions[i].mouse_move.dy;
+                packed[base+3] = r->actions[i].mouse_move.hold;
                 break;
             case ACT_STOP_MOUSE_MOVE:
-                argBuf[i * 3] = 0;
-                argBuf[i * 3 + 1] = 0;
-                argBuf[i * 3 + 2] = 0;
+                packed[base+1] = 0;
+                packed[base+2] = 0;
+                packed[base+3] = 0;
                 break;
             case ACT_GAMEPAD_STATE:
-                argBuf[i * 3] = r->actions[i].key.keycode;
-                argBuf[i * 3 + 1] = r->actions[i].key.is_down ? 1 : 0;
-                argBuf[i * 3 + 2] = 0;
+                packed[base+1] = r->actions[i].key.keycode;
+                packed[base+2] = r->actions[i].key.is_down ? 1 : 0;
+                packed[base+3] = 0;
+                break;
+            case ACT_GAMEPAD_RELEASE:
+                packed[base+1] = 0;
+                packed[base+2] = 0;
+                packed[base+3] = 0;
                 break;
             case ACT_GAMEPAD_AXIS:
-                argBuf[i * 3] = r->actions[i].gamepad_axis.is_left;
-                argBuf[i * 3 + 1] = r->actions[i].gamepad_axis.axis_x;
-                argBuf[i * 3 + 2] = r->actions[i].gamepad_axis.axis_y;
+                packed[base+1] = r->actions[i].gamepad_axis.is_left;
+                packed[base+2] = r->actions[i].gamepad_axis.axis_x;
+                packed[base+3] = r->actions[i].gamepad_axis.axis_y;
                 break;
             default:
-                argBuf[i * 3] = 0;
-                argBuf[i * 3 + 1] = 0;
-                argBuf[i * 3 + 2] = 0;
+                packed[base] = 0;
+                packed[base+1] = 0;
+                packed[base+2] = 0;
+                packed[base+3] = 0;
                 break;
         }
     }
 
-    jintArray types = env->NewIntArray(r->count);
-    jintArray intArgs = env->NewIntArray(r->count * 3);
-    env->SetIntArrayRegion(types, 0, r->count, typeBuf);
-    env->SetIntArrayRegion(intArgs, 0, r->count * 3, argBuf);
-
-    env->CallVoidMethod(g_dispatch_obj, g_dispatchAllActions, types, intArgs, (jint)r->count);
-
-    env->DeleteLocalRef(types);
-    env->DeleteLocalRef(intArgs);
+    env->SetIntArrayRegion(g_dispatch_packed, 0, n * 4, packed);
+    env->CallVoidMethod(g_dispatch_obj, g_dispatchAllActions, n);
+    g_dispatch_count = n;
 }
 
 extern "C" {
@@ -303,111 +375,158 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
     c->gesture_long_press_haptic = env->GetIntField(config, g_config.gestureLongPressHaptic);
     c->haptic_enabled = env->GetBooleanField(config, g_config.hapticEnabled);
 
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTap, c->ts_single_tap, c->ts_single_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsLongPress, c->ts_long_press, c->ts_long_press_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTap, c->ts_double_tap, c->ts_double_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTapDrag, c->ts_single_tap_drag, c->ts_single_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsLongPressDrag, c->ts_long_press_drag, c->ts_long_press_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTapDrag, c->ts_double_tap_drag, c->ts_double_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTap2nd, c->ts_single_2nd, c->ts_single_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTap2nd, c->ts_double_2nd, c->ts_double_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTapDrag2nd, c->ts_single_drag_2nd, c->ts_single_drag_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTapDrag2nd, c->ts_double_drag_2nd, c->ts_double_drag_2nd_count);
+    struct BindingSlotPair { GestureBindingSlot* slot; jfieldID fid; };
+    BindingSlotPair binding_slots[] = {
+        { &c->ts[GESTURE_SINGLE_TAP], g_config.tsSingleTap },
+        { &c->ts[GESTURE_LONG_PRESS], g_config.tsLongPress },
+        { &c->ts[GESTURE_DOUBLE_TAP], g_config.tsDoubleTap },
+        { &c->ts[GESTURE_SINGLE_TAP_DRAG], g_config.tsSingleTapDrag },
+        { &c->ts[GESTURE_LONG_PRESS_DRAG], g_config.tsLongPressDrag },
+        { &c->ts[GESTURE_DOUBLE_TAP_DRAG], g_config.tsDoubleTapDrag },
+        { &c->ts[GESTURE_SINGLE_2ND], g_config.tsSingleTap2nd },
+        { &c->ts[GESTURE_DOUBLE_2ND], g_config.tsDoubleTap2nd },
+        { &c->ts[GESTURE_SINGLE_DRAG_2ND], g_config.tsSingleTapDrag2nd },
+        { &c->ts[GESTURE_DOUBLE_DRAG_2ND], g_config.tsDoubleTapDrag2nd },
+        { &c->tp[GESTURE_SINGLE_TAP], g_config.tpSingleTap },
+        { &c->tp[GESTURE_LONG_PRESS], g_config.tpLongPress },
+        { &c->tp[GESTURE_DOUBLE_TAP], g_config.tpDoubleTap },
+        { &c->tp[GESTURE_SINGLE_TAP_DRAG], g_config.tpSingleTapDrag },
+        { &c->tp[GESTURE_LONG_PRESS_DRAG], g_config.tpLongPressDrag },
+        { &c->tp[GESTURE_DOUBLE_TAP_DRAG], g_config.tpDoubleTapDrag },
+        { &c->tp[GESTURE_SINGLE_2ND], g_config.tpSingleTap2nd },
+        { &c->tp[GESTURE_DOUBLE_2ND], g_config.tpDoubleTap2nd },
+        { &c->tp[GESTURE_SINGLE_DRAG_2ND], g_config.tpSingleTapDrag2nd },
+        { &c->tp[GESTURE_DOUBLE_DRAG_2ND], g_config.tpDoubleTapDrag2nd },
+    };
+    for (int i = 0; i < (int)(sizeof(binding_slots)/sizeof(binding_slots[0])); i++) {
+        jintArray arr = (jintArray)env->GetObjectField(config, binding_slots[i].fid);
+        binding_slots[i].slot->count = read_binding_list(env, arr, binding_slots[i].slot->arr, 8);
+    }
 
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTap, c->tp_single_tap, c->tp_single_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpLongPress, c->tp_long_press, c->tp_long_press_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTap, c->tp_double_tap, c->tp_double_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTapDrag, c->tp_single_tap_drag, c->tp_single_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpLongPressDrag, c->tp_long_press_drag, c->tp_long_press_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTapDrag, c->tp_double_tap_drag, c->tp_double_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTap2nd, c->tp_single_2nd, c->tp_single_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTap2nd, c->tp_double_2nd, c->tp_double_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTapDrag2nd, c->tp_single_drag_2nd, c->tp_single_drag_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTapDrag2nd, c->tp_double_drag_2nd, c->tp_double_drag_2nd_count);
+    struct StickySlotPair { jfieldID fid; GestureBindingSlot* slot; };
+    StickySlotPair sticky_slots[] = {
+        { g_config.stSingleTap, &c->ts[GESTURE_SINGLE_TAP] },
+        { g_config.stLongPress, &c->ts[GESTURE_LONG_PRESS] },
+        { g_config.stDoubleTap, &c->ts[GESTURE_DOUBLE_TAP] },
+        { g_config.stSingleTapDrag, &c->ts[GESTURE_SINGLE_TAP_DRAG] },
+        { g_config.stLongPressDrag, &c->ts[GESTURE_LONG_PRESS_DRAG] },
+        { g_config.stDoubleTapDrag, &c->ts[GESTURE_DOUBLE_TAP_DRAG] },
+        { g_config.stSingleTap2nd, &c->ts[GESTURE_SINGLE_2ND] },
+        { g_config.stDoubleTap2nd, &c->ts[GESTURE_DOUBLE_2ND] },
+        { g_config.stSingleTapDrag2nd, &c->ts[GESTURE_SINGLE_DRAG_2ND] },
+        { g_config.stDoubleTapDrag2nd, &c->ts[GESTURE_DOUBLE_DRAG_2ND] },
+        { g_config.stSingleTap, &c->tp[GESTURE_SINGLE_TAP] },
+        { g_config.stLongPress, &c->tp[GESTURE_LONG_PRESS] },
+        { g_config.stDoubleTap, &c->tp[GESTURE_DOUBLE_TAP] },
+        { g_config.stSingleTapDrag, &c->tp[GESTURE_SINGLE_TAP_DRAG] },
+        { g_config.stLongPressDrag, &c->tp[GESTURE_LONG_PRESS_DRAG] },
+        { g_config.stDoubleTapDrag, &c->tp[GESTURE_DOUBLE_TAP_DRAG] },
+        { g_config.stSingleTap2nd, &c->tp[GESTURE_SINGLE_2ND] },
+        { g_config.stDoubleTap2nd, &c->tp[GESTURE_DOUBLE_2ND] },
+        { g_config.stSingleTapDrag2nd, &c->tp[GESTURE_SINGLE_DRAG_2ND] },
+        { g_config.stDoubleTapDrag2nd, &c->tp[GESTURE_DOUBLE_DRAG_2ND] },
+    };
+    for (int i = 0; i < (int)(sizeof(sticky_slots)/sizeof(sticky_slots[0])); i++) {
+        int mask = env->GetIntField(config, sticky_slots[i].fid);
+        for (int j = 0; j < sticky_slots[i].slot->count; j++)
+            if (mask & (1 << j))
+                sticky_slots[i].slot->arr[j].modifiers = 1;
+    }
 
-#define APPLY_STICKY(arr, cnt, sid) do { \
-    int _st = env->GetIntField(config, g_config.sid); \
-    for (int _i = 0; _i < (cnt); _i++) if (_st & (1 << _i)) (arr)[_i].modifiers = 1; \
-} while(0)
-    APPLY_STICKY(c->ts_single_tap, c->ts_single_tap_count, stSingleTap);
-    APPLY_STICKY(c->ts_long_press, c->ts_long_press_count, stLongPress);
-    APPLY_STICKY(c->ts_double_tap, c->ts_double_tap_count, stDoubleTap);
-    APPLY_STICKY(c->ts_single_tap_drag, c->ts_single_tap_drag_count, stSingleTapDrag);
-    APPLY_STICKY(c->ts_long_press_drag, c->ts_long_press_drag_count, stLongPressDrag);
-    APPLY_STICKY(c->ts_double_tap_drag, c->ts_double_tap_drag_count, stDoubleTapDrag);
-    APPLY_STICKY(c->ts_single_2nd, c->ts_single_2nd_count, stSingleTap2nd);
-    APPLY_STICKY(c->ts_double_2nd, c->ts_double_2nd_count, stDoubleTap2nd);
-    APPLY_STICKY(c->ts_single_drag_2nd, c->ts_single_drag_2nd_count, stSingleTapDrag2nd);
-    APPLY_STICKY(c->ts_double_drag_2nd, c->ts_double_drag_2nd_count, stDoubleTapDrag2nd);
-
-    APPLY_STICKY(c->tp_single_tap, c->tp_single_tap_count, stSingleTap);
-    APPLY_STICKY(c->tp_long_press, c->tp_long_press_count, stLongPress);
-    APPLY_STICKY(c->tp_double_tap, c->tp_double_tap_count, stDoubleTap);
-    APPLY_STICKY(c->tp_single_tap_drag, c->tp_single_tap_drag_count, stSingleTapDrag);
-    APPLY_STICKY(c->tp_long_press_drag, c->tp_long_press_drag_count, stLongPressDrag);
-    APPLY_STICKY(c->tp_double_tap_drag, c->tp_double_tap_drag_count, stDoubleTapDrag);
-    APPLY_STICKY(c->tp_single_2nd, c->tp_single_2nd_count, stSingleTap2nd);
-    APPLY_STICKY(c->tp_double_2nd, c->tp_double_2nd_count, stDoubleTap2nd);
-    APPLY_STICKY(c->tp_single_drag_2nd, c->tp_single_drag_2nd_count, stSingleTapDrag2nd);
-    APPLY_STICKY(c->tp_double_drag_2nd, c->tp_double_drag_2nd_count, stDoubleTapDrag2nd);
-#undef APPLY_STICKY
+    c->color_primary = (uint32_t)env->GetIntField(config, g_config.colorPrimary);
+    c->color_secondary = (uint32_t)env->GetIntField(config, g_config.colorSecondary);
+    c->stroke_width_default = env->GetFloatField(config, g_config.strokeWidthDefault);
+    c->fill_alpha_inactive_default = env->GetIntField(config, g_config.fillAlphaInactiveDefault);
 }
 
 static void cache_config_field_ids(JNIEnv* env, jobject config) {
     jclass cls = env->GetObjectClass(config);
-    if (!cls) { __android_log_print(ANDROID_LOG_ERROR, "Winlator_JNI", "nativeInit: GetObjectClass failed"); return; }
+    if (!cls) { TP_LOG(ANDROID_LOG_ERROR, "Winlator_JNI", "nativeInit: GetObjectClass failed"); return; }
     g_config.configClass = (jclass)env->NewGlobalRef(cls);
-    g_config.touchMode = env->GetFieldID(cls, "touchMode", "I"); JNI_CHECK(env, "touchMode");
-    g_config.inputMode = env->GetFieldID(cls, "inputMode", "I"); JNI_CHECK(env, "inputMode");
-    g_config.longPressTimeoutMs = env->GetFieldID(cls, "longPressTimeoutMs", "I"); JNI_CHECK(env, "longPressTimeoutMs");
-    g_config.doubleTapTimeoutMs = env->GetFieldID(cls, "doubleTapTimeoutMs", "I"); JNI_CHECK(env, "doubleTapTimeoutMs");
-    g_config.singleTapDelayMs = env->GetFieldID(cls, "singleTapDelayMs", "I"); JNI_CHECK(env, "singleTapDelayMs");
-    g_config.dragThresholdPx = env->GetFieldID(cls, "dragThresholdPx", "I"); JNI_CHECK(env, "dragThresholdPx");
-    g_config.doubleTapDistancePx = env->GetFieldID(cls, "doubleTapDistancePx", "I"); JNI_CHECK(env, "doubleTapDistancePx");
-    g_config.bindingDelayMs = env->GetFieldID(cls, "bindingDelayMs", "I"); JNI_CHECK(env, "bindingDelayMs");
-    g_config.longPressDelayMs = env->GetFieldID(cls, "longPressDelayMs", "I"); JNI_CHECK(env, "longPressDelayMs");
-    g_config.cursorSpeed = env->GetFieldID(cls, "cursorSpeed", "I"); JNI_CHECK(env, "cursorSpeed");
-    g_config.gestureThresholdPx = env->GetFieldID(cls, "gestureThresholdPx", "I"); JNI_CHECK(env, "gestureThresholdPx");
-    g_config.cursorAccelerationThreshold = env->GetFieldID(cls, "cursorAccelerationThreshold", "I"); JNI_CHECK(env, "cursorAccelerationThreshold");
-    g_config.cursorAccelerationFactor = env->GetFieldID(cls, "cursorAccelerationFactor", "F"); JNI_CHECK(env, "cursorAccelerationFactor");
-    g_config.screenW = env->GetFieldID(cls, "screenW", "I"); JNI_CHECK(env, "screenW");
-    g_config.screenH = env->GetFieldID(cls, "screenH", "I"); JNI_CHECK(env, "screenH");
-    g_config.xformScaleX = env->GetFieldID(cls, "xformScaleX", "F"); JNI_CHECK(env, "xformScaleX");
-    g_config.xformScaleY = env->GetFieldID(cls, "xformScaleY", "F"); JNI_CHECK(env, "xformScaleY");
-    g_config.viewOffsetX = env->GetFieldID(cls, "viewOffsetX", "F"); JNI_CHECK(env, "viewOffsetX");
-    g_config.viewOffsetY = env->GetFieldID(cls, "viewOffsetY", "F"); JNI_CHECK(env, "viewOffsetY");
-    g_config.gestureLongPressHaptic = env->GetFieldID(cls, "gestureLongPressHaptic", "I"); JNI_CHECK(env, "gestureLongPressHaptic");
-    g_config.hapticEnabled = env->GetFieldID(cls, "hapticEnabled", "Z"); JNI_CHECK(env, "hapticEnabled");
-    g_config.tsSingleTap = env->GetFieldID(cls, "tsSingleTap", "[I"); JNI_CHECK(env, "tsSingleTap");
-    g_config.tsLongPress = env->GetFieldID(cls, "tsLongPress", "[I"); JNI_CHECK(env, "tsLongPress");
-    g_config.tsDoubleTap = env->GetFieldID(cls, "tsDoubleTap", "[I"); JNI_CHECK(env, "tsDoubleTap");
-    g_config.tsSingleTapDrag = env->GetFieldID(cls, "tsSingleTapDrag", "[I"); JNI_CHECK(env, "tsSingleTapDrag");
-    g_config.tsLongPressDrag = env->GetFieldID(cls, "tsLongPressDrag", "[I"); JNI_CHECK(env, "tsLongPressDrag");
-    g_config.tsDoubleTapDrag = env->GetFieldID(cls, "tsDoubleTapDrag", "[I"); JNI_CHECK(env, "tsDoubleTapDrag");
-    g_config.tsSingleTap2nd = env->GetFieldID(cls, "tsSingleTap2nd", "[I"); JNI_CHECK(env, "tsSingleTap2nd");
-    g_config.tsDoubleTap2nd = env->GetFieldID(cls, "tsDoubleTap2nd", "[I"); JNI_CHECK(env, "tsDoubleTap2nd");
-    g_config.tsSingleTapDrag2nd = env->GetFieldID(cls, "tsSingleTapDrag2nd", "[I"); JNI_CHECK(env, "tsSingleTapDrag2nd");
-    g_config.tsDoubleTapDrag2nd = env->GetFieldID(cls, "tsDoubleTapDrag2nd", "[I"); JNI_CHECK(env, "tsDoubleTapDrag2nd");
-    g_config.tpSingleTap = env->GetFieldID(cls, "tpSingleTap", "[I"); JNI_CHECK(env, "tpSingleTap");
-    g_config.tpLongPress = env->GetFieldID(cls, "tpLongPress", "[I"); JNI_CHECK(env, "tpLongPress");
-    g_config.tpDoubleTap = env->GetFieldID(cls, "tpDoubleTap", "[I"); JNI_CHECK(env, "tpDoubleTap");
-    g_config.tpSingleTapDrag = env->GetFieldID(cls, "tpSingleTapDrag", "[I"); JNI_CHECK(env, "tpSingleTapDrag");
-    g_config.tpLongPressDrag = env->GetFieldID(cls, "tpLongPressDrag", "[I"); JNI_CHECK(env, "tpLongPressDrag");
-    g_config.tpDoubleTapDrag = env->GetFieldID(cls, "tpDoubleTapDrag", "[I"); JNI_CHECK(env, "tpDoubleTapDrag");
-    g_config.tpSingleTap2nd = env->GetFieldID(cls, "tpSingleTap2nd", "[I"); JNI_CHECK(env, "tpSingleTap2nd");
-    g_config.tpDoubleTap2nd = env->GetFieldID(cls, "tpDoubleTap2nd", "[I"); JNI_CHECK(env, "tpDoubleTap2nd");
-    g_config.tpSingleTapDrag2nd = env->GetFieldID(cls, "tpSingleTapDrag2nd", "[I"); JNI_CHECK(env, "tpSingleTapDrag2nd");
-    g_config.tpDoubleTapDrag2nd = env->GetFieldID(cls, "tpDoubleTapDrag2nd", "[I"); JNI_CHECK(env, "tpDoubleTapDrag2nd");
-    g_config.stSingleTap = env->GetFieldID(cls, "stSingleTap", "I"); JNI_CHECK(env, "stSingleTap");
-    g_config.stLongPress = env->GetFieldID(cls, "stLongPress", "I"); JNI_CHECK(env, "stLongPress");
-    g_config.stDoubleTap = env->GetFieldID(cls, "stDoubleTap", "I"); JNI_CHECK(env, "stDoubleTap");
-    g_config.stSingleTapDrag = env->GetFieldID(cls, "stSingleTapDrag", "I"); JNI_CHECK(env, "stSingleTapDrag");
-    g_config.stLongPressDrag = env->GetFieldID(cls, "stLongPressDrag", "I"); JNI_CHECK(env, "stLongPressDrag");
-    g_config.stDoubleTapDrag = env->GetFieldID(cls, "stDoubleTapDrag", "I"); JNI_CHECK(env, "stDoubleTapDrag");
-    g_config.stSingleTap2nd = env->GetFieldID(cls, "stSingleTap2nd", "I"); JNI_CHECK(env, "stSingleTap2nd");
-    g_config.stDoubleTap2nd = env->GetFieldID(cls, "stDoubleTap2nd", "I"); JNI_CHECK(env, "stDoubleTap2nd");
-    g_config.stSingleTapDrag2nd = env->GetFieldID(cls, "stSingleTapDrag2nd", "I"); JNI_CHECK(env, "stSingleTapDrag2nd");
-    g_config.stDoubleTapDrag2nd = env->GetFieldID(cls, "stDoubleTapDrag2nd", "I"); JNI_CHECK(env, "stDoubleTapDrag2nd");
+
+    struct { jfieldID* dst; const char* name; const char* sig; } scalar[] = {
+        { &g_config.touchMode, "touchMode", "I" },
+        { &g_config.inputMode, "inputMode", "I" },
+        { &g_config.longPressTimeoutMs, "longPressTimeoutMs", "I" },
+        { &g_config.doubleTapTimeoutMs, "doubleTapTimeoutMs", "I" },
+        { &g_config.singleTapDelayMs, "singleTapDelayMs", "I" },
+        { &g_config.dragThresholdPx, "dragThresholdPx", "I" },
+        { &g_config.doubleTapDistancePx, "doubleTapDistancePx", "I" },
+        { &g_config.bindingDelayMs, "bindingDelayMs", "I" },
+        { &g_config.longPressDelayMs, "longPressDelayMs", "I" },
+        { &g_config.cursorSpeed, "cursorSpeed", "I" },
+        { &g_config.gestureThresholdPx, "gestureThresholdPx", "I" },
+        { &g_config.cursorAccelerationThreshold, "cursorAccelerationThreshold", "I" },
+        { &g_config.cursorAccelerationFactor, "cursorAccelerationFactor", "F" },
+        { &g_config.screenW, "screenW", "I" },
+        { &g_config.screenH, "screenH", "I" },
+        { &g_config.xformScaleX, "xformScaleX", "F" },
+        { &g_config.xformScaleY, "xformScaleY", "F" },
+        { &g_config.viewOffsetX, "viewOffsetX", "F" },
+        { &g_config.viewOffsetY, "viewOffsetY", "F" },
+        { &g_config.gestureLongPressHaptic, "gestureLongPressHaptic", "I" },
+        { &g_config.hapticEnabled, "hapticEnabled", "Z" },
+    };
+    for (int i = 0; i < (int)(sizeof(scalar)/sizeof(scalar[0])); i++) {
+        *scalar[i].dst = env->GetFieldID(cls, scalar[i].name, scalar[i].sig);
+        JNI_CHECK(env, scalar[i].name);
+    }
+
+    struct { jfieldID* dst; const char* name; } arrays[] = {
+        { &g_config.tsSingleTap, "tsSingleTap" },
+        { &g_config.tsLongPress, "tsLongPress" },
+        { &g_config.tsDoubleTap, "tsDoubleTap" },
+        { &g_config.tsSingleTapDrag, "tsSingleTapDrag" },
+        { &g_config.tsLongPressDrag, "tsLongPressDrag" },
+        { &g_config.tsDoubleTapDrag, "tsDoubleTapDrag" },
+        { &g_config.tsSingleTap2nd, "tsSingleTap2nd" },
+        { &g_config.tsDoubleTap2nd, "tsDoubleTap2nd" },
+        { &g_config.tsSingleTapDrag2nd, "tsSingleTapDrag2nd" },
+        { &g_config.tsDoubleTapDrag2nd, "tsDoubleTapDrag2nd" },
+        { &g_config.tpSingleTap, "tpSingleTap" },
+        { &g_config.tpLongPress, "tpLongPress" },
+        { &g_config.tpDoubleTap, "tpDoubleTap" },
+        { &g_config.tpSingleTapDrag, "tpSingleTapDrag" },
+        { &g_config.tpLongPressDrag, "tpLongPressDrag" },
+        { &g_config.tpDoubleTapDrag, "tpDoubleTapDrag" },
+        { &g_config.tpSingleTap2nd, "tpSingleTap2nd" },
+        { &g_config.tpDoubleTap2nd, "tpDoubleTap2nd" },
+        { &g_config.tpSingleTapDrag2nd, "tpSingleTapDrag2nd" },
+        { &g_config.tpDoubleTapDrag2nd, "tpDoubleTapDrag2nd" },
+    };
+    for (int i = 0; i < (int)(sizeof(arrays)/sizeof(arrays[0])); i++) {
+        *arrays[i].dst = env->GetFieldID(cls, arrays[i].name, "[I");
+        JNI_CHECK(env, arrays[i].name);
+    }
+
+    struct { jfieldID* dst; const char* name; const char* sig; } render_fields[] = {
+        { &g_config.colorPrimary, "colorPrimary", "I" },
+        { &g_config.colorSecondary, "colorSecondary", "I" },
+        { &g_config.strokeWidthDefault, "strokeWidthDefault", "F" },
+        { &g_config.fillAlphaInactiveDefault, "fillAlphaInactiveDefault", "I" },
+    };
+    for (int i = 0; i < (int)(sizeof(render_fields)/sizeof(render_fields[0])); i++) {
+        *render_fields[i].dst = env->GetFieldID(cls, render_fields[i].name, render_fields[i].sig);
+        JNI_CHECK(env, render_fields[i].name);
+    }
+
+    struct { jfieldID* dst; const char* name; } stickies[] = {
+        { &g_config.stSingleTap, "stSingleTap" },
+        { &g_config.stLongPress, "stLongPress" },
+        { &g_config.stDoubleTap, "stDoubleTap" },
+        { &g_config.stSingleTapDrag, "stSingleTapDrag" },
+        { &g_config.stLongPressDrag, "stLongPressDrag" },
+        { &g_config.stDoubleTapDrag, "stDoubleTapDrag" },
+        { &g_config.stSingleTap2nd, "stSingleTap2nd" },
+        { &g_config.stDoubleTap2nd, "stDoubleTap2nd" },
+        { &g_config.stSingleTapDrag2nd, "stSingleTapDrag2nd" },
+        { &g_config.stDoubleTapDrag2nd, "stDoubleTapDrag2nd" },
+    };
+    for (int i = 0; i < (int)(sizeof(stickies)/sizeof(stickies[0])); i++) {
+        *stickies[i].dst = env->GetFieldID(cls, stickies[i].name, "I");
+        JNI_CHECK(env, stickies[i].name);
+    }
+
     env->DeleteLocalRef(cls);
     g_config_cached = true;
 }
@@ -419,6 +538,56 @@ static void nativeInit(JNIEnv* env, jclass clazz, jobject config) {
     memset(&c, 0, sizeof(c));
     read_config_from_java(env, config, &c);
     touch_processor_init(&c);
+}
+
+#pragma pack(push, 1)
+typedef struct {
+    int32_t type;
+    int32_t shape;
+    int32_t x, y;
+    float hw, hh;
+    float scale;
+    float corner_radius;
+    float opacity;
+    uint32_t color_primary;
+    uint32_t color_secondary;
+    float stroke_width;
+    int32_t fill_alpha_inactive;
+    int32_t activation_mode;
+    int32_t range_orientation;
+    int32_t range_binding_count;
+} ElementGeometryEntry;
+#pragma pack(pop)
+
+static ElementGeometryEntry g_geom_buffer[MAX_ELEMENTS];
+static jobject g_geom_buffer_ref = NULL;
+static int g_geom_count = 0;
+static bool g_geom_dirty = false;
+
+static void element_geometry_flush(void) {
+    if (!g_geom_dirty) return;
+    g_geom_dirty = false;
+    int n = g_state.element_count;
+    for (int i = 0; i < n; i++) {
+        const TouchElement* e = &g_state.elements[i];
+        g_geom_buffer[i].type = (int32_t)e->type;
+        g_geom_buffer[i].shape = (int32_t)e->shape;
+        g_geom_buffer[i].x = e->x;
+        g_geom_buffer[i].y = e->y;
+        g_geom_buffer[i].hw = e->hw;
+        g_geom_buffer[i].hh = e->hh;
+        g_geom_buffer[i].scale = e->scale;
+        g_geom_buffer[i].corner_radius = e->corner_radius;
+        g_geom_buffer[i].opacity = e->opacity;
+        g_geom_buffer[i].color_primary = e->color_primary;
+        g_geom_buffer[i].color_secondary = e->color_secondary;
+        g_geom_buffer[i].stroke_width = e->stroke_width;
+        g_geom_buffer[i].fill_alpha_inactive = e->fill_alpha_inactive;
+        g_geom_buffer[i].activation_mode = (int32_t)e->activation_mode;
+        g_geom_buffer[i].range_orientation = e->range_orientation;
+        g_geom_buffer[i].range_binding_count = e->range_binding_count;
+    }
+    g_geom_count = n;
 }
 
 static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) {
@@ -449,6 +618,8 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
         g_elem.orientation = env->GetFieldID(ec, "orientation", "I");
         g_elem.buttonLongPressHaptic = env->GetFieldID(ec, "buttonLongPressHaptic", "I");
         g_elem.buttonGestureHaptic = env->GetFieldID(ec, "buttonGestureHaptic", "I");
+        g_elem.cornerRadius = env->GetFieldID(ec, "cornerRadius", "F");
+        g_elem.opacity = env->GetFieldID(ec, "opacity", "F");
         env->DeleteLocalRef(ec);
     }
 
@@ -483,6 +654,8 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
 
         elems[i].button_long_press_haptic = env->GetIntField(je, g_elem.buttonLongPressHaptic);
         elems[i].button_gesture_haptic = env->GetIntField(je, g_elem.buttonGestureHaptic);
+        elems[i].corner_radius = env->GetFloatField(je, g_elem.cornerRadius);
+        elems[i].opacity = env->GetFloatField(je, g_elem.opacity);
 
         elems[i].element_long_press_count = read_binding_list(env,
             (jintArray)env->GetObjectField(je, g_elem.elementLongPress), elems[i].element_long_press, 8);
@@ -532,10 +705,13 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
     }
 
     touch_processor_set_elements(elems, len);
+    g_geom_dirty = true;
+    element_geometry_flush();
 }
 
 static void nativeSetSnappingSize(JNIEnv* env, jclass clazz, jfloat size) {
     touch_processor_set_snapping_size(size);
+    g_geom_dirty = true;
 }
 
 static void nativeSetResolutionScale(JNIEnv* env, jclass clazz, jfloat scale) {
@@ -549,6 +725,7 @@ static void nativeSetSimTouchScreen(JNIEnv* env, jclass clazz, jboolean enabled)
 static void nativeOnFingerDown(JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y,
                                 jlong timeMs) {
     TouchActionResult r = touch_processor_on_finger_down(ptrId, x, y, (uint64_t)timeMs);
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "event=%s trigger_flush", "down");
     visual_state_flush();
     dispatch_actions_batch(env, &r);
 }
@@ -556,6 +733,7 @@ static void nativeOnFingerDown(JNIEnv* env, jclass clazz, jint ptrId, jfloat x, 
 static void nativeOnFingerMove(JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y,
                                 jlong timeMs) {
     TouchActionResult r = touch_processor_on_finger_move(ptrId, x, y, (uint64_t)timeMs);
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "event=%s trigger_flush", "move");
     visual_state_flush();
     dispatch_actions_batch(env, &r);
 }
@@ -563,21 +741,23 @@ static void nativeOnFingerMove(JNIEnv* env, jclass clazz, jint ptrId, jfloat x, 
 static void nativeOnFingerUp(JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y,
                               jlong timeMs) {
     TouchActionResult r = touch_processor_on_finger_up(ptrId, x, y, (uint64_t)timeMs);
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "event=%s trigger_flush", "up");
     visual_state_flush();
     dispatch_actions_batch(env, &r);
 }
 
 static void nativeTick(JNIEnv* env, jclass clazz, jlong timeMs) {
     TouchActionResult r = touch_processor_tick((uint64_t)timeMs);
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "event=%s trigger_flush", "tick");
     visual_state_flush();
     dispatch_actions_batch(env, &r);
 }
 
 static void nativeReset(JNIEnv* env, jclass clazz) {
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_JNI", "nativeReset called");
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_JNI", "nativeReset called");
     touch_processor_reset();
     memset(g_visual_buffer, 0, sizeof(g_visual_buffer));
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_JNI", "nativeReset done");
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_JNI", "nativeReset done");
 }
 
 static jobject nativeGetVisualBuffer(JNIEnv* env, jclass clazz) {
@@ -605,6 +785,20 @@ static void nativeSetXformScale(JNIEnv* env, jclass clazz, jfloat scaleX, jfloat
 
 static void nativeSetViewOffset(JNIEnv* env, jclass clazz, jfloat offsetX, jfloat offsetY) {
     touch_processor_set_view_offset(offsetX, offsetY);
+}
+
+// --- Element geometry buffer (static, updated on set_elements) ---
+static jobject nativeGetElementGeometry(JNIEnv* env, jclass clazz) {
+    if (g_geom_buffer_ref == NULL) {
+        g_geom_buffer_ref = env->NewGlobalRef(
+            env->NewDirectByteBuffer(g_geom_buffer, sizeof(g_geom_buffer)));
+    }
+    element_geometry_flush();
+    return g_geom_buffer_ref;
+}
+
+static jint nativeGetElementCount(JNIEnv* env, jclass clazz) {
+    return (jint)g_state.element_count;
 }
 
 static jboolean nativeGetElementState(JNIEnv* env, jclass clazz, jint elemIndex, jfloatArray outXY) {
@@ -639,6 +833,16 @@ static jint nativeHoveredIndex(JNIEnv* env, jclass clazz, jint ptrId) {
     return (jint)touch_processor_hovered_index(ptrId);
 }
 
+static void nativeSetDispatchPacked(JNIEnv* env, jclass clazz, jintArray packed) {
+    if (g_dispatch_packed) {
+        env->DeleteGlobalRef(g_dispatch_packed);
+        g_dispatch_packed = NULL;
+    }
+    if (packed) {
+        g_dispatch_packed = (jintArray)env->NewGlobalRef(packed);
+    }
+}
+
 static void nativeRegisterDispatcher(JNIEnv* env, jclass clazz, jobject dispatcher) {
     if (g_dispatch_obj) {
         env->DeleteGlobalRef(g_dispatch_obj);
@@ -647,7 +851,21 @@ static void nativeRegisterDispatcher(JNIEnv* env, jclass clazz, jobject dispatch
     if (!dispatcher) return;
     g_dispatch_obj = env->NewGlobalRef(dispatcher);
     jclass dcls = env->GetObjectClass(dispatcher);
-    g_dispatchAllActions = env->GetMethodID(dcls, "dispatchAllActions", "([I[II)V");
+    g_dispatchAllActions = env->GetMethodID(dcls, "dispatchAllActions", "(I)V");
+    g_injectPointerMove = env->GetMethodID(dcls, "injectPointerMove", "(II)V");
+    g_injectPointerMoveDelta = env->GetMethodID(dcls, "injectPointerMoveDelta", "(II)V");
+    g_injectPointerButtonPress = env->GetMethodID(dcls, "injectPointerButtonPress", "(I)V");
+    g_injectPointerButtonRelease = env->GetMethodID(dcls, "injectPointerButtonRelease", "(I)V");
+    g_injectKeyPress = env->GetMethodID(dcls, "injectKeyPress", "(IZ)V");
+    g_injectKeyRelease = env->GetMethodID(dcls, "injectKeyRelease", "(IZ)V");
+    g_mouseEvent = env->GetMethodID(dcls, "mouseEvent", "(III)V");
+    g_scrollEvent = env->GetMethodID(dcls, "scrollEvent", "(I)V");
+    g_hapticEvent = env->GetMethodID(dcls, "hapticEvent", "(I)V");
+    g_setCursorSpeed = env->GetMethodID(dcls, "setCursorSpeed", "(I)V");
+    g_startMouseMove = env->GetMethodID(dcls, "startMouseMove", "(III)V");
+    g_stopMouseMove = env->GetMethodID(dcls, "stopMouseMove", "()V");
+    g_gamepadState = env->GetMethodID(dcls, "gamepadState", "(IZ)V");
+    g_gamepadAxis = env->GetMethodID(dcls, "gamepadAxis", "(III)V");
     env->DeleteLocalRef(dcls);
 }
 
@@ -685,7 +903,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
         {"nativeTrackedCount", "(I)I", (void*)nativeTrackedCount},
         {"nativeHoveredIndex", "(I)I", (void*)nativeHoveredIndex},
         {"nativeRegisterDispatcher", "(Ljava/lang/Object;)V", (void*)nativeRegisterDispatcher},
+        {"nativeSetDispatchPacked", "([I)V", (void*)nativeSetDispatchPacked},
         {"nativeUpdateConfig", "(Lcom/winlator/cmod/inputcontrols/NativeTouchProcessor$NativeConfig;)V", (void*)nativeUpdateConfig},
+        {"nativeGetElementGeometry", "()Ljava/nio/ByteBuffer;", (void*)nativeGetElementGeometry},
+        {"nativeGetElementCount", "()I", (void*)nativeGetElementCount},
+        {"nativeSyncVisualState", "([F[I[F)I", (void*)nativeSyncVisualState},
     };
 
     int result = env->RegisterNatives(clazz, methods, sizeof(methods)/sizeof(methods[0]));

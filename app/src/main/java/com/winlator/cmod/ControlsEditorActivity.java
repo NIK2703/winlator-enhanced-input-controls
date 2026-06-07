@@ -80,6 +80,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         container.findViewById(R.id.BTRemoveElement).setOnClickListener(this);
         container.findViewById(R.id.BTElementSettings).setOnClickListener(this);
         container.findViewById(R.id.BTCopyElement).setOnClickListener(this);
+        container.findViewById(R.id.BTProfileSettings).setOnClickListener(this);
 
         inputControlsView.setOnEditActionListener(() -> adjustToolbarPosition());
 
@@ -123,6 +124,9 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                 if (!inputControlsView.copyElement()) {
                     AppUtils.showToast(this, R.string.no_control_element_selected);
                 }
+                break;
+            case R.id.BTProfileSettings:
+                showProfileSettings(v);
                 break;
         }
     }
@@ -509,6 +513,127 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             element.setText(text);
             element.setIconId(iconId);
             element.setCustomIconData(customIconData);
+            profile.save();
+            inputControlsView.invalidate();
+            inputControlsView.post(this::adjustToolbarPosition);
+        });
+    }
+
+    private void showProfileSettings(View anchorView) {
+        View view = LayoutInflater.from(this).inflate(R.layout.profile_settings_popup, null);
+
+        // --- Overlay Opacity ---
+        final TextView tvOpacity = view.findViewById(R.id.TVPopupOpacity);
+        SeekBar sbOpacity = view.findViewById(R.id.SBPopupOpacity);
+        sbOpacity.setProgress(Math.round(inputControlsView.getOverlayOpacity() * 100));
+        tvOpacity.setText(sbOpacity.getProgress() + "%");
+        sbOpacity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvOpacity.setText(progress + "%");
+                if (fromUser) {
+                    progress = (int)Mathf.roundTo(progress, 5);
+                    seekBar.setProgress(progress);
+                    float value = progress / 100.0f;
+                    inputControlsView.setOverlayOpacity(value);
+                    PreferenceManager.getDefaultSharedPreferences(ControlsEditorActivity.this).edit().putFloat("overlay_opacity", value).apply();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        // --- Stroke Width ---
+        final TextView tvStrokeWidth = view.findViewById(R.id.TVPopupStrokeWidth);
+        SeekBar sbStrokeWidth = view.findViewById(R.id.SBPopupStrokeWidth);
+        float initSW = profile.getStrokeWidth();
+        sbStrokeWidth.setProgress(Math.round((initSW - 0.05f) * 100));
+        tvStrokeWidth.setText(String.format("%.2fx", initSW));
+        sbStrokeWidth.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                float value = 0.05f + progress * 0.01f;
+                tvStrokeWidth.setText(String.format("%.2fx", value));
+                if (fromUser) {
+                    inputControlsView.setProfileStrokeWidth(value);
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { profile.save(); }
+        });
+
+        // --- Inactive Fill Alpha ---
+        final TextView tvFillAlpha = view.findViewById(R.id.TVPopupFillAlpha);
+        SeekBar sbFillAlpha = view.findViewById(R.id.SBPopupFillAlpha);
+        sbFillAlpha.setProgress(profile.getFillAlphaInactive());
+        tvFillAlpha.setText(String.valueOf(sbFillAlpha.getProgress()));
+        sbFillAlpha.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvFillAlpha.setText(String.valueOf(progress));
+                if (fromUser) {
+                    inputControlsView.setProfileFillAlphaInactive(progress);
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { profile.save(); }
+        });
+
+        // --- Corner Radius ---
+        final TextView tvCornerRadius = view.findViewById(R.id.TVPopupCornerRadius);
+        SeekBar sbCornerRadius = view.findViewById(R.id.SBPopupCornerRadius);
+        float initCR = profile.getCornerRadius();
+        sbCornerRadius.setProgress(Math.round(initCR * 10));
+        tvCornerRadius.setText(String.format("%.1f", initCR));
+        sbCornerRadius.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                float value = progress / 10.0f;
+                tvCornerRadius.setText(String.format("%.1f", value));
+                if (fromUser) {
+                    inputControlsView.setProfileCornerRadius(value);
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { profile.save(); }
+        });
+
+        // --- Popup ---
+        PopupWindow popupWindow = new PopupWindow(this);
+        popupWindow.setElevation(5.0f);
+        int popupWidthPx = (int)UnitUtils.dpToPx(340);
+        popupWindow.setWidth(popupWidthPx);
+        popupWindow.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+        popupWindow.setContentView(view);
+        popupWindow.setFocusable(false);
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.update();
+
+        int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(popupWidthPx, View.MeasureSpec.AT_MOST);
+        int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        view.measure(widthMeasureSpec, heightMeasureSpec);
+        int popupHeightPx = view.getMeasuredHeight();
+
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        int marginPx = (int)UnitUtils.dpToPx(8);
+
+        // Position: centered below toolbar or above if not enough space
+        int toolbarBottom = anchorView.getRootView().findViewById(R.id.LLControlsToolbar).getBottom();
+        int popupY;
+        if (toolbarBottom + popupHeightPx <= screenHeight - marginPx) {
+            popupY = toolbarBottom + marginPx;
+        } else if (toolbarBottom - marginPx - popupHeightPx >= marginPx) {
+            popupY = toolbarBottom - marginPx - popupHeightPx;
+        } else {
+            popupY = marginPx;
+        }
+        int popupX = Math.max(marginPx, (screenWidth - popupWidthPx) / 2);
+
+        popupWindow.showAtLocation(inputControlsView, Gravity.LEFT | Gravity.TOP, popupX, popupY);
+        popupWindow.setFocusable(true);
+        popupWindow.update();
+        popupWindow.setOnDismissListener(() -> {
             profile.save();
             inputControlsView.invalidate();
             inputControlsView.post(this::adjustToolbarPosition);

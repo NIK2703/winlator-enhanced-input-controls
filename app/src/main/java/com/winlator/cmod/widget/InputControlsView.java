@@ -58,6 +58,7 @@ import java.util.TimerTask;
 
 public class InputControlsView extends View {
     public static final float DEFAULT_OVERLAY_OPACITY = 0.4f;
+    public static boolean skipDiskCache = false;
     private static final byte MOUSE_WHEEL_DELTA = 120;
     private boolean editMode = false;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -77,7 +78,10 @@ public class InputControlsView extends View {
     private TouchpadView touchpadView;
     private XServer xServer;
     private NativeTouchProcessor nativeTouchProcessor;
-    private static final int VISUAL_STRIDE = 32;
+    private com.winlator.cmod.renderer.ElementOverlayRenderer elementOverlayRenderer;
+    private static final int VISUAL_STRIDE = 56;
+    private static final long VISUAL_THROTTLE_MS = 16;
+    private long lastInvalidateMs = 0;
     private final Bitmap[] icons = new Bitmap[40];
     private Timer mouseMoveTimer;
     private final PointF mouseMoveOffset = new PointF();
@@ -170,6 +174,12 @@ public class InputControlsView extends View {
         this.editMode = editMode;
     }
 
+    private void scheduleOverlayRender() {
+        if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
+            elementOverlayRenderer.scheduleRender();
+        }
+    }
+
     public void setOverlayOpacity(float overlayOpacity) {
         this.overlayOpacity = overlayOpacity;
         if (profile != null) {
@@ -180,6 +190,47 @@ public class InputControlsView extends View {
         ControlElement.clearSharedPool();
         cachesPreBuilt = false;
         invalidate();
+        scheduleOverlayRender();
+    }
+
+    public void setProfileStrokeWidth(float strokeWidth) {
+        if (profile != null) {
+            profile.setStrokeWidth(strokeWidth);
+            for (ControlElement element : profile.getElements()) {
+                element.invalidateElementCachesKeepDisk();
+            }
+        }
+        ControlElement.clearSharedPool();
+        cachesPreBuilt = false;
+        invalidate();
+        scheduleOverlayRender();
+    }
+
+    public void setProfileFillAlphaInactive(int fillAlpha) {
+        if (profile != null) {
+            profile.setFillAlphaInactive(fillAlpha);
+            for (ControlElement element : profile.getElements()) {
+                element.invalidateElementCachesKeepDisk();
+            }
+        }
+        ControlElement.clearSharedPool();
+        cachesPreBuilt = false;
+        invalidate();
+        scheduleOverlayRender();
+    }
+
+    public void setProfileCornerRadius(float cornerRadius) {
+        skipDiskCache = true;
+        if (profile != null) {
+            profile.setCornerRadius(cornerRadius);
+            for (ControlElement element : profile.getElements()) {
+                element.invalidateElementCachesKeepDisk();
+            }
+        }
+        ControlElement.clearSharedPool();
+        cachesPreBuilt = false;
+        invalidate();
+        scheduleOverlayRender();
     }
 
     public void invalidateCache() {
@@ -191,6 +242,7 @@ public class InputControlsView extends View {
         ControlElement.clearSharedPool();
         cachesPreBuilt = false;
         invalidate();
+        scheduleOverlayRender();
     }
 
     public int getSnappingSize() {
@@ -245,6 +297,7 @@ public class InputControlsView extends View {
                     element.drawCached(canvas);
                 }
                 cachesPreBuilt = true;
+                skipDiskCache = false;
             }
             else {
                 for (ControlElement element : profile.getElements()) {
@@ -499,26 +552,40 @@ public class InputControlsView extends View {
         this.nativeTouchProcessor = p;
     }
 
+    public void setElementOverlayRenderer(com.winlator.cmod.renderer.ElementOverlayRenderer r) {
+        this.elementOverlayRenderer = r;
+        if (r != null) {
+            r.setRenderCallback(canvas -> renderToOverlay(canvas));
+        }
+    }
+
     private void syncVisualStates() {
         if (profile == null) return;
-        ByteBuffer buf = nativeTouchProcessor.getVisualBuffer();
-        if (buf == null) return;
+        long now = System.currentTimeMillis();
+        boolean shouldInvalidate = (now - lastInvalidateMs) >= VISUAL_THROTTLE_MS;
+        if (!shouldInvalidate) return;
         List<ControlElement> elements = profile.getElements();
         int count = elements.size();
-        for (int i = 0; i < count; i++) {
-            int base = i * VISUAL_STRIDE;
+        if (count == 0) return;
+        float[] pos = nativeTouchProcessor.syncPositions;
+        int[] st = nativeTouchProcessor.syncStates;
+        float[] scroll = nativeTouchProcessor.syncScrollOffsets;
+        int n = nativeTouchProcessor.syncVisualState(pos, st, scroll);
+        if (n > count) n = count;
+        for (int i = 0; i < n; i++) {
             ControlElement e = elements.get(i);
+            int flags = st[i];
             e.syncVisualState(
-                buf.getInt(base + 8) != 0,
-                buf.getFloat(base),
-                buf.getFloat(base + 4),
-                buf.getInt(base + 12) != 0,
-                buf.getInt(base + 16) != 0,
-                buf.getInt(base + 20) != 0,
-                buf.getInt(base + 24) != 0,
-                buf.getFloat(base + 28)
+                (flags & 1) != 0,
+                pos[i*2], pos[i*2+1],
+                (flags & 2) != 0,
+                (flags & 4) != 0,
+                (flags & 8) != 0,
+                (flags & 16) != 0,
+                scroll[i]
             );
         }
+        lastInvalidateMs = now;
         invalidate();
     }
 
@@ -526,6 +593,35 @@ public class InputControlsView extends View {
         if (nativeTouchProcessor != null) {
             nativeTouchProcessor.tick(timeMs);
             syncVisualStates();
+        }
+        if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
+            int w = getWidth();
+            int h = getHeight();
+            if (w > 0 && h > 0) {
+                elementOverlayRenderer.setViewSize(w, h);
+            }
+        }
+    }
+
+    public void renderToOverlay(Canvas canvas) {
+        if (profile != null && showTouchscreenControls && !isFocusedOnStick()) {
+            if (!profile.isElementsLoaded()) profile.loadElements(this);
+            // Snapshot via toArray() to avoid ConcurrentModificationException
+            // from UI thread modifications during background render
+            Object[] snapshot = profile.getElements().toArray();
+            if (cachedRenderingEnabled) {
+                for (Object obj : snapshot) {
+                    ControlElement element = (ControlElement) obj;
+                    if (!cachesPreBuilt) element.buildCache();
+                    element.drawCached(canvas);
+                }
+                cachesPreBuilt = true;
+            }
+            else {
+                for (Object obj : snapshot) {
+                    ((ControlElement) obj).draw(canvas);
+                }
+            }
         }
     }
 
@@ -707,6 +803,9 @@ public class InputControlsView extends View {
                     float y = event.getY(actionIndex);
                     nativeTouchProcessor.onFingerDown(pointerId, x, y, event.getEventTime());
                     syncVisualStates();
+                    if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
+                        elementOverlayRenderer.scheduleRender();
+                    }
                     return true;
                 }
                 case MotionEvent.ACTION_MOVE: {
@@ -715,6 +814,9 @@ public class InputControlsView extends View {
                         nativeTouchProcessor.onFingerMove(pid, event.getX(i), event.getY(i), event.getEventTime());
                     }
                     syncVisualStates();
+                    if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
+                        elementOverlayRenderer.scheduleRender();
+                    }
                     return true;
                 }
                 case MotionEvent.ACTION_UP:
@@ -723,11 +825,17 @@ public class InputControlsView extends View {
                     float y = event.getY(actionIndex);
                     nativeTouchProcessor.onFingerUp(pointerId, x, y, event.getEventTime());
                     syncVisualStates();
+                    if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
+                        elementOverlayRenderer.scheduleRender();
+                    }
                     return true;
                 }
                 case MotionEvent.ACTION_CANCEL: {
                     nativeTouchProcessor.reset();
                     invalidate();
+                    if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
+                        elementOverlayRenderer.scheduleRender();
+                    }
                     return true;
                 }
             }
@@ -747,9 +855,8 @@ public class InputControlsView extends View {
                         moveCursor = false;
                         selectElement(element);
                     }
-                    else if (selectedElement != null) {
-                        offsetX = x - selectedElement.getX();
-                        offsetY = y - selectedElement.getY();
+                    else {
+                        deselectAllElements();
                     }
                     break;
                 }

@@ -13,6 +13,10 @@ public class Bitmask implements Iterable<Integer> {
         this.bits = bits;
     }
 
+    public void clear() {
+        this.bits = 0;
+    }
+
     public boolean isSet(long flag) {
         return (flag & this.bits) != 0;
     }

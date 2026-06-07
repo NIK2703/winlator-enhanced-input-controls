@@ -51,17 +51,7 @@ void release_held_actions(TouchActionResult* result) {
         g_state.gesture_is_action_held = false;
         return;
     }
-    // Release in reverse press order (non-modifiers first, then modifiers)
-    for (int i = g_state.gesture_held_count - 1; i >= 0; i--) {
-        const TouchBinding* b = &g_state.gesture_held_actions[i];
-        if (!is_modifier_binding(b))
-            release_binding(result, b);
-    }
-    for (int i = g_state.gesture_held_count - 1; i >= 0; i--) {
-        const TouchBinding* b = &g_state.gesture_held_actions[i];
-        if (is_modifier_binding(b))
-            release_binding(result, b);
-    }
+    release_non_modifiers_first(result, g_state.gesture_held_actions, g_state.gesture_held_count);
     g_state.gesture_held_count = 0;
     g_state.gesture_is_action_held = false;
 }
@@ -77,6 +67,24 @@ bool is_modifier_binding(const TouchBinding* b) {
         return kc == MOD_KEYCODE_SHIFT || kc == MOD_KEYCODE_CTRL || kc == MOD_KEYCODE_ALT;
     }
     return false;
+}
+
+void press_modifiers_first(TouchActionResult* result, const TouchBinding* actions, int count, bool hold) {
+    for (int i = 0; i < count; i++)
+        if (actions[i].type != BINDING_NONE && is_modifier_binding(&actions[i]))
+            press_binding(result, &actions[i], hold);
+    for (int i = 0; i < count; i++)
+        if (actions[i].type != BINDING_NONE && !is_modifier_binding(&actions[i]))
+            press_binding(result, &actions[i], hold);
+}
+
+void release_non_modifiers_first(TouchActionResult* result, const TouchBinding* actions, int count) {
+    for (int i = count - 1; i >= 0; i--)
+        if (actions[i].type != BINDING_NONE && !is_modifier_binding(&actions[i]))
+            release_binding(result, &actions[i]);
+    for (int i = count - 1; i >= 0; i--)
+        if (actions[i].type != BINDING_NONE && is_modifier_binding(&actions[i]))
+            release_binding(result, &actions[i]);
 }
 
 static void execute_actions_impl(TouchActionResult* result, const TouchBinding* actions, int count, bool force_hold) {

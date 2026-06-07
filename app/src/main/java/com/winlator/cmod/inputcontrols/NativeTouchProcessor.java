@@ -116,6 +116,12 @@ public class NativeTouchProcessor {
         public int stDoubleTap2nd;
         public int stSingleTapDrag2nd;
         public int stDoubleTapDrag2nd;
+
+        // Render config (shared across all elements)
+        public int colorPrimary = 0xFFFFFFFF;
+        public int colorSecondary = 0xFF0277BD;
+        public float strokeWidthDefault = 0.2f;
+        public int fillAlphaInactiveDefault = 50;
     }
 
     public static class NativeElement {
@@ -173,6 +179,7 @@ public class NativeTouchProcessor {
     }
     private ByteBuffer visualBuffer;
     private int elementCount;
+    private int[] dispatchPacked;
 
     public NativeTouchProcessor() {
         this.handler = new Handler(Looper.getMainLooper());
@@ -214,12 +221,27 @@ public class NativeTouchProcessor {
     private static native int nativeTrackedCount(int ptrId);
     private static native int nativeHoveredIndex(int ptrId);
     private static native void nativeRegisterDispatcher(Object dispatcher);
+    private static native ByteBuffer nativeGetElementGeometry();
+    private static native int nativeGetElementCount();
+    private static native void nativeSetDispatchPacked(int[] buf);
+    private static native int nativeSyncVisualState(float[] positions, int[] states, float[] scrollOffsets);
+
+    public final float[] syncPositions = new float[200 * 2];
+    public final int[] syncStates = new int[200];
+    public final float[] syncScrollOffsets = new float[200];
+
+    public int syncVisualState(float[] outPositions, int[] outStates, float[] outScrollOffsets) {
+        if (!loaded) return 0;
+        return nativeSyncVisualState(outPositions, outStates, outScrollOffsets);
+    }
 
     public void init(NativeConfig config) {
         if (!loaded) {
             return;
         }
         nativeInit(config);
+        dispatchPacked = new int[128]; // max 32 actions × 4 ints
+        nativeSetDispatchPacked(dispatchPacked);
         nativeRegisterDispatcher(this);
         visualBuffer = nativeGetVisualBuffer();
         if (visualBuffer != null) visualBuffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -362,6 +384,12 @@ public class NativeTouchProcessor {
         c.stDoubleTap2nd = profile.getGestureDoubleTap2ndFingerAction().encodeStickyBitmask();
         c.stSingleTapDrag2nd = profile.getGestureSingleTap2ndFingerDragAction().encodeStickyBitmask();
         c.stDoubleTapDrag2nd = profile.getGestureDoubleTap2ndFingerDragAction().encodeStickyBitmask();
+
+        // Render config
+        c.colorPrimary = 0xFFFFFFFF;
+        c.colorSecondary = 0xFF0277BD;
+        c.strokeWidthDefault = profile.getStrokeWidth();
+        c.fillAlphaInactiveDefault = profile.getFillAlphaInactive();
 
         return c;
     }
@@ -535,6 +563,16 @@ public class NativeTouchProcessor {
         return visualBuffer;
     }
 
+    public ByteBuffer getElementGeometryBuffer() {
+        if (!loaded) return null;
+        return nativeGetElementGeometry();
+    }
+
+    public int getElementCount() {
+        if (!loaded) return 0;
+        return nativeGetElementCount();
+    }
+
     public void reset() {
         if (!loaded) return;
         nativeReset();
@@ -637,12 +675,15 @@ public class NativeTouchProcessor {
         }
     }
 
-    public void dispatchAllActions(int[] types, int[] intArgs, int count) {
+    public void dispatchAllActions(int count) {
+        int[] buf = dispatchPacked;
+        if (buf == null) return;
         for (int i = 0; i < count; i++) {
-            int type = types[i];
-            int a0 = intArgs[i * 3];
-            int a1 = intArgs[i * 3 + 1];
-            int a2 = intArgs[i * 3 + 2];
+            int base = i * 4;
+            int type = buf[base];
+            int a0 = buf[base + 1];
+            int a1 = buf[base + 2];
+            int a2 = buf[base + 3];
             if (type == 13 || type == 14) {
                 Log.d("Winlator_StickBinding", "NTP.dispatchAllActions type="+type+" a0="+a0+" a1="+a1+" a2="+a2);
             }

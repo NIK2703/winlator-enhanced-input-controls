@@ -14,35 +14,27 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     g_state.main_ptr_id = f->ptr_id;
 
     g_state.passthrough_active = false;
-    for (int i = 0; i < g_state.element_count; i++) {
-        TouchElement* pe = &g_state.elements[i];
-        if (pe->bindings[0].type == BINDING_MOUSE_LEFT)
-            g_state.pointer_left_enabled = false;
-        if (point_in_element(x, y, pe) && pe->passthrough_touch)
-            g_state.passthrough_active = true;
-    }
-
-    // LOCK elements
-    {
-        bool found_lock = false;
-        for (int i = 0; i < g_state.element_count; i++) {
-            if (point_in_element(x, y, &g_state.elements[i]) && g_state.elements[i].activation_mode == ACTIVATION_LOCK) {
-                handle_element_down(&g_state.elements[i], f->ptr_id, x, y, time_ms, result);
-                found_lock = true;
-            }
-        }
-        if (found_lock) return;
-    }
-
-    // TRACK/HOVER non-BUTTON
+    bool found_lock = false;
     bool handled = false;
     for (int i = 0; i < g_state.element_count; i++) {
-        TouchElement* e = &g_state.elements[i];
-        if (e->type != ELEM_BUTTON && point_in_element(x, y, e)) {
-            handle_element_down(e, f->ptr_id, x, y, time_ms, result);
-            if (!e->passthrough_touch) handled = true;
+        TouchElement* pe = &g_state.elements[i];
+        if (__builtin_expect(pe->bindings[0].type == BINDING_MOUSE_LEFT, 0))
+            g_state.pointer_left_enabled = false;
+        if (!point_in_element(x, y, pe)) continue;
+
+        if (__builtin_expect(pe->passthrough_touch, 0))
+            g_state.passthrough_active = true;
+
+        ActivationMode am = pe->activation_mode;
+        if (__builtin_expect(am == ACTIVATION_LOCK, 0)) {
+            handle_element_down(pe, f->ptr_id, x, y, time_ms, result);
+            found_lock = true;
+        } else if (__builtin_expect(pe->type != ELEM_BUTTON, 0)) {
+            handle_element_down(pe, f->ptr_id, x, y, time_ms, result);
+            if (!pe->passthrough_touch) handled = true;
         }
     }
+    if (__builtin_expect(found_lock, 0)) return;
 
     // TRACK/HOVER BUTTON
     TouchElement* btn = hit_test_element(x, y);
@@ -249,8 +241,12 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 // handle_gesture_move
 // ============================================================
 void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    // Cache hit_test_element result to avoid redundant spatial grid lookups
+    TouchElement* ht_elem = NULL;
+    bool ht_elem_valid = false;
+
     // Track whether finger has ever moved beyond drag_threshold (for LP cancel logic)
-    if (fabsf(f->x - f->down_x) > g_state.cfg.drag_threshold_px || fabsf(f->y - f->down_y) > g_state.cfg.drag_threshold_px)
+    if (__builtin_expect(fabsf(f->x - f->down_x) > g_state.cfg.drag_threshold_px || fabsf(f->y - f->down_y) > g_state.cfg.drag_threshold_px, 0))
         f->cached_has_moved_beyond_threshold = true;
 
     // Save first tracked button's gesture state before element processing
@@ -279,7 +275,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     bool had_element_move = false;
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
-        if (e->engaged && e->current_ptr_id == f->ptr_id) {
+        if (__builtin_expect(e->engaged && e->current_ptr_id == f->ptr_id, 0)) {
             if (e->passthrough_touch) continue;
             handle_element_move(e, x, y, time_ms, result);
             had_element_move = true;
@@ -289,7 +285,8 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     // Toggle switch slide-over: handle toggles under finger regardless of tb->count
     // (works even when finger starts on empty space)
     {
-        TouchElement* toggle_btn = hit_test_element(x, y);
+        if (!ht_elem_valid) { ht_elem = hit_test_element(x, y); ht_elem_valid = true; }
+        TouchElement* toggle_btn = ht_elem;
         if (toggle_btn && toggle_btn->type == ELEM_BUTTON && toggle_btn->toggle_switch) {
             ActivationMode mode = g_state.element_count > 0 ?
                 g_state.elements[0].activation_mode : ACTIVATION_LOCK;
@@ -305,11 +302,13 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                         if (toggle_btn->bindings[0].type != BINDING_NONE)
                             release_binding(result, &toggle_btn->bindings[0]);
                         toggle_btn->selected = false;
+                        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "gesture_move[%d] type=%d visual=0 (toggle_deselect)", (int)(toggle_btn - g_state.elements), toggle_btn->type);
                         toggle_btn->visual_active = false;
                     } else {
                         if (toggle_btn->bindings[0].type != BINDING_NONE)
                             press_binding(result, &toggle_btn->bindings[0], true);
                         toggle_btn->selected = true;
+                        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "gesture_move[%d] type=%d visual=1 (toggle_select)", (int)(toggle_btn - g_state.elements), toggle_btn->type);
                         toggle_btn->visual_active = true;
                     }
                     toggle_btn->gesture_timer_armed = true;
@@ -333,7 +332,8 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
             if (first_idx >= 0 && first_idx < g_state.element_count) {
                 TouchElement* first = &g_state.elements[first_idx];
                 if (first->type == ELEM_BUTTON) {
-                    TouchElement* new_btn = hit_test_element(x, y);
+                    if (!ht_elem_valid) { ht_elem = hit_test_element(x, y); ht_elem_valid = true; }
+                    TouchElement* new_btn = ht_elem;
                     if (new_btn && new_btn->type == ELEM_BUTTON) {
                         if (!new_btn->toggle_switch) {
                             bool already = false;
@@ -357,7 +357,8 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                     if (first->activation_mode == ACTIVATION_HOVER) {
                         int hovered = g_state.hovered_element_per_ptr[pi];
                         TouchElement* prev = (hovered >= 0 && hovered < g_state.element_count) ? &g_state.elements[hovered] : NULL;
-                        TouchElement* curr = hit_test_element(x, y);
+                        if (!ht_elem_valid) { ht_elem = hit_test_element(x, y); ht_elem_valid = true; }
+                        TouchElement* curr = ht_elem;
                         if (prev && (!curr || curr != prev) && !prev->toggle_switch) {
                             bool prev_is_first = prev == &g_state.elements[tb->element_indices[0]];
                             release_element_bindings(prev, result);
@@ -368,6 +369,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                                 prev->gesture_timer_armed = first_btn_gest_timer;
                                 prev->current_ptr_id = f->ptr_id;
                                 prev->engaged = true;
+                                prev->visual_active = true;
                             }
                         }
                         if (curr && curr->type == ELEM_BUTTON && curr != prev) {
@@ -377,6 +379,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                                 if (curr->bindings[0].type != BINDING_NONE) {
                                     press_binding(result, &curr->bindings[0], true);
                                 }
+                                TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "gesture_move[%d] type=%d visual=1 (hover_activate)", (int)(curr - g_state.elements), curr->type);
                                 curr->visual_active = true;
                                 curr->engaged = true;
                                 curr->current_ptr_id = f->ptr_id;
@@ -395,7 +398,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
         }
     }
 
-    if (had_element_move) {
+    if (__builtin_expect(had_element_move, 0)) {
         f->last_x = x;
         f->last_y = y;
         return;
@@ -416,7 +419,8 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 
     // Legacy element hit test (passthrough elements are skipped — they've already
     // been filtered out above in the first element loop via continue for passthrough).
-    TouchElement* elem = hit_test_element(x, y);
+    if (!ht_elem_valid) { ht_elem = hit_test_element(x, y); ht_elem_valid = true; }
+    TouchElement* elem = ht_elem;
     if (elem && elem->current_ptr_id == f->ptr_id && !elem->passthrough_touch) {
         handle_element_move(elem, x, y, time_ms, result);
         f->last_x = x;
@@ -558,12 +562,7 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
                 int idx = tb->element_indices[j];
                 if (idx >= 0 && idx < g_state.element_count) {
                     TouchElement* e = &g_state.elements[idx];
-                    if (e->toggle_switch) {
-                        handle_element_up(e, x, y, time_ms, result);
-                    } else {
-                        if (e->bindings[0].type != BINDING_NONE)
-                            release_binding(result, &e->bindings[0]);
-                    }
+                    handle_element_up(e, x, y, time_ms, result);
                     if (e->gesture_swipe_triggered)
                         release_bindings_list(result, e->element_gesture, e->element_gesture_count);
                     if (e->gesture_long_press_triggered)
@@ -571,12 +570,6 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
                     e->long_press_arm = false;
                     e->gesture_long_press_triggered = false;
                     e->gesture_swipe_triggered = false;
-                    if (!e->toggle_switch) {
-                        e->current_ptr_id = -1;
-                        e->engaged = false;
-                        e->visual_active = false;
-                        g_state.visual_state_dirty = true;
-                    }
                 }
             }
             had_tracked = true;
@@ -605,7 +598,7 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
 
     bool had_element = false;
     for (int i = 0; i < g_state.element_count; i++) {
-        if (g_state.elements[i].current_ptr_id == f->ptr_id) {
+        if (__builtin_expect(g_state.elements[i].current_ptr_id == f->ptr_id, 0)) {
             handle_element_up(&g_state.elements[i], x, y, time_ms, result);
             had_element = true;
         }

@@ -90,6 +90,7 @@ import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.midi.MidiHandler;
 import com.winlator.cmod.midi.MidiManager;
 import com.winlator.cmod.renderer.VulkanRenderer;
+import com.winlator.cmod.renderer.ElementOverlayRenderer;
 import com.winlator.cmod.widget.WinlatorHUD;
 import com.winlator.cmod.widget.HudDataSource;
 import com.winlator.cmod.widget.InputControlsView;
@@ -165,6 +166,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private InputControlsView inputControlsView;
     private TouchpadView touchpadView;
     private NativeTouchProcessor nativeTouchProcessor;
+    private ElementOverlayRenderer elementOverlayRenderer;
     private XEnvironment environment;
     private DrawerLayout drawerLayout;
     private ContainerManager containerManager;
@@ -951,6 +953,13 @@ if (enableLogs) {
             nativeTouchProcessor = null;
         }
 
+        // Initialize ElementOverlayRenderer for Vulkan compositing of control elements
+        VulkanRenderer vkRenderer = xServerView.getRenderer();
+        if (vkRenderer != null) {
+            elementOverlayRenderer = new ElementOverlayRenderer(vkRenderer, vkRenderer.getNativeHandle());
+            inputControlsView.setElementOverlayRenderer(elementOverlayRenderer);
+        }
+
         startTouchscreenTimeout();
         boolean isTimeoutEnabled = preferences.getBoolean("touchscreen_timeout_enabled", false);
         if (isTimeoutEnabled) startTouchscreenTimeout();
@@ -1677,6 +1686,11 @@ private void applySidebarSettings() {
         inputControlsView.setShowTouchscreenControls(true);
         inputControlsView.setVisibility(View.GONE);
         inputControlsView.setProfile(null);
+
+        if (elementOverlayRenderer != null) {
+            elementOverlayRenderer.stop();
+            elementOverlayRenderer = null;
+        }
 
         // Stop native tick timer
         if (nativeTickRunnable != null && handler != null) {

@@ -216,6 +216,17 @@ Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetScanoutWindow(
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_renderer_VulkanRenderer_nativeUpdateElementOverlay(
+    JNIEnv* env, jobject, jlong handle, jobject buf, jint w, jint h)
+{
+    auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (!r || !buf) return;
+    void* px = env->GetDirectBufferAddress(buf);
+    if (px && env->GetDirectBufferCapacity(buf) >= (jlong)w * h * 4)
+        r->updateElementOverlay(px, w, h);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetVerboseLog(JNIEnv*, jobject, jlong handle, jboolean v) {
     auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
     if (r) r->setVerboseLog((bool)v);
@@ -274,4 +285,10 @@ Java_com_winlator_cmod_renderer_VulkanRenderer_nativeReattachSurface(JNIEnv* env
         r->destroyScanout();
     }
     return (jboolean)ok;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_renderer_VulkanRenderer_nativeOnVsync(JNIEnv*, jobject, jlong handle, jlong frameTimeNs) {
+    auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (r) r->onVsync();
 }

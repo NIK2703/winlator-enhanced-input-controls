@@ -1,4 +1,3 @@
-#include <android/log.h>
 #include "touch_processor_internal.h"
 
 ActivationMode activation_get_mode(int elem_index) {
@@ -31,10 +30,12 @@ bool activation_get_element_visual(int elem_index, float* out_x, float* out_y, b
 }
 
 void activation_activate_at(float x, float y) {
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_activate_at(%.0f,%.0f)", x, y);
     for (int i = 0; i < g_state.element_count; i++) {
         bool hit = point_in_element(x, y, &g_state.elements[i]);
         g_state.elements[i].visual_active = hit;
         if (hit) {
+            TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_activate_at[%d] type=%d visual=1 (hit)", i, g_state.elements[i].type);
             g_state.elements[i].visual_x = x;
             g_state.elements[i].visual_y = y;
         }
@@ -43,6 +44,7 @@ void activation_activate_at(float x, float y) {
 }
 
 void activation_deactivate_all(void) {
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_deactivate_all count=%d", g_state.element_count);
     for (int i = 0; i < g_state.element_count; i++) {
         g_state.elements[i].visual_active = false;
     }
@@ -74,14 +76,35 @@ static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* resul
         if (btn->bindings[0].type != BINDING_NONE)
             release_binding(result, &btn->bindings[0]);
         btn->selected = false;
+        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=0 (deselect)", (int)(btn - g_state.elements));
         btn->visual_active = false;
     } else {
         if (btn->bindings[0].type != BINDING_NONE)
             press_binding(result, &btn->bindings[0], true);
         btn->selected = true;
+        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=1 (select)", (int)(btn - g_state.elements));
         btn->visual_active = true;
     }
     g_state.visual_state_dirty = true;
+}
+
+static void process_engaged_non_buttons(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    for (int i = 0; i < g_state.element_count; i++) {
+        TouchElement* e = &g_state.elements[i];
+        if (e->current_ptr_id == ptr_id && e->type != ELEM_BUTTON)
+            handle_element_move(e, x, y, time_ms, result);
+    }
+}
+
+static bool release_engaged_elements(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    bool handled = false;
+    for (int i = 0; i < g_state.element_count; i++) {
+        if (g_state.elements[i].current_ptr_id == ptr_id) {
+            handle_element_up(&g_state.elements[i], x, y, time_ms, result);
+            handled = true;
+        }
+    }
+    return handled;
 }
 
 bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
@@ -162,13 +185,7 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
             break;
         }
         case ACTIVATION_TRACK: {
-            // Process non-button engaged elements
-            for (int i = 0; i < g_state.element_count; i++) {
-                TouchElement* e = &g_state.elements[i];
-                if (e->current_ptr_id == ptr_id && e->type != ELEM_BUTTON) {
-                    handle_element_move(e, x, y, time_ms, result);
-                }
-            }
+            process_engaged_non_buttons(ptr_id, x, y, time_ms, result);
             // Tracked buttons: check for new button at position
             TrackedButtons* tb = &g_state.tracked[(uint32_t)ptr_id % MAX_FINGERS];
             if (tb->ptr_id == ptr_id && tb->count > 0) {
@@ -202,13 +219,7 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
             break;
         }
         case ACTIVATION_HOVER: {
-            // Process non-button engaged elements
-            for (int i = 0; i < g_state.element_count; i++) {
-                TouchElement* e = &g_state.elements[i];
-                if (e->current_ptr_id == ptr_id && e->type != ELEM_BUTTON) {
-                    handle_element_move(e, x, y, time_ms, result);
-                }
-            }
+            process_engaged_non_buttons(ptr_id, x, y, time_ms, result);
             // Hover transitions: prev.deactivate(), curr.activate()
             int pid_slot = (uint32_t)ptr_id % MAX_FINGERS;
             int prev_idx = g_state.hovered_element_per_ptr[pid_slot];
@@ -267,13 +278,7 @@ bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchA
     switch (mode) {
         case ACTIVATION_LOCK:
         case ACTIVATION_HOVER: {
-            // Release element at pointer
-            for (int i = 0; i < g_state.element_count; i++) {
-                if (g_state.elements[i].current_ptr_id == ptr_id) {
-                    handle_element_up(&g_state.elements[i], x, y, time_ms, result);
-                    handled = true;
-                }
-            }
+            handled = release_engaged_elements(ptr_id, x, y, time_ms, result);
             break;
         }
         case ACTIVATION_TRACK: {
@@ -298,6 +303,7 @@ bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchA
 }
 
 void activation_reset(void) {
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_reset count=%d", g_state.element_count);
     for (int i = 0; i < MAX_FINGERS; i++) {
         g_state.tracked[i].ptr_id = -1;
         g_state.tracked[i].count = 0;
