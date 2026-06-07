@@ -574,8 +574,10 @@ static void nativeTick(JNIEnv* env, jclass clazz, jlong timeMs) {
 }
 
 static void nativeReset(JNIEnv* env, jclass clazz) {
+    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_JNI", "nativeReset called");
     touch_processor_reset();
     memset(g_visual_buffer, 0, sizeof(g_visual_buffer));
+    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_JNI", "nativeReset done");
 }
 
 static jobject nativeGetVisualBuffer(JNIEnv* env, jclass clazz) {

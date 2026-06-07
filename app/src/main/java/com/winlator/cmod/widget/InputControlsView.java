@@ -66,6 +66,7 @@ public class InputControlsView extends View {
     private final Point cursor = new Point();
     private boolean readyToDraw = false;
     private boolean moveCursor = false;
+    private Runnable onEditActionListener;
     private int snappingSize;
     private float offsetX;
     private float offsetY;
@@ -337,6 +338,7 @@ public class InputControlsView extends View {
             profile.save();
             invalidateCache();
             selectElement(element);
+            if (onEditActionListener != null) onEditActionListener.run();
             return true;
         }
         else return false;
@@ -349,13 +351,21 @@ public class InputControlsView extends View {
             element.setBindingCount(selectedElement.getBindingCount());
             for (int i = 0; i < element.getBindingCount(); i++) {
                 element.setBindingSequence(i, new ArrayList<>(selectedElement.getBindingSequence(i)));
+                List<Boolean> stickySeq = selectedElement.getBindingSticky(i);
+                for (int j = 0; j < stickySeq.size(); j++) {
+                    element.setBindingSticky(i, j, stickySeq.get(j));
+                }
             }
             element.setShape(selectedElement.getShape());
             element.setToggleSwitch(selectedElement.isToggleSwitch());
+            element.setPassthroughTouch(selectedElement.isPassthroughTouch());
+            element.setAutoRepeat(selectedElement.isAutoRepeat());
+            element.setAutoRepeatIntervalMs(selectedElement.getAutoRepeatIntervalMs());
             element.setScale(selectedElement.getScale());
             element.setText(selectedElement.getText());
             element.setIconId(selectedElement.getIconId());
             element.setCustomIconData(selectedElement.getCustomIconData());
+            if (selectedElement.getOpacity() >= 0) element.setOpacity(selectedElement.getOpacity());
             if (selectedElement.getRange() != null) element.setRange(selectedElement.getRange());
             element.setOrientation(selectedElement.getOrientation());
             element.setElementWidth(selectedElement.getElementWidth());
@@ -374,6 +384,7 @@ public class InputControlsView extends View {
             profile.save();
             invalidateCache();
             selectElement(element);
+            if (onEditActionListener != null) onEditActionListener.run();
             return true;
         }
         else return false;
@@ -385,6 +396,7 @@ public class InputControlsView extends View {
             selectedElement = null;
             profile.save();
             invalidateCache();
+            if (onEditActionListener != null) onEditActionListener.run();
             return true;
         }
         else return false;
@@ -426,6 +438,10 @@ public class InputControlsView extends View {
 
     public boolean isShowTouchscreenControls() {
         return showTouchscreenControls;
+    }
+
+    public void setOnEditActionListener(Runnable listener) {
+        this.onEditActionListener = listener;
     }
 
     public void setShowTouchscreenControls(boolean showTouchscreenControls) {
@@ -729,8 +745,12 @@ public class InputControlsView extends View {
                         offsetX = x - element.getX();
                         offsetY = y - element.getY();
                         moveCursor = false;
+                        selectElement(element);
                     }
-                    selectElement(element);
+                    else if (selectedElement != null) {
+                        offsetX = x - selectedElement.getX();
+                        offsetY = y - selectedElement.getY();
+                    }
                     break;
                 }
                 case MotionEvent.ACTION_MOVE: {
@@ -742,7 +762,10 @@ public class InputControlsView extends View {
                     break;
                 }
                 case MotionEvent.ACTION_UP: {
-                    if (selectedElement != null && profile != null) profile.save();
+                    if (selectedElement != null && profile != null) {
+                        profile.save();
+                        if (onEditActionListener != null) onEditActionListener.run();
+                    }
                     if (moveCursor) cursor.set((int) Mathf.roundTo(event.getX(), snappingSize), (int) Mathf.roundTo(event.getY(), snappingSize));
                     invalidate();
                     break;

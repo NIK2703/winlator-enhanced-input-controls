@@ -264,7 +264,6 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
 
     // SDTW timeout — second-finger double-tap expired, fire ST fallback
     {
-        TouchFinger* mf = NULL;
         if (g_state.second_double_tap_waiting
             && time_ms - g_state.second_tap_fallback_time >= g_state.cfg.double_tap_timeout_ms) {
             g_state.second_double_tap_waiting = false;
@@ -272,7 +271,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
                 execute_actions(result, g_state.second_tap_fallback, g_state.second_tap_fallback_count);
                 g_state.second_tap_fallback_count = 0;
             }
-            mf = find_finger(g_state.gesture_main_ptr_id);
+            TouchFinger* mf = find_finger(g_state.gesture_main_ptr_id);
             if (mf && mf->state != GESTURE_STATE_DRAGGING)
                 mf->state = GESTURE_STATE_IDLE;
         }
@@ -280,7 +279,6 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
 
     // DT timeout — first-finger double-tap expired, fire deferred S or D
     {
-        TouchFinger* mf = NULL;
         if (g_state.gesture_double_tap_waiting
             && time_ms - g_state.gesture_double_tap_start_time >= g_state.cfg.double_tap_timeout_ms) {
             g_state.gesture_double_tap_waiting = false;
@@ -291,7 +289,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
                                 g_state.gesture_pending_deferred_double_count);
             }
             gesture_clear_deferred_tap();
-            mf = find_finger(g_state.gesture_main_ptr_id);
+            TouchFinger* mf = find_finger(g_state.gesture_main_ptr_id);
             if (mf) mf->state = GESTURE_STATE_IDLE;
         }
     }
@@ -299,8 +297,15 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
     // Deferred single-tap (replaces nanosleep)
     for (int i = 0; i < MAX_FINGERS; i++) {
         TouchFinger* f = &g_state.fingers[i];
-        if (!f->active || !f->single_tap_deferred) continue;
+        if (!f->active || !f->single_tap_deferred) {
+            if (f->single_tap_deferred && !f->active)
+                __android_log_print(ANDROID_LOG_WARN, LOG_TAG, "gesture_tick: deferred tap SKIPPED finger[%d] active=%d ptr=%d",
+                    i, f->active, f->ptr_id);
+            continue;
+        }
         if (time_ms >= f->single_tap_deferred_time) {
+            __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "gesture_tick: processing deferred tap finger[%d] ptr=%d",
+                i, f->ptr_id);
             f->single_tap_deferred = false;
             handle_tap_up_impl(f, result, time_ms);
             if (!g_state.gesture_second_active || !g_state.gesture_is_action_held
@@ -335,6 +340,11 @@ inline void execute_tap_on_finger_down(TouchFinger* f, TouchActionResult* result
 static inline void fire_single_tap_on_up(TouchFinger* f, TouchActionResult* result) {
     if (!g_state.gesture_is_action_held && f->bindings.single_tap_count > 0)
         execute_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+}
+
+static inline void fire_single_and_idle(TouchFinger* f, TouchActionResult* result) {
+    fire_single_tap_on_up(f, result);
+    f->state = GESTURE_STATE_IDLE;
 }
 
 // Enter DT_WAITING state, optionally saving deferred bindings.
@@ -417,8 +427,7 @@ static void handle_tap_up_impl(TouchFinger* f, TouchActionResult* result, uint64
     // Path 3: double_tap_consumed (3+ tap)
     if (g_state.gesture_double_tap_consumed) {
         g_state.gesture_double_tap_consumed = false;
-        fire_single_tap_on_up(f, result);
-        f->state = GESTURE_STATE_IDLE;
+        fire_single_and_idle(f, result);
         return;
     }
 
@@ -429,16 +438,11 @@ static void handle_tap_up_impl(TouchFinger* f, TouchActionResult* result, uint64
         enter_double_tap_waiting(f, time_ms,
             active_single, active_single_count,
             active_double, active_double_count);
-    } else {
+    } else if (active_has_double_tap_drag) {
         fire_single_tap_on_up(f, result);
-        if (active_has_double_tap_drag) {
-            // Dd-only: enter DT_WAITING for 3-tap detection
-            enter_double_tap_waiting(f, time_ms,
-                NULL, 0,
-                NULL, 0);
-        } else {
-            f->state = GESTURE_STATE_IDLE;
-        }
+        enter_double_tap_waiting(f, time_ms, NULL, 0, NULL, 0);
+    } else {
+        fire_single_and_idle(f, result);
     }
 }
 

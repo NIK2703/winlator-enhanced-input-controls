@@ -112,7 +112,7 @@ public class ControlElement {
     private Shape shape = Shape.CIRCLE;
     private float elementWidth = 8f;
     private float elementHeight = 4f;
-    private float cornerRadius = 0.6f;
+    private float cornerRadius = -1f;
     private float dpadCornerRadius = 0.6f;
     private List<List<Binding>> bindings = new ArrayList<>();
     private List<List<Boolean>> bindingSticky = new ArrayList<>();
@@ -167,11 +167,13 @@ public class ControlElement {
 
     private float cachedStrokeWidth;
     private int cachedFillAlphaInactive;
+    private float cachedProfileCornerRadius = 0.8f;
 
     private void refreshProfileCache() {
         ControlsProfile p = inputControlsView.getProfile();
         cachedStrokeWidth = p != null ? p.getStrokeWidth() : 0.2f;
         cachedFillAlphaInactive = p != null ? p.getFillAlphaInactive() : 50;
+        cachedProfileCornerRadius = p != null ? p.getCornerRadius() : 0.8f;
     }
 
     public ControlElement(InputControlsView inputControlsView) {
@@ -219,6 +221,8 @@ public class ControlElement {
         customIconData = "";
         customIcon = null;
         range = null;
+        cornerRadius = -1f;
+        opacity = -1f;
         boundingBoxNeedsUpdate = true;
         refreshProfileCache();
         invalidateElementCache();
@@ -362,12 +366,18 @@ public class ControlElement {
     }
 
     public void setOpacity(float opacity) {
-        this.opacity = Math.max(opacity, 0.1f);
+        this.opacity = opacity < 0 ? -1f : Math.max(opacity, 0.1f);
         invalidateElementCachesKeepDisk();
     }
 
     public float getEffectiveOpacity() {
         return opacity >= 0 ? opacity : inputControlsView.getOverlayOpacity();
+    }
+
+    public float getEffectiveCornerRadius() {
+        if (cornerRadius >= 0) return cornerRadius;
+        ControlsProfile p = inputControlsView.getProfile();
+        return p != null ? p.getCornerRadius() : 0.8f;
     }
 
     public int getEffectiveAlphaInt() {
@@ -847,7 +857,7 @@ public class ControlElement {
         int pid = p != null ? p.id : 0;
         String prefix = layer == LAYER_FILL ? "f_" : "c_";
         String raw = pid + "|" + type.ordinal() + "|" + shape.ordinal() + "|" + elementWidth + "|" + elementHeight
-            + "|" + cornerRadius + "|" + scale;
+            + "|" + getEffectiveCornerRadius() + "|" + scale;
         if (layer == LAYER_FILL || layer == LAYER_COMBINED) {
             raw += "|" + getDisplayText() + "|" + iconId;
             if (hasCustomIcon()) raw += "|" + customIconData;
@@ -857,7 +867,7 @@ public class ControlElement {
 
     private String visualKey(int layer) {
         float effOp = getEffectiveOpacity();
-        String base = type.ordinal() + "_" + shape.ordinal() + "_" + elementWidth + "_" + elementHeight + "_" + cornerRadius + "_" + scale + "_" + (int)(effOp * 255);
+        String base = type.ordinal() + "_" + shape.ordinal() + "_" + elementWidth + "_" + elementHeight + "_" + getEffectiveCornerRadius() + "_" + scale + "_" + (int)(effOp * 255);
         String customSuffix = hasCustomIcon() ? "_" + customIconData.hashCode() : "";
         switch (layer) {
             case 0: return base + "_" + getDisplayText() + "_" + iconId + customSuffix + "_fill";
@@ -1046,12 +1056,12 @@ public class ControlElement {
                 }
                 case RANGE_BUTTON: {
                     int snappingSize = inputControlsView.getSnappingSize();
-                    float radius = snappingSize * 0.75f * scale;
+                    float radius = getEffectiveCornerRadius() * snappingSize * scale;
                     c.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, paint);
                     break;
                 }
                 case TRACKPAD: {
-                    float radius = box.height() * 0.15f;
+                    float radius = getEffectiveCornerRadius() * inputControlsView.getSnappingSize() * scale;
                     c.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, paint);
                     break;
                 }
@@ -1150,8 +1160,9 @@ public class ControlElement {
         Paint paint = inputControlsView.getPaint();
         float strokeWidth = snappingSize * strokeWidthMultiplier();
         paint.setPathEffect(null);
-        if (dpadCornerRadius > 0) {
-            if (dpadPathEffect == null) dpadPathEffect = new CornerPathEffect(dpadCornerRadius * snappingSize * scale);
+        float effCr = getEffectiveCornerRadius();
+        if (effCr > 0) {
+            if (dpadPathEffect == null) dpadPathEffect = new CornerPathEffect(effCr * snappingSize * scale);
             paint.setPathEffect(dpadPathEffect);
         }
         String strokeKey = diskKey(LAYER_FILL) + "_dpad_stroke";
@@ -1328,7 +1339,7 @@ public class ControlElement {
                     paint.setColor(savedColor);
                 }
             } else {
-                float radius = snappingSize * 0.75f * scale;
+                float radius = getEffectiveCornerRadius() * snappingSize * scale;
                 float elementSize = scroller.getElementSize();
                 float minTextSize = snappingSize * 2 * scale;
                 float scrollOffset = scroller.getScrollOffset();
@@ -1475,8 +1486,9 @@ public class ControlElement {
                 Path dpadPath = inputControlsView.getPath();
 
                 paint.setPathEffect(null);
-                if (dpadCornerRadius > 0) {
-                    if (dpadPathEffect == null) dpadPathEffect = new CornerPathEffect(dpadCornerRadius * snappingSize * scale);
+                float effCr = getEffectiveCornerRadius();
+                if (effCr > 0) {
+                    if (dpadPathEffect == null) dpadPathEffect = new CornerPathEffect(effCr * snappingSize * scale);
                     paint.setPathEffect(dpadPathEffect);
                 }
 
@@ -1569,7 +1581,7 @@ public class ControlElement {
             }
             case RANGE_BUTTON: {
                 Range range = getRange();
-                float radius = snappingSize * 0.75f * scale;
+                float radius = getEffectiveCornerRadius() * snappingSize * scale;
                 float elementSize = scroller.getElementSize();
                 float minTextSize = snappingSize * 2 * scale;
                 float scrollOffset = scroller.getScrollOffset();
@@ -1695,7 +1707,8 @@ public class ControlElement {
             }
 
             case TRACKPAD: {
-                float radius = boundingBox.height() * 0.15f;
+                int snapSize = inputControlsView.getSnappingSize();
+                float radius = getEffectiveCornerRadius() * snapSize * scale;
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(fillColor);
                 canvas.drawRoundRect(boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, paint);
@@ -1706,9 +1719,9 @@ public class ControlElement {
                 float offset = strokeWidth * 2.5f;
                 float innerStrokeWidth = strokeWidth * 2;
                 float innerHeight = boundingBox.height() - offset * 2;
-                radius = (innerHeight / boundingBox.height()) * radius - (innerStrokeWidth * 0.5f + strokeWidth * 0.5f);
+                float innerRadius = (innerHeight / boundingBox.height()) * radius - (innerStrokeWidth * 0.5f + strokeWidth * 0.5f);
                 paint.setStrokeWidth(innerStrokeWidth);
-                canvas.drawRoundRect(boundingBox.left + offset, boundingBox.top + offset, boundingBox.right - offset, boundingBox.bottom - offset, radius, radius, paint);
+                canvas.drawRoundRect(boundingBox.left + offset, boundingBox.top + offset, boundingBox.right - offset, boundingBox.bottom - offset, innerRadius, innerRadius, paint);
                 break;
             }
         }
@@ -1722,7 +1735,7 @@ public class ControlElement {
                 canvas.drawCircle(cx, cy, box.width() * 0.5f, paint);
                 break;
             case RECT: {
-                float r = cornerRadius * snappingSize * scale;
+                float r = getEffectiveCornerRadius() * snappingSize * scale;
                 if (r > 0)
                     canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, r, r, paint);
                 else
@@ -1751,11 +1764,9 @@ public class ControlElement {
             JSONObject elementJSONObject = new JSONObject();
             elementJSONObject.put("type", type.name());
             elementJSONObject.put("shape", shape.name());
-            if (type == Type.BUTTON && shape == Shape.RECT) {
-                elementJSONObject.put("elementWidth", elementWidth);
-                elementJSONObject.put("elementHeight", elementHeight);
-                elementJSONObject.put("cornerRadius", cornerRadius);
-            }
+            elementJSONObject.put("elementWidth", elementWidth);
+            elementJSONObject.put("elementHeight", elementHeight);
+            if (cornerRadius >= 0) elementJSONObject.put("cornerRadius", cornerRadius);
 
             JSONArray bindingsJSONArray = new JSONArray();
             for (List<Binding> seq : bindings) {
@@ -1809,9 +1820,7 @@ public class ControlElement {
                 elementJSONObject.put("range", range.name());
                 if (orientation != 0) elementJSONObject.put("orientation", orientation);
             }
-            if (type == Type.D_PAD && dpadCornerRadius > 0) {
-                elementJSONObject.put("dpadCornerRadius", dpadCornerRadius);
-            }
+
             return elementJSONObject;
         }
         catch (JSONException e) {

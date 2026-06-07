@@ -69,6 +69,21 @@ int activation_hovered_for_ptr(int ptr_id) {
 
 // --- Legacy Java-compatible handlers ---
 
+static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* result) {
+    if (btn->selected) {
+        if (btn->bindings[0].type != BINDING_NONE)
+            release_binding(result, &btn->bindings[0]);
+        btn->selected = false;
+        btn->visual_active = false;
+    } else {
+        if (btn->bindings[0].type != BINDING_NONE)
+            press_binding(result, &btn->bindings[0], true);
+        btn->selected = true;
+        btn->visual_active = true;
+    }
+    g_state.visual_state_dirty = true;
+}
+
 bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     bool handled = false;
     ActivationMode mode = g_state.element_count > 0 ?
@@ -160,20 +175,7 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
                 TouchElement* btn = hit_test_element(x, y);
                 if (btn && btn->type == ELEM_BUTTON) {
                     if (btn->toggle_switch) {
-                        // Slide-over toggle: toggle state, update visual, don't track
-                        if (btn->selected) {
-                            if (btn->bindings[0].type != BINDING_NONE)
-                                release_binding(result, &btn->bindings[0]);
-                            btn->selected = false;
-                            btn->visual_active = false;
-                            g_state.visual_state_dirty = true;
-                        } else {
-                            if (btn->bindings[0].type != BINDING_NONE)
-                                press_binding(result, &btn->bindings[0], true);
-                            btn->selected = true;
-                            btn->visual_active = true;
-                            g_state.visual_state_dirty = true;
-                        }
+                        toggle_slide_over(btn, result);
                     } else {
                         bool already = false;
                         for (int j = 0; j < tb->count; j++) {
@@ -222,20 +224,7 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
                     // Activate current
                     if (btn && btn->type == ELEM_BUTTON) {
                         if (btn->toggle_switch) {
-                            // Slide-over toggle: toggle state, update visual, clear hover
-                            if (btn->selected) {
-                                if (btn->bindings[0].type != BINDING_NONE)
-                                    release_binding(result, &btn->bindings[0]);
-                                btn->selected = false;
-                                btn->visual_active = false;
-                                g_state.visual_state_dirty = true;
-                            } else {
-                                if (btn->bindings[0].type != BINDING_NONE)
-                                    press_binding(result, &btn->bindings[0], true);
-                                btn->selected = true;
-                                btn->visual_active = true;
-                                g_state.visual_state_dirty = true;
-                            }
+                            toggle_slide_over(btn, result);
                             g_state.hovered_element_per_ptr[pid_slot] = -1;
                         } else {
                             bool already = false;

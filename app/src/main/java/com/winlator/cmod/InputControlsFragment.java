@@ -90,6 +90,8 @@ public class InputControlsFragment extends Fragment {
     private TextView tvStrokeWidth;
     private SeekBar sbFillAlphaInactive;
     private TextView tvFillAlphaInactive;
+    private SeekBar sbCornerRadius;
+    private TextView tvCornerRadius;
 
     private int[] keycodes;
 
@@ -346,6 +348,27 @@ public class InputControlsFragment extends Fragment {
             tvFillAlphaInactive.setText(String.valueOf(fa));
         });
 
+        tvCornerRadius = view.findViewById(R.id.TVCornerRadius);
+        sbCornerRadius = view.findViewById(R.id.SBCornerRadius);
+        sbCornerRadius.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                float value = progress / 10.0f;
+                tvCornerRadius.setText(String.format("%.1f", value));
+                if (fromUser && currentProfile != null) {
+                    currentProfile.setCornerRadius(value);
+                    currentProfile.save();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        sbCornerRadius.post(() -> {
+            float cr = currentProfile != null ? currentProfile.getCornerRadius() : 0.8f;
+            sbCornerRadius.setProgress(Math.round(cr * 10));
+            tvCornerRadius.setText(String.format("%.1f", cr));
+        });
+
         Spinner spTouchActivation = view.findViewById(R.id.SPTouchActivation);
         setupEnumSpinner(spTouchActivation, TouchActivationMode.values(), currentProfile != null ? currentProfile.getTouchActivationMode() : TouchActivationMode.LOCK);
         spTouchActivation.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -569,6 +592,9 @@ public class InputControlsFragment extends Fragment {
                     int fina = currentProfile.getFillAlphaInactive();
                     sbFillAlphaInactive.setProgress(fina);
                     tvFillAlphaInactive.setText(String.valueOf(fina));
+                    float cr = currentProfile.getCornerRadius();
+                    sbCornerRadius.setProgress(Math.round(cr * 10));
+                    tvCornerRadius.setText(String.format("%.1f", cr));
                 }
                 updateStarIcon.run();
             }

@@ -50,6 +50,8 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
     int n = count < MAX_ELEMENTS ? count : MAX_ELEMENTS;
     memcpy(g_state.elements, elements, n * sizeof(TouchElement));
     g_state.element_count = n;
+    g_state.button_count = 0;
+    g_state.range_count = 0;
     g_state.cfg.caps_has_track_hover_buttons = false;
     g_state.cfg.caps_has_toggle_switch = false;
     for (int i = 0; i < n; i++) {
@@ -66,11 +68,7 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
             g_state.cfg.caps_has_toggle_switch = true;
         float hs_snap = g_state.snapping_size > 0.0f ? g_state.snapping_size : 1.0f;
         element_compute_snapped_hwhh(e, hs_snap);
-    }
-    g_state.button_count = 0;
-    g_state.range_count = 0;
-    for (int i = 0; i < n; i++) {
-        TouchElement* e = &g_state.elements[i];
+
         if (e->type == ELEM_BUTTON && g_state.button_count < MAX_ELEMENTS)
             g_state.button_indices[g_state.button_count++] = i;
         else if (e->type == ELEM_RANGE_BUTTON && g_state.range_count < MAX_ELEMENTS)
@@ -98,8 +96,9 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "on_finger_down ptr=%d x=%.0f y=%.0f time=%llu count=%d",
         ptr_id, x, y, (unsigned long long)time_ms, g_state.element_count);
     TouchActionResult result; result.count = 0;
-    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "gesture_main_ptr_id=%d second_active=%d",
-        g_state.gesture_main_ptr_id, g_state.gesture_second_active);
+    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "gesture_main_ptr_id=%d second_active=%d touch_mode=%d gen=%d",
+        g_state.gesture_main_ptr_id, g_state.gesture_second_active,
+        g_state.cfg.touch_mode, g_state.cfg.bindings_generation);
     // Java does NOT release held actions on every finger-down — only in specific
     // paths (second-finger TouchscreenGestureHandler path or TouchpadGestureHandler
     // onFingerDown). Releasing here would cancel a long-press hold
@@ -109,7 +108,10 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     TouchFinger* f = find_finger(ptr_id);
     if (!f) {
         f = find_free_finger();
-        if (!f) return result;
+        if (!f) {
+            __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "on_finger_down: NO FREE FINGER SLOT!");
+            return result;
+        }
         f->ptr_id = ptr_id;
         f->active = true;
         f->bindings_generation = 0;  // force binding copy
@@ -145,8 +147,13 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     // Copy all 12 FingerBindings lists from config
     FingerBindings* fb = &f->bindings;
     if (f->bindings_generation != g_state.cfg.bindings_generation) {
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "bindings copy: finger_gen=%d cfg_gen=%d",
+            f->bindings_generation, g_state.cfg.bindings_generation);
         setup_main_finger_bindings(fb);
         f->bindings_generation = g_state.cfg.bindings_generation;
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "bindings result: S=%d L=%d D=%d Sd=%d Ld=%d Dd=%d",
+            fb->single_tap_count, fb->long_press_count, fb->double_tap_count,
+            fb->single_tap_drag_count, fb->long_press_drag_count, fb->double_tap_drag_count);
     }
     touch_finger_cache_bs(f);
 
@@ -171,9 +178,16 @@ TouchActionResult touch_processor_on_finger_move(int ptr_id, float x, float y, u
 TouchActionResult touch_processor_on_finger_up(int ptr_id, float x, float y, uint64_t time_ms) {
     TouchActionResult result; result.count = 0;
     TouchFinger* f = find_finger(ptr_id);
-    if (!f) return result;
+    if (!f) {
+        __android_log_print(ANDROID_LOG_WARN, LOG_TAG, "on_finger_up: finger not found ptr=%d", ptr_id);
+        return result;
+    }
+    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "on_finger_up ptr=%d state=%d active=%d act_fingers=%d",
+        ptr_id, f->state, f->active, g_state.active_finger_count);
     f->x = x; f->y = y;
     handle_gesture_up(f, x, y, time_ms, &result);
+    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "on_finger_up: after handle_gesture_up active=%d ptr_id=%d",
+        f->active, f->ptr_id);
     deactivate_finger(f);
     g_state.free_finger_hint = (int)(f - g_state.fingers);
     return result;
@@ -189,6 +203,11 @@ void touch_processor_on_finger_cancel(int ptr_id) {
 
 TouchActionResult touch_processor_tick(uint64_t time_ms) {
     TouchActionResult result; result.count = 0;
+
+    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "tick: time=%llu active=%d dt_wait=%d sdtw=%d caps_gesture=%d caps_dt=%d",
+        (unsigned long long)time_ms, g_state.active_finger_count,
+        g_state.gesture_double_tap_waiting, g_state.second_double_tap_waiting,
+        g_state.cfg.caps_has_gesture_bindings, g_state.cfg.caps_has_double_tap);
 
     process_scheduled_actions(&result, time_ms);
 
@@ -324,23 +343,37 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
 
 void touch_processor_reset(void) {
     // Save config/geometry before memset
+    TouchProcessorConfig saved_cfg = g_state.cfg;
     int saved_element_count = g_state.element_count;
     float saved_snapping_size = g_state.snapping_size;
     float saved_resolution_scale = g_state.resolution_scale;
     int saved_button_count = g_state.button_count;
     int saved_range_count = g_state.range_count;
+    float saved_ptr_x = g_state.ptr_x;
+    float saved_ptr_y = g_state.ptr_y;
     TouchElement saved_elements[MAX_ELEMENTS];
     memcpy(saved_elements, g_state.elements, sizeof(g_state.elements));
 
+    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "reset: cfg.touch_mode=%d gen=%d caps_gesture=%d caps_dt=%d caps_drag=%d",
+        saved_cfg.touch_mode, saved_cfg.bindings_generation,
+        saved_cfg.caps_has_gesture_bindings, saved_cfg.caps_has_double_tap, saved_cfg.caps_has_drag_bindings);
+
     memset(&g_state, 0, sizeof(g_state));
 
-    // Restore config/geometry
+    // Restore config (NOT zeroed — needed for touch processing after reset)
+    g_state.cfg = saved_cfg;
+    // Restore geometry
     g_state.element_count = saved_element_count;
     g_state.snapping_size = saved_snapping_size;
     g_state.resolution_scale = saved_resolution_scale;
     g_state.button_count = saved_button_count;
     g_state.range_count = saved_range_count;
+    g_state.ptr_x = saved_ptr_x;
+    g_state.ptr_y = saved_ptr_y;
     memcpy(g_state.elements, saved_elements, sizeof(g_state.elements));
+
+    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "reset: after restore cfg.touch_mode=%d gen=%d caps_gesture=%d",
+        g_state.cfg.touch_mode, g_state.cfg.bindings_generation, g_state.cfg.caps_has_gesture_bindings);
 
     // Reset runtime state only
     g_state.main_ptr_id = -1;
@@ -366,42 +399,8 @@ void touch_processor_reset(void) {
     g_state.pointer_right_enabled = true;
     g_state.scroll_accum_y = 0;
 
-    for (int i = 0; i < g_state.element_count; i++) {
-        g_state.elements[i].current_ptr_id = -1;
-        g_state.elements[i].engaged = false;
-        g_state.elements[i].visual_active = false;
-        g_state.elements[i].visual_x = g_state.elements[i].x;
-        g_state.elements[i].visual_y = g_state.elements[i].y;
-        g_state.elements[i].down_time_ms = 0;
-        g_state.elements[i].long_press_arm = false;
-        g_state.elements[i].gesture_long_press_triggered = false;
-        g_state.elements[i].gesture_swipe_triggered = false;
-        g_state.elements[i].gesture_swipe_direction = -1;
-        g_state.elements[i].gesture_timer_armed = false;
-        g_state.elements[i].gesture_suppressed = false;
-        g_state.elements[i].auto_repeat_last_time = 0;
-        g_state.elements[i].auto_repeat_primary_pressed = false;
-        g_state.elements[i].range_scrolling = false;
-        g_state.elements[i].range_has_binding = false;
-        g_state.elements[i].range_hold_pressed = false;
-        g_state.elements[i].range_pending_tap_release = false;
-        g_state.elements[i].range_tap_release_time = 0;
-        g_state.elements[i].range_current_offset = 0;
-        g_state.elements[i].range_scroll_offset = 0;
-        g_state.elements[i].range_last_position = 0;
-        g_state.elements[i].down_x = 0;
-        g_state.elements[i].down_y = 0;
-        g_state.elements[i].stick_value_x = 0;
-        g_state.elements[i].stick_value_y = 0;
-        g_state.elements[i].trackpad_last_x = 0;
-        g_state.elements[i].trackpad_last_y = 0;
-        g_state.elements[i].trackpad_vel_x = 0;
-        g_state.elements[i].trackpad_vel_y = 0;
-        g_state.elements[i].trackpad_last_time = 0;
-        g_state.elements[i].selected = false;
-        for (int p = 0; p < MAX_PETALS; p++)
-            g_state.elements[i].petal_active[p] = false;
-    }
+    for (int i = 0; i < g_state.element_count; i++)
+        element_reset_runtime(&g_state.elements[i]);
     g_state.visual_state_dirty = true;
     activation_reset();
 }

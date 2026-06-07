@@ -94,30 +94,33 @@
                 android:min="20"
                 android:max="200" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Corner Radius"/>
-
-                <TextView
-                    android:id="@+id/TVRadius"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-
-            <SeekBar
-                android:id="@+id/SBRadius"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:min="0"
-                android:max="100" />
         </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/LLElementCornerRadius"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Corner Radius" />
+
+            <TextView
+                android:id="@+id/TVRadius"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/SBRadius"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:min="0"
+            android:max="100" />
 
         <LinearLayout
             android:id="@+id/LLDPadOptions"
@@ -197,6 +200,7 @@
             android:id="@+id/SBOpacity"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:min="10"
             android:max="100" />
 
         <LinearLayout

@@ -57,6 +57,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private int singleTapDelay;
     private float strokeWidth = 0.15f;
     private int fillAlphaInactive = 0;
+    private float cornerRadius = 0.8f;
     private TouchActivationMode touchActivationMode = TouchActivationMode.LOCK;
 
 
@@ -374,6 +375,14 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
     public void setFillAlphaInactive(int fillAlphaInactive) {
         this.fillAlphaInactive = fillAlphaInactive;
+    }
+
+    public float getCornerRadius() {
+        return cornerRadius;
+    }
+
+    public void setCornerRadius(float cornerRadius) {
+        this.cornerRadius = cornerRadius;
     }
 
     public TouchActivationMode getTouchActivationMode() {
@@ -776,6 +785,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (doubleTapDistance != 50) data.put("doubleTapDistance", doubleTapDistance);
             if (gestureThreshold != 20) data.put("gestureThreshold", gestureThreshold);
             if (strokeWidth != 0.2f) data.put("strokeWidth", strokeWidth);
+            data.put("cornerRadius", cornerRadius);
             data.put("fillAlphaInactive", fillAlphaInactive);
 
             JSONArray elementsJSONArray = new JSONArray();
@@ -939,6 +949,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (profileJSONObject.has("dragThreshold")) dragThreshold = clamp(profileJSONObject.getInt("dragThreshold"), 0, 30);
             if (profileJSONObject.has("strokeWidth")) strokeWidth = (float)profileJSONObject.getDouble("strokeWidth");
             if (profileJSONObject.has("fillAlphaInactive")) fillAlphaInactive = profileJSONObject.getInt("fillAlphaInactive");
+            if (profileJSONObject.has("cornerRadius")) setCornerRadius((float)profileJSONObject.getDouble("cornerRadius"));
             if (profileJSONObject.has("gestureSettings")) {
                 loadUnifiedGestureSettingsFromJson(profileJSONObject.getJSONObject("gestureSettings"));
             }
@@ -970,7 +981,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                         default:
                             element.setElementWidth(8f);
                             element.setElementHeight(4f);
-                            element.setCornerRadius(0f);
                             break;
                     }
                 } else {

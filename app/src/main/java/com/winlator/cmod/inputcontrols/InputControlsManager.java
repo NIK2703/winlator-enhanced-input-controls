@@ -281,6 +281,7 @@ public class InputControlsManager {
             int bindingDelay = -1;
             int longPressDelay = -1;
             int dragThreshold = -1;
+            float cornerRadius = Float.NaN;
             int doubleTapTimeout = -1;
             int longPressTimeout = -1;
             String secondFingerModeStr = null;
@@ -306,6 +307,9 @@ public class InputControlsManager {
                 }
                 else if (name.equals("dragThreshold")) {
                     dragThreshold = reader.nextInt();
+                }
+                else if (name.equals("cornerRadius")) {
+                    cornerRadius = (float) reader.nextDouble();
                 }
                 else if (name.equals("touchscreenGestures")) {
                     reader.beginObject();
@@ -361,6 +365,7 @@ public class InputControlsManager {
             if (bindingDelay >= 0) profile.setBindingDelay(bindingDelay);
             if (longPressDelay >= 0) profile.setLongPressDelay(longPressDelay);
             if (dragThreshold >= 0) profile.setDragThreshold(dragThreshold);
+            if (!Float.isNaN(cornerRadius)) profile.setCornerRadius(cornerRadius);
 
             profile.markGestureSettingsLoaded();
             return profile;

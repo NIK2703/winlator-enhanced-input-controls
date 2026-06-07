@@ -384,7 +384,7 @@ public class NativeTouchProcessor {
             ne.w = ce.getElementWidth();
             ne.h = ce.getElementHeight();
             ne.scale = ce.getScale();
-            ne.cornerRadius = ce.getCornerRadius();
+            ne.cornerRadius = ce.getEffectiveCornerRadius();
             ne.passthroughTouch = ce.isPassthroughTouch();
             ne.activationMode = activationMode != null ? activationMode.ordinal() : 0;
             ne.toggleSwitch = ce.isToggleSwitch();

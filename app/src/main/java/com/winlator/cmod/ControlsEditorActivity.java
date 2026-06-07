@@ -2,11 +2,13 @@ package com.winlator.cmod;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -16,6 +18,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.view.Gravity;
 import android.widget.PopupWindow;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
@@ -61,7 +64,8 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
 
         inputControlsView = new InputControlsView(this);
         inputControlsView.setEditMode(true);
-        inputControlsView.setOverlayOpacity(0.6f);
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
+        inputControlsView.setOverlayOpacity(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY));
 
         profile = InputControlsManager.loadProfile(this, ControlsProfile.getProfileFile(this, getIntent().getIntExtra("profile_id", 0)));
         ((TextView)findViewById(R.id.TVProfileName)).setText(profile.getName());
@@ -76,6 +80,10 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         container.findViewById(R.id.BTRemoveElement).setOnClickListener(this);
         container.findViewById(R.id.BTElementSettings).setOnClickListener(this);
         container.findViewById(R.id.BTCopyElement).setOnClickListener(this);
+
+        inputControlsView.setOnEditActionListener(() -> adjustToolbarPosition());
+
+        inputControlsView.post(this::adjustToolbarPosition);
     }
 
     @Override
@@ -119,6 +127,47 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         }
     }
 
+    private void adjustToolbarPosition() {
+        View toolbar = findViewById(R.id.LLControlsToolbar);
+        if (profile == null || toolbar == null || inputControlsView.getSnappingSize() == 0) return;
+
+        int snappingSize = inputControlsView.getSnappingSize();
+        int hPad = snappingSize * 3;
+        int vPad = snappingSize * 2;
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+
+        // Use getTop() — stable reference, never includes translationY (fixes oscillation)
+        int defaultTop = toolbar.getTop();
+        int th = toolbar.getHeight();
+        int tw = toolbar.getWidth();
+        int tl = toolbar.getLeft();
+        int tr = tl + tw;
+
+        // Greedy: start from default top, find first Y with no element overlap
+        int testY = defaultTop;
+        boolean conflict;
+        int maxIter = 100;
+
+        do {
+            conflict = false;
+            for (ControlElement element : profile.getElements()) {
+                Rect box = element.getBoundingBox();
+                if (box.right > tl - hPad && box.left < tr + hPad) {
+                    if (box.top < testY + th + vPad && box.bottom > testY - vPad) {
+                        testY = Math.max(testY, box.bottom + vPad);
+                        conflict = true;
+                        break;
+                    }
+                }
+            }
+        } while (conflict && --maxIter > 0);
+
+        float newTranslationY = Math.max(0, testY - defaultTop);
+        if (toolbar.getTranslationY() != newTranslationY) {
+            toolbar.setTranslationY(newTranslationY);
+        }
+    }
+
     private void showControlElementSettings(View anchorView) {
         final ControlElement element = inputControlsView.getSelectedElement();
         View view = LayoutInflater.from(this).inflate(R.layout.control_element_settings, null);
@@ -135,6 +184,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             view.findViewById(R.id.LLCustomTextIcon).setVisibility(View.GONE);
             view.findViewById(R.id.LLRangeOptions).setVisibility(View.GONE);
             view.findViewById(R.id.LLRectDimensions).setVisibility(View.GONE);
+            view.findViewById(R.id.LLElementCornerRadius).setVisibility(View.GONE);
             view.findViewById(R.id.LLDPadOptions).setVisibility(View.GONE);
 
             if (type == ControlElement.Type.BUTTON) {
@@ -150,12 +200,17 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                 if (shape == ControlElement.Shape.RECT) {
                     view.findViewById(R.id.LLRectDimensions).setVisibility(View.VISIBLE);
                 }
+                view.findViewById(R.id.LLElementCornerRadius).setVisibility(View.VISIBLE);
             }
             else if (type == ControlElement.Type.RANGE_BUTTON) {
                 view.findViewById(R.id.LLRangeOptions).setVisibility(View.VISIBLE);
+                view.findViewById(R.id.LLElementCornerRadius).setVisibility(View.VISIBLE);
+            }
+            else if (type == ControlElement.Type.TRACKPAD) {
+                view.findViewById(R.id.LLElementCornerRadius).setVisibility(View.VISIBLE);
             }
             else if (type == ControlElement.Type.D_PAD) {
-                view.findViewById(R.id.LLDPadOptions).setVisibility(View.VISIBLE);
+                view.findViewById(R.id.LLElementCornerRadius).setVisibility(View.VISIBLE);
             }
 
             loadBindingSpinners(element, view);
@@ -171,6 +226,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             element.setOrientation((byte)(checkedId == R.id.RBVertical ? 1 : 0));
             profile.save();
             inputControlsView.invalidate();
+            inputControlsView.post(this::adjustToolbarPosition);
         });
 
         NumberPicker npColumns = view.findViewById(R.id.NPColumns);
@@ -179,6 +235,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             element.setBindingCount(value);
             profile.save();
             inputControlsView.invalidate();
+            inputControlsView.post(this::adjustToolbarPosition);
         });
 
         final TextView tvScale = view.findViewById(R.id.TVScale);
@@ -193,6 +250,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                     element.setScale(progress / 100.0f);
                     profile.save();
                     inputControlsView.invalidate();
+                    inputControlsView.post(ControlsEditorActivity.this::adjustToolbarPosition);
                 }
             }
 
@@ -206,31 +264,31 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
 
         final TextView tvOpacity = view.findViewById(R.id.TVOpacity);
         SeekBar sbOpacity = view.findViewById(R.id.SBOpacity);
-        final float profileOpacity = inputControlsView.getOverlayOpacity();
-        final Runnable updateOpacityLabel = () -> {
-            float elemOpacity = element.getOpacity();
-            if (elemOpacity < 0) {
-                tvOpacity.setText(getString(R.string.default_) + " (" + Math.round(profileOpacity * 100) + "%)");
-                sbOpacity.setProgress(Math.round(profileOpacity * 100));
-            }
-            else {
-                tvOpacity.setText(Math.round(elemOpacity * 100) + "%");
-                sbOpacity.setProgress(Math.round(elemOpacity * 100));
-            }
-        };
-        updateOpacityLabel.run();
+        final int profileOpacityProgress = Math.round(inputControlsView.getOverlayOpacity() * 100);
+        float initOpacity = element.getOpacity();
+        if (initOpacity < 0) {
+            tvOpacity.setText(getString(R.string.default_) + " (" + profileOpacityProgress + "%)");
+            sbOpacity.setProgress(profileOpacityProgress);
+        }
+        else {
+            tvOpacity.setText(Math.round(initOpacity * 100) + "%");
+            sbOpacity.setProgress(Math.round(initOpacity * 100));
+        }
         sbOpacity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) {
-                    if (progress < 10) {
-                        progress = 10;
-                        seekBar.setProgress(10);
+                    progress = (int)Mathf.roundTo(progress, 5);
+                    seekBar.setProgress(progress);
+                    if (progress == profileOpacityProgress) {
+                        element.setOpacity(-1f);
+                        tvOpacity.setText(getString(R.string.default_) + " (" + profileOpacityProgress + "%)");
+                    } else {
+                        element.setOpacity(progress / 100.0f);
+                        tvOpacity.setText(progress + "%");
                     }
-                    element.setOpacity(progress / 100.0f);
                     profile.save();
                     inputControlsView.invalidate();
-                    updateOpacityLabel.run();
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -247,6 +305,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                     element.setElementWidth(progress / 10.0f);
                     profile.save();
                     inputControlsView.invalidate();
+                    inputControlsView.post(ControlsEditorActivity.this::adjustToolbarPosition);
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -264,6 +323,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                     element.setElementHeight(progress / 10.0f);
                     profile.save();
                     inputControlsView.invalidate();
+                    inputControlsView.post(ControlsEditorActivity.this::adjustToolbarPosition);
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -273,12 +333,26 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
 
         final TextView tvRadius = view.findViewById(R.id.TVRadius);
         SeekBar sbRadius = view.findViewById(R.id.SBRadius);
+        final int profileRadiusProgress = Math.round(profile.getCornerRadius() * 10);
+        float initRadius = element.getCornerRadius();
+        if (initRadius < 0) {
+            tvRadius.setText(getString(R.string.default_) + " (" + String.format("%.1f", profileRadiusProgress / 10.0f) + ")");
+            sbRadius.setProgress(profileRadiusProgress);
+        } else {
+            tvRadius.setText(String.format("%.1f", initRadius));
+            sbRadius.setProgress(Math.round(initRadius * 10));
+        }
         sbRadius.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvRadius.setText(String.format("%.1f", progress / 10.0f));
                 if (fromUser) {
-                    element.setCornerRadius(progress / 10.0f);
+                    if (progress == profileRadiusProgress) {
+                        element.setCornerRadius(-1f);
+                        tvRadius.setText(getString(R.string.default_) + " (" + String.format("%.1f", profileRadiusProgress / 10.0f) + ")");
+                    } else {
+                        element.setCornerRadius(progress / 10.0f);
+                        tvRadius.setText(String.format("%.1f", progress / 10.0f));
+                    }
                     profile.save();
                     inputControlsView.invalidate();
                 }
@@ -286,7 +360,6 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
-        sbRadius.setProgress((int)(element.getCornerRadius() * 10));
 
         final TextView tvDPadRadius = view.findViewById(R.id.TVDPadRadius);
         SeekBar sbDPadRadius = view.findViewById(R.id.SBDPadRadius);
@@ -354,7 +427,70 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
 
         updateLayout.run();
 
-        PopupWindow popupWindow = AppUtils.showPopupWindow(anchorView, view, 340, 0);
+        // --- Popup: gravitate toward right, stay connected to element ---
+        PopupWindow popupWindow = new PopupWindow(this);
+        popupWindow.setElevation(5.0f);
+        int popupWidthPx = (int)UnitUtils.dpToPx(340);
+        popupWindow.setWidth(popupWidthPx);
+        popupWindow.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+        popupWindow.setContentView(view);
+        popupWindow.setFocusable(false);
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.update();
+
+        int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(popupWidthPx, View.MeasureSpec.AT_MOST);
+        int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        view.measure(widthMeasureSpec, heightMeasureSpec);
+        int popupHeightPx = view.getMeasuredHeight();
+
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        int marginPx = (int)UnitUtils.dpToPx(8);
+
+        // Element screen coordinates
+        Rect box = element.getBoundingBox();
+        int[] viewLocation = new int[2];
+        inputControlsView.getLocationOnScreen(viewLocation);
+        int elemLeft = viewLocation[0] + box.left;
+        int elemTop = viewLocation[1] + box.top;
+        int elemRight = viewLocation[0] + box.right;
+        int elemBottom = viewLocation[1] + box.bottom;
+
+        // --- Y: prefer top-aligned → below → above → clamped ---
+        int popupY;
+        if (elemTop + popupHeightPx <= screenHeight - marginPx) {
+            popupY = elemTop;
+        } else if (elemBottom + popupHeightPx <= screenHeight - marginPx) {
+            popupY = elemBottom;
+        } else if (elemTop - popupHeightPx >= marginPx) {
+            popupY = elemTop - popupHeightPx;
+        } else {
+            popupY = Math.max(marginPx, screenHeight - popupHeightPx - marginPx);
+        }
+
+        // --- X: right-of-element (connected) → left-of-element (fallback) → right edge (last resort) ---
+        int popupX;
+        if (elemRight + marginPx + popupWidthPx <= screenWidth - marginPx) {
+            popupX = elemRight + marginPx;
+        } else if (elemLeft - marginPx - popupWidthPx >= marginPx) {
+            popupX = elemLeft - marginPx - popupWidthPx;
+        } else {
+            popupX = Math.max(marginPx, screenWidth - marginPx - popupWidthPx);
+        }
+
+        // If the fallback right-edge position still overlaps, try vertical separation
+        if (popupX < elemRight && popupX + popupWidthPx > elemLeft &&
+            popupY < elemBottom && popupY + popupHeightPx > elemTop) {
+            if (elemBottom + popupHeightPx <= screenHeight - marginPx) {
+                popupY = elemBottom;
+            } else if (elemTop - popupHeightPx >= marginPx) {
+                popupY = elemTop - popupHeightPx;
+            }
+        }
+
+        popupWindow.showAtLocation(inputControlsView, Gravity.LEFT | Gravity.TOP, popupX, popupY);
+        popupWindow.setFocusable(true);
+        popupWindow.update();
         popupWindow.setOnDismissListener(() -> {
             String text = etCustomText.getText().toString().trim();
             byte iconId = 0;
@@ -375,6 +511,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             element.setCustomIconData(customIconData);
             profile.save();
             inputControlsView.invalidate();
+            inputControlsView.post(this::adjustToolbarPosition);
         });
     }
 
@@ -388,6 +525,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                 profile.save();
                 callback.run();
                 inputControlsView.invalidate();
+                inputControlsView.post(ControlsEditorActivity.this::adjustToolbarPosition);
             }
 
             @Override
@@ -411,6 +549,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                 profile.save();
                 callback.run();
                 inputControlsView.invalidate();
+                inputControlsView.post(ControlsEditorActivity.this::adjustToolbarPosition);
             }
 
             @Override

@@ -164,6 +164,10 @@ public abstract class AppUtils {
     }
 
     public static PopupWindow showPopupWindow(View anchor, View contentView, int width, int height) {
+        return showPopupWindow(anchor, contentView, width, height, Gravity.TOP | Gravity.START);
+    }
+
+    public static PopupWindow showPopupWindow(View anchor, View contentView, int width, int height, int gravity) {
         Context context = anchor.getContext();
         PopupWindow popupWindow = new PopupWindow(context);
         popupWindow.setElevation(5.0f);
@@ -192,7 +196,7 @@ public abstract class AppUtils {
         popupWindow.setOutsideTouchable(true);
 
         popupWindow.update();
-        popupWindow.showAsDropDown(anchor);
+        popupWindow.showAsDropDown(anchor, 0, 0, gravity);
 
         popupWindow.setFocusable(true);
         popupWindow.update();
