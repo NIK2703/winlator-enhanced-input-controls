@@ -145,20 +145,6 @@ struct CachedElementFieldIDs {
 static CachedElementFieldIDs g_elem;
 
 static jobject g_dispatch_obj = NULL;
-static jmethodID g_injectPointerMove;
-static jmethodID g_injectPointerMoveDelta;
-static jmethodID g_injectPointerButtonPress;
-static jmethodID g_injectPointerButtonRelease;
-static jmethodID g_injectKeyPress;
-static jmethodID g_injectKeyRelease;
-static jmethodID g_mouseEvent;
-static jmethodID g_scrollEvent;
-static jmethodID g_hapticEvent;
-static jmethodID g_setCursorSpeed;
-static jmethodID g_startMouseMove;
-static jmethodID g_stopMouseMove;
-static jmethodID g_gamepadState;
-static jmethodID g_gamepadAxis;
 static jmethodID g_dispatchAllActions;
 
 
@@ -292,143 +278,146 @@ void touch_processor_set_view_offset(float offset_x, float offset_y) {
     g_state.cfg.view_offset_y = offset_y;
 }
 
-static void nativeInit(JNIEnv* env, jclass clazz, jobject config) {
-    if (!g_config_cached) {
-        jclass cls = env->GetObjectClass(config);
-        if (!cls) { __android_log_print(ANDROID_LOG_ERROR, "Winlator_JNI", "nativeInit: GetObjectClass failed"); return; }
-        g_config.configClass = (jclass)env->NewGlobalRef(cls);
-        g_config.touchMode = env->GetFieldID(cls, "touchMode", "I"); JNI_CHECK(env, "touchMode");
-        g_config.inputMode = env->GetFieldID(cls, "inputMode", "I"); JNI_CHECK(env, "inputMode");
-        g_config.longPressTimeoutMs = env->GetFieldID(cls, "longPressTimeoutMs", "I"); JNI_CHECK(env, "longPressTimeoutMs");
-        g_config.doubleTapTimeoutMs = env->GetFieldID(cls, "doubleTapTimeoutMs", "I"); JNI_CHECK(env, "doubleTapTimeoutMs");
-        g_config.singleTapDelayMs = env->GetFieldID(cls, "singleTapDelayMs", "I"); JNI_CHECK(env, "singleTapDelayMs");
-        g_config.dragThresholdPx = env->GetFieldID(cls, "dragThresholdPx", "I"); JNI_CHECK(env, "dragThresholdPx");
-        g_config.doubleTapDistancePx = env->GetFieldID(cls, "doubleTapDistancePx", "I"); JNI_CHECK(env, "doubleTapDistancePx");
-        g_config.bindingDelayMs = env->GetFieldID(cls, "bindingDelayMs", "I"); JNI_CHECK(env, "bindingDelayMs");
-        g_config.longPressDelayMs = env->GetFieldID(cls, "longPressDelayMs", "I"); JNI_CHECK(env, "longPressDelayMs");
-        g_config.cursorSpeed = env->GetFieldID(cls, "cursorSpeed", "I"); JNI_CHECK(env, "cursorSpeed");
-        g_config.gestureThresholdPx = env->GetFieldID(cls, "gestureThresholdPx", "I"); JNI_CHECK(env, "gestureThresholdPx");
-        g_config.cursorAccelerationThreshold = env->GetFieldID(cls, "cursorAccelerationThreshold", "I"); JNI_CHECK(env, "cursorAccelerationThreshold");
-        g_config.cursorAccelerationFactor = env->GetFieldID(cls, "cursorAccelerationFactor", "F"); JNI_CHECK(env, "cursorAccelerationFactor");
-        g_config.screenW = env->GetFieldID(cls, "screenW", "I"); JNI_CHECK(env, "screenW");
-        g_config.screenH = env->GetFieldID(cls, "screenH", "I"); JNI_CHECK(env, "screenH");
-        g_config.xformScaleX = env->GetFieldID(cls, "xformScaleX", "F"); JNI_CHECK(env, "xformScaleX");
-        g_config.xformScaleY = env->GetFieldID(cls, "xformScaleY", "F"); JNI_CHECK(env, "xformScaleY");
-        g_config.viewOffsetX = env->GetFieldID(cls, "viewOffsetX", "F"); JNI_CHECK(env, "viewOffsetX");
-        g_config.viewOffsetY = env->GetFieldID(cls, "viewOffsetY", "F"); JNI_CHECK(env, "viewOffsetY");
-        g_config.gestureLongPressHaptic = env->GetFieldID(cls, "gestureLongPressHaptic", "I"); JNI_CHECK(env, "gestureLongPressHaptic");
-        g_config.hapticEnabled = env->GetFieldID(cls, "hapticEnabled", "Z"); JNI_CHECK(env, "hapticEnabled");
-        g_config.tsSingleTap = env->GetFieldID(cls, "tsSingleTap", "[I"); JNI_CHECK(env, "tsSingleTap");
-        g_config.tsLongPress = env->GetFieldID(cls, "tsLongPress", "[I"); JNI_CHECK(env, "tsLongPress");
-        g_config.tsDoubleTap = env->GetFieldID(cls, "tsDoubleTap", "[I"); JNI_CHECK(env, "tsDoubleTap");
-        g_config.tsSingleTapDrag = env->GetFieldID(cls, "tsSingleTapDrag", "[I"); JNI_CHECK(env, "tsSingleTapDrag");
-        g_config.tsLongPressDrag = env->GetFieldID(cls, "tsLongPressDrag", "[I"); JNI_CHECK(env, "tsLongPressDrag");
-        g_config.tsDoubleTapDrag = env->GetFieldID(cls, "tsDoubleTapDrag", "[I"); JNI_CHECK(env, "tsDoubleTapDrag");
-        g_config.tsSingleTap2nd = env->GetFieldID(cls, "tsSingleTap2nd", "[I"); JNI_CHECK(env, "tsSingleTap2nd");
-        g_config.tsDoubleTap2nd = env->GetFieldID(cls, "tsDoubleTap2nd", "[I"); JNI_CHECK(env, "tsDoubleTap2nd");
-        g_config.tsSingleTapDrag2nd = env->GetFieldID(cls, "tsSingleTapDrag2nd", "[I"); JNI_CHECK(env, "tsSingleTapDrag2nd");
-        g_config.tsDoubleTapDrag2nd = env->GetFieldID(cls, "tsDoubleTapDrag2nd", "[I"); JNI_CHECK(env, "tsDoubleTapDrag2nd");
-        g_config.tpSingleTap = env->GetFieldID(cls, "tpSingleTap", "[I"); JNI_CHECK(env, "tpSingleTap");
-        g_config.tpLongPress = env->GetFieldID(cls, "tpLongPress", "[I"); JNI_CHECK(env, "tpLongPress");
-        g_config.tpDoubleTap = env->GetFieldID(cls, "tpDoubleTap", "[I"); JNI_CHECK(env, "tpDoubleTap");
-        g_config.tpSingleTapDrag = env->GetFieldID(cls, "tpSingleTapDrag", "[I"); JNI_CHECK(env, "tpSingleTapDrag");
-        g_config.tpLongPressDrag = env->GetFieldID(cls, "tpLongPressDrag", "[I"); JNI_CHECK(env, "tpLongPressDrag");
-        g_config.tpDoubleTapDrag = env->GetFieldID(cls, "tpDoubleTapDrag", "[I"); JNI_CHECK(env, "tpDoubleTapDrag");
-        g_config.tpSingleTap2nd = env->GetFieldID(cls, "tpSingleTap2nd", "[I"); JNI_CHECK(env, "tpSingleTap2nd");
-        g_config.tpDoubleTap2nd = env->GetFieldID(cls, "tpDoubleTap2nd", "[I"); JNI_CHECK(env, "tpDoubleTap2nd");
-        g_config.tpSingleTapDrag2nd = env->GetFieldID(cls, "tpSingleTapDrag2nd", "[I"); JNI_CHECK(env, "tpSingleTapDrag2nd");
-        g_config.tpDoubleTapDrag2nd = env->GetFieldID(cls, "tpDoubleTapDrag2nd", "[I"); JNI_CHECK(env, "tpDoubleTapDrag2nd");
-        g_config.stSingleTap = env->GetFieldID(cls, "stSingleTap", "I"); JNI_CHECK(env, "stSingleTap");
-        g_config.stLongPress = env->GetFieldID(cls, "stLongPress", "I"); JNI_CHECK(env, "stLongPress");
-        g_config.stDoubleTap = env->GetFieldID(cls, "stDoubleTap", "I"); JNI_CHECK(env, "stDoubleTap");
-        g_config.stSingleTapDrag = env->GetFieldID(cls, "stSingleTapDrag", "I"); JNI_CHECK(env, "stSingleTapDrag");
-        g_config.stLongPressDrag = env->GetFieldID(cls, "stLongPressDrag", "I"); JNI_CHECK(env, "stLongPressDrag");
-        g_config.stDoubleTapDrag = env->GetFieldID(cls, "stDoubleTapDrag", "I"); JNI_CHECK(env, "stDoubleTapDrag");
-        g_config.stSingleTap2nd = env->GetFieldID(cls, "stSingleTap2nd", "I"); JNI_CHECK(env, "stSingleTap2nd");
-        g_config.stDoubleTap2nd = env->GetFieldID(cls, "stDoubleTap2nd", "I"); JNI_CHECK(env, "stDoubleTap2nd");
-        g_config.stSingleTapDrag2nd = env->GetFieldID(cls, "stSingleTapDrag2nd", "I"); JNI_CHECK(env, "stSingleTapDrag2nd");
-        g_config.stDoubleTapDrag2nd = env->GetFieldID(cls, "stDoubleTapDrag2nd", "I"); JNI_CHECK(env, "stDoubleTapDrag2nd");
-        env->DeleteLocalRef(cls);
-        g_config_cached = true;
-    }
+static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorConfig* c) {
+    c->touch_mode = (TouchMode)env->GetIntField(config, g_config.touchMode);
+    c->input_mode = (InputMode)env->GetIntField(config, g_config.inputMode);
+    c->long_press_timeout_ms = env->GetIntField(config, g_config.longPressTimeoutMs);
+    c->double_tap_timeout_ms = env->GetIntField(config, g_config.doubleTapTimeoutMs);
+    c->single_tap_delay_ms = env->GetIntField(config, g_config.singleTapDelayMs);
+    c->drag_threshold_px = env->GetIntField(config, g_config.dragThresholdPx);
+    c->double_tap_distance_px = env->GetIntField(config, g_config.doubleTapDistancePx);
+    c->binding_delay_ms = env->GetIntField(config, g_config.bindingDelayMs);
+    c->long_press_delay_ms = env->GetIntField(config, g_config.longPressDelayMs);
+    c->cursor_speed = env->GetIntField(config, g_config.cursorSpeed);
+    c->gesture_threshold_px = env->GetIntField(config, g_config.gestureThresholdPx);
+    c->cursor_acceleration_threshold = env->GetIntField(config, g_config.cursorAccelerationThreshold);
+    c->cursor_acceleration_factor = env->GetFloatField(config, g_config.cursorAccelerationFactor);
+    c->screen_w = env->GetIntField(config, g_config.screenW);
+    c->screen_h = env->GetIntField(config, g_config.screenH);
+    c->xform_scale_x = env->GetFloatField(config, g_config.xformScaleX);
+    if (c->xform_scale_x <= 0.0f) c->xform_scale_x = 1.0f;
+    c->xform_scale_y = env->GetFloatField(config, g_config.xformScaleY);
+    if (c->xform_scale_y <= 0.0f) c->xform_scale_y = 1.0f;
+    c->view_offset_x = env->GetFloatField(config, g_config.viewOffsetX);
+    c->view_offset_y = env->GetFloatField(config, g_config.viewOffsetY);
+    c->gesture_long_press_haptic = env->GetIntField(config, g_config.gestureLongPressHaptic);
+    c->haptic_enabled = env->GetBooleanField(config, g_config.hapticEnabled);
 
-    TouchProcessorConfig c;
-    memset(&c, 0, sizeof(c));
+    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTap, c->ts_single_tap, c->ts_single_tap_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tsLongPress, c->ts_long_press, c->ts_long_press_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTap, c->ts_double_tap, c->ts_double_tap_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTapDrag, c->ts_single_tap_drag, c->ts_single_tap_drag_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tsLongPressDrag, c->ts_long_press_drag, c->ts_long_press_drag_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTapDrag, c->ts_double_tap_drag, c->ts_double_tap_drag_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTap2nd, c->ts_single_2nd, c->ts_single_2nd_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTap2nd, c->ts_double_2nd, c->ts_double_2nd_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTapDrag2nd, c->ts_single_drag_2nd, c->ts_single_drag_2nd_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTapDrag2nd, c->ts_double_drag_2nd, c->ts_double_drag_2nd_count);
 
-    c.touch_mode = (TouchMode)env->GetIntField(config, g_config.touchMode);
-    c.input_mode = (InputMode)env->GetIntField(config, g_config.inputMode);
-    c.long_press_timeout_ms = env->GetIntField(config, g_config.longPressTimeoutMs);
-    c.double_tap_timeout_ms = env->GetIntField(config, g_config.doubleTapTimeoutMs);
-    c.single_tap_delay_ms = env->GetIntField(config, g_config.singleTapDelayMs);
-    c.drag_threshold_px = env->GetIntField(config, g_config.dragThresholdPx);
-    c.double_tap_distance_px = env->GetIntField(config, g_config.doubleTapDistancePx);
-    c.binding_delay_ms = env->GetIntField(config, g_config.bindingDelayMs);
-    c.long_press_delay_ms = env->GetIntField(config, g_config.longPressDelayMs);
-    c.cursor_speed = env->GetIntField(config, g_config.cursorSpeed);
-    c.gesture_threshold_px = env->GetIntField(config, g_config.gestureThresholdPx);
-    c.cursor_acceleration_threshold = env->GetIntField(config, g_config.cursorAccelerationThreshold);
-    c.cursor_acceleration_factor = env->GetFloatField(config, g_config.cursorAccelerationFactor);
-    c.screen_w = env->GetIntField(config, g_config.screenW);
-    c.screen_h = env->GetIntField(config, g_config.screenH);
-    c.xform_scale_x = env->GetFloatField(config, g_config.xformScaleX);
-    if (c.xform_scale_x <= 0.0f) c.xform_scale_x = 1.0f;
-    c.xform_scale_y = env->GetFloatField(config, g_config.xformScaleY);
-    if (c.xform_scale_y <= 0.0f) c.xform_scale_y = 1.0f;
-    c.view_offset_x = env->GetFloatField(config, g_config.viewOffsetX);
-    c.view_offset_y = env->GetFloatField(config, g_config.viewOffsetY);
-    c.gesture_long_press_haptic = env->GetIntField(config, g_config.gestureLongPressHaptic);
-    c.haptic_enabled = env->GetBooleanField(config, g_config.hapticEnabled);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTap, c->tp_single_tap, c->tp_single_tap_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tpLongPress, c->tp_long_press, c->tp_long_press_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTap, c->tp_double_tap, c->tp_double_tap_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTapDrag, c->tp_single_tap_drag, c->tp_single_tap_drag_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tpLongPressDrag, c->tp_long_press_drag, c->tp_long_press_drag_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTapDrag, c->tp_double_tap_drag, c->tp_double_tap_drag_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTap2nd, c->tp_single_2nd, c->tp_single_2nd_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTap2nd, c->tp_double_2nd, c->tp_double_2nd_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTapDrag2nd, c->tp_single_drag_2nd, c->tp_single_drag_2nd_count);
+    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTapDrag2nd, c->tp_double_drag_2nd, c->tp_double_drag_2nd_count);
 
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTap, c.ts_single_tap, c.ts_single_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsLongPress, c.ts_long_press, c.ts_long_press_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTap, c.ts_double_tap, c.ts_double_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTapDrag, c.ts_single_tap_drag, c.ts_single_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsLongPressDrag, c.ts_long_press_drag, c.ts_long_press_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTapDrag, c.ts_double_tap_drag, c.ts_double_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTap2nd, c.ts_single_2nd, c.ts_single_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTap2nd, c.ts_double_2nd, c.ts_double_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTapDrag2nd, c.ts_single_drag_2nd, c.ts_single_drag_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTapDrag2nd, c.ts_double_drag_2nd, c.ts_double_drag_2nd_count);
-
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTap, c.tp_single_tap, c.tp_single_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpLongPress, c.tp_long_press, c.tp_long_press_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTap, c.tp_double_tap, c.tp_double_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTapDrag, c.tp_single_tap_drag, c.tp_single_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpLongPressDrag, c.tp_long_press_drag, c.tp_long_press_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTapDrag, c.tp_double_tap_drag, c.tp_double_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTap2nd, c.tp_single_2nd, c.tp_single_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTap2nd, c.tp_double_2nd, c.tp_double_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTapDrag2nd, c.tp_single_drag_2nd, c.tp_single_drag_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTapDrag2nd, c.tp_double_drag_2nd, c.tp_double_drag_2nd_count);
-
-    // Apply sticky bitmasks to TouchBinding.modifiers (1=hold, 0=tap)
 #define APPLY_STICKY(arr, cnt, sid) do { \
     int _st = env->GetIntField(config, g_config.sid); \
     for (int _i = 0; _i < (cnt); _i++) if (_st & (1 << _i)) (arr)[_i].modifiers = 1; \
 } while(0)
-    APPLY_STICKY(c.ts_single_tap, c.ts_single_tap_count, stSingleTap);
-    APPLY_STICKY(c.ts_long_press, c.ts_long_press_count, stLongPress);
-    APPLY_STICKY(c.ts_double_tap, c.ts_double_tap_count, stDoubleTap);
-    APPLY_STICKY(c.ts_single_tap_drag, c.ts_single_tap_drag_count, stSingleTapDrag);
-    APPLY_STICKY(c.ts_long_press_drag, c.ts_long_press_drag_count, stLongPressDrag);
-    APPLY_STICKY(c.ts_double_tap_drag, c.ts_double_tap_drag_count, stDoubleTapDrag);
-    APPLY_STICKY(c.ts_single_2nd, c.ts_single_2nd_count, stSingleTap2nd);
-    APPLY_STICKY(c.ts_double_2nd, c.ts_double_2nd_count, stDoubleTap2nd);
-    APPLY_STICKY(c.ts_single_drag_2nd, c.ts_single_drag_2nd_count, stSingleTapDrag2nd);
-    APPLY_STICKY(c.ts_double_drag_2nd, c.ts_double_drag_2nd_count, stDoubleTapDrag2nd);
+    APPLY_STICKY(c->ts_single_tap, c->ts_single_tap_count, stSingleTap);
+    APPLY_STICKY(c->ts_long_press, c->ts_long_press_count, stLongPress);
+    APPLY_STICKY(c->ts_double_tap, c->ts_double_tap_count, stDoubleTap);
+    APPLY_STICKY(c->ts_single_tap_drag, c->ts_single_tap_drag_count, stSingleTapDrag);
+    APPLY_STICKY(c->ts_long_press_drag, c->ts_long_press_drag_count, stLongPressDrag);
+    APPLY_STICKY(c->ts_double_tap_drag, c->ts_double_tap_drag_count, stDoubleTapDrag);
+    APPLY_STICKY(c->ts_single_2nd, c->ts_single_2nd_count, stSingleTap2nd);
+    APPLY_STICKY(c->ts_double_2nd, c->ts_double_2nd_count, stDoubleTap2nd);
+    APPLY_STICKY(c->ts_single_drag_2nd, c->ts_single_drag_2nd_count, stSingleTapDrag2nd);
+    APPLY_STICKY(c->ts_double_drag_2nd, c->ts_double_drag_2nd_count, stDoubleTapDrag2nd);
 
-    APPLY_STICKY(c.tp_single_tap, c.tp_single_tap_count, stSingleTap);
-    APPLY_STICKY(c.tp_long_press, c.tp_long_press_count, stLongPress);
-    APPLY_STICKY(c.tp_double_tap, c.tp_double_tap_count, stDoubleTap);
-    APPLY_STICKY(c.tp_single_tap_drag, c.tp_single_tap_drag_count, stSingleTapDrag);
-    APPLY_STICKY(c.tp_long_press_drag, c.tp_long_press_drag_count, stLongPressDrag);
-    APPLY_STICKY(c.tp_double_tap_drag, c.tp_double_tap_drag_count, stDoubleTapDrag);
-    APPLY_STICKY(c.tp_single_2nd, c.tp_single_2nd_count, stSingleTap2nd);
-    APPLY_STICKY(c.tp_double_2nd, c.tp_double_2nd_count, stDoubleTap2nd);
-    APPLY_STICKY(c.tp_single_drag_2nd, c.tp_single_drag_2nd_count, stSingleTapDrag2nd);
-    APPLY_STICKY(c.tp_double_drag_2nd, c.tp_double_drag_2nd_count, stDoubleTapDrag2nd);
+    APPLY_STICKY(c->tp_single_tap, c->tp_single_tap_count, stSingleTap);
+    APPLY_STICKY(c->tp_long_press, c->tp_long_press_count, stLongPress);
+    APPLY_STICKY(c->tp_double_tap, c->tp_double_tap_count, stDoubleTap);
+    APPLY_STICKY(c->tp_single_tap_drag, c->tp_single_tap_drag_count, stSingleTapDrag);
+    APPLY_STICKY(c->tp_long_press_drag, c->tp_long_press_drag_count, stLongPressDrag);
+    APPLY_STICKY(c->tp_double_tap_drag, c->tp_double_tap_drag_count, stDoubleTapDrag);
+    APPLY_STICKY(c->tp_single_2nd, c->tp_single_2nd_count, stSingleTap2nd);
+    APPLY_STICKY(c->tp_double_2nd, c->tp_double_2nd_count, stDoubleTap2nd);
+    APPLY_STICKY(c->tp_single_drag_2nd, c->tp_single_drag_2nd_count, stSingleTapDrag2nd);
+    APPLY_STICKY(c->tp_double_drag_2nd, c->tp_double_drag_2nd_count, stDoubleTapDrag2nd);
 #undef APPLY_STICKY
+}
 
+static void cache_config_field_ids(JNIEnv* env, jobject config) {
+    jclass cls = env->GetObjectClass(config);
+    if (!cls) { __android_log_print(ANDROID_LOG_ERROR, "Winlator_JNI", "nativeInit: GetObjectClass failed"); return; }
+    g_config.configClass = (jclass)env->NewGlobalRef(cls);
+    g_config.touchMode = env->GetFieldID(cls, "touchMode", "I"); JNI_CHECK(env, "touchMode");
+    g_config.inputMode = env->GetFieldID(cls, "inputMode", "I"); JNI_CHECK(env, "inputMode");
+    g_config.longPressTimeoutMs = env->GetFieldID(cls, "longPressTimeoutMs", "I"); JNI_CHECK(env, "longPressTimeoutMs");
+    g_config.doubleTapTimeoutMs = env->GetFieldID(cls, "doubleTapTimeoutMs", "I"); JNI_CHECK(env, "doubleTapTimeoutMs");
+    g_config.singleTapDelayMs = env->GetFieldID(cls, "singleTapDelayMs", "I"); JNI_CHECK(env, "singleTapDelayMs");
+    g_config.dragThresholdPx = env->GetFieldID(cls, "dragThresholdPx", "I"); JNI_CHECK(env, "dragThresholdPx");
+    g_config.doubleTapDistancePx = env->GetFieldID(cls, "doubleTapDistancePx", "I"); JNI_CHECK(env, "doubleTapDistancePx");
+    g_config.bindingDelayMs = env->GetFieldID(cls, "bindingDelayMs", "I"); JNI_CHECK(env, "bindingDelayMs");
+    g_config.longPressDelayMs = env->GetFieldID(cls, "longPressDelayMs", "I"); JNI_CHECK(env, "longPressDelayMs");
+    g_config.cursorSpeed = env->GetFieldID(cls, "cursorSpeed", "I"); JNI_CHECK(env, "cursorSpeed");
+    g_config.gestureThresholdPx = env->GetFieldID(cls, "gestureThresholdPx", "I"); JNI_CHECK(env, "gestureThresholdPx");
+    g_config.cursorAccelerationThreshold = env->GetFieldID(cls, "cursorAccelerationThreshold", "I"); JNI_CHECK(env, "cursorAccelerationThreshold");
+    g_config.cursorAccelerationFactor = env->GetFieldID(cls, "cursorAccelerationFactor", "F"); JNI_CHECK(env, "cursorAccelerationFactor");
+    g_config.screenW = env->GetFieldID(cls, "screenW", "I"); JNI_CHECK(env, "screenW");
+    g_config.screenH = env->GetFieldID(cls, "screenH", "I"); JNI_CHECK(env, "screenH");
+    g_config.xformScaleX = env->GetFieldID(cls, "xformScaleX", "F"); JNI_CHECK(env, "xformScaleX");
+    g_config.xformScaleY = env->GetFieldID(cls, "xformScaleY", "F"); JNI_CHECK(env, "xformScaleY");
+    g_config.viewOffsetX = env->GetFieldID(cls, "viewOffsetX", "F"); JNI_CHECK(env, "viewOffsetX");
+    g_config.viewOffsetY = env->GetFieldID(cls, "viewOffsetY", "F"); JNI_CHECK(env, "viewOffsetY");
+    g_config.gestureLongPressHaptic = env->GetFieldID(cls, "gestureLongPressHaptic", "I"); JNI_CHECK(env, "gestureLongPressHaptic");
+    g_config.hapticEnabled = env->GetFieldID(cls, "hapticEnabled", "Z"); JNI_CHECK(env, "hapticEnabled");
+    g_config.tsSingleTap = env->GetFieldID(cls, "tsSingleTap", "[I"); JNI_CHECK(env, "tsSingleTap");
+    g_config.tsLongPress = env->GetFieldID(cls, "tsLongPress", "[I"); JNI_CHECK(env, "tsLongPress");
+    g_config.tsDoubleTap = env->GetFieldID(cls, "tsDoubleTap", "[I"); JNI_CHECK(env, "tsDoubleTap");
+    g_config.tsSingleTapDrag = env->GetFieldID(cls, "tsSingleTapDrag", "[I"); JNI_CHECK(env, "tsSingleTapDrag");
+    g_config.tsLongPressDrag = env->GetFieldID(cls, "tsLongPressDrag", "[I"); JNI_CHECK(env, "tsLongPressDrag");
+    g_config.tsDoubleTapDrag = env->GetFieldID(cls, "tsDoubleTapDrag", "[I"); JNI_CHECK(env, "tsDoubleTapDrag");
+    g_config.tsSingleTap2nd = env->GetFieldID(cls, "tsSingleTap2nd", "[I"); JNI_CHECK(env, "tsSingleTap2nd");
+    g_config.tsDoubleTap2nd = env->GetFieldID(cls, "tsDoubleTap2nd", "[I"); JNI_CHECK(env, "tsDoubleTap2nd");
+    g_config.tsSingleTapDrag2nd = env->GetFieldID(cls, "tsSingleTapDrag2nd", "[I"); JNI_CHECK(env, "tsSingleTapDrag2nd");
+    g_config.tsDoubleTapDrag2nd = env->GetFieldID(cls, "tsDoubleTapDrag2nd", "[I"); JNI_CHECK(env, "tsDoubleTapDrag2nd");
+    g_config.tpSingleTap = env->GetFieldID(cls, "tpSingleTap", "[I"); JNI_CHECK(env, "tpSingleTap");
+    g_config.tpLongPress = env->GetFieldID(cls, "tpLongPress", "[I"); JNI_CHECK(env, "tpLongPress");
+    g_config.tpDoubleTap = env->GetFieldID(cls, "tpDoubleTap", "[I"); JNI_CHECK(env, "tpDoubleTap");
+    g_config.tpSingleTapDrag = env->GetFieldID(cls, "tpSingleTapDrag", "[I"); JNI_CHECK(env, "tpSingleTapDrag");
+    g_config.tpLongPressDrag = env->GetFieldID(cls, "tpLongPressDrag", "[I"); JNI_CHECK(env, "tpLongPressDrag");
+    g_config.tpDoubleTapDrag = env->GetFieldID(cls, "tpDoubleTapDrag", "[I"); JNI_CHECK(env, "tpDoubleTapDrag");
+    g_config.tpSingleTap2nd = env->GetFieldID(cls, "tpSingleTap2nd", "[I"); JNI_CHECK(env, "tpSingleTap2nd");
+    g_config.tpDoubleTap2nd = env->GetFieldID(cls, "tpDoubleTap2nd", "[I"); JNI_CHECK(env, "tpDoubleTap2nd");
+    g_config.tpSingleTapDrag2nd = env->GetFieldID(cls, "tpSingleTapDrag2nd", "[I"); JNI_CHECK(env, "tpSingleTapDrag2nd");
+    g_config.tpDoubleTapDrag2nd = env->GetFieldID(cls, "tpDoubleTapDrag2nd", "[I"); JNI_CHECK(env, "tpDoubleTapDrag2nd");
+    g_config.stSingleTap = env->GetFieldID(cls, "stSingleTap", "I"); JNI_CHECK(env, "stSingleTap");
+    g_config.stLongPress = env->GetFieldID(cls, "stLongPress", "I"); JNI_CHECK(env, "stLongPress");
+    g_config.stDoubleTap = env->GetFieldID(cls, "stDoubleTap", "I"); JNI_CHECK(env, "stDoubleTap");
+    g_config.stSingleTapDrag = env->GetFieldID(cls, "stSingleTapDrag", "I"); JNI_CHECK(env, "stSingleTapDrag");
+    g_config.stLongPressDrag = env->GetFieldID(cls, "stLongPressDrag", "I"); JNI_CHECK(env, "stLongPressDrag");
+    g_config.stDoubleTapDrag = env->GetFieldID(cls, "stDoubleTapDrag", "I"); JNI_CHECK(env, "stDoubleTapDrag");
+    g_config.stSingleTap2nd = env->GetFieldID(cls, "stSingleTap2nd", "I"); JNI_CHECK(env, "stSingleTap2nd");
+    g_config.stDoubleTap2nd = env->GetFieldID(cls, "stDoubleTap2nd", "I"); JNI_CHECK(env, "stDoubleTap2nd");
+    g_config.stSingleTapDrag2nd = env->GetFieldID(cls, "stSingleTapDrag2nd", "I"); JNI_CHECK(env, "stSingleTapDrag2nd");
+    g_config.stDoubleTapDrag2nd = env->GetFieldID(cls, "stDoubleTapDrag2nd", "I"); JNI_CHECK(env, "stDoubleTapDrag2nd");
+    env->DeleteLocalRef(cls);
+    g_config_cached = true;
+}
+
+static void nativeInit(JNIEnv* env, jclass clazz, jobject config) {
+    if (!g_config_cached) cache_config_field_ids(env, config);
+
+    TouchProcessorConfig c;
+    memset(&c, 0, sizeof(c));
+    read_config_from_java(env, config, &c);
     touch_processor_init(&c);
 }
 
@@ -604,80 +593,7 @@ static jboolean nativeIsPassthroughActive(JNIEnv* env, jclass clazz) {
 static void nativeUpdateConfig(JNIEnv* env, jclass clazz, jobject config) {
     TouchProcessorConfig c;
     memset(&c, 0, sizeof(c));
-
-    c.touch_mode = (TouchMode)env->GetIntField(config, g_config.touchMode);
-    c.input_mode = (InputMode)env->GetIntField(config, g_config.inputMode);
-    c.long_press_timeout_ms = env->GetIntField(config, g_config.longPressTimeoutMs);
-    c.double_tap_timeout_ms = env->GetIntField(config, g_config.doubleTapTimeoutMs);
-    c.single_tap_delay_ms = env->GetIntField(config, g_config.singleTapDelayMs);
-    c.drag_threshold_px = env->GetIntField(config, g_config.dragThresholdPx);
-    c.double_tap_distance_px = env->GetIntField(config, g_config.doubleTapDistancePx);
-    c.binding_delay_ms = env->GetIntField(config, g_config.bindingDelayMs);
-    c.long_press_delay_ms = env->GetIntField(config, g_config.longPressDelayMs);
-    c.cursor_speed = env->GetIntField(config, g_config.cursorSpeed);
-    c.gesture_threshold_px = env->GetIntField(config, g_config.gestureThresholdPx);
-    c.cursor_acceleration_threshold = env->GetIntField(config, g_config.cursorAccelerationThreshold);
-    c.cursor_acceleration_factor = env->GetFloatField(config, g_config.cursorAccelerationFactor);
-    c.screen_w = env->GetIntField(config, g_config.screenW);
-    c.screen_h = env->GetIntField(config, g_config.screenH);
-    c.xform_scale_x = env->GetFloatField(config, g_config.xformScaleX);
-    if (c.xform_scale_x <= 0.0f) c.xform_scale_x = 1.0f;
-    c.xform_scale_y = env->GetFloatField(config, g_config.xformScaleY);
-    if (c.xform_scale_y <= 0.0f) c.xform_scale_y = 1.0f;
-    c.view_offset_x = env->GetFloatField(config, g_config.viewOffsetX);
-    c.view_offset_y = env->GetFloatField(config, g_config.viewOffsetY);
-    c.gesture_long_press_haptic = env->GetIntField(config, g_config.gestureLongPressHaptic);
-    c.haptic_enabled = env->GetBooleanField(config, g_config.hapticEnabled);
-
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTap, c.ts_single_tap, c.ts_single_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsLongPress, c.ts_long_press, c.ts_long_press_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTap, c.ts_double_tap, c.ts_double_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTapDrag, c.ts_single_tap_drag, c.ts_single_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsLongPressDrag, c.ts_long_press_drag, c.ts_long_press_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTapDrag, c.ts_double_tap_drag, c.ts_double_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTap2nd, c.ts_single_2nd, c.ts_single_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTap2nd, c.ts_double_2nd, c.ts_double_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsSingleTapDrag2nd, c.ts_single_drag_2nd, c.ts_single_drag_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tsDoubleTapDrag2nd, c.ts_double_drag_2nd, c.ts_double_drag_2nd_count);
-
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTap, c.tp_single_tap, c.tp_single_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpLongPress, c.tp_long_press, c.tp_long_press_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTap, c.tp_double_tap, c.tp_double_tap_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTapDrag, c.tp_single_tap_drag, c.tp_single_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpLongPressDrag, c.tp_long_press_drag, c.tp_long_press_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTapDrag, c.tp_double_tap_drag, c.tp_double_tap_drag_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTap2nd, c.tp_single_2nd, c.tp_single_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTap2nd, c.tp_double_2nd, c.tp_double_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpSingleTapDrag2nd, c.tp_single_drag_2nd, c.tp_single_drag_2nd_count);
-    READ_CACHED_BINDING_LIST(env, config, g_config.tpDoubleTapDrag2nd, c.tp_double_drag_2nd, c.tp_double_drag_2nd_count);
-
-#define APPLY_STICKY(arr, cnt, sid) do { \
-    int _st = env->GetIntField(config, g_config.sid); \
-    for (int _i = 0; _i < (cnt); _i++) if (_st & (1 << _i)) (arr)[_i].modifiers = 1; \
-} while(0)
-    APPLY_STICKY(c.ts_single_tap, c.ts_single_tap_count, stSingleTap);
-    APPLY_STICKY(c.ts_long_press, c.ts_long_press_count, stLongPress);
-    APPLY_STICKY(c.ts_double_tap, c.ts_double_tap_count, stDoubleTap);
-    APPLY_STICKY(c.ts_single_tap_drag, c.ts_single_tap_drag_count, stSingleTapDrag);
-    APPLY_STICKY(c.ts_long_press_drag, c.ts_long_press_drag_count, stLongPressDrag);
-    APPLY_STICKY(c.ts_double_tap_drag, c.ts_double_tap_drag_count, stDoubleTapDrag);
-    APPLY_STICKY(c.ts_single_2nd, c.ts_single_2nd_count, stSingleTap2nd);
-    APPLY_STICKY(c.ts_double_2nd, c.ts_double_2nd_count, stDoubleTap2nd);
-    APPLY_STICKY(c.ts_single_drag_2nd, c.ts_single_drag_2nd_count, stSingleTapDrag2nd);
-    APPLY_STICKY(c.ts_double_drag_2nd, c.ts_double_drag_2nd_count, stDoubleTapDrag2nd);
-
-    APPLY_STICKY(c.tp_single_tap, c.tp_single_tap_count, stSingleTap);
-    APPLY_STICKY(c.tp_long_press, c.tp_long_press_count, stLongPress);
-    APPLY_STICKY(c.tp_double_tap, c.tp_double_tap_count, stDoubleTap);
-    APPLY_STICKY(c.tp_single_tap_drag, c.tp_single_tap_drag_count, stSingleTapDrag);
-    APPLY_STICKY(c.tp_long_press_drag, c.tp_long_press_drag_count, stLongPressDrag);
-    APPLY_STICKY(c.tp_double_tap_drag, c.tp_double_tap_drag_count, stDoubleTapDrag);
-    APPLY_STICKY(c.tp_single_2nd, c.tp_single_2nd_count, stSingleTap2nd);
-    APPLY_STICKY(c.tp_double_2nd, c.tp_double_2nd_count, stDoubleTap2nd);
-    APPLY_STICKY(c.tp_single_drag_2nd, c.tp_single_drag_2nd_count, stSingleTapDrag2nd);
-    APPLY_STICKY(c.tp_double_drag_2nd, c.tp_double_drag_2nd_count, stDoubleTapDrag2nd);
-#undef APPLY_STICKY
-
+    read_config_from_java(env, config, &c);
     touch_processor_update_config(&c);
 }
 
@@ -729,20 +645,6 @@ static void nativeRegisterDispatcher(JNIEnv* env, jclass clazz, jobject dispatch
     if (!dispatcher) return;
     g_dispatch_obj = env->NewGlobalRef(dispatcher);
     jclass dcls = env->GetObjectClass(dispatcher);
-    g_injectPointerMove = env->GetMethodID(dcls, "injectPointerMove", "(II)V");
-    g_injectPointerMoveDelta = env->GetMethodID(dcls, "injectPointerMoveDelta", "(II)V");
-    g_injectPointerButtonPress = env->GetMethodID(dcls, "injectPointerButtonPress", "(I)V");
-    g_injectPointerButtonRelease = env->GetMethodID(dcls, "injectPointerButtonRelease", "(I)V");
-    g_injectKeyPress = env->GetMethodID(dcls, "injectKeyPress", "(IZ)V");
-    g_injectKeyRelease = env->GetMethodID(dcls, "injectKeyRelease", "(IZ)V");
-    g_mouseEvent = env->GetMethodID(dcls, "mouseEvent", "(III)V");
-    g_scrollEvent = env->GetMethodID(dcls, "scrollEvent", "(I)V");
-    g_hapticEvent = env->GetMethodID(dcls, "hapticEvent", "(I)V");
-    g_setCursorSpeed = env->GetMethodID(dcls, "setCursorSpeed", "(I)V");
-    g_startMouseMove = env->GetMethodID(dcls, "startMouseMove", "(III)V");
-    g_stopMouseMove = env->GetMethodID(dcls, "stopMouseMove", "()V");
-    g_gamepadState = env->GetMethodID(dcls, "gamepadState", "(IZ)V");
-    g_gamepadAxis = env->GetMethodID(dcls, "gamepadAxis", "(III)V");
     g_dispatchAllActions = env->GetMethodID(dcls, "dispatchAllActions", "([I[II)V");
     env->DeleteLocalRef(dcls);
 }

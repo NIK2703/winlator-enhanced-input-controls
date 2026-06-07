@@ -111,13 +111,7 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
                 // Java: does NOT release primary binding on gesture trigger
                 if (e->button_gesture_haptic > 0)
                     add_action(result, ACT_HAPTIC, e->button_gesture_haptic, 0, 0);
-                // Press modifier bindings first (held for entire sequence)
-                for (int k = 0; k < e->element_gesture_count; k++)
-                    if (is_modifier_binding(&e->element_gesture[k]))
-                        press_binding(result, &e->element_gesture[k], true);
-                for (int k = 0; k < e->element_gesture_count; k++)
-                    if (!is_modifier_binding(&e->element_gesture[k]))
-                        press_binding(result, &e->element_gesture[k], true);
+                press_bindings_list(result, e->element_gesture, e->element_gesture_count);
                 return;
             }
         }

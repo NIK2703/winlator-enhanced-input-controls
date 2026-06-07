@@ -77,7 +77,4 @@ void element_stick_up(TouchElement* e, float x, float y, uint64_t time_ms, Touch
     if (is_gamepad_binding(&e->bindings[0])) {
         add_action(result, ACT_GAMEPAD_AXIS, !is_right_stick_binding(e), 0, 0);
     }
-    e->engaged = false;
-    e->current_ptr_id = -1;
-    e->visual_active = false;
 }

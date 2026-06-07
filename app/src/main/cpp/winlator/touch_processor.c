@@ -65,21 +65,7 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
         if (e->toggle_switch)
             g_state.cfg.caps_has_toggle_switch = true;
         float hs_snap = g_state.snapping_size > 0.0f ? g_state.snapping_size : 1.0f;
-        switch (e->type) {
-            case ELEM_DPAD: e->hw = hs_snap * 7.0f * e->scale; e->hh = hs_snap * 7.0f * e->scale; break;
-            case ELEM_STICK:
-            case ELEM_TRACKPAD: e->hw = hs_snap * 6.0f * e->scale; e->hh = hs_snap * 6.0f * e->scale; break;
-            case ELEM_BUTTON:
-                if (e->shape == SHAPE_CIRCLE) { e->hw = hs_snap * 3.0f * e->scale; e->hh = hs_snap * 3.0f * e->scale; }
-                else { e->hw = e->w * hs_snap * 0.5f * e->scale; e->hh = e->h * hs_snap * 0.5f * e->scale; }
-                break;
-            case ELEM_RANGE_BUTTON:
-                e->hw = hs_snap * ((e->range_binding_count * 4) / 2) * e->scale;
-                e->hh = hs_snap * 2.0f * e->scale;
-                if (e->range_orientation == 1) { float _t = e->hw; e->hw = e->hh; e->hh = _t; }
-                break;
-            default: e->hw = e->w * hs_snap * 0.5f * e->scale; e->hh = e->h * hs_snap * 0.5f * e->scale; break;
-        }
+        element_compute_snapped_hwhh(e, hs_snap);
     }
     g_state.button_count = 0;
     g_state.range_count = 0;
@@ -97,27 +83,7 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
 void touch_processor_set_snapping_size(float size) {
     g_state.snapping_size = size;
     for (int i = 0; i < g_state.element_count; i++) {
-        TouchElement* e = &g_state.elements[i];
-        float hs = size;
-        float hw, hh;
-        switch (e->type) {
-            case ELEM_DPAD:
-                hw = hs * 7.0f * e->scale; hh = hs * 7.0f * e->scale; break;
-            case ELEM_STICK:
-            case ELEM_TRACKPAD:
-                hw = hs * 6.0f * e->scale; hh = hs * 6.0f * e->scale; break;
-            case ELEM_BUTTON:
-                if (e->shape == SHAPE_CIRCLE) { hw = hs * 3.0f * e->scale; hh = hs * 3.0f * e->scale; }
-                else { hw = e->w * hs * 0.5f * e->scale; hh = e->h * hs * 0.5f * e->scale; }
-                break;
-            case ELEM_RANGE_BUTTON:
-                hw = hs * ((e->range_binding_count * 4) / 2) * e->scale; hh = hs * 2.0f * e->scale;
-                if (e->range_orientation == 1) { float _t = hw; hw = hh; hh = _t; }
-                break;
-            default:
-                hw = e->w * hs * 0.5f * e->scale; hh = e->h * hs * 0.5f * e->scale; break;
-        }
-        e->hw = hw; e->hh = hh;
+        element_compute_snapped_hwhh(&g_state.elements[i], size);
     }
 }
 
@@ -208,9 +174,7 @@ TouchActionResult touch_processor_on_finger_up(int ptr_id, float x, float y, uin
     if (!f) return result;
     f->x = x; f->y = y;
     handle_gesture_up(f, x, y, time_ms, &result);
-    g_state.active_finger_count--;
-    g_state.finger_by_ptr_id[f->ptr_id] = NULL;
-    f->active = false;
+    deactivate_finger(f);
     g_state.free_finger_hint = (int)(f - g_state.fingers);
     return result;
 }
@@ -220,9 +184,7 @@ void touch_processor_on_finger_cancel(int ptr_id) {
     if (!f) return;
     TouchActionResult cancel_result = {0};
     release_held_actions(&cancel_result);
-    if (f->active) g_state.active_finger_count--;
-    g_state.finger_by_ptr_id[f->ptr_id] = NULL;
-    f->active = false;
+    if (f->active) deactivate_finger(f);
 }
 
 TouchActionResult touch_processor_tick(uint64_t time_ms) {
@@ -273,12 +235,7 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
                 e->visual_active = true;
                 g_state.visual_state_dirty = true;
                 e->long_press_arm = false;
-                for (int k = 0; k < e->element_long_press_count; k++)
-                    if (is_modifier_binding(&e->element_long_press[k]))
-                        press_binding(&result, &e->element_long_press[k], true);
-                for (int k = 0; k < e->element_long_press_count; k++)
-                    if (!is_modifier_binding(&e->element_long_press[k]))
-                        press_binding(&result, &e->element_long_press[k], true);
+                press_bindings_list(&result, e->element_long_press, e->element_long_press_count);
                 if (e->button_long_press_haptic > 0)
                     add_action(&result, ACT_HAPTIC, e->button_long_press_haptic, 0, 0);
             }
@@ -294,12 +251,7 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
                 e->visual_active = true;
                 g_state.visual_state_dirty = true;
                 e->gesture_timer_armed = false;
-                for (int k = 0; k < e->element_gesture_count; k++)
-                    if (is_modifier_binding(&e->element_gesture[k]))
-                        press_binding(&result, &e->element_gesture[k], true);
-                for (int k = 0; k < e->element_gesture_count; k++)
-                    if (!is_modifier_binding(&e->element_gesture[k]))
-                        press_binding(&result, &e->element_gesture[k], true);
+                press_bindings_list(&result, e->element_gesture, e->element_gesture_count);
                 if (e->button_gesture_haptic > 0)
                     add_action(&result, ACT_HAPTIC, e->button_gesture_haptic, 0, 0);
             }

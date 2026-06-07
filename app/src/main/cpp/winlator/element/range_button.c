@@ -77,11 +77,7 @@ void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_
 
 void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
     (void)x; (void)y;
-    TouchProcessorState* s = &g_state;
-    e->visual_active = false;
-    s->visual_state_dirty = true;
-    e->engaged = false;
-    e->current_ptr_id = -1;
+    (void)time_ms;
 
     if (e->range_hold_pressed) {
         // Hold press was already sent by tick — just release

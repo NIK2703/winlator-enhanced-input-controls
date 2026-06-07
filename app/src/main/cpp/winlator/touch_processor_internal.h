@@ -279,6 +279,35 @@ static inline void setup_second_finger_bindings(TouchFinger* f) {
     touch_finger_cache_bs(f);
 }
 
+// --- Element size computation (dedup set_elements / set_snapping_size) ---
+
+static inline void element_compute_snapped_hwhh(TouchElement* e, float snap) {
+    float hs = snap;
+    switch (e->type) {
+        case ELEM_DPAD: e->hw = hs * 7.0f * e->scale; e->hh = hs * 7.0f * e->scale; break;
+        case ELEM_STICK:
+        case ELEM_TRACKPAD: e->hw = hs * 6.0f * e->scale; e->hh = hs * 6.0f * e->scale; break;
+        case ELEM_BUTTON:
+            if (e->shape == SHAPE_CIRCLE) { e->hw = hs * 3.0f * e->scale; e->hh = hs * 3.0f * e->scale; }
+            else { e->hw = e->w * hs * 0.5f * e->scale; e->hh = e->h * hs * 0.5f * e->scale; }
+            break;
+        case ELEM_RANGE_BUTTON:
+            e->hw = hs * ((e->range_binding_count * 4) / 2) * e->scale;
+            e->hh = hs * 2.0f * e->scale;
+            if (e->range_orientation == 1) { float _t = e->hw; e->hw = e->hh; e->hh = _t; }
+            break;
+        default: e->hw = e->w * hs * 0.5f * e->scale; e->hh = e->h * hs * 0.5f * e->scale; break;
+    }
+}
+
+// --- Finger deactivation (dedup on_finger_up / on_finger_cancel) ---
+
+static inline void deactivate_finger(TouchFinger* f) {
+    g_state.finger_by_ptr_id[f->ptr_id] = NULL;
+    g_state.active_finger_count--;
+    f->active = false;
+}
+
 // --- Cleanup helpers (reduce repetitive zeroing patterns) ---
 
 static inline void gesture_clear_deferred_tap(void) {
@@ -384,6 +413,15 @@ int range_keycode(int ordinal, int index);
 void on_drag_start(TouchFinger* f);
 void double_tap_confirm_internal(TouchActionResult* result, const FingerBindings* fb);
 
+// --- TS pointer update (dedup 4x touch_transform_coords + ACT_POINTER_MOVE) ---
+static inline void update_ts_pointer(float x, float y, TouchActionResult* result) {
+    int tx, ty;
+    touch_transform_coords(x, y, &tx, &ty);
+    g_state.ptr_x = (float)tx;
+    g_state.ptr_y = (float)ty;
+    add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
+}
+
 static inline void release_bindings_list(TouchActionResult* result, TouchBinding* bindings, int count) {
     for (int k = count - 1; k >= 0; k--)
         if (bindings[k].type != BINDING_NONE && !is_modifier_binding(&bindings[k]))
@@ -391,6 +429,15 @@ static inline void release_bindings_list(TouchActionResult* result, TouchBinding
     for (int k = count - 1; k >= 0; k--)
         if (bindings[k].type != BINDING_NONE && is_modifier_binding(&bindings[k]))
             release_binding(result, &bindings[k]);
+}
+
+static inline void press_bindings_list(TouchActionResult* result, TouchBinding* bindings, int count) {
+    for (int k = 0; k < count; k++)
+        if (bindings[k].type != BINDING_NONE && is_modifier_binding(&bindings[k]))
+            press_binding(result, &bindings[k], true);
+    for (int k = 0; k < count; k++)
+        if (bindings[k].type != BINDING_NONE && !is_modifier_binding(&bindings[k]))
+            press_binding(result, &bindings[k], true);
 }
 bool gesture_is_within_tap_distance(float x, float y);
 void gesture_cancel_double_tap_wait(TouchActionResult* result);

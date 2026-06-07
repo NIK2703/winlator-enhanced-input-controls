@@ -223,6 +223,9 @@ void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
         case ELEM_TRACKPAD: element_trackpad_up(e, x, y, time_ms, result); break;
         case ELEM_RANGE_BUTTON: element_range_button_up(e, x, y, time_ms, result); break;
     }
+    e->engaged = false;
+    e->current_ptr_id = -1;
+    e->visual_active = false;
     g_state.visual_state_dirty = true;
 }
 

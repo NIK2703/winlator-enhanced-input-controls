@@ -43,7 +43,4 @@ void element_dpad_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchA
                 release_binding(result, &e->bindings[i]);
         }
     }
-    e->engaged = false;
-    e->current_ptr_id = -1;
-    e->visual_active = false;
 }

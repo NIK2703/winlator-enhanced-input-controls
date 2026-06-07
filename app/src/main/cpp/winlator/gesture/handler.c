@@ -138,11 +138,7 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                     if (found_orig) {
                         g_state.gesture_second_active = false;
                         g_state.gesture_main_ptr_id = orig_ptr_id;
-                        int tx, ty;
-                        touch_transform_coords(x, y, &tx, &ty);
-                        add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
-                        g_state.ptr_x = tx;
-                        g_state.ptr_y = ty;
+                        update_ts_pointer(x, y, result);
                         f->state = GESTURE_STATE_TAP_WAITING;
                         return;
                     }
@@ -169,13 +165,7 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 
         f->original_ptr_id = f->ptr_id;
         f->double_tap_original_id_set = true;
-        {
-            int tx, ty;
-            touch_transform_coords(x, y, &tx, &ty);
-            add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
-            g_state.ptr_x = tx;
-            g_state.ptr_y = ty;
-        }
+        update_ts_pointer(x, y, result);
 
         touchpad_finger_down(f, result, time_ms);
         return;
@@ -449,13 +439,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
             && !f->cached_has_long_press_timer
             && !g_state.gesture_post_double_tap_drag
             && f->state != GESTURE_STATE_LONG_PRESSING) {
-            {
-                int tx, ty;
-                touch_transform_coords(x, y, &tx, &ty);
-                g_state.ptr_x = tx;
-                g_state.ptr_y = ty;
-                add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
-            }
+            update_ts_pointer(x, y, result);
             f->last_x = x;
             f->last_y = y;
             return;
@@ -464,14 +448,13 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
         float dx = x - f->down_x;
         float dy = y - f->down_y;
         // Drag threshold for main finger's own bindings
-        if (f->state != GESTURE_STATE_DRAGGING)
-            check_start_drag(f, dx, dy, result);
+        check_start_drag(f, dx, dy, result);
 
         // TS: main-finger movement triggers second-finger STD (single-tap-drag)
         // when the second finger is held and has STD configured.
         if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN && g_state.gesture_second_active) {
             TouchFinger* sf = find_finger(g_state.gesture_second_ptr_id);
-            if (sf && sf->state != GESTURE_STATE_DRAGGING) {
+            if (sf) {
                 float sf_dx = x - g_state.gesture_second_main_ref_x;
                 float sf_dy = y - g_state.gesture_second_main_ref_y;
                 check_start_drag(sf, sf_dx, sf_dy, result);
@@ -489,19 +472,13 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
         float dy = y - f->down_y;
         // TS second-finger STD is triggered by main-finger movement (above).
         // This own-move path also handles press_on_drag for non-Sd S2.
-        if (f->state != GESTURE_STATE_DRAGGING)
-            check_start_drag(f, dx, dy, result);
+        check_start_drag(f, dx, dy, result);
     }
 
     // TS: update absolute pointer
     if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
-        if (g_state.gesture_main_ptr_id < 0 || f->ptr_id == g_state.gesture_main_ptr_id) {
-            int tx, ty;
-            touch_transform_coords(x, y, &tx, &ty);
-            g_state.ptr_x = tx;
-            g_state.ptr_y = ty;
-            add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
-        }
+        if (g_state.gesture_main_ptr_id < 0 || f->ptr_id == g_state.gesture_main_ptr_id)
+            update_ts_pointer(x, y, result);
         f->last_x = x;
         f->last_y = y;
         return;
