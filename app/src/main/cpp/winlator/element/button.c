@@ -208,8 +208,6 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     // Toggle + Auto-repeat: keep repeating after finger-up, don't flip selected
     if (e->toggle_switch && e->auto_repeat) {
         if (e->selected) {
-            e->engaged = false;
-            e->current_ptr_id = -1;
             return;
         }
     }
@@ -229,14 +227,10 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
             } else {
                 e->auto_repeat_primary_pressed = false;
             }
-            e->engaged = false;
-            e->current_ptr_id = -1;
             return;
         }
         e->selected = !e->selected;
         if (e->selected) {
-            e->engaged = false;
-            e->current_ptr_id = -1;
             return;
         }
     }
@@ -255,29 +249,10 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     //    e->bindings[0].type, (unsigned long long)(time_ms - e->down_time_ms));
 
     if (e->gesture_long_press_triggered) {
-        // Java releaseHeldBindings: releases long-press bindings only (NOT primary)
-        // Release non-modifiers first, then modifiers last
-        for (int k = e->element_long_press_count - 1; k >= 0; k--) {
-            if (e->element_long_press[k].type != BINDING_NONE && !is_modifier_binding(&e->element_long_press[k]))
-                release_binding(result, &e->element_long_press[k]);
-        }
-        for (int k = e->element_long_press_count - 1; k >= 0; k--) {
-            if (e->element_long_press[k].type != BINDING_NONE && is_modifier_binding(&e->element_long_press[k]))
-                release_binding(result, &e->element_long_press[k]);
-        }
+        release_bindings_list(result, e->element_long_press, e->element_long_press_count);
         e->gesture_long_press_triggered = false;
     } else if (e->gesture_swipe_triggered) {
-        if (e->element_gesture_count > 0) {
-            // Release non-modifiers first, then modifiers last
-            for (int k = e->element_gesture_count - 1; k >= 0; k--) {
-                if (e->element_gesture[k].type != BINDING_NONE && !is_modifier_binding(&e->element_gesture[k]))
-                    release_binding(result, &e->element_gesture[k]);
-            }
-            for (int k = e->element_gesture_count - 1; k >= 0; k--) {
-                if (e->element_gesture[k].type != BINDING_NONE && is_modifier_binding(&e->element_gesture[k]))
-                    release_binding(result, &e->element_gesture[k]);
-            }
-        }
+        release_bindings_list(result, e->element_gesture, e->element_gesture_count);
         e->gesture_swipe_triggered = false;
     } else {
         bool has_lp = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
@@ -293,8 +268,5 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     }
 
 cleanup:
-    e->engaged = false;
-    e->current_ptr_id = -1;
-    e->visual_active = false;
     e->gesture_timer_armed = false;
 }

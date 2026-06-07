@@ -139,15 +139,21 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         bool has_single_and_dt = f->cached_has_active_single_tap
             && (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag);
         // Held S2/D2: transition without re-fire if Sd2 unavailable or D2 present.
-        // (!fb->single_tap_drag_count) is true for TP (always zeroed) and for TS without Sd2 bindings.
         if (g_state.gesture_is_action_held
             && (!fb->single_tap_drag_count || f->cached_has_active_double_tap)) {
             g_state.gesture_pending_double_count = 0;
             start_drag_no_binding(f);
             return;
         }
+        // TP mode zeroes single_tap_drag on the finger; read from config directly.
+        const TouchBinding* sd = f->bindings.single_tap_drag;
+        int sd_count = f->bindings.single_tap_drag_count;
+        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD) {
+            sd = g_state.cfg.tp_single_drag_2nd;
+            sd_count = g_state.cfg.tp_single_drag_2nd_count;
+        }
         if (!resolve_drag_binding(
-                f->bindings.single_tap_drag, f->bindings.single_tap_drag_count,
+                sd, sd_count,
                 fb->single_tap, fb->single_tap_count, NULL, 0,
                 has_single_and_dt, false,
                 &drag_binding, &drag_count))
