@@ -20,11 +20,20 @@ static void dpad_update(TouchElement* e, float x, float y, TouchActionResult* re
 
 void element_dpad_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     (void)ptr_id; (void)time_ms;
+    __android_log_print(ANDROID_LOG_WARN, "Winlator_DBG", "DPAD_DOWN[%d] pos(%d,%d) finger(%.0f,%.0f) hw=%.0f hh=%.0f",
+        (int)(e - g_state.elements), e->x, e->y, x, y, e->hw, e->hh);
     dpad_update(e, x, y, result);
 }
 
 void element_dpad_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     (void)time_ms;
+    float fx = -1.0f, fy = -1.0f;
+    TouchFinger* fp = find_finger(e->current_ptr_id);
+    if (fp) { fx = fp->x; fy = fp->y; }
+    __android_log_print(ANDROID_LOG_WARN, "Winlator_DBG", "DPAD_MOVE[%d] finger(%.0f,%.0f) dx=%.0f dy=%.0f fxy=(%.0f,%.0f) down=(%.0f,%.0f) vis=(%.0f,%.0f) ret=%p",
+        (int)(e - g_state.elements), x, y, x - e->x, y - e->y,
+        fx, fy, e->down_x, e->down_y, e->visual_x, e->visual_y,
+        __builtin_return_address(0));
     dpad_update(e, x, y, result);
 }
 

@@ -73,7 +73,7 @@ void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, 
 
                 if (is_mouse_move_binding(b)) {
                     float value = (i == 1 || i == 3) ? value_x : value_y;
-                    int delta = (int)(value <= 0 ? floorf(value) : ceilf(value));
+                    int delta = lrintf(value);
                     if (i == 1 || i == 3) cursor_dx += delta;
                     if (i == 0 || i == 2) cursor_dy += delta;
                     continue;

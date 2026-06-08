@@ -4,7 +4,10 @@ import android.content.Context;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
+import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.Spinner;
+import android.widget.TextView;
 
 import com.winlator.cmod.R;
 
@@ -35,6 +38,13 @@ public class RendererOptionsDialog extends ContentDialog {
 
         boolean getRendererSwapRB();
         void setRendererSwapRB(boolean v);
+
+        boolean getGridRendering();
+        void setGridRendering(boolean v);
+        float getGridDarken();
+        void setGridDarken(float v);
+        int getGridCycleInterval();
+        void setGridCycleInterval(int v);
     }
 
     private static final String[] PRESENT_MODE_IDS    = {"fifo", "mailbox"};
@@ -62,6 +72,43 @@ public class RendererOptionsDialog extends ContentDialog {
         Spinner  spFilter  = findViewById(R.id.SPRendererFilter);
         Spinner  spRefresh = findViewById(R.id.SPRendererRefreshRate);
         CheckBox cbSwapRB  = findViewById(R.id.CBRendererSwapRB);
+        CheckBox cbGridRendering = findViewById(R.id.CBGridRendering);
+        LinearLayout groupGridDarken = findViewById(R.id.GroupGridDarken);
+        SeekBar sbGridDarken = findViewById(R.id.SBGridDarken);
+        TextView tvGridDarken = findViewById(R.id.TVGridDarken);
+        SeekBar sbGridCycleInterval = findViewById(R.id.SBGridCycleInterval);
+        TextView tvGridCycleInterval = findViewById(R.id.TVGridCycleInterval);
+
+        cbGridRendering.setChecked(config.getGridRendering());
+        int darkenProgress = Math.round(config.getGridDarken() * 100);
+        sbGridDarken.setProgress(darkenProgress);
+        tvGridDarken.setText(darkenProgress + "%");
+        int cycleInterval = config.getGridCycleInterval();
+        sbGridCycleInterval.setProgress(cycleInterval);
+        tvGridCycleInterval.setText(cycleInterval > 0 ? cycleInterval + "s" : "Off");
+        groupGridDarken.setVisibility(cbGridRendering.isChecked() ? View.VISIBLE : View.GONE);
+
+        cbGridRendering.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            groupGridDarken.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+        });
+
+        sbGridDarken.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvGridDarken.setText(progress + "%");
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        sbGridCycleInterval.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvGridCycleInterval.setText(progress > 0 ? progress + "s" : "Off");
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
 
         setGroupVisibility(R.id.GroupDriver,  View.GONE);
         setGroupVisibility(R.id.GroupFilter,  View.VISIBLE);
@@ -99,6 +146,9 @@ public class RendererOptionsDialog extends ContentDialog {
             config.setRendererFilterMode(spFilter.getSelectedItemPosition());
             config.setRendererRefreshRateLimit(REFRESH_RATE_VALUES[spRefresh.getSelectedItemPosition()]);
             config.setRendererSwapRB(cbSwapRB.isChecked());
+            config.setGridRendering(cbGridRendering.isChecked());
+            config.setGridDarken(sbGridDarken.getProgress() / 100.0f);
+            config.setGridCycleInterval(sbGridCycleInterval.getProgress());
         });
     }
 

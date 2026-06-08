@@ -1,10 +1,14 @@
 #include "touch_processor_internal.h"
 #include "touch_processor_activation.h"
+#include <stddef.h>
 
-TouchProcessorState g_state;
+TouchProcessorState g_state __attribute__((aligned(64)));
 
+__attribute__((cold))
 void touch_processor_init(const TouchProcessorConfig* config) {
     memset(&g_state, 0, sizeof(g_state));
+    memset(g_state.finger_slot_by_ptr_id, 0xFF, sizeof(g_state.finger_slot_by_ptr_id));
+    g_state.active_finger_count = 0;
     memcpy(&g_state.cfg, config, sizeof(TouchProcessorConfig));
     g_state.main_ptr_id = -1;
     g_state.gesture_main_ptr_id = -1;
@@ -25,12 +29,15 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     if (g_state.cfg.xform_scale_y <= 0.0f) g_state.cfg.xform_scale_y = 1.0f;
     g_state.cfg.bindings_generation = 1;
     compute_gesture_caps(&g_state.cfg);
-    init_bezier_lut();
+    float th = g_state.cfg.gesture_threshold_px > 0 ? (float)g_state.cfg.gesture_threshold_px : 20.0f;
+    g_state.gesture_threshold_sq = th * th;
 }
 
 void touch_processor_update_config(const TouchProcessorConfig* config) {
     memcpy(&g_state.cfg, config, sizeof(TouchProcessorConfig));
     compute_gesture_caps(&g_state.cfg);
+    float th = g_state.cfg.gesture_threshold_px > 0 ? (float)g_state.cfg.gesture_threshold_px : 20.0f;
+    g_state.gesture_threshold_sq = th * th;
     g_state.cfg.bindings_generation++;
 
     for (int i = 0; i < MAX_FINGERS; i++) {
@@ -43,6 +50,7 @@ void touch_processor_update_config(const TouchProcessorConfig* config) {
     }
 }
 
+__attribute__((cold))
 void touch_processor_set_elements(const TouchElement* elements, int count) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "touch_processor_set_elements: count=%d", count);
     int n = count < MAX_ELEMENTS ? count : MAX_ELEMENTS;
@@ -155,12 +163,12 @@ static void finger_init(TouchFinger* f, int ptr_id) {
     memset(f, 0, sizeof(TouchFinger));
     f->ptr_id = ptr_id;
     f->active = true;
-    f->bindings_generation = 0;
     f->is_tap = true;
-    g_state.finger_by_ptr_id[ptr_id] = f;
+    g_state.finger_slot_by_ptr_id[ptr_id] = (uint8_t)(f - g_state.fingers);
     g_state.active_finger_count++;
 }
 
+__attribute__((hot))
 TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, uint64_t time_ms) {
     TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "on_finger_down ptr=%d x=%.0f y=%.0f time=%llu count=%d",
         ptr_id, x, y, (unsigned long long)time_ms, g_state.element_count);
@@ -212,6 +220,7 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     return result;
 }
 
+__attribute__((hot))
 TouchActionResult touch_processor_on_finger_move(int ptr_id, float x, float y, uint64_t time_ms) {
     TouchActionResult result; result.count = 0;
     TouchFinger* f = find_finger(ptr_id);
@@ -231,6 +240,7 @@ TouchActionResult touch_processor_on_finger_move(int ptr_id, float x, float y, u
     return result;
 }
 
+__attribute__((hot))
 TouchActionResult touch_processor_on_finger_up(int ptr_id, float x, float y, uint64_t time_ms) {
     TouchActionResult result; result.count = 0;
     TouchFinger* f = find_finger(ptr_id);
@@ -249,7 +259,6 @@ TouchActionResult touch_processor_on_finger_up(int ptr_id, float x, float y, uin
     TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "on_finger_up: after handle_gesture_up active=%d ptr_id=%d",
         f->active, f->ptr_id);
     deactivate_finger(f);
-    g_state.free_finger_hint = (int)(f - g_state.fingers);
     return result;
 }
 
@@ -313,7 +322,7 @@ static inline void process_delayed_actions(TouchActionResult* restrict result, u
     }
 }
 
-static inline void process_auto_repeat_burst(TouchActionResult* restrict result, TouchBinding* actions, int count, uint64_t* last_time, uint64_t time_ms) {
+static inline void process_auto_repeat_burst(TouchActionResult* restrict result, TouchBinding* restrict actions, int count, uint64_t* restrict last_time, uint64_t time_ms) {
     if (count == 0) return;
     for (int i = 0; i < count; i++) {
         TouchBinding* b = &actions[i];
@@ -329,6 +338,7 @@ static inline void process_auto_repeat_burst(TouchActionResult* restrict result,
     }
 }
 
+__attribute__((hot))
 TouchActionResult touch_processor_tick(uint64_t time_ms) {
     TouchActionResult result; result.count = 0;
 
@@ -356,7 +366,10 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
         if (__builtin_expect(_bi + 4 < button_count, 1))
             __builtin_prefetch(&elements[button_indices[_bi + 4]], 0, 1);
 
-        if (__builtin_expect(!e->engaged && !e->selected && e->current_ptr_id < 0 && !e->cached_has_auto_repeat && !e->cached_has_long_press && !e->cached_has_gesture, 1)) {
+        if (__builtin_expect(!e->engaged && !e->selected && e->current_ptr_id < 0
+            && !(has_auto_repeat_buttons && e->cached_has_auto_repeat)
+            && !(has_any_element_long_press && e->cached_has_long_press)
+            && !(has_any_element_gesture && e->cached_has_gesture), 1)) {
             e->visual_x = e->x; e->visual_y = e->y;
             continue;
         }
@@ -466,13 +479,15 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
     int range_count = g_state.range_count;
     int* range_indices = g_state.range_indices;
     for (int _ri = 0; _ri < range_count; _ri++) {
+        if (_ri + 4 < range_count)
+            __builtin_prefetch(&elements[range_indices[_ri + 4]], 0, 1);
         TouchElement* e = &elements[range_indices[_ri]];
-        int kc = range_keycode(e->range_ordinal, e->range_index);
-        int _ridx = (int)(e - elements);
+        int _ridx = range_indices[_ri];
 
         // Range button hold timer
         if (__builtin_expect(e->current_ptr_id >= 0, 0) && !e->range_hold_pressed && !e->range_scrolling && e->range_has_binding) {
             if (time_ms - e->down_time_ms >= RANGE_TAP_TIMEOUT_MS) {
+                int kc = range_keycode(e->range_ordinal, e->range_index);
                 TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Range", "tick[%d] hold_timeout elapsed=%llu kc=%d",
                     _ridx, (unsigned long long)(time_ms - e->down_time_ms), kc);
                 if (kc > 0) {
@@ -484,6 +499,7 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
 
         // Range button deferred tap release
         if (e->range_pending_tap_release && time_ms >= e->range_tap_release_time) {
+            int kc = e->range_initial_kc;
             TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Range", "tick[%d] tap_release kc=%d", _ridx, kc);
             if (kc > 0)
                 add_action(&result, ACT_KEY_RELEASE, kc, 0, 0);
@@ -500,8 +516,7 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
 }
 
 void touch_processor_reset(void) {
-    // Save config/geometry before memset
-    TouchProcessorConfig saved_cfg = g_state.cfg;
+    // Save fields that are zeroed by targeted memset but need to be preserved
     int saved_element_count = g_state.element_count;
     float saved_snapping_size = g_state.snapping_size;
     float saved_resolution_scale = g_state.resolution_scale;
@@ -509,18 +524,17 @@ void touch_processor_reset(void) {
     int saved_range_count = g_state.range_count;
     float saved_ptr_x = g_state.ptr_x;
     float saved_ptr_y = g_state.ptr_y;
-    TouchElement saved_elements[MAX_ELEMENTS];
-    memcpy(saved_elements, g_state.elements, sizeof(g_state.elements));
 
     TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "reset: cfg.touch_mode=%d gen=%d caps_gesture=%d caps_dt=%d caps_drag=%d",
-        saved_cfg.touch_mode, saved_cfg.bindings_generation,
-        saved_cfg.caps_has_gesture_bindings, saved_cfg.caps_has_double_tap, saved_cfg.caps_has_drag_bindings);
+        g_state.cfg.touch_mode, g_state.cfg.bindings_generation,
+        g_state.cfg.caps_has_gesture_bindings, g_state.cfg.caps_has_double_tap, g_state.cfg.caps_has_drag_bindings);
 
-    memset(&g_state, 0, sizeof(g_state));
+    // Zero all runtime fields between cfg end and elements start
+    ptrdiff_t hot_start = offsetof(TouchProcessorState, finger_slot_by_ptr_id);
+    ptrdiff_t hot_end = offsetof(TouchProcessorState, elements);
+    memset((char*)&g_state + hot_start, 0, hot_end - hot_start);
 
-    // Restore config (NOT zeroed — needed for touch processing after reset)
-    g_state.cfg = saved_cfg;
-    // Restore geometry
+    // Restore preserved fields
     g_state.element_count = saved_element_count;
     g_state.snapping_size = saved_snapping_size;
     g_state.resolution_scale = saved_resolution_scale;
@@ -528,7 +542,6 @@ void touch_processor_reset(void) {
     g_state.range_count = saved_range_count;
     g_state.ptr_x = saved_ptr_x;
     g_state.ptr_y = saved_ptr_y;
-    memcpy(g_state.elements, saved_elements, sizeof(g_state.elements));
 
     TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "reset: after restore cfg.touch_mode=%d gen=%d caps_gesture=%d",
         g_state.cfg.touch_mode, g_state.cfg.bindings_generation, g_state.cfg.caps_has_gesture_bindings);
@@ -545,7 +558,7 @@ void touch_processor_reset(void) {
     for (int i = 0; i < MAX_FINGERS; i++) g_state.hovered_element_per_ptr[i] = -1;
     g_state.free_finger_hint = 0;
     for (int i = 0; i < MAX_FINGERS; i++) g_state.fingers[i].active = false;
-    for (int i = 0; i < MAX_FINGERS; i++) g_state.finger_by_ptr_id[i] = NULL;
+    memset(g_state.finger_slot_by_ptr_id, 0xFF, sizeof(g_state.finger_slot_by_ptr_id));
     g_state.active_finger_count = 0;
     g_state.passthrough_active = false;
     g_state.sim_continue_click = false;
@@ -557,6 +570,9 @@ void touch_processor_reset(void) {
     g_state.pointer_right_enabled = true;
     g_state.scroll_accum_y = 0;
     g_state.gesture_toggled_count = 0;
+
+    float th = g_state.cfg.gesture_threshold_px > 0 ? (float)g_state.cfg.gesture_threshold_px : 20.0f;
+    g_state.gesture_threshold_sq = th * th;
 
     for (int i = 0; i < g_state.element_count; i++)
         element_reset_runtime(&g_state.elements[i]);

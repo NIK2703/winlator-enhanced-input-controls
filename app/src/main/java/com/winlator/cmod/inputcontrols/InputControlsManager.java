@@ -102,9 +102,9 @@ public class InputControlsManager {
         copyAssetProfilesIfNeeded();
 
         ArrayList<ControlsProfile> profiles = new ArrayList<>();
-        File[] files = profilesDir.listFiles((d, n) -> n.endsWith(".icp"));
-        if (files != null) {
-            for (File file : files) {
+        File[] icpFiles = profilesDir.listFiles((d, n) -> n.endsWith(".icp") || n.endsWith(".icpx"));
+        if (icpFiles != null) {
+            for (File file : icpFiles) {
                 ControlsProfile profile = loadProfile(context, file);
                 if (profile != null) {
                     if (!(ignoreTemplates && profile.isTemplate())) profiles.add(profile);
@@ -211,19 +211,28 @@ public class InputControlsManager {
     }
 
     public File exportProfile(ControlsProfile profile) {
-        File destination;
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
         String winlatorPath = sp.getString("winlator_path_uri", null);
+        File profilesDir;
         if (winlatorPath != null) {
             Uri winlatorUri = Uri.parse(winlatorPath);
-            destination = new File(FileUtils.getFilePathFromUri(context, winlatorUri), "profiles/" + profile.getName() + ".icp");
+            profilesDir = new File(FileUtils.getFilePathFromUri(context, winlatorUri), "profiles");
         }
         else {
-            destination = new File(SettingsFragment.DEFAULT_WINLATOR_PATH, "profiles/" + profile.getName() + ".icp");
+            profilesDir = new File(SettingsFragment.DEFAULT_WINLATOR_PATH, "profiles");
         }
-        FileUtils.copy(ControlsProfile.getProfileFile(context, profile.id), destination);
-        MediaScannerConnection.scanFile(context, new String[]{destination.getAbsolutePath()}, null, null);
-        return destination.isFile() ? destination : null;
+        profilesDir.mkdirs();
+
+        // Export extended format as .icpx
+        File icpxDest = new File(profilesDir, profile.getName() + ".icpx");
+        FileUtils.copy(ControlsProfile.getProfileFile(context, profile.id), icpxDest);
+
+        // Export original Winlator-compatible format as .icp
+        File icpDest = new File(profilesDir, profile.getName() + ".icp");
+        profile.exportOriginalFormat(icpDest);
+
+        MediaScannerConnection.scanFile(context, new String[]{icpDest.getAbsolutePath(), icpxDest.getAbsolutePath()}, null, null);
+        return icpxDest.isFile() ? icpxDest : null;
     }
 
     public static ControlsProfile loadProfile(Context context, File file) {

@@ -80,6 +80,9 @@ public class Container {
     private String box64Version;
     private String emulator;
     private boolean exclusiveXInput = true;
+    private boolean gridRendering = false;
+    private float gridDarken = 0.25f;
+    private int gridCycleInterval = 0;
 
     private ContainerManager containerManager;
 
@@ -385,6 +388,13 @@ public class Container {
         this.exclusiveXInput = exclusiveXInput;
     }
 
+    public boolean isGridRendering() { return gridRendering; }
+    public void setGridRendering(boolean v) { this.gridRendering = v; }
+    public float getGridDarken() { return gridDarken; }
+    public void setGridDarken(float v) { this.gridDarken = Math.max(0.0f, Math.min(1.0f, v)); }
+    public int getGridCycleInterval() { return gridCycleInterval; }
+    public void setGridCycleInterval(int v) { this.gridCycleInterval = Math.max(0, v); }
+
     public Iterable<String[]> drivesIterator() {
         return drivesIterator(drives);
     }
@@ -447,6 +457,9 @@ public class Container {
             data.put("primaryController", primaryController);
             data.put("controllerMapping", controllerMapping);
             data.put("exclusiveXInput", exclusiveXInput);
+            if (gridRendering) data.put("gridRendering", true);
+            if (gridDarken != 0.25f) data.put("gridDarken", gridDarken);
+            if (gridCycleInterval > 0) data.put("gridCycleInterval", gridCycleInterval);
             if (!WineInfo.isMainWineVersion(wineVersion)) data.put("wineVersion", wineVersion);
             FileUtils.writeString(getConfigFile(), data.toString());
         }
@@ -568,6 +581,15 @@ public class Container {
                     break;
                 case "exclusiveXInput" :
                     setExclusiveXInput(data.getBoolean(key));
+                    break;
+                case "gridRendering" :
+                    gridRendering = data.getBoolean(key);
+                    break;
+                case "gridDarken" :
+                    gridDarken = (float)data.getDouble(key);
+                    break;
+                case "gridCycleInterval" :
+                    gridCycleInterval = data.getInt(key);
                     break;
             }
         }

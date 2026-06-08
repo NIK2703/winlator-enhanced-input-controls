@@ -480,6 +480,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (data.has("gestureSettings")) {
                 loadUnifiedGestureSettingsFromJson(data.getJSONObject("gestureSettings"));
             }
+            else if (data.has("touchscreenGestures")) {
+                loadLegacyTouchscreenGesturesFromJson(data.getJSONObject("touchscreenGestures"));
+            }
         }
         catch (JSONException e) {
 
@@ -535,6 +538,44 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 singleTapDelay = clamp(gestureData.getInt("singleTapDelay"), 0, 10);
             if (gestureData.has("cursorSpeed"))
                 cursorSpeed = (float)gestureData.getDouble("cursorSpeed");
+            if (gestureData.has("touchActivationMode"))
+                touchActivationMode = parseEnum(TouchActivationMode.class, gestureData.getString("touchActivationMode"), TouchActivationMode.LOCK);
+        }
+        catch (JSONException e) {
+
+        }
+    }
+
+    private void loadLegacyTouchscreenGesturesFromJson(JSONObject gestureData) {
+        if (gestureData == null) return;
+        try {
+            if (gestureData.has("mouseMode"))
+                mouseMode = parseEnum(MouseMode.class, gestureData.getString("mouseMode"), MouseMode.TOUCHPAD);
+            if (gestureData.has("inputMode"))
+                inputMode = parseEnum(InputMode.class, gestureData.getString("inputMode"), InputMode.ABSOLUTE);
+            if (gestureData.has("dragMode"))
+                dragMode = parseEnum(DragMode.class, gestureData.getString("dragMode"), DragMode.AUTO);
+
+            String[] gestureKeys = {"singleTapAction", "longPressAction", "doubleTapAction",
+                "singleTapDragAction", "longPressDragAction", "doubleTapDragAction",
+                "singleTap2ndFingerAction", "doubleTap2ndFingerAction",
+                "singleTap2ndFingerDragAction", "doubleTap2ndFingerDragAction"};
+            Binding[] gestureDefaults = {Binding.MOUSE_LEFT_BUTTON, Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
+                Binding.NONE, Binding.MOUSE_LEFT_BUTTON, Binding.NONE,
+                Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
+                Binding.NONE, Binding.NONE};
+
+            for (int i = 0; i < gestureKeys.length; i++) {
+                if (gestureData.has(gestureKeys[i])) {
+                    JSONArray arr = gestureData.getJSONArray(gestureKeys[i]);
+                    setGestureAction(i, BindPackage.fromJSONArray(arr, gestureDefaults[i]));
+                }
+            }
+
+            if (gestureData.has("doubleTapTimeout"))
+                doubleTapTimeout = clamp(gestureData.getInt("doubleTapTimeout"), 50, 500);
+            if (gestureData.has("longPressTimeout"))
+                longPressTimeout = clamp(gestureData.getInt("longPressTimeout"), 50, 1000);
             if (gestureData.has("touchActivationMode"))
                 touchActivationMode = parseEnum(TouchActivationMode.class, gestureData.getString("touchActivationMode"), TouchActivationMode.LOCK);
         }
@@ -654,6 +695,61 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         catch (JSONException e) {}
     }
 
+    public void exportOriginalFormat(File dest) {
+        try {
+            JSONObject data = new JSONObject();
+            data.put("id", id);
+            data.put("name", name);
+            data.put("cursorSpeed", Float.valueOf(cursorSpeed));
+
+            JSONArray elementsJSONArray = new JSONArray();
+            if (!elementsLoaded) {
+                File file = getProfileFile(context, id);
+                if (file.isFile()) {
+                    try {
+                        JSONObject profileJSONObject = new JSONObject(FileUtils.readString(file));
+                        elementsJSONArray = profileJSONObject.getJSONArray("elements");
+                    }
+                    catch (JSONException e) {
+                        for (ControlElement element : elements) elementsJSONArray.put(element.toOriginalJSONObject());
+                    }
+                }
+            }
+            else {
+                for (ControlElement element : elements) elementsJSONArray.put(element.toOriginalJSONObject());
+            }
+            data.put("elements", elementsJSONArray);
+
+            JSONArray controllersJSONArray = new JSONArray();
+            if (!controllersLoaded) {
+                File file = getProfileFile(context, id);
+                if (file.isFile()) {
+                    try {
+                        JSONObject profileJSONObject = new JSONObject(FileUtils.readString(file));
+                        if (profileJSONObject.has("controllers")) controllersJSONArray = profileJSONObject.getJSONArray("controllers");
+                    }
+                    catch (JSONException e) {
+                        for (ExternalController controller : controllers) {
+                            JSONObject c = controller.toJSONObject();
+                            if (c != null) controllersJSONArray.put(c);
+                        }
+                    }
+                }
+            }
+            else {
+                for (ExternalController controller : controllers) {
+                    JSONObject c = controller.toJSONObject();
+                    if (c != null) controllersJSONArray.put(c);
+                }
+            }
+            if (controllersJSONArray.length() > 0) data.put("controllers", controllersJSONArray);
+
+            FileUtils.writeString(dest, data.toString());
+        }
+        catch (JSONException e) {
+        }
+    }
+
     public static File getProfileFile(Context context, int id) {
         return new File(InputControlsManager.getProfilesDir(context), "controls-"+id+".icp");
     }
@@ -739,6 +835,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (profileJSONObject.has("gestureSettings")) {
                 loadUnifiedGestureSettingsFromJson(profileJSONObject.getJSONObject("gestureSettings"));
             }
+            else if (profileJSONObject.has("touchscreenGestures")) {
+                loadLegacyTouchscreenGesturesFromJson(profileJSONObject.getJSONObject("touchscreenGestures"));
+            }
             gestureSettingsLoaded = true;
 
             JSONArray elementsJSONArray = profileJSONObject.getJSONArray("elements");
@@ -788,14 +887,49 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 if (elementJSONObject.has("orientation")) element.setOrientation((byte)elementJSONObject.getInt("orientation"));
 
                 boolean hasGamepadBinding = true;
-                JSONArray slotPackagesArray = elementJSONObject.getJSONArray("slotPackages");
-                for (int j = 0; j < slotPackagesArray.length(); j++) {
-                    JSONObject pkgObj = slotPackagesArray.getJSONObject(j);
-                    BindPackage pkg = BindPackage.fromJSON(pkgObj, Binding.NONE);
-                    element.setSlotPackage(j, pkg);
-                    for (int k = 0; k < pkg.size(); k++) {
-                        Binding b = pkg.get(k);
-                        if (b != null && !b.isGamepad()) hasGamepadBinding = false;
+                JSONArray slotPackagesArray = elementJSONObject.optJSONArray("slotPackages");
+                if (slotPackagesArray != null) {
+                    for (int j = 0; j < slotPackagesArray.length(); j++) {
+                        JSONObject pkgObj = slotPackagesArray.getJSONObject(j);
+                        BindPackage pkg = BindPackage.fromJSON(pkgObj, Binding.NONE);
+                        element.setSlotPackage(j, pkg);
+                        for (int k = 0; k < pkg.size(); k++) {
+                            Binding b = pkg.get(k);
+                            if (b != null && !b.isGamepad()) hasGamepadBinding = false;
+                        }
+                    }
+                }
+                else {
+                    JSONArray oldBindingsArray = elementJSONObject.optJSONArray("bindings");
+                    if (oldBindingsArray != null && oldBindingsArray.length() > 0) {
+                        try {
+                            boolean isFlat = oldBindingsArray.get(0) instanceof String;
+                            boolean oldToggleSwitch = elementJSONObject.optBoolean("toggleSwitch", false);
+                            if (isFlat) {
+                                for (int j = 0; j < oldBindingsArray.length(); j++) {
+                                    String bName = oldBindingsArray.optString(j, "NONE");
+                                    BindPackage pkg = BindPackage.fromSingle(parseBinding(bName, Binding.NONE));
+                                    pkg.setToggleSwitch(oldToggleSwitch);
+                                    element.setSlotPackage(j, pkg);
+                                    Binding b = pkg.get(0);
+                                    if (b != null && !b.isGamepad()) hasGamepadBinding = false;
+                                }
+                            }
+                            else {
+                                for (int j = 0; j < oldBindingsArray.length(); j++) {
+                                    JSONArray seqArray = oldBindingsArray.getJSONArray(j);
+                                    BindPackage pkg = BindPackage.fromJSONArray(seqArray, Binding.NONE);
+                                    pkg.setToggleSwitch(oldToggleSwitch);
+                                    element.setSlotPackage(j, pkg);
+                                    for (int k = 0; k < pkg.size(); k++) {
+                                        Binding b = pkg.get(k);
+                                        if (b != null && !b.isGamepad()) hasGamepadBinding = false;
+                                    }
+                                }
+                            }
+                        }
+                        catch (JSONException e2) {
+                        }
                     }
                 }
 

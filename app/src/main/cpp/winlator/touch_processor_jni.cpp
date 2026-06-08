@@ -33,9 +33,7 @@ static VisualStateEntry g_visual_buffer[MAX_ELEMENTS];
 static jobject g_visual_buffer_ref = NULL;
 
 static void visual_state_flush(void) {
-    uint32_t any = 0;
-    for (int b = 0; b < 4; b++) any |= g_state.visual_dirty_mask[b];
-    if (__builtin_expect(!any, 1)) return;
+    if (__builtin_expect(!g_state.visual_dirty_any, 1)) return;
 
     int n = g_state.element_count;
     int active_count = 0;
@@ -71,6 +69,7 @@ static void visual_state_flush(void) {
             mask &= mask - 1;
         } while (mask);
     }
+    g_state.visual_dirty_any = 0;
     if (active_count > 0 || n > 0) {
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "flush: total=%d active=%d dirty=0", n, active_count);
     }
@@ -79,9 +78,10 @@ static void visual_state_flush(void) {
 // Bulk write all elements' visual state into Java arrays (1 JNI call replaces N×8 ByteBuffer reads)
 static jint nativeSyncVisualState(JNIEnv* env, jclass clazz, jfloatArray positions, jintArray states, jfloatArray scrollOffsets) {
     int n = g_state.element_count;
-    jfloat* pos = env->GetFloatArrayElements(positions, NULL);
-    jint* st = env->GetIntArrayElements(states, NULL);
-    jfloat* scroll = scrollOffsets ? env->GetFloatArrayElements(scrollOffsets, NULL) : NULL;
+    jboolean isCopy_pos, isCopy_state, isCopy_scroll;
+    jfloat* pos = env->GetFloatArrayElements(positions, &isCopy_pos);
+    jint* st = env->GetIntArrayElements(states, &isCopy_state);
+    jfloat* scroll = scrollOffsets ? env->GetFloatArrayElements(scrollOffsets, &isCopy_scroll) : NULL;
     int max = env->GetArrayLength(positions) / 2;
     if (n > max) n = max;
     int active_count = 0;
@@ -99,9 +99,9 @@ static jint nativeSyncVisualState(JNIEnv* env, jclass clazz, jfloatArray positio
         if (scroll) scroll[i] = g_state.elements[i].range_scroll_offset;
     }
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "nativeSyncVisualState: count=%d active=%d", n, active_count);
-    env->ReleaseFloatArrayElements(positions, pos, 0);
-    env->ReleaseIntArrayElements(states, st, 0);
-    if (scroll) env->ReleaseFloatArrayElements(scrollOffsets, scroll, 0);
+    env->ReleaseFloatArrayElements(positions, pos, isCopy_pos ? 0 : JNI_ABORT);
+    env->ReleaseIntArrayElements(states, st, isCopy_state ? 0 : JNI_ABORT);
+    if (scroll) env->ReleaseFloatArrayElements(scrollOffsets, scroll, isCopy_scroll ? 0 : JNI_ABORT);
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "nativeSyncVisualState: count=%d active=%d", n, active_count);
     return (jint)n;
 }
@@ -240,6 +240,8 @@ struct CachedElementFieldIDs {
     jfieldID bindingTypes;
     jfieldID bindingSticky;
     jfieldID bindingToggle;
+    jfieldID bindingAutoRepeat;
+    jfieldID bindingAutoRepeatIntervalMs;
     jfieldID longPressToggleBitmask;
     jfieldID gestureToggleBitmask;
     jfieldID rangeOrdinal;
@@ -279,103 +281,126 @@ static int read_binding_list(JNIEnv* env, jintArray arr, TouchBinding* dst, int 
 
 
 static void dispatch_actions_batch(JNIEnv* env, const TouchActionResult* r) {
-    if (!g_dispatch_obj || !r || r->count == 0 || !g_dispatch_packed) {
-        return;
-    }
+    if (!g_dispatch_obj || !r || r->count == 0 || !g_dispatch_packed) return;
     int n = r->count;
     if (n > DISPATCH_MAX_ACTIONS) n = DISPATCH_MAX_ACTIONS;
 
-    int* packed = env->GetIntArrayElements(g_dispatch_packed, NULL);
+    jboolean isCopy;
+    int* packed = env->GetIntArrayElements(g_dispatch_packed, &isCopy);
+
+    static const void* const dispatch_table[] = {
+        [ACT_NONE]               = &&L_NONE,
+        [ACT_POINTER_MOVE]       = &&L_POINTER_MOVE,
+        [ACT_POINTER_MOVE_DELTA] = &&L_POINTER_MOVE_DELTA,
+        [ACT_POINTER_BUTTON_PRESS]  = &&L_POINTER_BUTTON,
+        [ACT_POINTER_BUTTON_RELEASE] = &&L_POINTER_BUTTON,
+        [ACT_KEY_PRESS]          = &&L_KEY,
+        [ACT_KEY_RELEASE]        = &&L_KEY,
+        [ACT_MOUSE_EVENT]        = &&L_MOUSE_EVENT,
+        [ACT_SCROLL]             = &&L_SCROLL,
+        [ACT_HAPTIC]             = &&L_HAPTIC,
+        [ACT_SET_CURSOR_SPEED]   = &&L_CURSOR_SPEED,
+        [ACT_START_MOUSE_MOVE]   = &&L_START_MOUSE_MOVE,
+        [ACT_STOP_MOUSE_MOVE]    = &&L_ZERO,
+        [ACT_GAMEPAD_STATE]      = &&L_KEY,
+        [ACT_GAMEPAD_RELEASE]    = &&L_ZERO,
+        [ACT_GAMEPAD_AXIS]       = &&L_GAMEPAD_AXIS,
+    };
+
+    int* p = packed;
     for (int i = 0; i < n; i++) {
-        int base = i * 4;
         int type = (int)r->actions[i].type;
-        packed[base] = type;
-        switch (type) {
-            case ACT_POINTER_MOVE:
-                packed[base+1] = r->actions[i].pointer_move.x;
-                packed[base+2] = r->actions[i].pointer_move.y;
-                packed[base+3] = 0;
-                break;
-            case ACT_POINTER_MOVE_DELTA:
-                packed[base+1] = r->actions[i].pointer_delta.dx;
-                packed[base+2] = r->actions[i].pointer_delta.dy;
-                packed[base+3] = 0;
-                break;
-            case ACT_POINTER_BUTTON_PRESS:
-                packed[base+1] = r->actions[i].pointer_button.button;
-                packed[base+2] = 0;
-                packed[base+3] = 0;
-                break;
-            case ACT_POINTER_BUTTON_RELEASE:
-                packed[base+1] = r->actions[i].pointer_button.button;
-                packed[base+2] = 0;
-                packed[base+3] = 0;
-                break;
-            case ACT_KEY_PRESS:
-                packed[base+1] = r->actions[i].key.keycode;
-                packed[base+2] = r->actions[i].key.is_down ? 1 : 0;
-                packed[base+3] = 0;
-                break;
-            case ACT_KEY_RELEASE:
-                packed[base+1] = r->actions[i].key.keycode;
-                packed[base+2] = r->actions[i].key.is_down ? 1 : 0;
-                packed[base+3] = 0;
-                break;
-            case ACT_MOUSE_EVENT:
-                packed[base+1] = r->actions[i].mouse_event.flags;
-                packed[base+2] = r->actions[i].mouse_event.dx;
-                packed[base+3] = r->actions[i].mouse_event.dy;
-                break;
-            case ACT_SCROLL:
-                packed[base+1] = r->actions[i].scroll.amount;
-                packed[base+2] = 0;
-                packed[base+3] = 0;
-                break;
-            case ACT_HAPTIC:
-                packed[base+1] = r->actions[i].haptic.effect;
-                packed[base+2] = 0;
-                packed[base+3] = 0;
-                break;
-            case ACT_SET_CURSOR_SPEED:
-                packed[base+1] = r->actions[i].cursor_speed.speed;
-                packed[base+2] = 0;
-                packed[base+3] = 0;
-                break;
-            case ACT_START_MOUSE_MOVE:
-                packed[base+1] = r->actions[i].mouse_move.dx;
-                packed[base+2] = r->actions[i].mouse_move.dy;
-                packed[base+3] = r->actions[i].mouse_move.hold;
-                break;
-            case ACT_STOP_MOUSE_MOVE:
-                packed[base+1] = 0;
-                packed[base+2] = 0;
-                packed[base+3] = 0;
-                break;
-            case ACT_GAMEPAD_STATE:
-                packed[base+1] = r->actions[i].key.keycode;
-                packed[base+2] = r->actions[i].key.is_down ? 1 : 0;
-                packed[base+3] = 0;
-                break;
-            case ACT_GAMEPAD_RELEASE:
-                packed[base+1] = 0;
-                packed[base+2] = 0;
-                packed[base+3] = 0;
-                break;
-            case ACT_GAMEPAD_AXIS:
-                packed[base+1] = r->actions[i].gamepad_axis.is_left;
-                packed[base+2] = r->actions[i].gamepad_axis.axis_x;
-                packed[base+3] = r->actions[i].gamepad_axis.axis_y;
-                break;
-            default:
-                packed[base] = 0;
-                packed[base+1] = 0;
-                packed[base+2] = 0;
-                packed[base+3] = 0;
-                break;
-        }
+        if (type < 0 || type > ACT_GAMEPAD_AXIS) type = 0;
+        goto *dispatch_table[type];
+
+    L_POINTER_MOVE:
+        p[0] = type;
+        p[1] = r->actions[i].pointer_move.x;
+        p[2] = r->actions[i].pointer_move.y;
+        p[3] = 0;
+        goto L_DONE;
+
+    L_POINTER_MOVE_DELTA:
+        p[0] = type;
+        p[1] = r->actions[i].pointer_delta.dx;
+        p[2] = r->actions[i].pointer_delta.dy;
+        p[3] = 0;
+        goto L_DONE;
+
+    L_POINTER_BUTTON:
+        p[0] = type;
+        p[1] = r->actions[i].pointer_button.button;
+        p[2] = 0;
+        p[3] = 0;
+        goto L_DONE;
+
+    L_KEY:
+        p[0] = type;
+        p[1] = r->actions[i].key.keycode;
+        p[2] = r->actions[i].key.is_down ? 1 : 0;
+        p[3] = 0;
+        goto L_DONE;
+
+    L_MOUSE_EVENT:
+        p[0] = type;
+        p[1] = r->actions[i].mouse_event.flags;
+        p[2] = r->actions[i].mouse_event.dx;
+        p[3] = r->actions[i].mouse_event.dy;
+        goto L_DONE;
+
+    L_SCROLL:
+        p[0] = type;
+        p[1] = r->actions[i].scroll.amount;
+        p[2] = 0;
+        p[3] = 0;
+        goto L_DONE;
+
+    L_HAPTIC:
+        p[0] = type;
+        p[1] = r->actions[i].haptic.effect;
+        p[2] = 0;
+        p[3] = 0;
+        goto L_DONE;
+
+    L_CURSOR_SPEED:
+        p[0] = type;
+        p[1] = r->actions[i].cursor_speed.speed;
+        p[2] = 0;
+        p[3] = 0;
+        goto L_DONE;
+
+    L_START_MOUSE_MOVE:
+        p[0] = type;
+        p[1] = r->actions[i].mouse_move.dx;
+        p[2] = r->actions[i].mouse_move.dy;
+        p[3] = r->actions[i].mouse_move.hold;
+        goto L_DONE;
+
+    L_ZERO:
+        p[0] = type;
+        p[1] = 0;
+        p[2] = 0;
+        p[3] = 0;
+        goto L_DONE;
+
+    L_GAMEPAD_AXIS:
+        p[0] = type;
+        p[1] = r->actions[i].gamepad_axis.is_left;
+        p[2] = r->actions[i].gamepad_axis.axis_x;
+        p[3] = r->actions[i].gamepad_axis.axis_y;
+        goto L_DONE;
+
+    L_NONE:
+        p[0] = 0;
+        p[1] = 0;
+        p[2] = 0;
+        p[3] = 0;
+
+    L_DONE:
+        p += 4;
     }
 
-    env->ReleaseIntArrayElements(g_dispatch_packed, packed, 0);
+    env->ReleaseIntArrayElements(g_dispatch_packed, packed, isCopy ? 0 : JNI_ABORT);
     env->CallVoidMethod(g_dispatch_obj, g_dispatchAllActions, n);
 }
 
@@ -439,6 +464,19 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
         binding_slots[i].slot->count = read_binding_list(env, arr, binding_slots[i].slot->arr, 8);
     }
 
+    // Cache sticky bitmask values (each field used for both ts and tp slots)
+    jint st_vals[10] = {
+        env->GetIntField(config, g_config.stSingleTap),
+        env->GetIntField(config, g_config.stLongPress),
+        env->GetIntField(config, g_config.stDoubleTap),
+        env->GetIntField(config, g_config.stSingleTapDrag),
+        env->GetIntField(config, g_config.stLongPressDrag),
+        env->GetIntField(config, g_config.stDoubleTapDrag),
+        env->GetIntField(config, g_config.stSingleTap2nd),
+        env->GetIntField(config, g_config.stDoubleTap2nd),
+        env->GetIntField(config, g_config.stSingleTapDrag2nd),
+        env->GetIntField(config, g_config.stDoubleTapDrag2nd),
+    };
     struct StickySlotPair { jfieldID fid; GestureBindingSlot* slot; };
     StickySlotPair sticky_slots[] = {
         { g_config.stSingleTap, &c->ts[GESTURE_SINGLE_TAP] },
@@ -463,12 +501,25 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
         { g_config.stDoubleTapDrag2nd, &c->tp[GESTURE_DOUBLE_DRAG_2ND] },
     };
     for (int i = 0; i < (int)(sizeof(sticky_slots)/sizeof(sticky_slots[0])); i++) {
-        int mask = env->GetIntField(config, sticky_slots[i].fid);
+        int mask = st_vals[i % 10];
         for (int j = 0; j < sticky_slots[i].slot->count; j++)
             if (mask & (1 << j))
                 sticky_slots[i].slot->arr[j].modifiers = 1;
     }
 
+    // Cache toggle bitmask values (each field used for both ts and tp slots)
+    jint tg_vals[10] = {
+        env->GetIntField(config, g_config.tgSingleTap),
+        env->GetIntField(config, g_config.tgLongPress),
+        env->GetIntField(config, g_config.tgDoubleTap),
+        env->GetIntField(config, g_config.tgSingleTapDrag),
+        env->GetIntField(config, g_config.tgLongPressDrag),
+        env->GetIntField(config, g_config.tgDoubleTapDrag),
+        env->GetIntField(config, g_config.tgSingleTap2nd),
+        env->GetIntField(config, g_config.tgDoubleTap2nd),
+        env->GetIntField(config, g_config.tgSingleTapDrag2nd),
+        env->GetIntField(config, g_config.tgDoubleTapDrag2nd),
+    };
     struct ToggleSlotPair { jfieldID fid; GestureBindingSlot* slot; };
     ToggleSlotPair toggle_slots[] = {
         { g_config.tgSingleTap, &c->ts[GESTURE_SINGLE_TAP] },
@@ -493,13 +544,37 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
         { g_config.tgDoubleTapDrag2nd, &c->tp[GESTURE_DOUBLE_DRAG_2ND] },
     };
     for (int i = 0; i < (int)(sizeof(toggle_slots)/sizeof(toggle_slots[0])); i++) {
-        int mask = env->GetIntField(config, toggle_slots[i].fid);
+        int mask = tg_vals[i % 10];
         for (int j = 0; j < toggle_slots[i].slot->count; j++)
             if (mask & (1 << j))
                 toggle_slots[i].slot->arr[j].toggle = true;
     }
 
     // Phase 4: auto-repeat bitmasks + intervals (per-binding, like toggle)
+    jint ar_vals[10] = {
+        env->GetIntField(config, g_config.arSingleTap),
+        env->GetIntField(config, g_config.arLongPress),
+        env->GetIntField(config, g_config.arDoubleTap),
+        env->GetIntField(config, g_config.arSingleTapDrag),
+        env->GetIntField(config, g_config.arLongPressDrag),
+        env->GetIntField(config, g_config.arDoubleTapDrag),
+        env->GetIntField(config, g_config.arSingleTap2nd),
+        env->GetIntField(config, g_config.arDoubleTap2nd),
+        env->GetIntField(config, g_config.arSingleTapDrag2nd),
+        env->GetIntField(config, g_config.arDoubleTapDrag2nd),
+    };
+    jint ar_interval_vals[10] = {
+        env->GetIntField(config, g_config.arSingleTapIntervalMs),
+        env->GetIntField(config, g_config.arLongPressIntervalMs),
+        env->GetIntField(config, g_config.arDoubleTapIntervalMs),
+        env->GetIntField(config, g_config.arSingleTapDragIntervalMs),
+        env->GetIntField(config, g_config.arLongPressDragIntervalMs),
+        env->GetIntField(config, g_config.arDoubleTapDragIntervalMs),
+        env->GetIntField(config, g_config.arSingleTap2ndIntervalMs),
+        env->GetIntField(config, g_config.arDoubleTap2ndIntervalMs),
+        env->GetIntField(config, g_config.arSingleTapDrag2ndIntervalMs),
+        env->GetIntField(config, g_config.arDoubleTapDrag2ndIntervalMs),
+    };
     struct AutoRepeatSlotPair { jfieldID fid; GestureBindingSlot* slot; jfieldID interval_fid; };
     AutoRepeatSlotPair ar_slots[] = {
         { g_config.arSingleTap, &c->ts[GESTURE_SINGLE_TAP], g_config.arSingleTapIntervalMs },
@@ -524,8 +599,8 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
         { g_config.arDoubleTapDrag2nd, &c->tp[GESTURE_DOUBLE_DRAG_2ND], g_config.arDoubleTapDrag2ndIntervalMs },
     };
     for (int i = 0; i < (int)(sizeof(ar_slots)/sizeof(ar_slots[0])); i++) {
-        int mask = env->GetIntField(config, ar_slots[i].fid);
-        int interval = env->GetIntField(config, ar_slots[i].interval_fid);
+        int mask = ar_vals[i % 10];
+        int interval = ar_interval_vals[i % 10];
         if (interval <= 0) interval = 100;
         for (int j = 0; j < ar_slots[i].slot->count; j++) {
             if (mask & (1 << j))
@@ -767,6 +842,8 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
         g_elem.bindingTypes = env->GetFieldID(ec, "bindingTypes", "[I");
         g_elem.bindingSticky = env->GetFieldID(ec, "bindingSticky", "[I");
         g_elem.bindingToggle = env->GetFieldID(ec, "bindingToggle", "[I");
+        g_elem.bindingAutoRepeat = env->GetFieldID(ec, "bindingAutoRepeat", "[I");
+        g_elem.bindingAutoRepeatIntervalMs = env->GetFieldID(ec, "bindingAutoRepeatIntervalMs", "[I");
         g_elem.longPressToggleBitmask = env->GetFieldID(ec, "longPressToggleBitmask", "I");
         g_elem.gestureToggleBitmask = env->GetFieldID(ec, "gestureToggleBitmask", "I");
         g_elem.rangeOrdinal = env->GetFieldID(ec, "rangeOrdinal", "I");
@@ -871,6 +948,28 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
                 env->ReleaseIntArrayElements(toggleArr, toggles, JNI_ABORT);
             }
         }
+        {
+            jintArray arArr = (jintArray)env->GetObjectField(je, g_elem.bindingAutoRepeat);
+            if (arArr) {
+                jint* ar = env->GetIntArrayElements(arArr, NULL);
+                jsize arLen = env->GetArrayLength(arArr);
+                for (int j = 0; j < arLen && j < 4; j++)
+                    if (ar[j] & 1)
+                        elems[i].bindings[j].auto_repeat = true;
+                env->ReleaseIntArrayElements(arArr, ar, JNI_ABORT);
+            }
+        }
+        {
+            jintArray arIntervalArr = (jintArray)env->GetObjectField(je, g_elem.bindingAutoRepeatIntervalMs);
+            if (arIntervalArr) {
+                jint* arInterval = env->GetIntArrayElements(arIntervalArr, NULL);
+                jsize arIntervalLen = env->GetArrayLength(arIntervalArr);
+                for (int j = 0; j < arIntervalLen && j < 4; j++)
+                    if (arInterval[j] > 0)
+                        elems[i].bindings[j].auto_repeat_interval_ms = arInterval[j];
+                env->ReleaseIntArrayElements(arIntervalArr, arInterval, JNI_ABORT);
+            }
+        }
 
         elems[i].current_ptr_id = -1;
         elems[i].engaged = false;
@@ -956,9 +1055,8 @@ static void nativeOnFingerBatch(JNIEnv* env, jclass clazz, jint actionType, jint
         }
         int space = DISPATCH_MAX_ACTIONS - r.count;
         int take = single.count < space ? single.count : space;
-        for (int j = 0; j < take; j++) {
-            r.actions[r.count++] = single.actions[j];
-        }
+        memcpy(&r.actions[r.count], single.actions, take * sizeof(TouchAction));
+        r.count += take;
     }
 
     env->ReleaseIntArrayElements(ptrIds, ids, JNI_ABORT);

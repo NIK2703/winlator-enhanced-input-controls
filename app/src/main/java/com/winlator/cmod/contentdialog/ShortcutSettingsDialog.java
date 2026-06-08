@@ -150,6 +150,12 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                     public void setRendererRefreshRateLimit(int val) { shortcut.setRendererRefreshRateLimit(val); }
                     public boolean getRendererSwapRB() { return shortcut.getRendererSwapRB(); }
                     public void setRendererSwapRB(boolean val) { shortcut.setRendererSwapRB(val); }
+                    public boolean getGridRendering() { return shortcut.getGridRendering(); }
+                    public void setGridRendering(boolean val) { shortcut.setGridRendering(val); }
+                    public float getGridDarken() { return shortcut.getGridDarken(); }
+                    public void setGridDarken(float val) { shortcut.setGridDarken(val); }
+                    public int getGridCycleInterval() { return shortcut.getGridCycleInterval(); }
+                    public void setGridCycleInterval(int val) { shortcut.setGridCycleInterval(val); }
                 }, false).show();
             });
         }

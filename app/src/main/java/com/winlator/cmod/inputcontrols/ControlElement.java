@@ -1913,6 +1913,48 @@ public class ControlElement {
         }
     }
 
+    public JSONObject toOriginalJSONObject() {
+        try {
+            JSONObject obj = new JSONObject();
+            obj.put("type", type.name());
+            String origShape = shape.name();
+            if (shape == Shape.RECT && elementWidth == 5f && elementHeight == 5f && cornerRadius >= 0.74f && cornerRadius <= 0.76f)
+                origShape = "SQUARE";
+            else if (shape == Shape.RECT && elementWidth == 8f && elementHeight == 4f && cornerRadius >= 1.99f && cornerRadius <= 2.01f)
+                origShape = "ROUND_RECT";
+            obj.put("shape", origShape);
+
+            JSONArray flatBindings = new JSONArray();
+            int count = Math.max(4, bindings.size());
+            if (type == Type.RANGE_BUTTON) count = 6;
+            for (int i = 0; i < count; i++) {
+                Binding b = Binding.NONE;
+                if (slotPackages != null && i < slotPackages.length && slotPackages[i] != null && !slotPackages[i].isEmpty())
+                    b = slotPackages[i].get(0);
+                else if (i < bindings.size()) {
+                    List<Binding> seq = bindings.get(i);
+                    if (!seq.isEmpty()) b = seq.get(0);
+                }
+                flatBindings.put(b != null ? b.name() : "NONE");
+            }
+            obj.put("bindings", flatBindings);
+            obj.put("toggleSwitch", hasAnySlotToggle());
+            obj.put("scale", Float.valueOf(scale));
+            obj.put("x", (float)x / inputControlsView.getMaxWidth());
+            obj.put("y", (float)y / inputControlsView.getMaxHeight());
+            obj.put("text", text);
+            obj.put("iconId", iconId);
+            if (type == Type.RANGE_BUTTON && range != null) {
+                obj.put("range", range.name());
+                if (orientation != 0) obj.put("orientation", orientation);
+            }
+            return obj;
+        }
+        catch (JSONException e) {
+            return null;
+        }
+    }
+
     public boolean containsPoint(float x, float y) {
         Rect box = getBoundingBox();
         return x >= box.left - 0.5f && x <= box.right + 0.5f &&

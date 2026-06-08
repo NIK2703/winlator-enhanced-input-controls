@@ -7,14 +7,6 @@
 extern "C" {
 #endif
 
-// --- Activation Mode Query ---
-
-// Get current activation mode for a specific element
-ActivationMode activation_get_mode(int elem_index);
-
-// Set activation mode for all elements (batch update)
-void activation_set_mode_all(ActivationMode mode);
-
 // --- Per-Pointer Activation State ---
 
 // Get visual state for all elements packed into arrays.
@@ -37,9 +29,6 @@ void activation_deactivate_all(void);
 
 // Get the number of tracked buttons for a given pointer
 int activation_tracked_count(int ptr_id);
-
-// Get tracked button element index at position for a pointer
-int activation_tracked_at(int ptr_id, int index);
 
 // Get hovered element index for a pointer (-1 if none)
 int activation_hovered_for_ptr(int ptr_id);

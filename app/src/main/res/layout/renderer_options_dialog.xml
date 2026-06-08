@@ -89,6 +89,72 @@
                 android:layout_marginTop="12dp"
                 android:text="Swap red/blue channels" />
 
+            <CheckBox
+                android:id="@+id/CBGridRendering"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Half Resolution Grid Rendering" />
+
+            <LinearLayout
+                android:id="@+id/GroupGridDarken"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Grid Darken"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:paddingBottom="4dp"
+                    android:layout_marginTop="8dp"/>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <SeekBar
+                        android:id="@+id/SBGridDarken"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="100"
+                        android:progress="25" />
+                    <TextView
+                        android:id="@+id/TVGridDarken"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="25%" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Grid Cycle Interval"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:paddingBottom="4dp"
+                    android:layout_marginTop="8dp"/>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <SeekBar
+                        android:id="@+id/SBGridCycleInterval"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="60"
+                        android:progress="0" />
+                    <TextView
+                        android:id="@+id/TVGridCycleInterval"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Off" />
+                </LinearLayout>
+            </LinearLayout>
+
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

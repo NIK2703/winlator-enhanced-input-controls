@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
 #define MAX_FINGERS 8
+#define MAX_DEFERRED_BINDINGS 8
 #define MAX_ELEMENTS 128
 #define MAX_PETALS 4
 #define STICK_DEAD_ZONE 0.15f
@@ -35,12 +36,12 @@ typedef enum {
 } BindingType;
 
 typedef struct {
-    BindingType type;
-    int keycode;  // X11 keycode for keyboard bindings
-    int modifiers; // 1 = sticky (hold on press), 0 = tap (press+release)
-    bool toggle;   // 1 = toggle switch (press on first activation, release on second)
-    bool auto_repeat;
-    int auto_repeat_interval_ms;
+    uint16_t type;
+    uint16_t keycode;
+    uint16_t auto_repeat_interval_ms;
+    uint8_t  modifiers;
+    bool     toggle;
+    bool     auto_repeat;
 } TouchBinding;
 
 typedef enum {
@@ -91,11 +92,11 @@ typedef enum {
     // --- Element state ---
     typedef struct {
         // === HOT: accessed every element iteration or every event (first cache line) ===
-        // Ints/enums first (6 * 4 = 24 bytes)
-        int current_ptr_id;
-        ElementType type;
-        ElementShape shape;
-        ActivationMode activation_mode;
+        // Ints/enums first (compact)
+        int16_t current_ptr_id;
+        uint8_t type;
+        uint8_t shape;
+        uint8_t activation_mode;
         int x;
         int y;
         // Floats (7 * 4 = 28 bytes)
@@ -200,7 +201,6 @@ typedef enum {
 typedef enum {
     GESTURE_STATE_IDLE,
     GESTURE_STATE_TAP_WAITING,
-    GESTURE_STATE_TOUCHING,
     GESTURE_STATE_DOUBLE_TAP_WAITING,
     GESTURE_STATE_LONG_PRESSING,
     GESTURE_STATE_DRAGGING
@@ -220,15 +220,26 @@ typedef struct {
 } FingerBindings;
 
 typedef struct {
-    int ptr_id;
     float x, y;
     float down_x, down_y;
-    uint64_t down_time_ms;
-    uint64_t last_move_time_ms;
     float last_x, last_y;
     float travel_x, travel_y;
+    float tap_up_x, tap_up_y;
+
+    uint64_t down_time_ms;
+    uint64_t last_move_time_ms;
+    uint64_t single_tap_hold_timer;
+    uint64_t single_tap_deferred_time;
+
+    uint32_t bindings_generation;
+    int single_tap_hold_delay_ms;
+
+    int16_t ptr_id;
+    int16_t original_ptr_id;
+
+    uint8_t state;
+
     bool active;
-    // Cached GestureBindingSet fields (recomputed after bindings change, avoids rebuilding per call)
     bool cached_has_active_single_tap;
     bool cached_has_active_double_tap;
     bool cached_has_active_long_press;
@@ -238,37 +249,18 @@ typedef struct {
     bool cached_has_long_press_timer;
     bool cached_has_moved_beyond_threshold;
     bool is_tap;
-    GestureState state;
-    FingerBindings bindings;
-    // For second-finger gesture handling
     bool is_second_finger;
-    // Held actions
-    TouchBinding held_actions[16];
-    int held_actions_count;
-    // Double-tap state
-    uint64_t last_tap_up_time;
-    float tap_up_x, tap_up_y;
-    bool double_tap_waiting;
-    TouchBinding deferred_tap[8];
-    int deferred_tap_count;
-    TouchBinding pending_double[8];
-    int pending_double_count;
-    uint32_t bindings_generation;
-
-    // Second-finger resume (touchscreen)
-    TouchBinding pending_resume_action[8];
-    int pending_resume_action_count;
-    int original_ptr_id;            // finger identity for double-tap continuity
     bool double_tap_original_id_set;
-
-    // Single-tap hold timer (touchscreen finger-down hold)
-    int single_tap_hold_delay_ms;
-    uint64_t single_tap_hold_timer;
-
-    // Deferred single-tap (replaces nanosleep)
     bool single_tap_deferred;
-    uint64_t single_tap_deferred_time;
 
+    int16_t engaged_elem_indices[4];
+    uint8_t engaged_elem_count;
+
+    FingerBindings bindings;
+
+    // Drag-pause/resume state (second-finger interaction)
+    TouchBinding pending_resume_action[MAX_DEFERRED_BINDINGS];
+    int pending_resume_action_count;
 } TouchFinger;
 
 typedef enum {
@@ -286,66 +278,64 @@ typedef struct {
     TouchMode touch_mode;
     InputMode input_mode;
 
+    // Pre-computed gesture capability flags (hot, kept in first cache line)
+    bool caps_has_gesture_bindings;
+    bool caps_has_drag_bindings;
+    bool caps_has_double_tap;
+    bool caps_has_long_press;
+    bool caps_has_long_press_timer;
+    bool caps_has_track_hover_buttons;
+    bool is_ts;
+    bool is_tp;
+    bool caps_has_element_toggle;
+    bool caps_has_any_element_long_press;
+    bool caps_has_any_element_gesture;
+    bool caps_has_auto_repeat_buttons;
+    bool caps_has_mouse_left_element;
+    bool caps_has_passthrough_elements;
+    bool haptic_enabled;
+    uint32_t caps_mode_mask;
+    uint32_t caps_second_mask;
+    uint32_t caps_ts_mask;
+    uint32_t caps_tp_mask;
+
     // Gesture timing
-    int long_press_timeout_ms;
-    int double_tap_timeout_ms;
-    int single_tap_delay_ms;
-    int drag_threshold_px;
-    int gesture_threshold_px;      // separate threshold for element swipe detection
-    int double_tap_distance_px;
-    int binding_delay_ms;
-    int long_press_delay_ms;
-    int cursor_speed;
-    int cursor_acceleration_threshold;  // delta above which acceleration applies
-    float cursor_acceleration_factor;   // multiplier (e.g. 1.25f)
+    uint16_t long_press_timeout_ms;
+    uint16_t double_tap_timeout_ms;
+    uint16_t single_tap_delay_ms;
+    int16_t drag_threshold_px;
+    int16_t gesture_threshold_px;
+    int16_t double_tap_distance_px;
+    uint16_t binding_delay_ms;
+    uint16_t long_press_delay_ms;
+    int16_t cursor_speed;
+    int16_t cursor_acceleration_threshold;
+    float cursor_acceleration_factor;
 
-    // For touchpad absolute mode
-    int screen_w, screen_h;
+    // Touchpad absolute mode
+    int16_t screen_w, screen_h;
 
-    // Xform scale + view offset (maps view-pixels to Wine-screen-pixels, for touchscreen absolute)
+    // Xform scale + view offset
     float xform_scale_x;
     float xform_scale_y;
     float view_offset_x;
     float view_offset_y;
 
     // Haptic
-    int gesture_long_press_haptic;
-    bool haptic_enabled;
+    int16_t gesture_long_press_haptic;
 
-    // Gesture bindings — indexed by GestureType
+    // Gesture bindings — indexed by GestureType (large arrays, pushed after hot fields)
     GestureBindingSlot ts[GESTURE_TYPE_COUNT];
     GestureBindingSlot tp[GESTURE_TYPE_COUNT];
     uint32_t bindings_generation;
 
-    // Render config (shared across all elements)
-    uint32_t color_primary;       // default 0xFFFFFFFF (white)
-    uint32_t color_secondary;     // default 0xFF0277BD (blue)
-    float stroke_width_default;   // default 0.2f
-    int fill_alpha_inactive_default; // default 50
+    // Render config
+    uint32_t color_primary;
+    uint32_t color_secondary;
+    float stroke_width_default;
+    int16_t fill_alpha_inactive_default;
 
-    // Pre-computed gesture capability flags (set by compute_gesture_caps)
-    bool caps_has_gesture_bindings;
-    bool caps_has_drag_bindings;
-    bool caps_has_double_tap;
-    bool caps_has_long_press;
-    bool caps_has_long_press_timer;
-    bool caps_has_track_hover_buttons;  // true if any element has ACTIVATION_TRACK or ACTIVATION_HOVER
-    uint32_t caps_mode_mask;       // touch_mode-specific mask: caps_ts_mask or caps_tp_mask (pre-resolved, avoids ternary)
-    bool is_ts;    // true if touch_mode == TOUCH_MODE_TOUCHSCREEN
-    bool is_tp;    // true if touch_mode == TOUCH_MODE_TOUCHPAD
-    uint32_t caps_second_mask;     // second-finger gesture mask: SINGLE_2ND|DOUBLE_2ND|SINGLE_DRAG_2ND|DOUBLE_DRAG_2ND
-    bool caps_has_element_toggle;   // true if any element has toggle bindings
-    bool caps_has_any_element_long_press;  // true if any button has element_long_press bindings
-    bool caps_has_any_element_gesture;     // true if any button has element_gesture bindings
-    bool caps_has_auto_repeat_buttons;   // true if any button has auto_repeat binding
-    bool caps_has_mouse_left_element;    // true if any element has BINDING_MOUSE_LEFT as first binding
-    bool caps_has_passthrough_elements;  // true if any element has passthrough_touch
-
-    // Per-mode gesture type presence bitmasks (bit i set iff GestureType i has bindings in that mode)
-    // Enables O(1) tests like: if (caps_ts_mask & GESTURE_MASK(GESTURE_LONG_PRESS)) ...
-    uint32_t caps_ts_mask;
-    uint32_t caps_tp_mask;
-    GestureModeBindings cached_mode_bindings;  // precomputed, avoids struct copy per call
+    GestureModeBindings cached_mode_bindings;
 } TouchProcessorConfig;
 
 #define GESTURE_MASK(t) (1u << (t))

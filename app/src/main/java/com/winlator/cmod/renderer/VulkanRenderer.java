@@ -31,6 +31,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     public static final int EFFECT_CRT = 3;
     public static final int EFFECT_HDR = 4;
     public static final int EFFECT_NATURAL = 5;
+    public static final int EFFECT_GRID = 6;
 
     public final XServerView xServerView;
     private final XServer xServer;

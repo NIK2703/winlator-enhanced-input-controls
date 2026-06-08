@@ -57,7 +57,8 @@ add_library(touch_processor SHARED
         winlator/element/range_button.c
 )
 
-target_compile_options(touch_processor PRIVATE -Wall -Wextra -ffast-math -funroll-loops -ftree-vectorize)
+target_compile_options(touch_processor PRIVATE -Wall -Wextra -ffast-math -funroll-loops -ftree-vectorize -fno-exceptions -fno-rtti)
+# LTO disabled — NDK toolchain forces ld.gold which lacks LLVMgold.so
 set_source_files_properties(winlator/touch_processor.c PROPERTIES COMPILE_OPTIONS "-std=c11")
 set_source_files_properties(winlator/touch_processor_jni.cpp PROPERTIES COMPILE_OPTIONS "-std=c++17")
 target_link_libraries(touch_processor log android)

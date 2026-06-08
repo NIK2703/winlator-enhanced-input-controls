@@ -82,7 +82,7 @@ void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms
 
     if (e->range_hold_pressed) {
         // Hold press was already sent by tick — just release
-        int kc = range_keycode(e->range_ordinal, e->range_index);
+        int kc = e->range_initial_kc;
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Range", "range_up[%d] HOLD_RELEASE kc=%d", idx, kc);
         if (kc > 0)
             add_action(result, ACT_KEY_RELEASE, kc, 0, 0);
@@ -112,7 +112,7 @@ void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Range", "range_up[%d] decision=%s duration=%llu scrolling=%d",
         idx, decision, (unsigned long long)duration, e->range_scrolling);
 
-    int kc = range_keycode(e->range_ordinal, e->range_index);
+    int kc = e->range_initial_kc;
 
     if (kc > 0) {
         if (is_tap) {

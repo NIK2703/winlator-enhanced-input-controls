@@ -211,6 +211,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean isDarkMode;
     private GuestProgramLauncherComponent guestProgramLauncherComponent;
     private EnvVars overrideEnvVars;
+    private boolean gridRenderingEnabled = false;
+    private float gridDarkenAmount = 0.25f;
+    private View gridOverlay;
+    private android.graphics.Paint gridPaint;
+    private android.os.Handler gridCycleHandler;
+    private int gridCyclePhase;
+    private int gridCycleInterval;
 
     private CheckBox cbFps, cbGpu, cbCpuRam, cbBattTemp, cbGraph, cbRenderer, cbRam;
 
@@ -427,6 +434,48 @@ if (enableLogs) {
                 double sharpnessDenoise = Double.parseDouble(shortcut.getExtra("sharpnessDenoise", "100"));
                 vkbasaltConfig = "effects=" + sharpnessEffect.toLowerCase() + ";" + "casSharpness=" + sharpnessLevel / 100 + ";" + "dlsSharpness=" + sharpnessLevel / 100  + ";" + "dlsDenoise=" + sharpnessDenoise / 100 + ";" + "enableOnLaunch=True";
             }
+        }
+
+        // Grid rendering mode
+        boolean gridRendering = shortcut != null
+            ? shortcut.getGridRendering()
+            : container.isGridRendering();
+        gridRenderingEnabled = gridRendering;
+
+        if (gridRendering) {
+            // Parse original screen size for aspect ratio
+            String[] parts = screenSize.split("x");
+            if (parts.length == 2) {
+                try {
+                    int origW = Integer.parseInt(parts[0]);
+                    int origH = Integer.parseInt(parts[1]);
+
+                    int deviceWidth = AppUtils.getScreenWidth();
+                    int deviceHeight = AppUtils.getScreenHeight();
+                    int landscapeW = Math.max(deviceWidth, deviceHeight);
+                    int landscapeH = Math.min(deviceWidth, deviceHeight);
+
+                    // Height = half of device landscape height
+                    int gridH = landscapeH / 2;
+                    // Width = height * aspect ratio, capped at landscapeW / 2
+                    int gridW = (int)((float)gridH * origW / origH);
+                    int maxW = landscapeW / 2;
+                    if (gridW > maxW) gridW = maxW;
+
+                    // Ensure even dimensions
+                    if ((gridW & 1) != 0) gridW++;
+                    if ((gridH & 1) != 0) gridH++;
+
+                    screenSize = gridW + "x" + gridH;
+                }
+                catch (NumberFormatException e) {}
+            }
+            gridDarkenAmount = shortcut != null
+                ? shortcut.getGridDarken()
+                : container.getGridDarken();
+            gridCycleInterval = shortcut != null
+                ? shortcut.getGridCycleInterval()
+                : container.getGridCycleInterval();
         }
 
         this.graphicsDriverConfig = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
@@ -682,6 +731,10 @@ if (enableLogs) {
     protected void onDestroy() {
         activeInstance = null;
         if (hudDataSource != null) hudDataSource.stop();
+        if (gridCycleHandler != null) {
+            gridCycleHandler.removeCallbacksAndMessages(null);
+            gridCycleHandler = null;
+        }
         super.onDestroy();
     }
 
@@ -883,6 +936,11 @@ if (enableLogs) {
             renderer.setFpsLimit(Math.max(0, sidebarFpsLimit));
         }
 
+        // Apply grid rendering mode overrides
+        if (gridRenderingEnabled) {
+            renderer.setFilterMode(1); // Nearest neighbor
+        }
+
         if (shortcut != null) renderer.setUnviewableWMClasses("explorer.exe");
 
         boolean isNative = false;
@@ -890,6 +948,44 @@ if (enableLogs) {
 
         xServer.setRenderer(renderer);
         rootView.addView(xServerView);
+
+        // Add grid overlay on top of xServerView
+        if (gridRenderingEnabled && gridDarkenAmount > 0f) {
+            gridPaint = new android.graphics.Paint();
+            gridPaint.setAntiAlias(false);
+            gridPaint.setFilterBitmap(false);
+            updateGridPattern(0);
+
+            gridOverlay = new View(this) {
+                {
+                    setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
+                    setWillNotDraw(false);
+                }
+
+                @Override
+                protected void onDraw(android.graphics.Canvas canvas) {
+                    canvas.drawRect(0, 0, getWidth(), getHeight(), gridPaint);
+                }
+            };
+            gridOverlay.setClickable(false);
+            gridOverlay.setFocusable(false);
+            gridOverlay.setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+            rootView.addView(gridOverlay);
+
+            if (gridCycleInterval > 0) {
+                gridCyclePhase = 0;
+                gridCycleHandler = new Handler(Looper.getMainLooper());
+                gridCycleHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (gridCycleHandler == null) return;
+                        gridCyclePhase = (gridCyclePhase + 1) % 4;
+                        updateGridPattern(gridCyclePhase);
+                        gridCycleHandler.postDelayed(this, gridCycleInterval * 1000L);
+                    }
+                }, gridCycleInterval * 1000L);
+            }
+        }
 
         globalCursorSpeed = preferences.getFloat("cursor_speed", 1.0f);
         touchpadView = new TouchpadView(this, xServer, timeoutHandler, hideControlsRunnable);
@@ -1023,6 +1119,23 @@ if (enableLogs) {
         }
 
         AppUtils.observeSoftKeyboardVisibility(drawerLayout, renderer::setScreenOffsetYRelativeToCursor);
+    }
+
+    private void updateGridPattern(int phase) {
+        int darkAlpha = (int)(gridDarkenAmount * 255);
+        android.graphics.Bitmap pattern = android.graphics.Bitmap.createBitmap(2, 2, android.graphics.Bitmap.Config.ARGB_8888);
+        int darkColor = android.graphics.Color.argb(darkAlpha, 0, 0, 0);
+        // Sequential cycle: phase 0=(0,0) bright, 1=(1,0) bright, 2=(0,1) bright, 3=(1,1) bright
+        int[][] order = {{0,0}, {1,0}, {0,1}, {1,1}};
+        pattern.setPixel(0, 0, darkColor);
+        pattern.setPixel(1, 0, darkColor);
+        pattern.setPixel(0, 1, darkColor);
+        pattern.setPixel(1, 1, darkColor);
+        pattern.setPixel(order[phase][0], order[phase][1], 0);
+        android.graphics.BitmapShader shader = new android.graphics.BitmapShader(
+            pattern, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT);
+        gridPaint.setShader(shader);
+        if (gridOverlay != null) gridOverlay.invalidate();
     }
 
 private void setupLeftSidebar() {
