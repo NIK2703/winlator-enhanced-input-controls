@@ -2,14 +2,11 @@ package com.winlator.cmod.widget;
 
 import android.app.AlertDialog;
 import android.content.Context;
-import android.os.Build;
 import android.view.LayoutInflater;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.PopupMenu;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -23,6 +20,11 @@ import com.winlator.cmod.inputcontrols.Binding;
 public class BindingSequenceEditor {
     public static View createView(Context context, String label, int helpTextResId,
                                    final BindPackage bp, final Runnable onChanged) {
+        return createView(context, label, helpTextResId, bp, onChanged, true);
+    }
+
+    public static View createView(Context context, String label, int helpTextResId,
+                                   final BindPackage bp, final Runnable onChanged, boolean showMenu) {
         final LinearLayout section = new LinearLayout(context);
         section.setOrientation(LinearLayout.VERTICAL);
         section.setLayoutParams(new LinearLayout.LayoutParams(
@@ -59,53 +61,64 @@ public class BindingSequenceEditor {
         }
         titleRow.addView(leftGroup);
 
-        {
-            ImageView btMenu = new ImageView(context);
-            int menuSize = (int) UnitUtils.dpToPx(22);
-            LinearLayout.LayoutParams lpMenu = new LinearLayout.LayoutParams(menuSize, menuSize);
-            lpMenu.leftMargin = (int) UnitUtils.dpToPx(4);
-            btMenu.setLayoutParams(lpMenu);
-            btMenu.setImageResource(android.R.drawable.ic_menu_more);
-            btMenu.setColorFilter(0xffe0e0e0);
-            btMenu.setOnClickListener((v) -> {
-                PopupMenu popupMenu = new PopupMenu(context, v);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) popupMenu.setForceShowIcon(true);
-                MenuItem toggleItem = popupMenu.getMenu().add(0, 1, 0, "Toggle Switch");
-                toggleItem.setCheckable(true);
-                toggleItem.setChecked(bp.isToggleSwitch());
-                toggleItem.setOnMenuItemClickListener((menuItem) -> {
-                    boolean newState = !bp.isToggleSwitch();
-                    bp.setToggleSwitch(newState);
-                    menuItem.setChecked(newState);
-                    if (onChanged != null) onChanged.run();
-                    return true;
-                });
+        if (showMenu) {
+            final int colorAccent = context.getResources().getColor(R.color.colorAccent, context.getTheme());
+            int iconSize = (int) UnitUtils.dpToPx(28);
 
-                MenuItem autoRepeatItem = popupMenu.getMenu().add(0, 2, 0, "Auto Repeat");
-                autoRepeatItem.setCheckable(true);
-                autoRepeatItem.setChecked(bp.isAutoRepeat());
-
-                MenuItem intervalItem = popupMenu.getMenu().add(0, 3, 0, "Interval: " + bp.getAutoRepeatIntervalMs() + "ms");
-                intervalItem.setEnabled(bp.isAutoRepeat());
-
-                autoRepeatItem.setOnMenuItemClickListener((menuItem) -> {
-                    boolean newState = !bp.isAutoRepeat();
-                    bp.setAutoRepeat(newState);
-                    menuItem.setChecked(newState);
-                    intervalItem.setEnabled(newState);
-                    if (onChanged != null) onChanged.run();
-                    if (newState) showIntervalDialog(context, intervalItem, bp, onChanged);
-                    return true;
-                });
-
-                intervalItem.setOnMenuItemClickListener((menuItem) -> {
-                    showIntervalDialog(context, intervalItem, bp, onChanged);
-                    return true;
-                });
-
-                popupMenu.show();
+            ImageView btToggle = new ImageView(context);
+            LinearLayout.LayoutParams lpToggle = new LinearLayout.LayoutParams(iconSize, iconSize);
+            lpToggle.leftMargin = (int) UnitUtils.dpToPx(4);
+            btToggle.setLayoutParams(lpToggle);
+            btToggle.setScaleType(ImageView.ScaleType.CENTER);
+            btToggle.setImageResource(R.drawable.icon_toggle);
+            btToggle.setColorFilter(bp.isToggleSwitch() ? colorAccent : 0xff888888);
+            btToggle.setOnClickListener((v) -> {
+                boolean newState = !bp.isToggleSwitch();
+                bp.setToggleSwitch(newState);
+                btToggle.setColorFilter(newState ? colorAccent : 0xff888888);
+                if (onChanged != null) onChanged.run();
             });
-            titleRow.addView(btMenu);
+            titleRow.addView(btToggle);
+
+            LinearLayout autoRepeatGroup = new LinearLayout(context);
+            autoRepeatGroup.setOrientation(LinearLayout.HORIZONTAL);
+            autoRepeatGroup.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+            ImageView btAutoRepeat = new ImageView(context);
+            btAutoRepeat.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
+            btAutoRepeat.setScaleType(ImageView.ScaleType.CENTER);
+            btAutoRepeat.setImageResource(R.drawable.icon_autorepeat);
+            btAutoRepeat.setColorFilter(bp.isAutoRepeat() ? colorAccent : 0xff888888);
+            autoRepeatGroup.addView(btAutoRepeat);
+
+            TextView tvInterval = new TextView(context);
+            tvInterval.setText(bp.getAutoRepeatIntervalMs() + "ms");
+            tvInterval.setTextColor(bp.isAutoRepeat() ? colorAccent : 0xff888888);
+            tvInterval.setVisibility(bp.isAutoRepeat() ? View.VISIBLE : View.GONE);
+            tvInterval.setTextSize(12);
+            tvInterval.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams lpInterval = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT);
+            lpInterval.leftMargin = (int) UnitUtils.dpToPx(2);
+            tvInterval.setLayoutParams(lpInterval);
+            autoRepeatGroup.addView(tvInterval);
+
+            autoRepeatGroup.setOnClickListener((v) -> {
+                boolean newState = !bp.isAutoRepeat();
+                bp.setAutoRepeat(newState);
+                btAutoRepeat.setColorFilter(newState ? colorAccent : 0xff888888);
+                tvInterval.setTextColor(newState ? colorAccent : 0xff888888);
+                tvInterval.setVisibility(newState ? View.VISIBLE : View.GONE);
+                if (newState) {
+                    showIntervalDialog(context, bp, () -> {
+                        tvInterval.setText(bp.getAutoRepeatIntervalMs() + "ms");
+                        if (onChanged != null) onChanged.run();
+                    });
+                }
+                if (onChanged != null) onChanged.run();
+            });
+            titleRow.addView(autoRepeatGroup);
         }
 
         section.addView(titleRow);
@@ -191,16 +204,16 @@ public class BindingSequenceEditor {
         return section;
     }
 
-    private static void showIntervalDialog(Context context, MenuItem intervalItem, BindPackage bp, Runnable onChanged) {
+    private static void showIntervalDialog(Context context, BindPackage bp, Runnable onOk) {
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
         int pad = (int) UnitUtils.dpToPx(20);
         layout.setPadding(pad, pad, pad, pad);
 
         SeekBar seekBar = new SeekBar(context);
-        seekBar.setMax(95);
+        seekBar.setMax(90);
         int cur = bp.getAutoRepeatIntervalMs();
-        seekBar.setProgress(Math.max(0, cur / 10 - 5));
+        seekBar.setProgress(Math.max(0, cur / 10 - 10));
         layout.addView(seekBar);
 
         TextView tvValue = new TextView(context);
@@ -211,7 +224,7 @@ public class BindingSequenceEditor {
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar s, int progress, boolean fromUser) {
-                tvValue.setText(String.valueOf((progress + 5) * 10) + "ms");
+                tvValue.setText(String.valueOf((progress + 10) * 10) + "ms");
             }
             @Override public void onStartTrackingTouch(SeekBar s) {}
             @Override public void onStopTrackingTouch(SeekBar s) {}
@@ -221,10 +234,9 @@ public class BindingSequenceEditor {
             .setTitle("Repeat Interval")
             .setView(layout)
             .setPositiveButton("OK", (dialog, which) -> {
-                int value = (seekBar.getProgress() + 5) * 10;
+                int value = (seekBar.getProgress() + 10) * 10;
                 bp.setAutoRepeatIntervalMs(value);
-                intervalItem.setTitle("Interval: " + value + "ms");
-                if (onChanged != null) onChanged.run();
+                if (onOk != null) onOk.run();
             })
             .setNegativeButton("Cancel", null)
             .show();

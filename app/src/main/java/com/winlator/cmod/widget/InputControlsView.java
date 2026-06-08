@@ -586,24 +586,28 @@ public class InputControlsView extends View {
             invalidate();
             return;
         }
-        float[] pos = nativeTouchProcessor.syncPositions;
-        int[] st = nativeTouchProcessor.syncStates;
-        float[] scroll = nativeTouchProcessor.syncScrollOffsets;
-        int n = nativeTouchProcessor.syncVisualState(pos, st, scroll);
+        ByteBuffer vb = nativeTouchProcessor.getVisualBuffer();
+        if (vb == null) return;
+        int n = nativeTouchProcessor.getElementCount();
         if (n > count) n = count;
         int activeCount = 0;
         for (int i = 0; i < n; i++) {
             ControlElement e = elements.get(i);
-            int flags = st[i];
-            if ((flags & 1) != 0) activeCount++;
+            int base = i * VISUAL_STRIDE;
+            float px = vb.getFloat(base);
+            float py = vb.getFloat(base + 4);
+            int active = vb.getInt(base + 8);
+            int petal0 = vb.getInt(base + 12);
+            int petal1 = vb.getInt(base + 16);
+            int petal2 = vb.getInt(base + 20);
+            int petal3 = vb.getInt(base + 24);
+            float scrollOff = vb.getFloat(base + 28);
+            if (active != 0) activeCount++;
             e.syncVisualState(
-                (flags & 1) != 0,
-                pos[i*2], pos[i*2+1],
-                (flags & 2) != 0,
-                (flags & 4) != 0,
-                (flags & 8) != 0,
-                (flags & 16) != 0,
-                scroll[i]
+                active != 0, px, py,
+                petal0 != 0, petal1 != 0,
+                petal2 != 0, petal3 != 0,
+                scrollOff
             );
         }
         Log.w("Winlator_Controls", "syncVisualStates: synced=" + n + " active=" + activeCount);
@@ -837,10 +841,16 @@ public class InputControlsView extends View {
                     return true;
                 }
                 case MotionEvent.ACTION_MOVE: {
-                    for (int i = 0; i < event.getPointerCount(); i++) {
-                        int pid = event.getPointerId(i);
-                        nativeTouchProcessor.onFingerMove(pid, event.getX(i), event.getY(i), event.getEventTime());
+                    int pc = event.getPointerCount();
+                    int[] batchPtrIds = new int[pc];
+                    float[] batchXs = new float[pc];
+                    float[] batchYs = new float[pc];
+                    for (int i = 0; i < pc; i++) {
+                        batchPtrIds[i] = event.getPointerId(i);
+                        batchXs[i] = event.getX(i);
+                        batchYs[i] = event.getY(i);
                     }
+                    nativeTouchProcessor.onFingerBatch(1, batchPtrIds, batchXs, batchYs, event.getEventTime());
                     syncVisualStates();
                     if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
                         elementOverlayRenderer.scheduleRender();

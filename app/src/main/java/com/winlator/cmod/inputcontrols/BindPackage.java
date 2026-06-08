@@ -16,7 +16,7 @@ public class BindPackage {
     private final List<Boolean> stickyFlags = new ArrayList<>();
     private boolean toggleSwitch = false;
     private boolean autoRepeat = false;
-    private int autoRepeatIntervalMs = 200;
+    private int autoRepeatIntervalMs = 300;
 
     public BindPackage() {}
 
@@ -83,7 +83,7 @@ public class BindPackage {
         stickyFlags.clear();
         this.toggleSwitch = false;
         this.autoRepeat = false;
-        this.autoRepeatIntervalMs = 200;
+        this.autoRepeatIntervalMs = 300;
     }
 
     public void add(Binding binding) {
@@ -244,7 +244,7 @@ public class BindPackage {
         BindPackage bp = fromJSONArray(bindingsArray, defaultBinding);
         bp.setToggleSwitch(obj.optBoolean("toggleSwitch", false));
         bp.setAutoRepeat(obj.optBoolean("autoRepeat", false));
-        bp.setAutoRepeatIntervalMs(obj.optInt("autoRepeatIntervalMs", 200));
+        bp.setAutoRepeatIntervalMs(obj.optInt("autoRepeatIntervalMs", 300));
         JSONArray stickyArray = obj.optJSONArray("sticky");
         if (stickyArray != null) {
             for (int i = 0; i < stickyArray.length() && i < bp.size(); i++) {

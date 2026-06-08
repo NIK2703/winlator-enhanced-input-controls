@@ -2,16 +2,6 @@
 
 #define RANGE_SCROLL_THRESHOLD 10
 
-static void range_compute_sizes(const TouchElement* e, float* out_cw, float* out_ch, float* out_element_size) {
-    TouchProcessorState* s = &g_state;
-    float hs = s->snapping_size;
-    *out_cw = hs * (e->range_binding_count * 2) * e->scale;
-    *out_ch = hs * 2.0f * e->scale;
-    if (e->range_orientation == 1) SWAP_F(*out_cw, *out_ch);
-    int rbc = e->range_binding_count > 0 ? e->range_binding_count : 1;
-    *out_element_size = (e->range_orientation == 0 ? *out_cw * 2.0f : *out_ch * 2.0f) / (float)rbc;
-}
-
 int range_keycode(int ordinal, int index) {
     static const int alphabet[26] = {38,56,54,40,26,41,42,43,31,44,45,46,58,57,32,33,24,27,39,28,30,55,25,53,29,52};
     static const int number[10]  = {10,11,12,13,14,15,16,17,18,19};
@@ -26,7 +16,7 @@ int range_keycode(int ordinal, int index) {
     return 0;
 }
 
-void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     (void)ptr_id;
     e->range_scrolling = false;
     e->range_has_binding = false;
@@ -35,10 +25,9 @@ void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, ui
     e->range_tap_release_time = 0;
     e->range_last_position = e->range_orientation == 0 ? x : y;
 
-    float cw, ch, element_size;
-    range_compute_sizes(e, &cw, &ch, &element_size);
-    float left = e->x - cw;
-    float top  = e->y - ch;
+    float element_size = e->cached_range_element_size;
+    float left = e->x - e->cached_range_cw;
+    float top  = e->y - e->cached_range_ch;
 
     float offset = e->range_orientation == 0 ? x - left - e->range_current_offset : y - top - e->range_current_offset;
     int index = (int)floorf(offset / element_size);
@@ -54,7 +43,7 @@ void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, ui
         (int)(e - g_state.elements), x, y, e->range_ordinal, e->range_max, e->range_has_binding, e->range_index, kc);
 }
 
-void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     TouchProcessorState* s = &g_state;
     float pos = e->range_orientation == 0 ? x : y;
     float delta = pos - e->range_last_position;
@@ -71,21 +60,19 @@ void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_
     }
 
     if (e->range_scrolling) {
-        float cw, ch, element_size;
-        range_compute_sizes(e, &cw, &ch, &element_size);
-        float scroll_size = element_size * (float)e->range_max;
+        float inv_scroll_size = e->cached_inv_scroll_size;
 
         e->range_current_offset += delta;
-        e->range_scroll_offset = -fmodf(e->range_current_offset, scroll_size);
-        if (e->range_scroll_offset < 0) e->range_scroll_offset += scroll_size;
+        float offset_mod = e->range_current_offset - ((int)(e->range_current_offset * inv_scroll_size)) * e->cached_scroll_size;
+        e->range_scroll_offset = -offset_mod;
         e->range_last_position = pos;
-        s->visual_state_dirty = true;
+        mark_element_dirty(e);
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Range", "range_move[%d] scroll_offset=%.0f current_offset=%.0f scroll_size=%.0f",
-            idx, e->range_scroll_offset, e->range_current_offset, scroll_size);
+            idx, e->range_scroll_offset, e->range_current_offset, e->cached_scroll_size);
     }
 }
 
-void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     (void)x; (void)y;
     (void)time_ms;
     int idx = (int)(e - g_state.elements);
@@ -134,7 +121,7 @@ void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms
             TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Range", "range_up[%d] TAP press kc=%d schedule_release", idx, kc);
             add_action(result, ACT_KEY_PRESS, kc, 1, 0);
             e->range_pending_tap_release = true;
-            e->range_tap_release_time = now_ms() + 30;
+            e->range_tap_release_time = time_ms + 30;
             // Don't clear flags yet — deferred release in tick will do it
         } else {
             // Hold (>=200ms without hold-press, or scroll): press + release immediately

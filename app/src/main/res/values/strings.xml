@@ -649,6 +649,22 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="two_finger_help">Gestures triggered by a second finger while the first finger stays held on screen.</string>
     <string name="single_tap_delay_help"><![CDATA[When <b>Double Tap</b> or <b>Double Tap Drag</b> actions are assigned, single tap response is delayed by the Double Tap Timeout.]]></string>
     <string name="long_press_drag_help"><![CDATA[When <b>Long Press Drag</b> action is assigned, long press fires after releasing the finger instead of immediately after the Long Press Timeout.]]></string>
+    <string name="single_tap_help"><![CDATA[Single tap with one finger.<br><br>
+<b>Activation:</b> press and release one finger.<br><br>
+<b>Behavior with other gestures:</b><br>
+— If <b>Double Tap</b> is assigned: tap fires after <b>Double Tap Timeout</b> (awaits second tap)<br>
+— If <b>Long Press</b> is assigned: tap fires only on quick release — holding past <b>Long Press Timeout</b> suppresses the tap<br>
+— If <b>Single Tap Drag</b> is assigned: tap fires on release if no drag — otherwise replaced by drag binding when movement exceeds <b>Drag Threshold</b>]]></string>
+    <string name="single_tap_drag_help"><![CDATA[Single tap drag: press, hold and drag (Touchscreen only).<br><br>
+— If <b>Single Tap</b> also assigned: tap fires on release; drag uses this instead (S suppressed) past <b>Drag Threshold</b><br>
+— <b>Single Tap</b> NOT assigned: tap does nothing — drag-only<br>
+— <b>Long Press</b> assigned: holding past <b>Long Press Timeout</b> switches to <b>Long Press Drag</b> on drag<br>
+— <b>Double Tap</b> assigned: tap-up enters DT waiting — <b>Single Tap</b> fires on <b>Double Tap Timeout</b>]]></string>
+    <string name="double_tap_help"><![CDATA[Double tap: two quick taps within <b>Double Tap Timeout</b> and <b>Double Tap Distance</b>.<br><br>
+— D fires on second tap (press+hold); on single tap — fires after <b>Double Tap Timeout</b><br>
+— If <b>Single Tap</b> also assigned: first tap delayed — S fires on timeout; D fires on second tap<br>
+— If <b>Double Tap Drag</b> assigned: D fires on second finger-up; drag uses Dd instead<br>
+— D enables <b>Single Tap</b> as press-on-drag (drag without <b>Single Tap Drag</b>)]]></string>
     <string name="binding_delay_help">Adds a delay (ms) between each binding in a sequence.</string>
 
     <!-- Icon Pack Manager -->

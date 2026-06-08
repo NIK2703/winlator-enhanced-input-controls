@@ -40,15 +40,18 @@ void activation_activate_at(float x, float y) {
             g_state.elements[i].visual_y = y;
         }
     }
-    g_state.visual_state_dirty = true;
+    mark_all_dirty();
 }
 
 void activation_deactivate_all(void) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_deactivate_all count=%d", g_state.element_count);
     for (int i = 0; i < g_state.element_count; i++) {
-        g_state.elements[i].visual_active = false;
+        TouchElement* e = &g_state.elements[i];
+        // Toggle buttons that are still selected keep their visual activation
+        if (!element_is_toggle_active(e))
+            e->visual_active = false;
     }
-    g_state.visual_state_dirty = true;
+    mark_all_dirty();
 }
 
 int activation_tracked_count(int ptr_id) {
@@ -71,7 +74,7 @@ int activation_hovered_for_ptr(int ptr_id) {
 
 // --- Legacy Java-compatible handlers ---
 
-static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* result) {
+static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* restrict result) {
     if (btn->selected) {
         if (btn->bindings[0].type != BINDING_NONE)
             release_binding(result, &btn->bindings[0]);
@@ -85,21 +88,21 @@ static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* resul
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=1 (select)", (int)(btn - g_state.elements));
         btn->visual_active = true;
     }
-    g_state.visual_state_dirty = true;
+    mark_element_dirty(btn);
 }
 
-static void process_engaged_non_buttons(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+static void process_engaged_non_buttons(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
-        if (e->current_ptr_id == ptr_id && e->type != ELEM_BUTTON)
+        if (__builtin_expect(e->current_ptr_id == ptr_id, 0) && e->type != ELEM_BUTTON)
             handle_element_move(e, x, y, time_ms, result);
     }
 }
 
-static bool release_engaged_elements(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+static bool release_engaged_elements(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     bool handled = false;
     for (int i = 0; i < g_state.element_count; i++) {
-        if (g_state.elements[i].current_ptr_id == ptr_id) {
+        if (__builtin_expect(g_state.elements[i].current_ptr_id == ptr_id, 0)) {
             handle_element_up(&g_state.elements[i], x, y, time_ms, result);
             handled = true;
         }
@@ -107,14 +110,31 @@ static bool release_engaged_elements(int ptr_id, float x, float y, uint64_t time
     return handled;
 }
 
-bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+    if (__builtin_expect(g_state.element_count == 0, 0)) return false;
+
+    // Fast path: all elements are ACTIVATION_LOCK — skip switch overhead
+    if (!g_state.cfg.caps_has_track_hover_buttons) {
+        bool handled = false;
+        for (int i = 0; i < g_state.element_count; i++) {
+            if (__builtin_expect(i + 4 < g_state.element_count, 1))
+                __builtin_prefetch(&g_state.elements[i + 4], 0, 1);
+            if (point_in_element(x, y, &g_state.elements[i])) {
+                handle_element_down(&g_state.elements[i], ptr_id, x, y, time_ms, result);
+                handled = true;
+            }
+        }
+        return handled;
+    }
+
     bool handled = false;
-    ActivationMode mode = g_state.element_count > 0 ?
-        g_state.elements[0].activation_mode : ACTIVATION_LOCK;
+    ActivationMode mode = g_state.activation_mode;
 
     switch (mode) {
         case ACTIVATION_LOCK: {
             for (int i = 0; i < g_state.element_count; i++) {
+                if (__builtin_expect(i + 4 < g_state.element_count, 1))
+                    __builtin_prefetch(&g_state.elements[i + 4], 0, 1);
                 if (point_in_element(x, y, &g_state.elements[i])) {
                     handle_element_down(&g_state.elements[i], ptr_id, x, y, time_ms, result);
                     handled = true;
@@ -127,6 +147,8 @@ bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, Touc
             // Single pass: find non-button hit and button hit together
             TouchElement* btn = NULL;
             for (int i = 0; i < g_state.element_count; i++) {
+                if (__builtin_expect(i + 4 < g_state.element_count, 1))
+                    __builtin_prefetch(&g_state.elements[i + 4], 0, 1);
                 TouchElement* e = &g_state.elements[i];
                 if (!point_in_element(x, y, e)) continue;
                 if (e->type != ELEM_BUTTON) {
@@ -139,7 +161,7 @@ bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, Touc
             // Button at point: handle with tracking
             if (btn && btn->type == ELEM_BUTTON) {
                 // In track/hover mode, skip OFF toggle switches to prevent accidental activation
-                bool skip_toggle = btn->toggle_switch && !btn->selected;
+                bool skip_toggle = btn->cached_has_toggle && !btn->selected && !btn->lp_toggled && !btn->gesture_toggled;
 
                 TrackedButtons* tb = &g_state.tracked[(uint32_t)ptr_id % MAX_FINGERS];
                 if (tb->ptr_id != ptr_id) {
@@ -170,9 +192,22 @@ bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, Touc
     return handled;
 }
 
-void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
-    ActivationMode mode = g_state.element_count > 0 ?
-        g_state.elements[0].activation_mode : ACTIVATION_LOCK;
+void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+    if (__builtin_expect(g_state.element_count == 0, 0)) return;
+
+    // Fast path: all elements are ACTIVATION_LOCK — skip switch overhead
+    if (!g_state.cfg.caps_has_track_hover_buttons) {
+        for (int i = 0; i < g_state.element_count; i++) {
+            if (__builtin_expect(i + 4 < g_state.element_count, 1))
+                __builtin_prefetch(&g_state.elements[i + 4], 0, 1);
+            if (g_state.elements[i].current_ptr_id == ptr_id) {
+                handle_element_move(&g_state.elements[i], x, y, time_ms, result);
+            }
+        }
+        return;
+    }
+
+    ActivationMode mode = g_state.activation_mode;
 
     switch (mode) {
         case ACTIVATION_LOCK: {
@@ -191,7 +226,7 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
             if (tb->ptr_id == ptr_id && tb->count > 0) {
                 TouchElement* btn = hit_test_element(x, y);
                 if (btn && btn->type == ELEM_BUTTON) {
-                    if (btn->toggle_switch) {
+                    if (btn->cached_has_toggle) {
                         toggle_slide_over(btn, result);
                     } else {
                         bool already = false;
@@ -234,7 +269,7 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
                     }
                     // Activate current
                     if (btn && btn->type == ELEM_BUTTON) {
-                        if (btn->toggle_switch) {
+                        if (btn->cached_has_toggle) {
                             toggle_slide_over(btn, result);
                             g_state.hovered_element_per_ptr[pid_slot] = -1;
                         } else {
@@ -269,11 +304,17 @@ void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, Touc
     }
 }
 
-bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+    if (__builtin_expect(g_state.element_count == 0, 0)) return false;
+
+    // Fast path: all elements are ACTIVATION_LOCK — skip switch overhead
+    if (!g_state.cfg.caps_has_track_hover_buttons) {
+        return release_engaged_elements(ptr_id, x, y, time_ms, result);
+    }
+
     bool handled = false;
     int pid_slot = (uint32_t)ptr_id % MAX_FINGERS;
-    ActivationMode mode = g_state.element_count > 0 ?
-        g_state.elements[0].activation_mode : ACTIVATION_LOCK;
+    ActivationMode mode = g_state.activation_mode;
 
     switch (mode) {
         case ACTIVATION_LOCK:
@@ -310,7 +351,10 @@ void activation_reset(void) {
         g_state.hovered_element_per_ptr[i] = -1;
     }
     for (int i = 0; i < g_state.element_count; i++) {
-        g_state.elements[i].visual_active = false;
+        TouchElement* e = &g_state.elements[i];
+        // Toggle buttons that are still selected keep their visual activation
+        if (!element_is_toggle_active(e))
+            e->visual_active = false;
     }
-    g_state.visual_state_dirty = true;
+    mark_all_dirty();
 }

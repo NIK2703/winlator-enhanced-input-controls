@@ -62,6 +62,19 @@ typedef struct {
     int count;
 } GestureBindingSlot;
 
+typedef struct {
+    const TouchBinding* single_tap;         int single_tap_count;
+    const TouchBinding* long_press;         int long_press_count;
+    const TouchBinding* double_tap;         int double_tap_count;
+    const TouchBinding* single_tap_drag;    int single_tap_drag_count;
+    const TouchBinding* long_press_drag;    int long_press_drag_count;
+    const TouchBinding* double_tap_drag;    int double_tap_drag_count;
+    const TouchBinding* single_2nd;         int single_2nd_count;
+    const TouchBinding* double_2nd;         int double_2nd_count;
+    const TouchBinding* single_drag_2nd;    int single_drag_2nd_count;
+    const TouchBinding* double_drag_2nd;    int double_drag_2nd_count;
+} GestureModeBindings;
+
 // --- Element types ---
 typedef enum {
     ELEM_BUTTON, ELEM_DPAD, ELEM_RANGE_BUTTON, ELEM_STICK, ELEM_TRACKPAD
@@ -75,83 +88,113 @@ typedef enum {
     ACTIVATION_LOCK, ACTIVATION_TRACK, ACTIVATION_HOVER
 } ActivationMode;
 
-// --- Element state ---
-typedef struct {
-    // --- HOT fields (accessed on every touch event) ---
-    ElementType type;
-    ElementShape shape;
-    ActivationMode activation_mode;
-    int current_ptr_id;
-    bool engaged;
-    bool passthrough_touch;
-    bool toggle_switch;
-    bool gesture_suppressed;
-    bool auto_repeat;
-    int x, y;
-    float hw, hh;
-    float w, h;
-    float scale;
-    TouchBinding bindings[4];
+    // --- Element state ---
+    typedef struct {
+        // === HOT: accessed every element iteration or every event (first cache line) ===
+        // Ints/enums first (6 * 4 = 24 bytes)
+        int current_ptr_id;
+        ElementType type;
+        ElementShape shape;
+        ActivationMode activation_mode;
+        int x;
+        int y;
+        // Floats (7 * 4 = 28 bytes)
+        float visual_x;
+        float visual_y;
+        float cached_left;
+        float cached_right;
+        float cached_top;
+        float cached_bottom;
+        float cached_hw_sq;
+        // Bools (9 * 1 = 9 bytes + 3 padding = 12 bytes)
+        bool engaged;
+        bool selected;
+        bool passthrough_touch;
+        bool gesture_suppressed;
+        bool cached_has_toggle;
+        bool cached_has_auto_repeat;
+        bool cached_has_long_press;
+        bool cached_has_gesture;
+        bool cached_has_any_binding;
 
-    // --- WARM fields (gesture/timer paths) ---
-    bool long_press_arm;
-    bool gesture_long_press_triggered;
-    bool gesture_swipe_triggered;
-    bool gesture_timer_armed;
-    int gesture_swipe_direction;
-    int primary_sticky_mask;
-    bool selected;
-    int button_long_press_haptic;
-    int button_gesture_haptic;
-    int auto_repeat_interval_ms;
-    uint64_t auto_repeat_last_time;
-    bool auto_repeat_primary_pressed;
-    uint64_t down_time_ms;
-    float down_x, down_y;
+        // === WARM: accessed per-tick but conditionally or via dispatch ===
+        // Bools first (13 * 1 = 13 bytes + 3 padding = 16 bytes)
+        bool visual_active;
+        bool long_press_arm;
+        bool gesture_swipe_triggered;
+        bool gesture_long_press_triggered;
+        bool gesture_timer_armed;
+        bool lp_toggled;
+        bool gesture_toggled;
+        bool auto_repeat_primary_pressed;
+        bool visual_long_press_active;
+        bool cached_lp_has_toggle;
+        bool cached_gesture_has_toggle;
+        bool cached_bind0_is_gamepad;
+        bool cached_bind0_is_right_stick;
+        // Ints (6 * 4 = 24 bytes)
+        int cached_auto_repeat_interval;
+        int primary_sticky_mask;
+        int button_long_press_haptic;
+        int button_gesture_haptic;
+        int element_long_press_count;
+        int element_gesture_count;
+        // Floats (2 * 4 = 8 bytes)
+        float down_x;
+        float down_y;
+        // 64-bit (2 * 8 = 16 bytes)
+        uint64_t down_time_ms;
+        uint64_t auto_repeat_last_time;
+        // Binding arrays (big, at end of WARM to avoid cache line pollution)
+        TouchBinding bindings[4];
+        TouchBinding element_long_press[8];
+        TouchBinding element_gesture[8];
 
-    // --- Element long-press and gesture bindings ---
-    int element_long_press_count;
-    TouchBinding element_long_press[8];
-    int element_gesture_count;
-    TouchBinding element_gesture[8];
-
-    // --- Long press visual state ---
-    bool visual_long_press_active;
-
-    // --- Range button state ---
-    int range_ordinal;
-    int range_index;
-    int range_max;
-    int range_binding_count;
-    int range_orientation;
-    float range_scroll_offset;
-    float range_current_offset;
-    float range_last_position;
-    bool range_scrolling;
-    bool range_has_binding;
-    bool range_hold_pressed;
-    bool range_pending_tap_release;
-    uint64_t range_tap_release_time;
-    int range_initial_kc;
-
-    // --- Stick/trackpad state ---
-    bool petal_active[MAX_PETALS];
-    float stick_value_x, stick_value_y;
-    float trackpad_last_x, trackpad_last_y;
-    float trackpad_vel_x, trackpad_vel_y;
-    uint64_t trackpad_last_time;
-
-    // --- Render state (cold, accessed only during visual sync) ---
-    bool visual_active;
-    float visual_x;
-    float visual_y;
-    float opacity;
-    float corner_radius;
-    uint32_t color_primary;
-    uint32_t color_secondary;
-    float stroke_width;
-    int fill_alpha_inactive;
-} TouchElement;
+        // === COLD: init/setup only ===
+        // Bools (4 + array of 4 = 8 bytes)
+        bool range_scrolling;
+        bool range_has_binding;
+        bool range_hold_pressed;
+        bool range_pending_tap_release;
+        bool petal_active[MAX_PETALS];
+        // 64-bit (2 * 8 = 16 bytes)
+        uint64_t range_tap_release_time;
+        uint64_t trackpad_last_time;
+        // Ints (7 * 4 = 28 bytes)
+        int range_ordinal;
+        int range_index;
+        int range_max;
+        int range_binding_count;
+        int range_orientation;
+        int range_initial_kc;
+        int fill_alpha_inactive;
+        // Floats (15 * 4 = 60 bytes)
+        float hw;
+        float hh;
+        float w;
+        float h;
+        float scale;
+        float range_scroll_offset;
+        float range_current_offset;
+        float range_last_position;
+        float cached_range_cw;
+        float cached_range_ch;
+        float cached_range_element_size;
+        float cached_scroll_size;
+        float cached_inv_scroll_size;
+        float stick_value_x;
+        float stick_value_y;
+        float trackpad_last_x;
+        float trackpad_last_y;
+        float trackpad_vel_x;
+        float trackpad_vel_y;
+        float opacity;
+        float corner_radius;
+        float stroke_width;
+        // 32-bit (2 * 4 = 8 bytes)
+        uint32_t color_primary;
+        uint32_t color_secondary;
+    } TouchElement;
 
 // --- Gesture handler types ---
 typedef enum {
@@ -185,6 +228,15 @@ typedef struct {
     float last_x, last_y;
     float travel_x, travel_y;
     bool active;
+    // Cached GestureBindingSet fields (recomputed after bindings change, avoids rebuilding per call)
+    bool cached_has_active_single_tap;
+    bool cached_has_active_double_tap;
+    bool cached_has_active_long_press;
+    bool cached_has_active_single_tap_drag;
+    bool cached_has_active_long_press_drag;
+    bool cached_has_active_double_tap_drag;
+    bool cached_has_long_press_timer;
+    bool cached_has_moved_beyond_threshold;
     bool is_tap;
     GestureState state;
     FingerBindings bindings;
@@ -209,10 +261,6 @@ typedef struct {
     int original_ptr_id;            // finger identity for double-tap continuity
     bool double_tap_original_id_set;
 
-    // Modifier tracking
-    TouchBinding held_modifiers[8];
-    int held_modifiers_count;
-
     // Single-tap hold timer (touchscreen finger-down hold)
     int single_tap_hold_delay_ms;
     uint64_t single_tap_hold_timer;
@@ -221,15 +269,6 @@ typedef struct {
     bool single_tap_deferred;
     uint64_t single_tap_deferred_time;
 
-    // Cached GestureBindingSet fields (recomputed after bindings change, avoids rebuilding per call)
-    bool cached_has_active_single_tap;
-    bool cached_has_active_double_tap;
-    bool cached_has_active_long_press;
-    bool cached_has_active_single_tap_drag;
-    bool cached_has_active_long_press_drag;
-    bool cached_has_active_double_tap_drag;
-    bool cached_has_long_press_timer;
-    bool cached_has_moved_beyond_threshold;
 } TouchFinger;
 
 typedef enum {
@@ -291,35 +330,76 @@ typedef struct {
     bool caps_has_long_press;
     bool caps_has_long_press_timer;
     bool caps_has_track_hover_buttons;  // true if any element has ACTIVATION_TRACK or ACTIVATION_HOVER
-    bool caps_has_toggle_switch;         // true if any element has toggle_switch
+    uint32_t caps_mode_mask;       // touch_mode-specific mask: caps_ts_mask or caps_tp_mask (pre-resolved, avoids ternary)
+    bool is_ts;    // true if touch_mode == TOUCH_MODE_TOUCHSCREEN
+    bool is_tp;    // true if touch_mode == TOUCH_MODE_TOUCHPAD
+    uint32_t caps_second_mask;     // second-finger gesture mask: SINGLE_2ND|DOUBLE_2ND|SINGLE_DRAG_2ND|DOUBLE_DRAG_2ND
+    bool caps_has_element_toggle;   // true if any element has toggle bindings
+    bool caps_has_any_element_long_press;  // true if any button has element_long_press bindings
+    bool caps_has_any_element_gesture;     // true if any button has element_gesture bindings
+    bool caps_has_auto_repeat_buttons;   // true if any button has auto_repeat binding
+    bool caps_has_mouse_left_element;    // true if any element has BINDING_MOUSE_LEFT as first binding
+    bool caps_has_passthrough_elements;  // true if any element has passthrough_touch
+
+    // Per-mode gesture type presence bitmasks (bit i set iff GestureType i has bindings in that mode)
+    // Enables O(1) tests like: if (caps_ts_mask & GESTURE_MASK(GESTURE_LONG_PRESS)) ...
+    uint32_t caps_ts_mask;
+    uint32_t caps_tp_mask;
+    GestureModeBindings cached_mode_bindings;  // precomputed, avoids struct copy per call
 } TouchProcessorConfig;
+
+#define GESTURE_MASK(t) (1u << (t))
 
 // Compute gesture capability flags from a TouchProcessorConfig
 static inline void compute_gesture_caps(TouchProcessorConfig* cfg) {
-    cfg->caps_has_gesture_bindings = false;
-    cfg->caps_has_drag_bindings = false;
-    cfg->caps_has_double_tap = false;
-    cfg->caps_has_long_press = false;
-    cfg->caps_has_long_press_timer = false;
+    cfg->caps_ts_mask = 0;
+    cfg->caps_tp_mask = 0;
 
-    for (int m = 0; m < 2; m++) {
-        GestureBindingSlot* slots = (m == 0) ? cfg->ts : cfg->tp;
-        for (int g = 0; g < GESTURE_TYPE_COUNT; g++) {
-            if (slots[g].count > 0) {
-                cfg->caps_has_gesture_bindings = true;
-                if (g == GESTURE_SINGLE_TAP_DRAG || g == GESTURE_LONG_PRESS_DRAG ||
-                    g == GESTURE_DOUBLE_TAP_DRAG || g == GESTURE_SINGLE_DRAG_2ND ||
-                    g == GESTURE_DOUBLE_DRAG_2ND)
-                    cfg->caps_has_drag_bindings = true;
-                if (g == GESTURE_DOUBLE_TAP || g == GESTURE_DOUBLE_2ND ||
-                    g == GESTURE_DOUBLE_TAP_DRAG || g == GESTURE_DOUBLE_DRAG_2ND)
-                    cfg->caps_has_double_tap = true;
-                if (g == GESTURE_LONG_PRESS)
-                    cfg->caps_has_long_press = true;
-                if (g == GESTURE_LONG_PRESS || g == GESTURE_LONG_PRESS_DRAG)
-                    cfg->caps_has_long_press_timer = true;
-            }
-        }
+    for (int g = 0; g < GESTURE_TYPE_COUNT; g++) {
+        if (cfg->ts[g].count > 0) cfg->caps_ts_mask |= GESTURE_MASK(g);
+        if (cfg->tp[g].count > 0) cfg->caps_tp_mask |= GESTURE_MASK(g);
+    }
+
+    uint32_t all = cfg->caps_ts_mask | cfg->caps_tp_mask;
+
+    cfg->caps_has_gesture_bindings = all != 0;
+
+    uint32_t drag_mask =
+        GESTURE_MASK(GESTURE_SINGLE_TAP_DRAG) | GESTURE_MASK(GESTURE_LONG_PRESS_DRAG) |
+        GESTURE_MASK(GESTURE_DOUBLE_TAP_DRAG) | GESTURE_MASK(GESTURE_SINGLE_DRAG_2ND) |
+        GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND);
+    cfg->caps_has_drag_bindings = (all & drag_mask) != 0;
+
+    uint32_t dt_mask =
+        GESTURE_MASK(GESTURE_DOUBLE_TAP) | GESTURE_MASK(GESTURE_DOUBLE_2ND) |
+        GESTURE_MASK(GESTURE_DOUBLE_TAP_DRAG) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND);
+    cfg->caps_has_double_tap = (all & dt_mask) != 0;
+
+    cfg->caps_has_long_press = (all & GESTURE_MASK(GESTURE_LONG_PRESS)) != 0;
+
+    cfg->caps_has_long_press_timer =
+        (all & (GESTURE_MASK(GESTURE_LONG_PRESS) | GESTURE_MASK(GESTURE_LONG_PRESS_DRAG))) != 0;
+
+    cfg->caps_mode_mask = (cfg->touch_mode == TOUCH_MODE_TOUCHSCREEN) ? cfg->caps_ts_mask : cfg->caps_tp_mask;
+    cfg->caps_second_mask =
+        GESTURE_MASK(GESTURE_SINGLE_2ND) | GESTURE_MASK(GESTURE_DOUBLE_2ND) |
+        GESTURE_MASK(GESTURE_SINGLE_DRAG_2ND) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND);
+
+    cfg->is_ts = (cfg->touch_mode == TOUCH_MODE_TOUCHSCREEN);
+    cfg->is_tp = (cfg->touch_mode == TOUCH_MODE_TOUCHPAD);
+
+    {
+        const GestureBindingSlot* slots = cfg->is_ts ? cfg->ts : cfg->tp;
+        cfg->cached_mode_bindings.single_tap        = slots[GESTURE_SINGLE_TAP].arr;        cfg->cached_mode_bindings.single_tap_count        = slots[GESTURE_SINGLE_TAP].count;
+        cfg->cached_mode_bindings.long_press        = slots[GESTURE_LONG_PRESS].arr;        cfg->cached_mode_bindings.long_press_count        = slots[GESTURE_LONG_PRESS].count;
+        cfg->cached_mode_bindings.double_tap        = slots[GESTURE_DOUBLE_TAP].arr;        cfg->cached_mode_bindings.double_tap_count        = slots[GESTURE_DOUBLE_TAP].count;
+        cfg->cached_mode_bindings.single_tap_drag   = slots[GESTURE_SINGLE_TAP_DRAG].arr;   cfg->cached_mode_bindings.single_tap_drag_count   = slots[GESTURE_SINGLE_TAP_DRAG].count;
+        cfg->cached_mode_bindings.long_press_drag   = slots[GESTURE_LONG_PRESS_DRAG].arr;   cfg->cached_mode_bindings.long_press_drag_count   = slots[GESTURE_LONG_PRESS_DRAG].count;
+        cfg->cached_mode_bindings.double_tap_drag   = slots[GESTURE_DOUBLE_TAP_DRAG].arr;   cfg->cached_mode_bindings.double_tap_drag_count   = slots[GESTURE_DOUBLE_TAP_DRAG].count;
+        cfg->cached_mode_bindings.single_2nd        = slots[GESTURE_SINGLE_2ND].arr;        cfg->cached_mode_bindings.single_2nd_count        = slots[GESTURE_SINGLE_2ND].count;
+        cfg->cached_mode_bindings.double_2nd        = slots[GESTURE_DOUBLE_2ND].arr;        cfg->cached_mode_bindings.double_2nd_count        = slots[GESTURE_DOUBLE_2ND].count;
+        cfg->cached_mode_bindings.single_drag_2nd   = slots[GESTURE_SINGLE_DRAG_2ND].arr;   cfg->cached_mode_bindings.single_drag_2nd_count   = slots[GESTURE_SINGLE_DRAG_2ND].count;
+        cfg->cached_mode_bindings.double_drag_2nd   = slots[GESTURE_DOUBLE_DRAG_2ND].arr;   cfg->cached_mode_bindings.double_drag_2nd_count   = slots[GESTURE_DOUBLE_DRAG_2ND].count;
     }
 }
 

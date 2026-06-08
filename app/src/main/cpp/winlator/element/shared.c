@@ -1,21 +1,21 @@
 #include "../touch_processor_internal.h"
 
 bool point_in_element(float px, float py, const TouchElement* e) {
+    if (px < e->cached_left || px >= e->cached_right) return false;
+    if (py < e->cached_top || py >= e->cached_bottom) return false;
     if (e->shape == SHAPE_CIRCLE) {
-        float dx = px - (float)e->x;
-        float dy = py - (float)e->y;
-        return (dx * dx + dy * dy) <= (e->hw * e->hw);
+        float dx = px - e->x, dy = py - e->y;
+        if (dx * dx + dy * dy > e->cached_hw_sq) return false;
     }
-    return px >= e->x - e->hw && px <= e->x + e->hw &&
-           py >= e->y - e->hh && py <= e->y + e->hh;
+    return true;
 }
 
 TouchElement* hit_test_element(float x, float y) {
     // Use spatial grid if available
     if (g_state.grid_cell_w > 0.0f && g_state.grid_cell_h > 0.0f) {
         // Early exit: point outside spatial grid bounds cannot hit any element
-        if (x < g_state.grid_min_x || x > g_state.grid_min_x + GRID_COLS * g_state.grid_cell_w ||
-            y < g_state.grid_min_y || y > g_state.grid_min_y + GRID_ROWS * g_state.grid_cell_h)
+        if (x < g_state.grid_min_x || x > g_state.grid_max_x ||
+            y < g_state.grid_min_y || y > g_state.grid_max_y)
             return NULL;
 
         int col = (int)((x - g_state.grid_min_x) / g_state.grid_cell_w);
@@ -45,6 +45,8 @@ TouchElement* hit_test_element(float x, float y) {
     // Fallback: linear scan
     for (int i = g_state.element_count - 1; i >= 0; i--) {
         TouchElement* e = &g_state.elements[i];
+        if (__builtin_expect(i - 4 >= 0, 1))
+            __builtin_prefetch(&g_state.elements[i - 4], 0, 1);
         if (point_in_element(x, y, e))
             return e;
     }
@@ -121,11 +123,8 @@ int detect_swipe_dir(float dx, float dy, float threshold) {
     return dy > 0 ? 1 : 0;
 }
 
-bool is_mouse_move_binding(const TouchBinding* b) {
-    return b->type >= BINDING_MOUSE_MOVE_LEFT && b->type <= BINDING_MOUSE_MOVE_DOWN;
-}
-
-void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, TouchActionResult* result) {
+void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, TouchActionResult* restrict result) {
+    if (!e->cached_has_any_binding) return;
     bool raw_up = ny <= -dead_zone;
     bool raw_right = nx >= dead_zone;
     bool raw_down = ny >= dead_zone;
@@ -148,21 +147,41 @@ void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, To
     }
 }
 
-bool finger_has_engaged_element(int ptr_id) {
-    for (int i = 0; i < g_state.element_count; i++) {
-        if (g_state.elements[i].engaged && g_state.elements[i].current_ptr_id == ptr_id)
-            return true;
-    }
-    return false;
-}
+typedef void (*element_down_fn)(TouchElement*, int, float, float, uint64_t, TouchActionResult* restrict);
+typedef void (*element_move_fn)(TouchElement*, float, float, uint64_t, TouchActionResult* restrict);
+typedef void (*element_up_fn)(TouchElement*, float, float, uint64_t, TouchActionResult* restrict);
 
-void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+static const element_down_fn element_down_table[] = {
+    element_button_down,
+    element_dpad_down,
+    element_range_button_down,
+    element_stick_down,
+    element_trackpad_down,
+};
+
+static const element_move_fn element_move_table[] = {
+    element_button_move,
+    element_dpad_move,
+    element_range_button_move,
+    element_stick_move,
+    element_trackpad_move,
+};
+
+static const element_up_fn element_up_table[] = {
+    element_button_up,
+    element_dpad_up,
+    element_range_button_up,
+    element_stick_up,
+    element_trackpad_up,
+};
+
+void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_element_down[%d] type=%d ptr=%d x=%.0f y=%.0f", (int)(e - g_state.elements), e->type, ptr_id, x, y);
     //LOG_SHARED("handle_element_down type=%d ptr=%d x=%.0f y=%.0f cur_ptr=%d engaged=%d b0=%d",
     //    e->type, ptr_id, x, y, e->current_ptr_id, e->engaged, e->bindings[0].type);
     // Java ControlElement.handleTouchDown: if (currentPointerId == -1 && containsPoint(x, y))
     // containsPoint is checked by the caller; guard already-engaged elements here.
-    if (e->current_ptr_id >= 0) {
+    if (__builtin_expect(e->current_ptr_id >= 0, 0)) {
         //LOG_SHARED("  already engaged (ptr=%d), returning", e->current_ptr_id);
         //__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN skip: already engaged ptr=%d type=%d", ptr_id, e->type);
         return;
@@ -175,91 +194,100 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     e->visual_active = true;
     e->visual_x = x;
     e->visual_y = y;
-    g_state.visual_state_dirty = true;
-    e->gesture_swipe_triggered = false;
+    mark_element_dirty(e);
+    // gesture_swipe_triggered is NOT cleared here — it persists from first
+    // gesture trigger until handle_element_up, preventing re-trigger within
+    // a single touch even across HOVER transitions.
     e->gesture_long_press_triggered = false;
-    e->gesture_swipe_direction = -1;
     e->long_press_arm = false;
     e->gesture_timer_armed = false;
     e->gesture_suppressed = false;
 
-    switch (e->type) {
-        case ELEM_BUTTON: element_button_down(e, ptr_id, x, y, time_ms, result); break;
-        case ELEM_DPAD: element_dpad_down(e, ptr_id, x, y, time_ms, result); break;
-        case ELEM_STICK: element_stick_down(e, ptr_id, x, y, time_ms, result); break;
-        case ELEM_TRACKPAD: element_trackpad_down(e, ptr_id, x, y, time_ms, result); break;
-        case ELEM_RANGE_BUTTON: element_range_button_down(e, ptr_id, x, y, time_ms, result); break;
-    }
-    //LOG_SHARED("  after switch: result_count=%d", result->count);
+    element_down_table[e->type](e, ptr_id, x, y, time_ms, result);
 }
 
-void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     e->visual_active = true;
     e->visual_x = x;
     e->visual_y = y;
-    g_state.visual_state_dirty = true;
-    switch (e->type) {
-        case ELEM_BUTTON: element_button_move(e, x, y, time_ms, result); break;
-        case ELEM_DPAD: element_dpad_move(e, x, y, time_ms, result); break;
-        case ELEM_STICK: element_stick_move(e, x, y, time_ms, result); break;
-        case ELEM_TRACKPAD: element_trackpad_move(e, x, y, time_ms, result); break;
-        case ELEM_RANGE_BUTTON: element_range_button_move(e, x, y, time_ms, result); break;
-    }
+    mark_element_dirty(e);
+    element_move_table[e->type](e, x, y, time_ms, result);
     // HOVER mode: non-toggle buttons are only visually active when finger is inside.
     // This runs after element_button_move (which may return early on gesture trigger)
     // and overrides any visual_active=true set above for non-hovered buttons.
     if (e->type == ELEM_BUTTON && e->activation_mode == ACTIVATION_HOVER
-        && !e->toggle_switch && !point_in_element(x, y, e)) {
+        && !element_is_toggle_active(e) && !point_in_element(x, y, e)) {
         e->visual_active = false;
     }
 }
 
-void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_element_up[%d] type=%d ptr=%d", (int)(e - g_state.elements), e->type, e->current_ptr_id);
     //__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "UP type=%d ptr=%d lp_trig=%d swipe=%d b0=%d",
     //    e->type, e->current_ptr_id, e->gesture_long_press_triggered, e->gesture_swipe_triggered, e->bindings[0].type);
-    switch (e->type) {
-        case ELEM_BUTTON: element_button_up(e, x, y, time_ms, result); break;
-        case ELEM_DPAD: element_dpad_up(e, x, y, time_ms, result); break;
-        case ELEM_STICK: element_stick_up(e, x, y, time_ms, result); break;
-        case ELEM_TRACKPAD: element_trackpad_up(e, x, y, time_ms, result); break;
-        case ELEM_RANGE_BUTTON: element_range_button_up(e, x, y, time_ms, result); break;
-    }
+    element_up_table[e->type](e, x, y, time_ms, result);
     e->engaged = false;
     e->current_ptr_id = -1;
-    e->visual_active = false;
-    g_state.visual_state_dirty = true;
+    // Toggle buttons that are still selected keep their visual activation
+    if (!element_is_toggle_active(e))
+        e->visual_active = false;
+    mark_element_dirty(e);
+    // Clean up leaked gesture flags: element-specific up may early-return
+    // (e.g., toggle buttons that stay selected) without clearing these,
+    // leaving gesture bindings pressed forever and breaking future gesture
+    // detection on subsequent finger-downs.
+    if (e->gesture_swipe_triggered) {
+        if (!e->gesture_toggled)
+            release_bindings_list(result, e->element_gesture, e->element_gesture_count);
+        e->gesture_swipe_triggered = false;
+    }
+    if (e->gesture_long_press_triggered) {
+        if (!e->lp_toggled)
+            release_bindings_list(result, e->element_long_press, e->element_long_press_count);
+        e->gesture_long_press_triggered = false;
+    }
 }
 
-void suppress_element_gestures(TouchElement* e, TouchActionResult* result) {
-    //LOG_SHARED("suppress_element_gestures type=%d b0=%d lp_arm=%d",
-    //    e->type, e->bindings[0].type, e->long_press_arm);
+void suppress_element_gestures(TouchElement* e, TouchActionResult* restrict result) {
     if (e->long_press_arm && e->bindings[0].type != BINDING_NONE)
         press_binding(result, &e->bindings[0], true);
+    if (e->lp_toggled) {
+        release_bindings_list(result, e->element_long_press, e->element_long_press_count);
+        e->lp_toggled = false;
+    }
+    // Don't release gesture toggles — they persist until explicitly toggled OFF
+    // by the user via another gesture, not by HOVER transitions.
+    // e->gesture_toggled and its bindings are preserved across re-entry.
+    // gesture_swipe_triggered is NOT cleared here — persists until finger UP.
     e->long_press_arm = false;
     e->gesture_long_press_triggered = false;
-    e->gesture_swipe_triggered = false;
     e->gesture_timer_armed = false;
     e->visual_long_press_active = false;
     e->gesture_suppressed = true;
 }
 
-void release_element_bindings(TouchElement* e, TouchActionResult* result) {
-    if (e->bindings[0].type != BINDING_NONE && !(e->primary_sticky_mask & 1))
+void release_element_bindings(TouchElement* e, TouchActionResult* restrict result) {
+    if (!e->cached_has_any_binding && !e->gesture_swipe_triggered && !e->gesture_long_press_triggered)
+        return;
+    if (e->bindings[0].type != BINDING_NONE && !(e->primary_sticky_mask & 1)
+        && !(e->bindings[0].toggle && e->selected))
         release_binding(result, &e->bindings[0]);
-    if (e->gesture_swipe_triggered)
+    if (__builtin_expect(e->gesture_swipe_triggered, 0) && !e->gesture_toggled)
         release_bindings_list(result, e->element_gesture, e->element_gesture_count);
-    if (e->gesture_long_press_triggered)
+    if (__builtin_expect(e->gesture_long_press_triggered, 0) && !e->lp_toggled)
         release_bindings_list(result, e->element_long_press, e->element_long_press_count);
     e->long_press_arm = false;
     e->gesture_long_press_triggered = false;
-    e->gesture_swipe_triggered = false;
+    // gesture_swipe_triggered is NOT cleared here — persists until finger UP.
+    // Otherwise, leaving and re-entering a button in HOVER mode would re-enable
+    // gesture detection, causing multiple triggers per touch.
     e->gesture_timer_armed = false;
     e->visual_long_press_active = false;
     e->current_ptr_id = -1;
     e->engaged = false;
-    e->visual_active = false;
-    g_state.visual_state_dirty = true;
+    if (!e->cached_has_toggle && !e->lp_toggled && !e->gesture_toggled)
+        e->visual_active = false;
+    mark_element_dirty(e);
 }
 
 void touch_finger_cache_bs(TouchFinger* f) {
@@ -298,6 +326,8 @@ void build_spatial_grid(void) {
     
     g_state.grid_min_x = min_x;
     g_state.grid_min_y = min_y;
+    g_state.grid_max_x = max_x;
+    g_state.grid_max_y = max_y;
     g_state.grid_cell_w = range_x / GRID_COLS;
     g_state.grid_cell_h = range_y / GRID_ROWS;
     
@@ -329,7 +359,6 @@ void element_reset_runtime(TouchElement* e) {
     e->gesture_long_press_triggered = false;
     e->gesture_swipe_triggered = false;
     e->gesture_timer_armed = false;
-    e->gesture_swipe_direction = 0;
     e->auto_repeat_primary_pressed = false;
     e->auto_repeat_last_time = 0;
     e->stick_value_x = 0.0f;

@@ -1,28 +1,76 @@
 #include "../touch_processor_internal.h"
-#include <unistd.h>
 
 #define DELAYED_RELEASE_MS 30
 
-static inline void delay_ms(int ms) {
-    if (ms > 0) usleep(ms * 1000);
+static inline bool check_confirm_dt_waiting(TouchFinger* f, TouchActionResult* restrict result,
+    TouchFinger* main_finger, bool use_main_bindings)
+{
+    if (!__builtin_expect(g_state.gesture_double_tap_waiting, 0)) return false;
+    if (!gesture_is_within_tap_distance(f->x, f->y)) {
+        gesture_cancel_double_tap_wait(result);
+        return false;
+    }
+    TouchFinger* dt_target = use_main_bindings && main_finger ? main_finger : f;
+    double_tap_confirm_internal(result, dt_target);
+    TouchFinger* reset_target = use_main_bindings ? main_finger : f;
+    if (reset_target) {
+        reset_target->state = GESTURE_STATE_TAP_WAITING;
+        reset_finger_tap_state(reset_target);
+        if (use_main_bindings) {
+            reset_target->down_x = reset_target->x;
+            reset_target->down_y = reset_target->y;
+        }
+    }
+    return true;
+}
+
+static inline void save_pending_resume_action(TouchFinger* main_finger) {
+    if (!main_finger || !main_finger->active) return;
+    main_finger->pending_resume_action_count = 0;
+    if (g_state.gesture_is_action_held) {
+        for (int i = 0; i < g_state.gesture_held_count && i < 8; i++) {
+            main_finger->pending_resume_action[i] = g_state.gesture_held_actions[i];
+            main_finger->pending_resume_action_count++;
+        }
+    }
+}
+
+static inline void cleanup_second_finger_up(TouchActionResult* restrict result) {
+    TouchFinger* main = find_finger(g_state.gesture_main_ptr_id);
+    if (main && main->pending_resume_action_count > 0) {
+        execute_actions_hold(result, main->pending_resume_action, main->pending_resume_action_count);
+        main->pending_resume_action_count = 0;
+        main->state = GESTURE_STATE_DRAGGING;
+    }
+    g_state.gesture_second_ptr_id = -1;
+}
+
+static inline void schedule_pending_release(uint64_t* time_field, int* ptr_field, int* id_field, int ptr_id, uint64_t time_ms) {
+    if (*id_field == ptr_id) {
+        *time_field = time_ms + DELAYED_RELEASE_MS;
+        *ptr_field = ptr_id;
+        *id_field = -1;
+    }
 }
 
 // ============================================================
 // handle_gesture_down
 // ============================================================
-void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     g_state.main_ptr_id = f->ptr_id;
 
     g_state.passthrough_active = false;
     bool found_lock = false;
     bool handled = false;
-    for (int i = 0; i < g_state.element_count; i++) {
-        TouchElement* pe = &g_state.elements[i];
-        if (__builtin_expect(pe->bindings[0].type == BINDING_MOUSE_LEFT, 0))
+    TouchElement* elements = g_state.elements;
+    int element_count = g_state.element_count;
+    for (int i = 0; i < element_count; i++) {
+        TouchElement* pe = &elements[i];
+        if (g_state.cfg.caps_has_mouse_left_element && __builtin_expect(pe->bindings[0].type == BINDING_MOUSE_LEFT, 0))
             g_state.pointer_left_enabled = false;
         if (!point_in_element(x, y, pe)) continue;
 
-        if (__builtin_expect(pe->passthrough_touch, 0))
+        if (g_state.cfg.caps_has_passthrough_elements && __builtin_expect(pe->passthrough_touch, 0))
             g_state.passthrough_active = true;
 
         ActivationMode am = pe->activation_mode;
@@ -65,7 +113,7 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     // and receives second-finger bindings. Single-finger gestures for this
     // finger are disabled (state = IDLE), but cursor/pointer tracking
     // and two-finger gestures via the second finger work normally.
-    if (g_state.passthrough_active) {
+    if (__builtin_expect(g_state.passthrough_active, 0)) {
         g_state.gesture_handler_active = true;
         f->state = GESTURE_STATE_IDLE;
         if (g_state.gesture_main_ptr_id < 0) {
@@ -101,56 +149,46 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     // ============================================================
     // TS MAIN FINGER
     // ============================================================
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN && is_first) {
+    if (g_state.cfg.is_ts && is_first) {
         bool was_second_deferred = g_state.gesture_deferred_second_finger_tap;
         g_state.gesture_deferred_second_finger_tap = false;
 
         // DT waiting check
-        if (g_state.gesture_double_tap_waiting) {
-            if (gesture_is_within_tap_distance(f->x, f->y)) {
-                double_tap_confirm_internal(result, &f->bindings);
-                f->state = GESTURE_STATE_TAP_WAITING;
-                f->cached_has_long_press_timer = false;
-                f->single_tap_hold_delay_ms = 0;
-                f->single_tap_hold_timer = 0;
-                f->cached_has_moved_beyond_threshold = false;
-                g_state.gesture_main_ptr_id = f->ptr_id;
+        if (check_confirm_dt_waiting(f, result, NULL, false)) {
+            g_state.gesture_main_ptr_id = f->ptr_id;
 
-                // pointer switch — original main finger lifting
-                if (f->double_tap_original_id_set) {
-                    bool found_orig = false;
-                    int orig_ptr_id = -1;
-                    for (int _oi = 0; _oi < MAX_FINGERS; _oi++) {
-                        TouchFinger* _of = &g_state.fingers[_oi];
-                        if (_of->active && _of->double_tap_original_id_set && _of->ptr_id != f->ptr_id) {
-                            found_orig = true;
-                            orig_ptr_id = _of->ptr_id;
-                            break;
-                        }
-                    }
-                    if (found_orig) {
-                        g_state.gesture_second_active = false;
-                        g_state.gesture_main_ptr_id = orig_ptr_id;
-                        update_ts_pointer(x, y, result);
-                        f->state = GESTURE_STATE_TAP_WAITING;
-                        return;
+            // pointer switch — original main finger lifting
+            if (f->double_tap_original_id_set) {
+                bool found_orig = false;
+                int orig_ptr_id = -1;
+                for (int _oi = 0; _oi < MAX_FINGERS; _oi++) {
+                    TouchFinger* _of = &g_state.fingers[_oi];
+                    if (_of->active && _of->double_tap_original_id_set && _of->ptr_id != f->ptr_id) {
+                        found_orig = true;
+                        orig_ptr_id = _of->ptr_id;
+                        break;
                     }
                 }
-
-                // restore second-finger bindings if deferred and still active
-                if (was_second_deferred && g_state.gesture_second_ptr_id >= 0) {
-                    g_state.gesture_second_active = true;
-                    f->is_second_finger = true;
-                    setup_second_finger_bindings(f);
+                if (found_orig) {
+                    g_state.gesture_second_active = false;
+                    g_state.gesture_main_ptr_id = orig_ptr_id;
+                    update_ts_pointer(x, y, result);
+                    f->state = GESTURE_STATE_TAP_WAITING;
+                    return;
                 }
-                return;
-            } else {
-                gesture_cancel_double_tap_wait(result);
             }
+
+            // restore second-finger bindings if deferred and still active
+            if (was_second_deferred && g_state.gesture_second_ptr_id >= 0) {
+                g_state.gesture_second_active = true;
+                f->is_second_finger = true;
+                setup_second_finger_bindings(f);
+            }
+            return;
         }
 
         // was_second_deferred without DT — only restore if second finger is still active
-        if (!g_state.gesture_double_tap_waiting && was_second_deferred && g_state.gesture_second_ptr_id >= 0) {
+        if (!__builtin_expect(g_state.gesture_double_tap_waiting, 0) && was_second_deferred && g_state.gesture_second_ptr_id >= 0) {
             g_state.gesture_second_active = true;
             f->is_second_finger = true;
             setup_second_finger_bindings(f);
@@ -167,37 +205,25 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     // ============================================================
     // TS SECOND FINGER
     // ============================================================
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN && is_second) {
-        if (g_state.gesture_double_tap_waiting) {
-            if (gesture_is_within_tap_distance(f->x, f->y)) {
-                TouchFinger* _mf = find_finger(g_state.gesture_main_ptr_id);
-                double_tap_confirm_internal(result, _mf ? &_mf->bindings : &f->bindings);
-                g_state.gesture_second_active = false;
-                if (_mf) {
-                    _mf->state = GESTURE_STATE_TAP_WAITING;
-                    _mf->cached_has_long_press_timer = false;
-                    _mf->single_tap_hold_delay_ms = 0;
-                    _mf->single_tap_hold_timer = 0;
-                    _mf->cached_has_moved_beyond_threshold = false;
-                    _mf->down_x = _mf->x;
-                    _mf->down_y = _mf->y;
-                }
-                return;
-            } else {
-                gesture_cancel_double_tap_wait(result);
-            }
+    if (g_state.cfg.is_ts && is_second) {
+        // Early exit: no second-finger gesture bindings in TS mode and no pending DT
+        if (!(g_state.cfg.caps_ts_mask & (GESTURE_MASK(GESTURE_SINGLE_2ND) | GESTURE_MASK(GESTURE_DOUBLE_2ND)
+            | GESTURE_MASK(GESTURE_SINGLE_DRAG_2ND) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND)))
+            && !__builtin_expect(g_state.gesture_double_tap_waiting, 0)) {
+            g_state.gesture_second_active = true;
+            g_state.gesture_second_ptr_id = f->ptr_id;
+            f->is_second_finger = true;
+            f->state = GESTURE_STATE_IDLE;
+            return;
         }
 
-        TouchFinger* main_finger = find_finger(g_state.gesture_main_ptr_id);
-        if (main_finger && main_finger->active) {
-            main_finger->pending_resume_action_count = 0;
-            if (g_state.gesture_is_action_held) {
-                for (int i = 0; i < g_state.gesture_held_count && i < 8; i++) {
-                    main_finger->pending_resume_action[i] = g_state.gesture_held_actions[i];
-                    main_finger->pending_resume_action_count++;
-                }
-            }
+        TouchFinger* _mf = find_finger(g_state.gesture_main_ptr_id);
+        if (check_confirm_dt_waiting(f, result, _mf, true)) {
+            g_state.gesture_second_active = false;
+            return;
         }
+
+        save_pending_resume_action(find_finger(g_state.gesture_main_ptr_id));
         release_held_actions(result);
         touchpad_finger_down(f, result, time_ms);
         return;
@@ -210,17 +236,7 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
         g_state.scrolling = false;
         g_state.scroll_accum_y = 0;
     } else if (is_second) {
-        // Save and release ongoing first-finger drag before processing second finger
-        TouchFinger* main_finger = find_finger(g_state.gesture_main_ptr_id);
-        if (main_finger && main_finger->active) {
-            main_finger->pending_resume_action_count = 0;
-            if (g_state.gesture_is_action_held) {
-                for (int i = 0; i < g_state.gesture_held_count && i < 8; i++) {
-                    main_finger->pending_resume_action[i] = g_state.gesture_held_actions[i];
-                    main_finger->pending_resume_action_count++;
-                }
-            }
-        }
+        save_pending_resume_action(find_finger(g_state.gesture_main_ptr_id));
         release_held_actions(result);
     }
 
@@ -254,7 +270,7 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 // ============================================================
 // handle_gesture_move
 // ============================================================
-void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     // Cache hit_test_element result to avoid redundant spatial grid lookups
     TouchElement* ht_elem = NULL;
     bool ht_elem_valid = false;
@@ -265,31 +281,34 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 
     // Save first tracked button's gesture state before element processing
     // (element_button_move may disarm timers when finger leaves button bounds)
-    int saved_pi = (uint32_t)f->ptr_id % MAX_FINGERS;
-    TrackedButtons* saved_tb = &g_state.tracked[saved_pi];
     bool first_btn_has_gesture = false;
     bool first_btn_lp_arm = false;
     bool first_btn_gest_swipe = false;
     bool first_btn_gest_lp = false;
     bool first_btn_gest_timer = false;
-    bool first_btn_vis_lp = false;
-    if (saved_tb->count > 0) {
-        int first_idx = saved_tb->element_indices[0];
-        if (first_idx >= 0 && first_idx < g_state.element_count) {
-            TouchElement* first_btn = &g_state.elements[first_idx];
-            if (first_btn->type == ELEM_BUTTON && first_btn->activation_mode == ACTIVATION_HOVER) {
-                first_btn_lp_arm = first_btn->long_press_arm;
-                first_btn_gest_swipe = first_btn->gesture_swipe_triggered;
-                first_btn_gest_lp = first_btn->gesture_long_press_triggered;
-                first_btn_gest_timer = first_btn->gesture_timer_armed;
-                first_btn_has_gesture = true;
+    if (g_state.cfg.caps_has_track_hover_buttons) {
+        int saved_pi = (uint32_t)f->ptr_id % MAX_FINGERS;
+        TrackedButtons* saved_tb = &g_state.tracked[saved_pi];
+        if (saved_tb->count > 0) {
+            int first_idx = saved_tb->element_indices[0];
+            if (first_idx >= 0 && first_idx < g_state.element_count) {
+                TouchElement* first_btn = &g_state.elements[first_idx];
+                if (first_btn->type == ELEM_BUTTON && first_btn->activation_mode == ACTIVATION_HOVER) {
+                    first_btn_lp_arm = first_btn->long_press_arm;
+                    first_btn_gest_swipe = first_btn->gesture_swipe_triggered;
+                    first_btn_gest_lp = first_btn->gesture_long_press_triggered;
+                    first_btn_gest_timer = first_btn->gesture_timer_armed;
+                    first_btn_has_gesture = true;
+                }
             }
         }
     }
 
     bool had_element_move = false;
-    for (int i = 0; i < g_state.element_count; i++) {
-        TouchElement* e = &g_state.elements[i];
+    TouchElement* elements = g_state.elements;
+    int element_count = g_state.element_count;
+    for (int i = 0; i < element_count; i++) {
+        TouchElement* e = &elements[i];
         if (__builtin_expect(e->engaged && e->current_ptr_id == f->ptr_id, 0)) {
             if (e->passthrough_touch) continue;
             handle_element_move(e, x, y, time_ms, result);
@@ -299,12 +318,11 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 
     // Toggle switch slide-over: handle toggles under finger regardless of tb->count
     // (works even when finger starts on empty space)
-    {
+    if (g_state.cfg.caps_has_element_toggle) {
         if (!ht_elem_valid) { ht_elem = hit_test_element(x, y); ht_elem_valid = true; }
         TouchElement* toggle_btn = ht_elem;
-        if (toggle_btn && toggle_btn->type == ELEM_BUTTON && toggle_btn->toggle_switch) {
-            ActivationMode mode = g_state.element_count > 0 ?
-                g_state.elements[0].activation_mode : ACTIVATION_LOCK;
+        if (toggle_btn && toggle_btn->type == ELEM_BUTTON && toggle_btn->cached_has_toggle) {
+            ActivationMode mode = g_state.activation_mode;
             if (mode == ACTIVATION_TRACK || mode == ACTIVATION_HOVER) {
                 int pi = (uint32_t)f->ptr_id % MAX_FINGERS;
                 TrackedButtons* tb = &g_state.tracked[pi];
@@ -327,19 +345,19 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                         toggle_btn->visual_active = true;
                     }
                     toggle_btn->gesture_timer_armed = true;
-                    g_state.visual_state_dirty = true;
+                    mark_element_dirty(toggle_btn);
                 }
             }
         } else {
             // Finger not on a toggle — reset gates so re-entry can toggle again
-            for (int i = 0; i < g_state.element_count; i++)
-                if (g_state.elements[i].toggle_switch)
-                    g_state.elements[i].gesture_timer_armed = false;
+            for (int i = 0; i < element_count; i++)
+                if (elements[i].cached_has_toggle)
+                    elements[i].gesture_timer_armed = false;
         }
     }
 
     // TRACK/HOVER button tracking
-    {
+    if (g_state.cfg.caps_has_track_hover_buttons) {
         int pi = (uint32_t)f->ptr_id % MAX_FINGERS;
         TrackedButtons* tb = &g_state.tracked[pi];
         if (tb->count > 0) {
@@ -350,7 +368,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                     if (!ht_elem_valid) { ht_elem = hit_test_element(x, y); ht_elem_valid = true; }
                     TouchElement* new_btn = ht_elem;
                     if (new_btn && new_btn->type == ELEM_BUTTON) {
-                        if (!new_btn->toggle_switch) {
+                        if (!new_btn->cached_has_toggle) {
                             bool already = false;
                             for (int j = 0; j < tb->count; j++) {
                                 if (tb->element_indices[j] == (int)(new_btn - g_state.elements)) { already = true; break; }
@@ -374,7 +392,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                         TouchElement* prev = (hovered >= 0 && hovered < g_state.element_count) ? &g_state.elements[hovered] : NULL;
                         if (!ht_elem_valid) { ht_elem = hit_test_element(x, y); ht_elem_valid = true; }
                         TouchElement* curr = ht_elem;
-                        if (prev && (!curr || curr != prev) && !prev->toggle_switch) {
+                        if (prev && (!curr || curr != prev) && !prev->cached_has_toggle) {
                             bool prev_is_first = prev == &g_state.elements[tb->element_indices[0]];
                             release_element_bindings(prev, result);
                             if (prev_is_first && first_btn_has_gesture) {
@@ -388,7 +406,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                             }
                         }
                         if (curr && curr->type == ELEM_BUTTON && curr != prev) {
-                            if (curr->toggle_switch) {
+                            if (curr->cached_has_toggle) {
                                 g_state.hovered_element_per_ptr[pi] = -1;
                             } else {
                                 if (curr->bindings[0].type != BINDING_NONE) {
@@ -398,7 +416,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                                 curr->visual_active = true;
                                 curr->engaged = true;
                                 curr->current_ptr_id = f->ptr_id;
-                                g_state.visual_state_dirty = true;
+                                mark_element_dirty(curr);
                                 if (curr != &g_state.elements[tb->element_indices[0]] && !curr->gesture_suppressed) {
                                     suppress_element_gestures(curr, result);
                                 }
@@ -420,7 +438,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     }
 
     // Skip gesture if tracked non-passthrough button
-    {
+    if (g_state.cfg.caps_has_track_hover_buttons) {
         TrackedButtons* tb = &g_state.tracked[(uint32_t)f->ptr_id % MAX_FINGERS];
         if (tb->count > 0) {
             int first_idx = tb->element_indices[0];
@@ -448,7 +466,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     if ((f->state >= GESTURE_STATE_TAP_WAITING || f->state == GESTURE_STATE_IDLE) && f->ptr_id == g_state.gesture_main_ptr_id) {
         // TS cursor optimization (skip when competing D/Dd or L/Ld present —
         // they need gesture processing for press_on_drag on drag threshold)
-        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN
+        if (g_state.cfg.is_ts
             && !g_state.gesture_second_active
             && !f->cached_has_active_single_tap_drag
             && !f->cached_has_active_long_press_drag
@@ -471,7 +489,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 
         // TS: main-finger movement triggers second-finger STD (single-tap-drag)
         // when the second finger is held and has STD configured.
-        if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN && g_state.gesture_second_active) {
+        if (g_state.cfg.is_ts && g_state.gesture_second_active) {
             TouchFinger* sf = find_finger(g_state.gesture_second_ptr_id);
             if (sf) {
                 float sf_dx = x - g_state.gesture_second_main_ref_x;
@@ -482,20 +500,23 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     }
 
     // TS second finger gesture move (own movement)
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN
+    if (g_state.cfg.is_ts
         && f->state >= GESTURE_STATE_TAP_WAITING
         && g_state.gesture_second_active
-        && f->ptr_id == g_state.gesture_second_ptr_id
-        && f->ptr_id != g_state.gesture_main_ptr_id) {
+        && f->ptr_id == g_state.gesture_second_ptr_id) {
         float dx = x - f->down_x;
         float dy = y - f->down_y;
         // TS second-finger STD is triggered by main-finger movement (above).
         // This own-move path also handles press_on_drag for non-Sd S2.
-        check_start_drag(f, dx, dy, result);
+        // Only process if second-finger bindings exist in TS mode
+        uint32_t ts_second = GESTURE_MASK(GESTURE_SINGLE_2ND) | GESTURE_MASK(GESTURE_DOUBLE_2ND)
+                           | GESTURE_MASK(GESTURE_SINGLE_DRAG_2ND) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND);
+        if (g_state.cfg.caps_ts_mask & ts_second)
+            check_start_drag(f, dx, dy, result);
     }
 
     // TS: update absolute pointer
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
+    if (g_state.cfg.is_ts) {
         if (g_state.gesture_main_ptr_id < 0 || f->ptr_id == g_state.gesture_main_ptr_id)
             update_ts_pointer(x, y, result);
         f->last_x = x;
@@ -504,7 +525,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     }
 
     // TP second finger gesture move (aggregate two-finger drag threshold)
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD
+    if (g_state.cfg.is_tp
         && g_state.gesture_second_active
         && f->ptr_id == g_state.gesture_second_ptr_id
         && f->state >= GESTURE_STATE_TAP_WAITING
@@ -516,14 +537,18 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
             dx += _mf->x - g_state.gesture_second_main_ref_x;
             dy += _mf->y - g_state.gesture_second_main_ref_y;
         }
-        check_start_drag(f, dx, dy, result);
+        // Only process if second-finger bindings exist in TP mode
+        uint32_t tp_second = GESTURE_MASK(GESTURE_SINGLE_2ND) | GESTURE_MASK(GESTURE_DOUBLE_2ND)
+                           | GESTURE_MASK(GESTURE_SINGLE_DRAG_2ND) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND);
+        if (g_state.cfg.caps_tp_mask & tp_second)
+            check_start_drag(f, dx, dy, result);
     }
 
 
 
     // TP: cursor movement
     int afc = active_finger_count();
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD && !g_state.scrolling && afc <= 2) {
+    if (g_state.cfg.is_tp && !g_state.scrolling && afc <= 2) {
         if (g_state.sim_touch_screen) {
             if (f->travel_x > MAX_TAP_TRAVEL || f->travel_y > MAX_TAP_TRAVEL)
                 g_state.sim_continue_click = false;
@@ -567,55 +592,61 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 // ============================================================
 // handle_gesture_up
 // ============================================================
-void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_gesture_up ptr=%d", f->ptr_id);
     int pi = (uint32_t)f->ptr_id % MAX_FINGERS;
     TrackedButtons* tb = &g_state.tracked[pi];
     bool had_tracked = false;
-    if (tb->count > 0) {
-        if (tb->count > 1) {
-            for (int j = 0; j < tb->count; j++) {
-                int idx = tb->element_indices[j];
+    if (g_state.cfg.caps_has_track_hover_buttons) {
+        if (tb->count > 0) {
+            if (tb->count > 1) {
+                for (int j = 0; j < tb->count; j++) {
+                    int idx = tb->element_indices[j];
+                    if (idx >= 0 && idx < g_state.element_count) {
+                        TouchElement* e = &g_state.elements[idx];
+                        handle_element_up(e, x, y, time_ms, result);
+                        if (__builtin_expect(e->gesture_swipe_triggered, 0))
+                            release_bindings_list(result, e->element_gesture, e->element_gesture_count);
+                        if (__builtin_expect(e->gesture_long_press_triggered, 0))
+                            release_bindings_list(result, e->element_long_press, e->element_long_press_count);
+                        e->long_press_arm = false;
+                        e->gesture_long_press_triggered = false;
+                        e->gesture_swipe_triggered = false;
+                    }
+                }
+                had_tracked = true;
+            } else {
+                // Single tracked button: ensure full cleanup via handle_element_up
+                // Fixes bug where visual_active could remain true after finger-up
+                // when the element loop doesn't find it (current_ptr_id mismatch)
+                int idx = tb->element_indices[0];
                 if (idx >= 0 && idx < g_state.element_count) {
                     TouchElement* e = &g_state.elements[idx];
                     handle_element_up(e, x, y, time_ms, result);
-                    if (e->gesture_swipe_triggered)
-                        release_bindings_list(result, e->element_gesture, e->element_gesture_count);
-                    if (e->gesture_long_press_triggered)
-                        release_bindings_list(result, e->element_long_press, e->element_long_press_count);
-                    e->long_press_arm = false;
-                    e->gesture_long_press_triggered = false;
-                    e->gesture_swipe_triggered = false;
+                    if (!element_is_toggle_active(e)) {
+                        e->visual_active = false;
+                    }
                 }
+                had_tracked = true;
             }
-            had_tracked = true;
-        } else {
-            // Single tracked button: ensure full cleanup via handle_element_up
-            // Fixes bug where visual_active could remain true after finger-up
-            // when the element loop doesn't find it (current_ptr_id mismatch)
-            int idx = tb->element_indices[0];
-            if (idx >= 0 && idx < g_state.element_count) {
-                TouchElement* e = &g_state.elements[idx];
-                handle_element_up(e, x, y, time_ms, result);
-                if (!e->toggle_switch) {
-                    e->visual_active = false;
-                }
-            }
-            had_tracked = true;
+            memset(tb, 0, sizeof(TrackedButtons));
         }
-        memset(tb, 0, sizeof(TrackedButtons));
     }
     g_state.hovered_element_per_ptr[pi] = -1;
 
-    // Reset slide-over toggle flags so the next gesture can toggle them again
-    for (int i = 0; i < g_state.element_count; i++)
-        if (g_state.elements[i].toggle_switch)
-            g_state.elements[i].gesture_timer_armed = false;
+    TouchElement* elements = g_state.elements;
+    int element_count = g_state.element_count;
+    if (g_state.cfg.caps_has_element_toggle) {
+        for (int i = 0; i < element_count; i++) {
+            if (!elements[i].cached_has_toggle) continue;
+            elements[i].gesture_timer_armed = false;
+        }
+    }
 
     bool had_element = false;
-    for (int i = 0; i < g_state.element_count; i++) {
-        if (__builtin_expect(g_state.elements[i].current_ptr_id == f->ptr_id, 0)) {
-            handle_element_up(&g_state.elements[i], x, y, time_ms, result);
+    for (int i = 0; i < element_count; i++) {
+        if (__builtin_expect(elements[i].current_ptr_id == f->ptr_id, 0)) {
+            handle_element_up(&elements[i], x, y, time_ms, result);
             had_element = true;
         }
     }
@@ -625,9 +656,17 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
         return;
     }
 
+    // Gesture up: skip gesture-specific handling if no gestures in current mode
+    if (!current_mode_has_gestures() && !__builtin_expect(g_state.gesture_double_tap_waiting, 0)
+        && !__builtin_expect(g_state.gesture_post_double_tap_drag, 0)
+        && !__builtin_expect(g_state.second_double_tap_waiting, 0)) {
+        f->active = false;
+        g_state.main_ptr_id = -1;
+        return;
+    }
 
     // TS-specific up handling
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHSCREEN) {
+    if (g_state.cfg.is_ts) {
         if (f->ptr_id == g_state.gesture_main_ptr_id) {
         g_state.gesture_deferred_second_finger_tap = g_state.gesture_second_active;
         f->pending_resume_action_count = 0;
@@ -638,7 +677,6 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
             g_state.second_tap_fallback_count = 0;
             f->active = false;
         } else if (f->double_tap_original_id_set && g_state.gesture_main_ptr_id >= 0
-                   && f->ptr_id != g_state.gesture_main_ptr_id
                    && f->ptr_id == f->original_ptr_id) {
             if (!g_state.gesture_second_active) {
                 release_held_actions(result);
@@ -656,14 +694,8 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
             }
             f->active = false;
         } else if (g_state.gesture_second_active && f->ptr_id != g_state.gesture_main_ptr_id) {
-            TouchFinger* main = find_finger(g_state.gesture_main_ptr_id);
             touchpad_finger_up(f, result, time_ms);
-            if (main && main->pending_resume_action_count > 0) {
-                execute_actions_hold(result, main->pending_resume_action, main->pending_resume_action_count);
-                main->pending_resume_action_count = 0;
-                main->state = GESTURE_STATE_DRAGGING;
-            }
-            g_state.gesture_second_ptr_id = -1;
+            cleanup_second_finger_up(result);
         } else {
             f->active = false;
         }
@@ -677,25 +709,11 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
 
         // Restore interrupted first-finger drag on second-finger up
         if (f->is_second_finger) {
-            TouchFinger* main = find_finger(g_state.gesture_main_ptr_id);
-            if (main && main->pending_resume_action_count > 0) {
-                execute_actions_hold(result, main->pending_resume_action, main->pending_resume_action_count);
-                main->pending_resume_action_count = 0;
-                main->state = GESTURE_STATE_DRAGGING;
-            }
-            g_state.gesture_second_ptr_id = -1;
+            cleanup_second_finger_up(result);
         }
 
-        if (g_state.finger_pointer_left == f->ptr_id) {
-            g_state.pending_left_release_time = time_ms + DELAYED_RELEASE_MS;
-            g_state.pending_left_release_ptr_id = f->ptr_id;
-            g_state.finger_pointer_left = -1;
-        }
-        if (g_state.finger_pointer_right == f->ptr_id) {
-            g_state.pending_right_release_time = time_ms + DELAYED_RELEASE_MS;
-            g_state.pending_right_release_ptr_id = f->ptr_id;
-            g_state.finger_pointer_right = -1;
-        }
+        schedule_pending_release(&g_state.pending_left_release_time, &g_state.pending_left_release_ptr_id, &g_state.finger_pointer_left, f->ptr_id, time_ms);
+        schedule_pending_release(&g_state.pending_right_release_time, &g_state.pending_right_release_ptr_id, &g_state.finger_pointer_right, f->ptr_id, time_ms);
     }
 
     g_state.main_ptr_id = -1;

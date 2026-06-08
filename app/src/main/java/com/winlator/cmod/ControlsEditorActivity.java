@@ -207,7 +207,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                 view.findViewById(R.id.LLElementCornerRadius).setVisibility(View.VISIBLE);
             }
 
-            view.findViewById(R.id.CBToggleSwitch).setVisibility(View.VISIBLE);
+
             loadBindingSpinners(element, view);
         };
 
@@ -372,15 +372,6 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
         sbDPadRadius.setProgress((int)(element.getDpadCornerRadius() * 10));
-
-        CheckBox cbToggleSwitch = view.findViewById(R.id.CBToggleSwitch);
-        cbToggleSwitch.setChecked(element.hasAnySlotToggle());
-        cbToggleSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            for (int s = 0; s < element.getBindingCount() && s < 4; s++) {
-                element.setSlotToggle(s, isChecked);
-            }
-            profile.save();
-        });
 
         CheckBox cbPassthrough = view.findViewById(R.id.CBPassthroughTouch);
         cbPassthrough.setChecked(element.isPassthroughTouch());
@@ -653,44 +644,57 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         container.removeAllViews();
 
         ControlElement.Type type = element.getType();
+        boolean showMenu = type == ControlElement.Type.BUTTON;
         if (type == ControlElement.Type.BUTTON) {
-            loadBindingSection(element, container, 0, R.string.binding);
+            loadBindingSection(element, container, 0, R.string.binding, showMenu);
             if (!element.getSlotAutoRepeat(0))
-                loadLongPressBindingSection(element, container);
-            loadGestureBindingSection(element, container);
+                loadLongPressBindingSection(element, container, showMenu);
+            loadGestureBindingSection(element, container, showMenu);
         }
         else if (type == ControlElement.Type.D_PAD || type == ControlElement.Type.STICK || type == ControlElement.Type.TRACKPAD) {
-            loadBindingSection(element, container, 0, R.string.binding_up);
-            loadBindingSection(element, container, 1, R.string.binding_right);
-            loadBindingSection(element, container, 2, R.string.binding_down);
-            loadBindingSection(element, container, 3, R.string.binding_left);
+            loadBindingSection(element, container, 0, R.string.binding_up, showMenu);
+            loadBindingSection(element, container, 1, R.string.binding_right, showMenu);
+            loadBindingSection(element, container, 2, R.string.binding_down, showMenu);
+            loadBindingSection(element, container, 3, R.string.binding_left, showMenu);
         }
     }
 
     private void loadBindingSection(final ControlElement element, LinearLayout container, final int index, int titleResId) {
+        loadBindingSection(element, container, index, titleResId, true);
+    }
+
+    private void loadBindingSection(final ControlElement element, LinearLayout container, final int index, int titleResId, boolean showMenu) {
         BindPackage bp = element.getSlotPackage(index);
         View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, getString(titleResId), 0, bp, () -> {
             profile.save();
             inputControlsView.invalidate();
-        });
+        }, showMenu);
         container.addView(section);
     }
 
     private void loadLongPressBindingSection(final ControlElement element, LinearLayout container) {
+        loadLongPressBindingSection(element, container, true);
+    }
+
+    private void loadLongPressBindingSection(final ControlElement element, LinearLayout container, boolean showMenu) {
         BindPackage bp = element.getLongPressPackage();
         View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Long Press", 0, bp, () -> {
             profile.save();
             inputControlsView.invalidate();
-        });
+        }, showMenu);
         container.addView(section);
     }
 
     private void loadGestureBindingSection(final ControlElement element, LinearLayout container) {
+        loadGestureBindingSection(element, container, true);
+    }
+
+    private void loadGestureBindingSection(final ControlElement element, LinearLayout container, boolean showMenu) {
         BindPackage bp = element.getGesturePackage();
         View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Gesture", 0, bp, () -> {
             profile.save();
             inputControlsView.invalidate();
-        });
+        }, showMenu);
         container.addView(section);
     }
 

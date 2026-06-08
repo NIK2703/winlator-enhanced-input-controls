@@ -116,13 +116,12 @@ public class ControlElement {
     private float dpadCornerRadius = 0.6f;
     private List<List<Binding>> bindings = new ArrayList<>();
     private List<List<Boolean>> bindingSticky = new ArrayList<>();
-    private boolean autoRepeat = false;
-    private int autoRepeatIntervalMs = 200;
+
     private float scale = 1.0f;
     private short x;
     private short y;
     private boolean selected = false;
-    private boolean toggleSwitch = false;
+
     private boolean passthroughTouch;
     private float opacity = -1f;
     private final Rect boundingBox = new Rect();
@@ -335,30 +334,6 @@ public class ControlElement {
         this.orientation = orientation;
         boundingBoxNeedsUpdate = true;
         invalidateElementCache();
-    }
-
-    public boolean isToggleSwitch() {
-        return toggleSwitch;
-    }
-
-    public void setToggleSwitch(boolean toggleSwitch) {
-        this.toggleSwitch = toggleSwitch;
-    }
-
-    public boolean isAutoRepeat() {
-        return autoRepeat;
-    }
-
-    public void setAutoRepeat(boolean autoRepeat) {
-        this.autoRepeat = autoRepeat;
-    }
-
-    public int getAutoRepeatIntervalMs() {
-        return autoRepeatIntervalMs;
-    }
-
-    public void setAutoRepeatIntervalMs(int autoRepeatIntervalMs) {
-        this.autoRepeatIntervalMs = autoRepeatIntervalMs;
     }
 
     public boolean isPassthroughTouch() {
@@ -629,27 +604,12 @@ public class ControlElement {
         return false;
     }
 
-    public void setSlotToggle(int slot, boolean toggle) {
-        if (slotPackages != null && slot >= 0 && slot < slotPackages.length && slotPackages[slot] != null) {
-            slotPackages[slot].setToggleSwitch(toggle);
-        }
-    }
-
     public boolean isLongPressToggle() {
         return longPressPackageVal != null && longPressPackageVal.isToggleSwitch();
     }
 
     public boolean isGestureToggle() {
         return gesturePackageVal != null && gesturePackageVal.isToggleSwitch();
-    }
-
-    public boolean hasAnySlotAutoRepeat() {
-        if (slotPackages != null) {
-            for (BindPackage pkg : slotPackages) {
-                if (pkg != null && pkg.isAutoRepeat()) return true;
-            }
-        }
-        return false;
     }
 
     public boolean getSlotAutoRepeat(int slot) {
@@ -860,7 +820,7 @@ public class ControlElement {
     }
 
     public boolean isEngaged() {
-        return active || (toggleSwitch && selected);
+        return active || (hasAnySlotToggle() && selected);
     }
 
     public void invalidateElementCache() {
@@ -1330,7 +1290,7 @@ public class ControlElement {
         if (!isCachingEnabled()) { draw(canvas); return; }
         Rect box = getBoundingBox();
         if (box.width() <= 0 || box.height() <= 0) return;
-        if (selected && !(toggleSwitch && type == Type.BUTTON)) { draw(canvas); return; }
+        if (selected && !(hasAnySlotToggle() && type == Type.BUTTON)) { draw(canvas); return; }
 
         int pad = strokePad();
         int snappingSize = inputControlsView.getSnappingSize();
@@ -1898,7 +1858,7 @@ public class ControlElement {
             elementJSONObject.put("scale", Float.valueOf(scale));
             elementJSONObject.put("x", (float)x / inputControlsView.getMaxWidth());
             elementJSONObject.put("y", (float)y / inputControlsView.getMaxHeight());
-            elementJSONObject.put("toggleSwitch", toggleSwitch);
+            elementJSONObject.put("toggleSwitch", hasAnySlotToggle());
 
             JSONArray stickyArray = new JSONArray();
             for (List<Boolean> seq : bindingSticky) {

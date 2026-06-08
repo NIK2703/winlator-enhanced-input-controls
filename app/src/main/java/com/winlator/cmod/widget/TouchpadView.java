@@ -143,10 +143,16 @@ public class TouchpadView extends View {
                     break;
                 }
                 case MotionEvent.ACTION_MOVE: {
-                    for (int i = 0; i < event.getPointerCount(); i++) {
-                        int pid = event.getPointerId(i);
-                        nativeTouchProcessor.onFingerMove(pid, event.getX(i), event.getY(i), event.getEventTime());
+                    int pc = event.getPointerCount();
+                    int[] batchPtrIds = new int[pc];
+                    float[] batchXs = new float[pc];
+                    float[] batchYs = new float[pc];
+                    for (int i = 0; i < pc; i++) {
+                        batchPtrIds[i] = event.getPointerId(i);
+                        batchXs[i] = event.getX(i);
+                        batchYs[i] = event.getY(i);
                     }
+                    nativeTouchProcessor.onFingerBatch(1, batchPtrIds, batchXs, batchYs, event.getEventTime());
                     break;
                 }
                 case MotionEvent.ACTION_UP:

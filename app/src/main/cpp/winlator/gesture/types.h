@@ -76,7 +76,7 @@ static inline GesturePairPlan gesture_decide_branch(GestureBranchParams bp) {
 
     if (!bp.has_x) return p;
 
-    if (bp.has_x && !bp.has_xd) {
+    if (!bp.has_xd) {
         if (bp.has_competing_dt || bp.has_competing_lp) {
             p.press_on_drag = true;
             p.pulse_on_up = true;
@@ -94,20 +94,20 @@ static inline GesturePairPlan gesture_decide_branch(GestureBranchParams bp) {
 }
 
 // Gesture handler tick (processes long-press, single-tap-hold, double-tap, second-finger timeouts)
-void gesture_tick(uint64_t time_ms, TouchActionResult* result);
+void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result);
 
 // Gesture handler state machine
 void on_drag_start(TouchFinger* f);
 bool gesture_is_within_tap_distance(float x, float y);
-void gesture_cancel_double_tap_wait(TouchActionResult* result);
-void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* result);
-void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms);
-void double_tap_confirm_internal(TouchActionResult* result, const FingerBindings* fb);
+void gesture_cancel_double_tap_wait(TouchActionResult* restrict result);
+void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* restrict result);
+void handle_tap_up(TouchFinger* f, TouchActionResult* restrict result, uint64_t time_ms);
+void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger* f);
 
 // Unified tap execution helpers (shared across base.c, entry.c, handler.c)
-void execute_tap_on_finger_down(TouchFinger* f, TouchActionResult* result,
+void execute_tap_on_finger_down(TouchFinger* f, TouchActionResult* restrict result,
     uint64_t time_ms, GesturePairPlan plan, bool force_hold);
-bool confirm_double_tap(TouchActionResult* result,
+bool confirm_double_tap(TouchActionResult* restrict result,
     GesturePairPlan d_plan,
     const TouchBinding* src, int src_count,
     TouchBinding* dst, int* dst_count, int dst_max,

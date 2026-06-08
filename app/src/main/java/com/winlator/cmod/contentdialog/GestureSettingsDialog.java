@@ -99,20 +99,32 @@ public class GestureSettingsDialog {
         boolean isTouchpad = currentMode == MouseMode.TOUCHPAD;
 
         LinearLayout llSingleFinger = view.findViewById(R.id.LLSingleFinger);
-        addBindingSection(llSingleFinger, "single", "Single Tap", profile.getGestureSingleTapAction(), R.string.single_tap_delay_help);
-        addBindingSection(llSingleFinger, "single_drag", "Single Tap Drag", profile.getGestureSingleTapDragAction());
-        addBindingSection(llSingleFinger, "double", "Double Tap", profile.getGestureDoubleTapAction(), R.string.single_tap_delay_help);
-        addBindingSection(llSingleFinger, "double_drag", "Double Tap Drag", profile.getGestureDoubleTapDragAction(), R.string.single_tap_delay_help);
-
         LinearLayout llHoldGestures = view.findViewById(R.id.LLHoldGesturesContent);
-        addBindingSection(llHoldGestures, "long", "Long Press", profile.getGestureLongPressAction(), R.string.long_press_drag_help);
-        addBindingSection(llHoldGestures, "long_drag", "Long Press Drag", profile.getGestureLongPressDragAction(), R.string.long_press_drag_help);
-
         LinearLayout llTwoFinger = view.findViewById(R.id.LLTwoFinger);
-        addBindingSection(llTwoFinger, "single_2nd", "Single Tap", profile.getGestureSingleTap2ndFingerAction());
-        addBindingSection(llTwoFinger, "single_2nd_drag", "Single Tap Drag", profile.getGestureSingleTap2ndFingerDragAction());
-        addBindingSection(llTwoFinger, "double_2nd", "Double Tap", profile.getGestureDoubleTap2ndFingerAction(), R.string.single_tap_delay_help);
-        addBindingSection(llTwoFinger, "double_2nd_drag", "Double Tap Drag", profile.getGestureDoubleTap2ndFingerDragAction(), R.string.single_tap_delay_help);
+
+        // Gesture binding sections (mirrors saveKeys/saveIndices pattern in save())
+        LinearLayout[] sectionContainers = {llSingleFinger, llSingleFinger, llSingleFinger, llSingleFinger,
+                                            llHoldGestures, llHoldGestures,
+                                            llTwoFinger, llTwoFinger, llTwoFinger, llTwoFinger};
+        String[] sectionKeys = {"single", "single_drag", "double", "double_drag",
+                                "long", "long_drag",
+                                "single_2nd", "single_2nd_drag", "double_2nd", "double_2nd_drag"};
+        String[] sectionLabels = {"Single Tap", "Single Tap Drag", "Double Tap", "Double Tap Drag",
+                                  "Long Press", "Long Press Drag",
+                                  "Single Tap", "Single Tap Drag", "Double Tap", "Double Tap Drag"};
+        int[] sectionGestureIndices = {ControlsProfile.GESTURE_SINGLE_TAP, ControlsProfile.GESTURE_SINGLE_TAP_DRAG,
+                                       ControlsProfile.GESTURE_DOUBLE_TAP, ControlsProfile.GESTURE_DOUBLE_TAP_DRAG,
+                                       ControlsProfile.GESTURE_LONG_PRESS, ControlsProfile.GESTURE_LONG_PRESS_DRAG,
+                                       ControlsProfile.GESTURE_SINGLE_2ND, ControlsProfile.GESTURE_SINGLE_DRAG_2ND,
+                                       ControlsProfile.GESTURE_DOUBLE_2ND, ControlsProfile.GESTURE_DOUBLE_DRAG_2ND};
+        int[] sectionHelpResIds = {R.string.single_tap_help, R.string.single_tap_drag_help,
+                                    R.string.double_tap_help, R.string.single_tap_delay_help,
+                                   R.string.long_press_drag_help, R.string.long_press_drag_help,
+                                   0, 0, R.string.single_tap_delay_help, R.string.single_tap_delay_help};
+        for (int i = 0; i < sectionKeys.length; i++) {
+            addBindingSection(sectionContainers[i], sectionKeys[i], sectionLabels[i],
+                              profile.getGestureAction(sectionGestureIndices[i]), sectionHelpResIds[i]);
+        }
 
         // Update single-tap-drag visibility based on mode
         updateSingleTapDragVisibility(llSingleFinger, isTouchpad);
@@ -185,16 +197,18 @@ public class GestureSettingsDialog {
         profile.setCursorSpeed(speed);
 
         // Save gesture bindings (BindPackage includes sticky flags)
-        profile.setGestureSingleTapAction(bindingValues.get("single"));
-        profile.setGestureSingleTapDragAction(bindingValues.get("single_drag"));
-        profile.setGestureLongPressAction(bindingValues.get("long"));
-        profile.setGestureLongPressDragAction(bindingValues.get("long_drag"));
-        profile.setGestureDoubleTapAction(bindingValues.get("double"));
-        profile.setGestureDoubleTapDragAction(bindingValues.get("double_drag"));
-        profile.setGestureSingleTap2ndFingerAction(bindingValues.get("single_2nd"));
-        profile.setGestureSingleTap2ndFingerDragAction(bindingValues.get("single_2nd_drag"));
-        profile.setGestureDoubleTap2ndFingerAction(bindingValues.get("double_2nd"));
-        profile.setGestureDoubleTap2ndFingerDragAction(bindingValues.get("double_2nd_drag"));
+        String[] saveKeys = {"single", "single_drag", "long", "long_drag",
+            "double", "double_drag",
+            "single_2nd", "single_2nd_drag", "double_2nd", "double_2nd_drag"};
+        int[] saveIndices = {ControlsProfile.GESTURE_SINGLE_TAP, ControlsProfile.GESTURE_SINGLE_TAP_DRAG,
+            ControlsProfile.GESTURE_LONG_PRESS, ControlsProfile.GESTURE_LONG_PRESS_DRAG,
+            ControlsProfile.GESTURE_DOUBLE_TAP, ControlsProfile.GESTURE_DOUBLE_TAP_DRAG,
+            ControlsProfile.GESTURE_SINGLE_2ND, ControlsProfile.GESTURE_SINGLE_DRAG_2ND,
+            ControlsProfile.GESTURE_DOUBLE_2ND, ControlsProfile.GESTURE_DOUBLE_DRAG_2ND};
+
+        for (int i = 0; i < saveKeys.length; i++) {
+            profile.setGestureAction(saveIndices[i], bindingValues.get(saveKeys[i]));
+        }
 
         profile.save();
         if (onSaveListener != null) onSaveListener.onSave(profile);

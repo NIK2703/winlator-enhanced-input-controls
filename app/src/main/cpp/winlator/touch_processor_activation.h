@@ -50,14 +50,14 @@ int activation_hovered_for_ptr(int ptr_id);
 
 // Handle finger down with activation mode logic
 // Returns true if the event was consumed by an element
-bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
+bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 
 // Handle finger move with activation mode logic (LOCK/TRACK/HOVER)
-void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 
 // Handle finger up with activation mode logic
 // Returns true if the event was consumed by tracked elements
-bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
+bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 
 // Reset all activation state (clear tracked, hovered, visual flags)
 void activation_reset(void);

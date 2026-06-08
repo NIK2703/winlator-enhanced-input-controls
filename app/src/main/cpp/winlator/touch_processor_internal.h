@@ -1,15 +1,18 @@
 #ifndef TOUCH_PROCESSOR_INTERNAL_H
 #define TOUCH_PROCESSOR_INTERNAL_H
 
+// C++ lacks 'restrict' keyword — use compiler extension for compatibility
+#ifdef __cplusplus
+#define restrict __restrict__
+#endif
+
 #include "touch_processor.h"
 #include "gesture/types.h"
 #include <string.h>
-#include <stdlib.h>
 #include <math.h>
 #include <time.h>
-#include <android/log.h>
 
-#define TP_LOG(prio, tag, fmt, ...) __android_log_print(prio, tag, fmt, ##__VA_ARGS__)
+#define TP_LOG(prio, tag, fmt, ...) ((void)0)
 #ifndef LOG_TAG
 #define LOG_TAG "Winlator_Touch"
 #endif
@@ -42,6 +45,7 @@ typedef struct {
 } TrackedButtons;
 
 typedef struct {
+    // --- HOT fields: accessed every touch event and/or tick ---
     TouchProcessorConfig cfg;
     TouchFinger* finger_by_ptr_id[256];
     TouchFinger fingers[MAX_FINGERS];
@@ -57,7 +61,7 @@ typedef struct {
     int main_ptr_id;
     bool passthrough_active;
 
-    // Gesture handler state
+    // Gesture core
     bool gesture_handler_active;
     int gesture_main_ptr_id;
     int gesture_second_ptr_id;
@@ -67,6 +71,47 @@ typedef struct {
     bool gesture_post_double_tap_drag;
     bool gesture_double_tap_consumed;
     bool gesture_double_tap_waiting;
+    bool gesture_is_down_event;
+    bool second_double_tap_waiting;
+
+    // Two-finger touchpad
+    bool scrolling;
+    bool pointer_left_enabled;
+    bool pointer_right_enabled;
+    int finger_pointer_left;
+    int finger_pointer_right;
+
+    // Element layout
+    float snapping_size;
+    float resolution_scale;
+
+    // Spatial grid metadata (hit-testing — every touch event)
+    #define GRID_COLS 8
+    #define GRID_ROWS 8
+    int spatial_grid_count[GRID_COLS * GRID_ROWS];
+    float grid_cell_w;
+    float grid_cell_h;
+    int button_indices[MAX_ELEMENTS];
+    int range_indices[MAX_ELEMENTS];
+    float grid_min_x;
+    float grid_min_y;
+    float grid_max_x;
+    float grid_max_y;
+
+    // Visual sync
+    uint32_t visual_dirty_mask[4];
+    ActivationMode activation_mode;
+    int free_finger_hint;
+
+    // --- WARM fields: accessed on activation / gesture paths ---
+    TrackedButtons tracked[MAX_FINGERS];
+    int hovered_element_per_ptr[MAX_FINGERS];
+    int last_touch_x, last_touch_y;
+    bool gesture_deferred_second_finger_tap;
+    float gesture_last_tap_up_x, gesture_last_tap_up_y;
+    uint64_t gesture_double_tap_start_time;
+
+    // --- COLD fields: accessed during gesture-specific or rare paths ---
     TouchBinding gesture_deferred_tap[8];
     int gesture_deferred_tap_count;
     TouchBinding gesture_pending_double[8];
@@ -78,89 +123,51 @@ typedef struct {
     TouchBinding gesture_held_actions[16];
     int gesture_held_count;
     bool gesture_is_action_held;
-
-    // Toggle actions (persist across finger-ups until explicitly toggled off)
     TouchBinding gesture_toggled_actions[16];
     int gesture_toggled_count;
-
-    // Gesture auto-repeat last fire time per toggled action (indexed by gesture_toggled_actions[])
     uint64_t gesture_auto_repeat_last_time[16];
-
-    // Gesture auto-repeat last fire time per held action (indexed by gesture_held_actions[])
     uint64_t gesture_auto_repeat_last_time_held[16];
-
-    // Second-finger double-tap state (global, survives finger deactivation between taps)
-    // Mirrors Java TouchpadGestureHandler secondFingerDoubleTapWaiting, pendingSecondTapAction, etc.
-    bool second_double_tap_waiting;
     TouchBinding second_tap_fallback[8];
     int second_tap_fallback_count;
     uint64_t second_tap_fallback_time;
     TouchBinding pending_second_double[8];
     int pending_second_double_count;
-
-    // TouchActivationMode state
-    TrackedButtons tracked[MAX_FINGERS];
-    int hovered_element_per_ptr[MAX_FINGERS];
-
-    // simTouchScreen
     bool sim_touch_screen;
-    int last_touch_x, last_touch_y;
-
-    // Deferred second-finger tap flag (for touchscreen — survives finger deactivation, matches Java deferredSecondFingerTap)
-    bool gesture_deferred_second_finger_tap;
-
-    // Double-tap tracking (global, survives finger deactivation)
-    float gesture_last_tap_up_x, gesture_last_tap_up_y;
-    uint64_t gesture_double_tap_start_time;
-
-    // Two-finger touchpad
-    bool scrolling;
-    bool pointer_left_enabled;
-    bool pointer_right_enabled;
-    int finger_pointer_left;
-    int finger_pointer_right;
-
-    // Snapping size for element layout
-    float snapping_size;
-    float resolution_scale;
-    // Spatial grid for element hit-testing
-    #define GRID_COLS 8
-    #define GRID_ROWS 8
-    int spatial_grid[GRID_COLS * GRID_ROWS][MAX_ELEMENTS];
-    int spatial_grid_count[GRID_COLS * GRID_ROWS];
-    float grid_cell_w;
-    float grid_cell_h;
-    // Element type index lists for accelerated tick scanning
-    int button_indices[MAX_ELEMENTS];
-    int range_indices[MAX_ELEMENTS];
-    float grid_min_x;
-    float grid_min_y;
-
-    // Delayed action mechanism (matching Java postDelayed)
-    // 30ms delayed pointer button release (TouchpadView.releasePointerButtonLeft/Right)
     uint64_t pending_left_release_time;
     int pending_left_release_ptr_id;
     uint64_t pending_right_release_time;
     int pending_right_release_ptr_id;
-
-    // simTouchScreen delayed click (50ms CLICK_DELAYED_TIME)
     uint64_t sim_click_press_time;
     bool sim_continue_click;
     int sim_click_ptr_id;
     uint64_t sim_click_release_time;
-
-    // Scheduled actions queue (replaces blocking nanosleep)
     ScheduledAction scheduled_actions[MAX_SCHEDULED_ACTIONS];
     int scheduled_action_count;
     uint8_t scheduled_seq_counter;
 
-    bool visual_state_dirty;
-
-    int free_finger_hint;
-
+    // Massive 32 KB array — pushed to absolute end to avoid polluting cache lines
+    int spatial_grid[GRID_COLS * GRID_ROWS][MAX_ELEMENTS];
 } TouchProcessorState;
 
 extern TouchProcessorState g_state;
+
+static inline void mark_element_dirty(TouchElement* e) {
+    int idx = (int)(e - g_state.elements);
+    g_state.visual_dirty_mask[idx / 32] |= (1u << (idx % 32));
+}
+
+static inline void mark_all_dirty(void) {
+    int n = g_state.element_count;
+    for (int b = 0; b < 4; b++) {
+        int base = b * 32;
+        if (base >= n) {
+            g_state.visual_dirty_mask[b] = 0;
+        } else {
+            int rem = n - base;
+            g_state.visual_dirty_mask[b] = (rem >= 32) ? 0xFFFFFFFF : ((1u << rem) - 1);
+        }
+    }
+}
 
 // Forward declarations
 void touch_finger_cache_bs(TouchFinger* f);
@@ -201,37 +208,20 @@ static inline int active_finger_count(void) {
     return g_state.active_finger_count;
 }
 
-// GestureModeBindings — mode-agnostic view of all binding arrays.
-// This is the single point where TS/TP config branching is resolved.
-typedef struct {
-    const TouchBinding* single_tap;         int single_tap_count;
-    const TouchBinding* long_press;         int long_press_count;
-    const TouchBinding* double_tap;         int double_tap_count;
-    const TouchBinding* single_tap_drag;    int single_tap_drag_count;
-    const TouchBinding* long_press_drag;    int long_press_drag_count;
-    const TouchBinding* double_tap_drag;    int double_tap_drag_count;
-    const TouchBinding* single_2nd;         int single_2nd_count;
-    const TouchBinding* double_2nd;         int double_2nd_count;
-    const TouchBinding* single_drag_2nd;    int single_drag_2nd_count;
-    const TouchBinding* double_drag_2nd;    int double_drag_2nd_count;
-} GestureModeBindings;
-
 // SINGLE place where TS vs TP binding selection happens.
-static inline GestureModeBindings get_mode_bindings(void) {
-    GestureModeBindings b;
-    const TouchProcessorConfig* c = &g_state.cfg;
-    const GestureBindingSlot* slots = (c->touch_mode == TOUCH_MODE_TOUCHSCREEN) ? c->ts : c->tp;
-    b.single_tap        = slots[GESTURE_SINGLE_TAP].arr;        b.single_tap_count        = slots[GESTURE_SINGLE_TAP].count;
-    b.long_press        = slots[GESTURE_LONG_PRESS].arr;        b.long_press_count        = slots[GESTURE_LONG_PRESS].count;
-    b.double_tap        = slots[GESTURE_DOUBLE_TAP].arr;        b.double_tap_count        = slots[GESTURE_DOUBLE_TAP].count;
-    b.single_tap_drag   = slots[GESTURE_SINGLE_TAP_DRAG].arr;   b.single_tap_drag_count   = slots[GESTURE_SINGLE_TAP_DRAG].count;
-    b.long_press_drag   = slots[GESTURE_LONG_PRESS_DRAG].arr;   b.long_press_drag_count   = slots[GESTURE_LONG_PRESS_DRAG].count;
-    b.double_tap_drag   = slots[GESTURE_DOUBLE_TAP_DRAG].arr;   b.double_tap_drag_count   = slots[GESTURE_DOUBLE_TAP_DRAG].count;
-    b.single_2nd        = slots[GESTURE_SINGLE_2ND].arr;        b.single_2nd_count        = slots[GESTURE_SINGLE_2ND].count;
-    b.double_2nd        = slots[GESTURE_DOUBLE_2ND].arr;        b.double_2nd_count        = slots[GESTURE_DOUBLE_2ND].count;
-    b.single_drag_2nd   = slots[GESTURE_SINGLE_DRAG_2ND].arr;   b.single_drag_2nd_count   = slots[GESTURE_SINGLE_DRAG_2ND].count;
-    b.double_drag_2nd   = slots[GESTURE_DOUBLE_DRAG_2ND].arr;   b.double_drag_2nd_count   = slots[GESTURE_DOUBLE_DRAG_2ND].count;
-    return b;
+// Returns pointer to precomputed cached_mode_bindings from compute_gesture_caps.
+static inline const GestureModeBindings* get_mode_bindings(void) {
+    return &g_state.cfg.cached_mode_bindings;
+}
+
+// Quick check: does current touch mode have ANY gesture bindings?
+static inline bool current_mode_has_gestures(void) {
+    return g_state.cfg.caps_mode_mask != 0;
+}
+
+// Quick check: does current touch mode have a specific gesture type?
+static inline bool current_mode_has_gesture(GestureType t) {
+    return (g_state.cfg.caps_mode_mask & GESTURE_MASK(t)) != 0;
 }
 
 // Copy main-finger bindings from mode bindings (zeroes second-finger slots).
@@ -264,8 +254,8 @@ static inline GestureModeBindings get_mode_bindings(void) {
 
 // Set up bindings for a main finger from the active mode, zeroing single-tap-drag for TP.
 static inline void setup_main_finger_bindings(FingerBindings* fb) {
-    GestureModeBindings mb = get_mode_bindings();
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD) {
+    GestureModeBindings mb = *get_mode_bindings();
+    if (g_state.cfg.is_tp) {
         mb.single_tap_drag = NULL; mb.single_tap_drag_count = 0;
         mb.single_drag_2nd = NULL; mb.single_drag_2nd_count = 0;
     }
@@ -275,10 +265,14 @@ static inline void setup_main_finger_bindings(FingerBindings* fb) {
 // Set up second-finger bindings: 2nd variants map to primary FingerBindings slots.
 static inline void setup_second_finger_bindings(TouchFinger* f) {
     FingerBindings* fb = &f->bindings;
-    GestureModeBindings mb = get_mode_bindings();
-    COPY_FROM_MODE_BINDINGS_2ND(fb, mb);
-    // TP second finger has no independent single-tap-drag.
-    if (g_state.cfg.touch_mode == TOUCH_MODE_TOUCHPAD) {
+    // If no second-finger bindings exist in current mode, skip setup entirely
+    if (!(g_state.cfg.caps_mode_mask & g_state.cfg.caps_second_mask)) {
+        memset(fb, 0, sizeof(*fb));
+        return;
+    }
+    const GestureModeBindings* mb = get_mode_bindings();
+    COPY_FROM_MODE_BINDINGS_2ND(fb, *mb);
+    if (g_state.cfg.is_tp) {
         fb->single_tap_drag = NULL; fb->single_tap_drag_count = 0;
     }
     touch_finger_cache_bs(f);
@@ -313,6 +307,17 @@ static inline void deactivate_finger(TouchFinger* f) {
     f->active = false;
 }
 
+// --- Internal function declarations ---
+
+// Actions
+void add_action(TouchActionResult* restrict r, ActionType type, int a0, int a1, int a2);
+void release_held_actions(TouchActionResult* restrict result);
+
+void execute_actions(TouchActionResult* restrict result, const TouchBinding* actions, int count);
+void execute_actions_hold(TouchActionResult* restrict result, const TouchBinding* actions, int count);
+void release_binding(TouchActionResult* restrict result, const TouchBinding* b);
+void press_binding(TouchActionResult* restrict result, const TouchBinding* b, bool hold);
+
 // --- Cleanup helpers (reduce repetitive zeroing patterns) ---
 
 static inline void gesture_clear_deferred_tap(void) {
@@ -321,8 +326,24 @@ static inline void gesture_clear_deferred_tap(void) {
     g_state.gesture_pending_deferred_double_count = 0;
 }
 
+static inline void execute_deferred_double(TouchActionResult* restrict result) {
+    if (g_state.gesture_pending_deferred_double_count > 0) {
+        execute_actions(result, g_state.gesture_pending_deferred_double,
+                        g_state.gesture_pending_deferred_double_count);
+        g_state.gesture_pending_deferred_double_count = 0;
+    }
+}
+
 static inline void gesture_clear_pending_long_press(void) {
     g_state.gesture_pending_deferred_long_press_count = 0;
+}
+
+static inline void tap_up_cleanup(TouchFinger* f, TouchActionResult* restrict result) {
+    if (!g_state.gesture_second_active || !g_state.gesture_is_action_held
+        || g_state.cfg.is_tp)
+        release_held_actions(result);
+    g_state.gesture_main_ptr_id = -1;
+    f->active = false;
 }
 
 static inline void gesture_clear_second_finger_globals(void) {
@@ -347,12 +368,24 @@ static inline void enter_sdtw(uint64_t time_ms) {
 }
 
 static inline bool finger_has_gesture(const TouchFinger* f) {
-    return f->bindings.single_tap_count > 0
-        || f->bindings.long_press_count > 0
-        || f->bindings.double_tap_count > 0
-        || f->bindings.single_tap_drag_count > 0
-        || f->bindings.long_press_drag_count > 0
-        || f->bindings.double_tap_drag_count > 0;
+    return f->cached_has_active_single_tap
+        || f->cached_has_active_long_press
+        || f->cached_has_active_double_tap
+        || f->cached_has_active_single_tap_drag
+        || f->cached_has_active_long_press_drag
+        || f->cached_has_active_double_tap_drag;
+}
+
+static inline bool element_has_toggle(const TouchElement* e) {
+    return e->bindings[0].toggle || e->bindings[1].toggle || e->bindings[2].toggle || e->bindings[3].toggle;
+}
+
+static inline bool element_is_toggle_active(const TouchElement* e) {
+    return (e->cached_has_toggle && e->selected) || e->lp_toggled || e->gesture_toggled;
+}
+
+static inline bool element_has_auto_repeat(const TouchElement* e) {
+    return e->bindings[0].auto_repeat || e->bindings[1].auto_repeat || e->bindings[2].auto_repeat || e->bindings[3].auto_repeat;
 }
 
 // Cached fields accessed directly via f->cached_* — no wrapper overhead needed
@@ -364,6 +397,19 @@ static inline bool finger_has_gesture(const TouchFinger* f) {
 static inline bool is_keyboard_binding(const TouchBinding* b) {
     return b->type >= BINDING_KEYBOARD_FIRST && b->type <= BINDING_KEYBOARD_LAST;
 }
+
+// Keyboard modifier keycodes (X11): 0x25=Left Shift, 0x32=Left Ctrl, 0x40=Left Alt
+#define MOD_KEYCODE_SHIFT 0x25
+#define MOD_KEYCODE_CTRL  0x32
+#define MOD_KEYCODE_ALT   0x40
+
+static inline bool is_modifier_binding(const TouchBinding* b) {
+    if (is_keyboard_binding(b)) {
+        int kc = b->keycode;
+        return kc == MOD_KEYCODE_SHIFT || kc == MOD_KEYCODE_CTRL || kc == MOD_KEYCODE_ALT;
+    }
+    return false;
+}
 static inline bool is_gamepad_binding(const TouchBinding* b) {
     return b->type >= BINDING_GAMEPAD_BASE && b->type < BINDING_GAMEPAD_BASE + BINDING_GAMEPAD_COUNT;
 }
@@ -372,63 +418,49 @@ static inline bool is_right_stick_binding(const TouchElement* e) {
     return bt >= 16 && bt <= 19;
 }
 
-// --- Internal function declarations ---
-
-// Actions
-void add_action(TouchActionResult* r, ActionType type, int a0, int a1, int a2);
-void release_held_actions(TouchActionResult* result);
-bool is_modifier_binding(const TouchBinding* b);
-void execute_actions(TouchActionResult* result, const TouchBinding* actions, int count);
-void execute_actions_hold(TouchActionResult* result, const TouchBinding* actions, int count);
-void release_binding(TouchActionResult* result, const TouchBinding* b);
-void press_binding(TouchActionResult* result, const TouchBinding* b, bool hold);
-
 // Element shared helpers
 bool point_in_element(float px, float py, const TouchElement* e);
 TouchElement* hit_test_element(float x, float y);
 void touch_finger_cache_bs(TouchFinger* f);
 int detect_swipe_dir(float dx, float dy, float threshold);
-bool is_mouse_move_binding(const TouchBinding* b);
+static inline bool is_mouse_move_binding(const TouchBinding* b) {
+    return b->type >= BINDING_MOUSE_MOVE_LEFT && b->type <= BINDING_MOUSE_MOVE_DOWN;
+}
 float cubic_bezier_interpolate(float x, float cpx1, float cpy1);
 float cubic_bezier_interpolate_trackpad(float x);
-void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, TouchActionResult* result);
-void release_element_bindings(TouchElement* e, TouchActionResult* result);
-void suppress_element_gestures(TouchElement* e, TouchActionResult* result);
-bool finger_has_engaged_element(int ptr_id);
+void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, TouchActionResult* restrict result);
+void release_element_bindings(TouchElement* e, TouchActionResult* restrict result);
+void suppress_element_gestures(TouchElement* e, TouchActionResult* restrict result);
 
 // Element dispatchers
-void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 
 // Per-type element handlers
-void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 
-void element_dpad_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void element_dpad_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void element_dpad_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void element_dpad_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void element_dpad_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void element_dpad_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 
-void element_stick_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void element_stick_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void element_stick_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void element_stick_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 
-void element_trackpad_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void element_trackpad_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void element_trackpad_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void element_trackpad_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 
-void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void element_range_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 int range_keycode(int ordinal, int index);
 
-// Gesture — base (maps to GestureHandler.java)
-void on_drag_start(TouchFinger* f);
-void double_tap_confirm_internal(TouchActionResult* result, const FingerBindings* fb);
-
 // --- TS pointer update (dedup 4x touch_transform_coords + ACT_POINTER_MOVE) ---
-static inline void update_ts_pointer(float x, float y, TouchActionResult* result) {
+static inline void update_ts_pointer(float x, float y, TouchActionResult* restrict result) {
     int tx, ty;
     touch_transform_coords(x, y, &tx, &ty);
     g_state.ptr_x = (float)tx;
@@ -436,53 +468,70 @@ static inline void update_ts_pointer(float x, float y, TouchActionResult* result
     add_action(result, ACT_POINTER_MOVE, tx, ty, 0);
 }
 
-static inline void release_bindings_list(TouchActionResult* result, TouchBinding* bindings, int count) {
-    for (int k = count - 1; k >= 0; k--)
-        if (bindings[k].type != BINDING_NONE && !is_modifier_binding(&bindings[k]))
+static inline void release_bindings_list(TouchActionResult* restrict result, const TouchBinding* bindings, int count) {
+    if (__builtin_expect(count == 0, 1)) return;
+    for (int k = count - 1; k >= 0; k--) {
+        if (bindings[k].type == BINDING_NONE) continue;
+        if (!is_modifier_binding(&bindings[k]))
             release_binding(result, &bindings[k]);
-    for (int k = count - 1; k >= 0; k--)
-        if (bindings[k].type != BINDING_NONE && is_modifier_binding(&bindings[k]))
+    }
+    for (int k = count - 1; k >= 0; k--) {
+        if (bindings[k].type == BINDING_NONE) continue;
+        if (is_modifier_binding(&bindings[k]))
             release_binding(result, &bindings[k]);
+    }
 }
 
-static inline void press_bindings_list(TouchActionResult* result, TouchBinding* bindings, int count) {
-    for (int k = 0; k < count; k++)
-        if (bindings[k].type != BINDING_NONE && is_modifier_binding(&bindings[k]))
+static inline void press_bindings_list(TouchActionResult* restrict result, const TouchBinding* bindings, int count) {
+    if (__builtin_expect(count == 0, 1)) return;
+    for (int k = 0; k < count; k++) {
+        if (__builtin_expect(k + 2 < count, 1))
+            __builtin_prefetch(&bindings[k + 2], 0, 1);
+        if (bindings[k].type == BINDING_NONE) continue;
+        if (is_modifier_binding(&bindings[k]))
             press_binding(result, &bindings[k], true);
-    for (int k = 0; k < count; k++)
-        if (bindings[k].type != BINDING_NONE && !is_modifier_binding(&bindings[k]))
+    }
+    for (int k = 0; k < count; k++) {
+        if (bindings[k].type == BINDING_NONE) continue;
+        if (!is_modifier_binding(&bindings[k]))
             press_binding(result, &bindings[k], true);
+    }
 }
-bool gesture_is_within_tap_distance(float x, float y);
-void gesture_cancel_double_tap_wait(TouchActionResult* result);
-void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* result);
-void handle_tap_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms);
+static inline void reset_finger_tap_state(TouchFinger* f) {
+    f->cached_has_long_press_timer = false;
+    f->single_tap_hold_delay_ms = 0;
+    f->single_tap_hold_timer = 0;
+    f->cached_has_moved_beyond_threshold = false;
+}
 
 // Gesture — entry points (touch_processor_gesture.c)
-void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t time_ms);
-void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time_ms);
+void touchpad_finger_down(TouchFinger* f, TouchActionResult* restrict result, uint64_t time_ms);
+void touchpad_finger_up(TouchFinger* f, TouchActionResult* restrict result, uint64_t time_ms);
 
 // Unified gesture handler (replaces both touchscreen.c and touchpad.c)
 // The only difference between TOUCHPAD and TOUCHSCREEN modes is cursor behavior:
 //   TOUCHSCREEN - cursor attached absolutely to first finger
 //   TOUCHPAD    - relative cursor movement with delta accumulation
-void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result);
+void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 
 // --- Activation internal helpers ---
-bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
-void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
-bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result);
+bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
+bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 void activation_reset(void);
 
 // Scheduled actions
-void process_scheduled_actions(TouchActionResult* result, uint64_t time_ms);
+void process_scheduled_actions(TouchActionResult* restrict result, uint64_t time_ms);
 
 // Spatial grid
 void build_spatial_grid(void);
 
 // Element runtime reset (defined in element/shared.c)
 void element_reset_runtime(TouchElement* e);
+
+// Bezier LUT init (defined in element/shared.c)
+void init_bezier_lut(void);
 
 #endif // TOUCH_PROCESSOR_INTERNAL_H

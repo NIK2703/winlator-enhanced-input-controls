@@ -1,7 +1,6 @@
 #include "../touch_processor_internal.h"
-#include <android/log.h>
 
-void element_stick_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+void element_stick_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Stick", "DOWN idx=%d type=%d ptr_id=%d x=%f y=%f", (int)(e - g_state.elements), e->type, ptr_id, x, y);
     (void)ptr_id;
     for (int i = 0; i < 4; i++) e->petal_active[i] = false;
@@ -10,7 +9,7 @@ void element_stick_down(TouchElement* e, int ptr_id, float x, float y, uint64_t 
     element_stick_move(e, x, y, time_ms, result);
 }
 
-void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     (void)time_ms;
     TouchProcessorState* s = &g_state;
     float radius = s->snapping_size * 6.0f * e->scale;
@@ -18,7 +17,7 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
     float dy = y - e->y;
     float dist = sqrtf(dx*dx + dy*dy);
     if (dist < 0.0001f) return;
-    float inv_dist = dist > 0.0f ? 1.0f / dist : 0.0f;
+    float inv_dist = 1.0f / dist;
     float nx, ny;
     if (dist > radius) {
         float clamped = radius * inv_dist;
@@ -41,22 +40,16 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
     //    dist, nx, ny, e->bindings[0].type, is_gamepad_binding(&e->bindings[0]),
     //    fminf(dist * inv_dist, 1.0f));
 
-    if (is_gamepad_binding(&e->bindings[0])) {
-        float mag = fminf(dist * inv_dist, 1.0f);
-        float axis_x = 0, axis_y = 0;
-        if (mag > STICK_DEAD_ZONE) {
-            float scaled = fminf(fmaxf(0.0f, mag - 0.01f) * STICK_SENSITIVITY, 1.0f);
-            axis_x = nx * scaled;
-            axis_y = ny * scaled;
-        }
-        e->stick_value_x = axis_x;
-        e->stick_value_y = axis_y;
+    bool is_gamepad = e->cached_bind0_is_gamepad;
+    if (is_gamepad) {
+        e->stick_value_x = nx;
+        e->stick_value_y = ny;
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Stick", "MOVE values idx=%d type=%d stick_value_x=%f stick_value_y=%f", (int)(e - g_state.elements), e->type, e->stick_value_x, e->stick_value_y);
-        int is_left = !is_right_stick_binding(e);
+        int is_left = !e->cached_bind0_is_right_stick;
         //TP_LOG(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
         //    "stick_move GAMEPAD AXIS is_left=%d axis_x=%f axis_y=%f",
         //    is_left, axis_x, axis_y);
-        add_action(result, ACT_GAMEPAD_AXIS, is_left, (int)(axis_x * 32767), (int)(axis_y * 32767));
+        add_action(result, ACT_GAMEPAD_AXIS, is_left, (int)(nx * 32767), (int)(ny * 32767));
     } else {
         //TP_LOG(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
         //    "stick_move PETAL mode bind0=0x%x bind1=0x%x bind2=0x%x bind3=0x%x",
@@ -65,21 +58,23 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
     }
 }
 
-void element_stick_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+void element_stick_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     (void)x; (void)y; (void)time_ms;
     e->visual_x = e->x;
     e->visual_y = e->y;
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Stick", "UP center idx=%d type=%d center_x=%f center_y=%f", (int)(e - g_state.elements), e->type, e->x, e->y);
     e->stick_value_x = 0;
     e->stick_value_y = 0;
-    for (int i = 0; i < 4; i++) {
-        if (e->petal_active[i]) {
-            e->petal_active[i] = false;
-            if (e->bindings[i].type != BINDING_NONE && !(e->primary_sticky_mask & (1 << i)))
-                release_binding(result, &e->bindings[i]);
+    if (e->cached_has_any_binding) {
+        for (int i = 0; i < 4; i++) {
+            if (__builtin_expect(e->petal_active[i], 0)) {
+                e->petal_active[i] = false;
+                if (e->bindings[i].type != BINDING_NONE && !(e->primary_sticky_mask & (1 << i)))
+                    release_binding(result, &e->bindings[i]);
+            }
         }
     }
-    if (is_gamepad_binding(&e->bindings[0])) {
-        add_action(result, ACT_GAMEPAD_AXIS, !is_right_stick_binding(e), 0, 0);
+    if (e->cached_bind0_is_gamepad) {
+        add_action(result, ACT_GAMEPAD_AXIS, !e->cached_bind0_is_right_stick, 0, 0);
     }
 }
