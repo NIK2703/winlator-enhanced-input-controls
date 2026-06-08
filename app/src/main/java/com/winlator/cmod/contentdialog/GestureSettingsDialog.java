@@ -2,15 +2,16 @@ package com.winlator.cmod.contentdialog;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.view.ViewGroup;
+
+import com.google.android.material.tabs.TabLayout;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
@@ -48,15 +49,17 @@ public class GestureSettingsDialog {
         builder.setView(view);
 
         // Mode toggle
-        Spinner spInputMode = view.findViewById(R.id.SPInputMode);
+        TabLayout tabLayout = view.findViewById(R.id.TabLayoutInputMode);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        boolean isDarkMode = prefs.getBoolean("dark_mode", true);
+        if (isDarkMode) {
+            tabLayout.setBackgroundResource(R.drawable.tab_layout_background_dark);
+        } else {
+            tabLayout.setBackgroundResource(R.drawable.tab_layout_background);
+        }
         MouseMode currentMode = profile.getMouseMode();
         MouseMode[] modes = MouseMode.values();
-        int selectedIndex = 0;
-        for (int i = 0; i < modes.length; i++) {
-            if (modes[i] == currentMode) { selectedIndex = i; break; }
-        }
-        spInputMode.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, modes));
-        spInputMode.setSelection(selectedIndex, false);
+        tabLayout.getTabAt(currentMode.ordinal()).select();
 
         // Timing controls
         NumberPicker npLongPress = view.findViewById(R.id.NPLongPressTimeout);
@@ -117,22 +120,28 @@ public class GestureSettingsDialog {
         updateCursorSpeedVisibility(llCursorSpeed, isTouchpad);
 
         builder.setPositiveButton("Save", (dialog, which) -> save(
-                spInputMode, npLongPress, npDoubleTap, npDragThreshold, npSingleTapDelay, sbCursorSpeed));
+                tabLayout, modes, npLongPress, npDoubleTap, npDragThreshold, npSingleTapDelay, sbCursorSpeed));
         builder.setNegativeButton("Cancel", null);
 
         AlertDialog dialog = builder.create();
         dialog.show();
 
         // Listen for mode changes to update visibility
-        spInputMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
-            public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) {
-                boolean tpMode = modes[pos] == MouseMode.TOUCHPAD;
+            public void onTabSelected(TabLayout.Tab tab) {
+                boolean tpMode = tab.getPosition() == 0;
                 updateSingleTapDragVisibility(llSingleFinger, tpMode);
                 updateCursorSpeedVisibility(llCursorSpeed, tpMode);
             }
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+            public void onTabUnselected(TabLayout.Tab tab) {}
+            @Override
+            public void onTabReselected(TabLayout.Tab tab) {
+                boolean tpMode = tab.getPosition() == 0;
+                updateSingleTapDragVisibility(llSingleFinger, tpMode);
+                updateCursorSpeedVisibility(llCursorSpeed, tpMode);
+            }
         });
     }
 
@@ -160,11 +169,10 @@ public class GestureSettingsDialog {
         }
     }
 
-    private void save(Spinner spInputMode, NumberPicker npLongPress, NumberPicker npDoubleTap,
+    private void save(TabLayout tabLayout, MouseMode[] modes, NumberPicker npLongPress, NumberPicker npDoubleTap,
                       NumberPicker npDragThreshold, NumberPicker npSingleTapDelay, SeekBar sbCursorSpeed) {
         // Save mode
-        MouseMode selectedMode = (MouseMode) spInputMode.getSelectedItem();
-        profile.setMouseMode(selectedMode);
+        profile.setMouseMode(modes[tabLayout.getSelectedTabPosition()]);
 
         // Save timing
         profile.setLongPressTimeout(npLongPress.getValue());
@@ -198,6 +206,8 @@ public class GestureSettingsDialog {
 
     private void addBindingSection(LinearLayout container, String key, String label, BindPackage bp, int helpTextResId) {
         BindPackage stored = new BindPackage(bp);
+        if (android.util.Log.isLoggable("Winlator_Gesture", android.util.Log.WARN))
+            android.util.Log.w("Winlator_Gesture", "open: key="+key+" toggleSwitch="+stored.isToggleSwitch()+" label="+label);
         bindingValues.put(key, stored);
         View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(context, label, helpTextResId, stored, () -> {});
         container.addView(section);

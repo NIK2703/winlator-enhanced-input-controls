@@ -67,7 +67,11 @@ static inline void cleanup_main_finger(TouchFinger* f) {
     gesture_clear_pending_long_press();
     g_state.gesture_main_ptr_id = -1;
     g_state.gesture_double_tap_consumed = false;
-    g_state.gesture_deferred_second_finger_tap = false;
+    // Only clear deferred_second_finger_tap if no second finger is holding the context.
+    // When main finger lifts during drag-pause (2nd touch held), the flag
+    // must survive so a new main finger can restore second-finger bindings.
+    if (!g_state.gesture_second_active)
+        g_state.gesture_deferred_second_finger_tap = false;
 }
 
 // ---- touchpad_finger_down ----
@@ -120,6 +124,15 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
 
     } else if (f->ptr_id != g_state.gesture_main_ptr_id) {
         // === SECOND FINGER ===
+        // Guard against 3rd+ finger overwriting second-finger state.
+        // Only the first non-main finger is treated as the gesture second finger.
+        if (g_state.gesture_second_active) {
+            // Disable gesture processing for 3rd+ fingers: keep IDLE so no
+            // gesture actions fire, but the finger remains active for element
+            // processing (buttons, sticks, etc.).
+            f->state = GESTURE_STATE_IDLE;
+            return;
+        }
         f->is_second_finger = true;
         g_state.gesture_second_active = true;
         g_state.gesture_second_ptr_id = f->ptr_id;
@@ -188,8 +201,7 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
                         break;
                     }
                 }
-                g_state.gesture_second_active = false;
-                g_state.gesture_second_ptr_id = -1;
+                gesture_clear_second_finger_globals();
                 f->state = GESTURE_STATE_IDLE;
                 g_state.gesture_handler_active = true;
                 return;
@@ -227,7 +239,12 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* result, uint64_t ti
                 true
             ));
 
-            execute_tap_on_finger_down(f, result, time_ms, plan, false);
+            // When first-finger drag was saved to pending_resume_action,
+            // force_hold so S2 press persists until second-finger up
+            // (instead of press+release tap).
+            TouchFinger* _exec_main = find_finger(g_state.gesture_main_ptr_id);
+            bool _drag_paused = _exec_main && _exec_main->pending_resume_action_count > 0;
+            execute_tap_on_finger_down(f, result, time_ms, plan, _drag_paused);
         }
     }
 }
@@ -259,15 +276,9 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* result, uint64_t time
             add_action(result, ACT_POINTER_BUTTON_RELEASE, 2, 0, 0);
         }
 
-        g_state.gesture_second_active = false;
-        g_state.gesture_second_ptr_id = -1;
-        g_state.gesture_deferred_second_finger_tap = false;
-        g_state.gesture_post_double_tap_drag = false;
-        g_state.gesture_second_main_ref_x = 0;
-        g_state.gesture_second_main_ref_y = 0;
+        gesture_clear_second_finger_globals();
 
-        if (!g_state.second_double_tap_waiting && f->state != GESTURE_STATE_DRAGGING)
-            f->state = GESTURE_STATE_IDLE;
+        f->state = GESTURE_STATE_IDLE;
         f->active = false;
         return;
     }

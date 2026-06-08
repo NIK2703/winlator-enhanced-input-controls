@@ -16,6 +16,7 @@
         <item name="popupWindowStyle">@style/PopupWindow</item>
         <item name="android:popupMenuStyle">@style/PopupMenu</item>
         <item name="popupMenuStyle">@style/PopupMenu</item>
+        <item name="tabLayoutBackground">@drawable/tab_layout_background</item>
     </style>
 
     <!-- Dark Theme -->
@@ -34,6 +35,7 @@
         <item name="popupWindowStyle">@style/PopupWindow.Dark</item>
         <item name="android:popupMenuStyle">@style/PopupMenu.Dark</item>
         <item name="popupMenuStyle">@style/PopupMenu.Dark</item>
+        <item name="tabLayoutBackground">@drawable/tab_layout_background_dark</item>
     </style>
 
     <!-- Light Theme Fullscreen -->

@@ -588,6 +588,8 @@ void VulkanRendererContext::updateElementOverlay(void* pixels, int w, int h) {
     ensureElementOverlayStaging(sz);
     memcpy(elementOverlayStgP, pixels, (size_t)sz);
     elementOverlayDirty.store(true);
+    needsRender.store(true);
+    dirtyCV.notify_one();
 }
 
 void VulkanRendererContext::createCmdBufs() {

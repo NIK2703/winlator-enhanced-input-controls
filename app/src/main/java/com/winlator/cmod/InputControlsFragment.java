@@ -54,7 +54,6 @@ import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
 import com.winlator.cmod.inputcontrols.TouchActivationMode;
-import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.widget.InputControlsView;
 import org.json.JSONException;
@@ -86,12 +85,7 @@ public class InputControlsFragment extends Fragment {
     private TextView tvGestureThreshold;
     private SeekBar sbDoubleTapDistance;
     private TextView tvDoubleTapDistance;
-    private SeekBar sbStrokeWidth;
-    private TextView tvStrokeWidth;
-    private SeekBar sbFillAlphaInactive;
-    private TextView tvFillAlphaInactive;
-    private SeekBar sbCornerRadius;
-    private TextView tvCornerRadius;
+
 
     private int[] keycodes;
 
@@ -184,28 +178,6 @@ public class InputControlsFragment extends Fragment {
         };
 
         updateLayout.run();
-
-        final TextView tvUiOpacity = view.findViewById(R.id.TVUiOpacity);
-        SeekBar sbUiOpacity = view.findViewById(R.id.SBOverlayOpacity);
-        sbUiOpacity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvUiOpacity.setText(progress+"%");
-                if (fromUser) {
-                    progress = (int)Mathf.roundTo(progress, 5);
-                    seekBar.setProgress(progress);
-                    preferences.edit().putFloat("overlay_opacity", progress / 100.0f).apply();
-                }
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {}
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-        sbUiOpacity.setProgress((int)(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY) * 100));
-        sbUiOpacity.setSecondaryProgress((int)(InputControlsView.DEFAULT_OVERLAY_OPACITY * 100));
 
         tvBindingDelay = view.findViewById(R.id.TVBindingDelay);
         sbBindingDelay = view.findViewById(R.id.SBBindingDelay);
@@ -310,71 +282,6 @@ public class InputControlsFragment extends Fragment {
             sbDoubleTapDistance.setProgress(distance - 10);
             sbDoubleTapDistance.setSecondaryProgress(40);
             tvDoubleTapDistance.setText(distance + " px");
-        });
-
-        tvStrokeWidth = view.findViewById(R.id.TVStrokeWidth);
-        sbStrokeWidth = view.findViewById(R.id.SBStrokeWidth);
-        sbStrokeWidth.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                float value = 0.05f + progress * 0.01f;
-                tvStrokeWidth.setText(String.format("%.2fx", value));
-                if (fromUser && currentProfile != null) {
-                    currentProfile.setStrokeWidth(value);
-                    currentProfile.save();
-                }
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-        sbStrokeWidth.post(() -> {
-            float sw = currentProfile != null ? currentProfile.getStrokeWidth() : 0.2f;
-            sbStrokeWidth.setProgress(Math.round((sw - 0.05f) * 100));
-            sbStrokeWidth.setSecondaryProgress(15);
-            tvStrokeWidth.setText(String.format("%.2fx", sw));
-        });
-
-        tvFillAlphaInactive = view.findViewById(R.id.TVFillAlphaInactive);
-        sbFillAlphaInactive = view.findViewById(R.id.SBFillAlphaInactive);
-        sbFillAlphaInactive.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvFillAlphaInactive.setText(String.valueOf(progress));
-                if (fromUser && currentProfile != null) {
-                    currentProfile.setFillAlphaInactive(progress);
-                    currentProfile.save();
-                }
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-        sbFillAlphaInactive.post(() -> {
-            int fa = currentProfile != null ? currentProfile.getFillAlphaInactive() : 50;
-            sbFillAlphaInactive.setProgress(fa);
-            sbFillAlphaInactive.setSecondaryProgress(50);
-            tvFillAlphaInactive.setText(String.valueOf(fa));
-        });
-
-        tvCornerRadius = view.findViewById(R.id.TVCornerRadius);
-        sbCornerRadius = view.findViewById(R.id.SBCornerRadius);
-        sbCornerRadius.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                float value = progress / 10.0f;
-                tvCornerRadius.setText(String.format("%.1f", value));
-                if (fromUser && currentProfile != null) {
-                    currentProfile.setCornerRadius(value);
-                    currentProfile.save();
-                }
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-        sbCornerRadius.post(() -> {
-            float cr = currentProfile != null ? currentProfile.getCornerRadius() : 0.8f;
-            sbCornerRadius.setProgress(Math.round(cr * 10));
-            sbCornerRadius.setSecondaryProgress(8);
-            tvCornerRadius.setText(String.format("%.1f", cr));
         });
 
         Spinner spTouchActivation = view.findViewById(R.id.SPTouchActivation);
@@ -594,15 +501,7 @@ public class InputControlsFragment extends Fragment {
                     int ddDistance = currentProfile.getDoubleTapDistance();
                     sbDoubleTapDistance.setProgress(ddDistance - 10);
                     tvDoubleTapDistance.setText(ddDistance + " px");
-                    float sw = currentProfile.getStrokeWidth();
-                    sbStrokeWidth.setProgress(Math.round((sw - 0.05f) * 100));
-                    tvStrokeWidth.setText(String.format("%.2fx", sw));
-                    int fina = currentProfile.getFillAlphaInactive();
-                    sbFillAlphaInactive.setProgress(fina);
-                    tvFillAlphaInactive.setText(String.valueOf(fina));
-                    float cr = currentProfile.getCornerRadius();
-                    sbCornerRadius.setProgress(Math.round(cr * 10));
-                    tvCornerRadius.setText(String.format("%.1f", cr));
+
                 }
                 updateStarIcon.run();
             }

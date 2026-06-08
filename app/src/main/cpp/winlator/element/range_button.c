@@ -79,6 +79,7 @@ void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_
         e->range_scroll_offset = -fmodf(e->range_current_offset, scroll_size);
         if (e->range_scroll_offset < 0) e->range_scroll_offset += scroll_size;
         e->range_last_position = pos;
+        s->visual_state_dirty = true;
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Range", "range_move[%d] scroll_offset=%.0f current_offset=%.0f scroll_size=%.0f",
             idx, e->range_scroll_offset, e->range_current_offset, scroll_size);
     }

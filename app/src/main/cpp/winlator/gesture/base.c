@@ -51,7 +51,22 @@ static inline void start_drag_with_binding(TouchFinger* f,
                         g_state.gesture_held_actions, g_state.gesture_held_count);
     }
     if (!same_as_held) {
+        // Save auto-repeat bindings before releasing held actions,
+        // so their auto-repeat continues through the drag transition.
+        TouchBinding saved_ar[MAX_HELD_ACTIONS];
+        int saved_ar_count = 0;
+        for (int i = 0; i < g_state.gesture_held_count; i++) {
+            if (g_state.gesture_held_actions[i].auto_repeat) {
+                saved_ar[saved_ar_count++] = g_state.gesture_held_actions[i];
+            }
+        }
         release_held_actions(result);
+        // Restore auto-repeat bindings so tick continues bursting them
+        for (int i = 0; i < saved_ar_count && g_state.gesture_held_count < MAX_HELD_ACTIONS; i++) {
+            g_state.gesture_held_actions[g_state.gesture_held_count++] = saved_ar[i];
+        }
+        if (saved_ar_count > 0)
+            g_state.gesture_is_action_held = true;
         execute_actions_hold(result, drag_binding, drag_count);
     }
     start_drag_no_binding(f);
@@ -82,6 +97,7 @@ void gesture_cancel_double_tap_wait(TouchActionResult* result) {
 
 // ---- check_start_drag ----
 void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* result) {
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "check_start_drag ptr=%d state=%d dx=%.1f dy=%.1f", f->ptr_id, f->state, dx, dy);
     if (f->state != GESTURE_STATE_TAP_WAITING && f->state != GESTURE_STATE_LONG_PRESSING) {
         return;
     }
@@ -229,7 +245,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
                     f->single_tap_hold_delay_ms = 0;
                     f->state = GESTURE_STATE_LONG_PRESSING;
                 } else {
-                    execute_actions(result, f->bindings.long_press, f->bindings.long_press_count);
+                    execute_actions_hold(result, f->bindings.long_press, f->bindings.long_press_count);
                     f->single_tap_hold_delay_ms = 0;
                     f->state = GESTURE_STATE_LONG_PRESSING;
                 }

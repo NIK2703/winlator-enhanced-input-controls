@@ -6,24 +6,19 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     (void)ptr_id; (void)x; (void)y; (void)time_ms;
     TouchProcessorState* s = &g_state;
     bool has_primary = e->bindings[0].type != BINDING_NONE;
-    TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN ptr=%d b0=%d tog=%d auto=%d arm=%d lp_cnt=%d delay=%d",
+    __android_log_print(ANDROID_LOG_WARN, LOG_TAG, "DOWN ptr=%d b0=%d TOGGLE_SWITCH=%d auto=%d arm=%d lp_cnt=%d delay=%d",
         ptr_id, e->bindings[0].type, e->toggle_switch, e->auto_repeat,
         e->long_press_arm, e->element_long_press_count, s->cfg.long_press_delay_ms);
 
-    // Toggle + Auto-repeat mode: toggle on/off (same for all modes — quick-toggle on DOWN)
+    // Toggle + Auto-repeat mode: burst mode — press+release all bindings at interval
     if (e->toggle_switch && e->auto_repeat) {
         if (e->selected) {
-            if (e->auto_repeat_primary_pressed && has_primary)
-                release_binding(result, &e->bindings[0]);
             e->auto_repeat_primary_pressed = false;
             e->selected = false;
             e->visual_active = false;
-            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (toggle_auto_deselect)", (int)(e - g_state.elements), e->bindings[0].type);
+            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] visual=0 (toggle_auto_deselect)", (int)(e - g_state.elements));
         } else {
-            if (has_primary) {
-                press_binding(result, &e->bindings[0], true);
-                e->auto_repeat_primary_pressed = true;
-            }
+            execute_actions(result, e->bindings, 4);
             e->selected = true;
             e->auto_repeat_last_time = time_ms;
         }
@@ -53,15 +48,18 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     }
 
     bool has_lp = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
+    bool has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
     bool arm_lp = has_lp && !e->toggle_switch;
+    bool defer_primary = (has_lp || has_gesture) && !e->toggle_switch;
     e->long_press_arm = arm_lp;
-    TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN arm_lp=%d has_lp=%d tog=%d lp_cnt=%d lp0=%d",
-        arm_lp, has_lp, e->toggle_switch, e->element_long_press_count,
+    TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN arm_lp=%d has_lp=%d has_gesture=%d defer=%d tog=%d lp_cnt=%d lp0=%d",
+        arm_lp, has_lp, has_gesture, defer_primary, e->toggle_switch, e->element_long_press_count,
         e->element_long_press[0].type);
-    if (arm_lp) {
+
+    if (defer_primary) {
         if (!has_primary) {
             e->visual_active = false;
-            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (arm_lp_no_primary)", (int)(e - g_state.elements), e->bindings[0].type);
+            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (defer_primary)", (int)(e - g_state.elements), e->bindings[0].type);
         }
         return;
     }
@@ -78,13 +76,8 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
             e->auto_repeat_primary_pressed = true;
         }
     } else if (!e->toggle_switch) {
-        bool has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
-        if (has_gesture) {
-            e->gesture_timer_armed = true;
-        } else {
-            e->visual_active = false;
-            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (no_primary_no_gesture)", (int)(e - g_state.elements), e->bindings[0].type);
-        }
+        e->visual_active = false;
+        TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (no_primary)", (int)(e - g_state.elements), e->bindings[0].type);
     }
 }
 
@@ -261,6 +254,7 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     //    e->bindings[0].type, (unsigned long long)(time_ms - e->down_time_ms));
 
     if (e->gesture_long_press_triggered) {
+        e->visual_long_press_active = false;
         release_bindings_list(result, e->element_long_press, e->element_long_press_count);
         e->gesture_long_press_triggered = false;
     } else if (e->gesture_swipe_triggered) {
@@ -268,12 +262,17 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
         e->gesture_swipe_triggered = false;
     } else {
         bool has_lp = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
-        if (has_lp && !e->gesture_long_press_triggered) {
+        bool has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
+        bool defer_primary = (has_lp || has_gesture) && !e->toggle_switch;
+
+        if (defer_primary) {
+            // Primary was NOT pressed on DOWN — press+release as tap on UP
             if (has_primary && !(e->primary_sticky_mask & 1)) {
                 press_binding(result, &e->bindings[0], true);
                 release_binding(result, &e->bindings[0]);
             }
         } else {
+            // Normal button: primary was pressed on DOWN, release on UP
             if (has_primary && !(e->primary_sticky_mask & 1))
                 release_binding(result, &e->bindings[0]);
         }

@@ -1,7 +1,7 @@
 package com.winlator.cmod.inputcontrols;
 
 import android.content.Context;
-
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -44,8 +44,8 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private MouseMode mouseMode = MouseMode.TOUCHPAD;
     private InputMode inputMode = InputMode.ABSOLUTE;
     private DragMode dragMode = DragMode.AUTO;
-    private int doubleTapTimeout = 300;
-    private int longPressTimeout = 200;
+    private int doubleTapTimeout = 150;
+    private int longPressTimeout = 150;
     private int bindingDelay;
     private int longPressDelay = 200;
     private int buttonLongPressHaptic = 1;
@@ -516,22 +516,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (data.has("buttonLongPressHaptic")) buttonLongPressHaptic = clamp(data.getInt("buttonLongPressHaptic"), 0, 5);
             if (data.has("buttonGestureHaptic")) buttonGestureHaptic = clamp(data.getInt("buttonGestureHaptic"), 0, 5);
             if (data.has("gestureLongPressHaptic")) gestureLongPressHaptic = clamp(data.getInt("gestureLongPressHaptic"), 0, 5);
-            else if (data.has("hapticFeedbackEnabled")) {
-                boolean oldVal = data.getBoolean("hapticFeedbackEnabled");
-                if (!oldVal) {
-                    buttonLongPressHaptic = 0;
-                    buttonGestureHaptic = 0;
-                    gestureLongPressHaptic = 0;
-                }
-            }
-            else if (data.has("longPressHapticEnabled")) {
-                boolean oldVal = data.getBoolean("longPressHapticEnabled");
-                if (!oldVal) {
-                    buttonLongPressHaptic = 0;
-                    buttonGestureHaptic = 0;
-                    gestureLongPressHaptic = 0;
-                }
-            }
             if (data.has("dragThreshold")) dragThreshold = clamp(data.getInt("dragThreshold"), 0, 30);
             if (data.has("doubleTapDistance")) doubleTapDistance = clamp(data.getInt("doubleTapDistance"), 10, 100);
             if (data.has("gestureThreshold")) gestureThreshold = clamp(data.getInt("gestureThreshold"), 10, 50);
@@ -540,14 +524,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (data.has("gestureSettings")) {
                 loadUnifiedGestureSettingsFromJson(data.getJSONObject("gestureSettings"));
             }
-            else {
-                if (data.has("touchscreenGestures")) {
-                    loadGestureSettingsFromJson(data.getJSONObject("touchscreenGestures"));
-                }
-                if (data.has("touchpadGestures")) {
-                    loadGestureSettingsFromJson(data.getJSONObject("touchpadGestures"));
-                }
-            }
         }
         catch (JSONException e) {
 
@@ -555,63 +531,15 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         gestureSettingsLoaded = true;
     }
 
-    public void loadGestureSettingsFromJson(JSONObject gestureData) {
-        if (gestureData == null) return;
-        try {
-            if (gestureData.has("mouseMode"))
-                mouseMode = parseEnum(MouseMode.class, gestureData.getString("mouseMode"), MouseMode.TOUCHPAD);
-            if (gestureData.has("inputMode"))
-                inputMode = parseEnum(InputMode.class, gestureData.getString("inputMode"), InputMode.ABSOLUTE);
-            if (gestureData.has("dragMode"))
-                dragMode = parseEnum(DragMode.class, gestureData.getString("dragMode"), DragMode.AUTO);
 
-            // Read touchscreen bindings (ts setters delegate to unified BindPackage)
-            if (gestureData.has("singleTapAction")) {
-                setSingleTapAction(parseGestureBindingList(gestureData, "singleTapAction", Binding.MOUSE_LEFT_BUTTON));
-            }
-            if (gestureData.has("longPressAction")) {
-                setLongPressAction(parseGestureBindingList(gestureData, "longPressAction", Binding.MOUSE_LEFT_BUTTON));
-            }
-            if (gestureData.has("doubleTapAction")) {
-                setDoubleTapAction(parseGestureBindingList(gestureData, "doubleTapAction", Binding.NONE));
-            }
-            if (gestureData.has("singleTap2ndFingerAction")) {
-                setSingleTap2ndFingerAction(parseGestureBindingList(gestureData, "singleTap2ndFingerAction", Binding.MOUSE_RIGHT_BUTTON));
-            }
-            if (gestureData.has("doubleTap2ndFingerAction")) {
-                setDoubleTap2ndFingerAction(parseGestureBindingList(gestureData, "doubleTap2ndFingerAction", Binding.NONE));
-            }
-            if (gestureData.has("singleTapDragAction")) {
-                setSingleTapDragAction(parseGestureBindingList(gestureData, "singleTapDragAction", Binding.NONE));
-            }
-            if (gestureData.has("longPressDragAction")) {
-                setLongPressDragAction(parseGestureBindingList(gestureData, "longPressDragAction", Binding.NONE));
-            }
-            if (gestureData.has("doubleTapDragAction")) {
-                setDoubleTapDragAction(parseGestureBindingList(gestureData, "doubleTapDragAction", Binding.NONE));
-            }
-            if (gestureData.has("singleTap2ndFingerDragAction")) {
-                setSingleTap2ndFingerDragAction(parseGestureBindingList(gestureData, "singleTap2ndFingerDragAction", Binding.NONE));
-            }
-            if (gestureData.has("doubleTap2ndFingerDragAction")) {
-                setDoubleTap2ndFingerDragAction(parseGestureBindingList(gestureData, "doubleTap2ndFingerDragAction", Binding.NONE));
-            }
-            if (gestureData.has("doubleTapTimeout"))
-                doubleTapTimeout = clamp(gestureData.getInt("doubleTapTimeout"), 50, 500);
-            if (gestureData.has("longPressTimeout"))
-                longPressTimeout = clamp(gestureData.getInt("longPressTimeout"), 50, 1000);
-            if (gestureData.has("touchActivationMode"))
-                touchActivationMode = parseEnum(TouchActivationMode.class, gestureData.getString("touchActivationMode"), TouchActivationMode.LOCK);
-            if (gestureData.has("singleTapDelay"))
-                singleTapDelay = clamp(gestureData.getInt("singleTapDelay"), 0, 10);
-        }
-        catch (JSONException e) {
-
-        }
-    }
 
     public void markGestureSettingsLoaded() {
         this.gestureSettingsLoaded = true;
+    }
+
+    public void forceReloadGestureSettings() {
+        this.gestureSettingsLoaded = false;
+        ensureGestureSettingsLoaded();
     }
 
     public void loadUnifiedGestureSettingsFromJson(JSONObject gestureData) {
@@ -624,65 +552,26 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (gestureData.has("dragMode"))
                 dragMode = parseEnum(DragMode.class, gestureData.getString("dragMode"), DragMode.AUTO);
 
-            // Parse per-section sticky flags (legacy separate storage)
-            Map<String, List<Boolean>> stickyMap = new HashMap<>();
-            if (gestureData.has("bindingSticky")) {
-                JSONObject stickyObj = gestureData.getJSONObject("bindingSticky");
-                java.util.Iterator<String> it = stickyObj.keys();
-                while (it.hasNext()) {
-                    String key = it.next();
-                    JSONArray arr = stickyObj.getJSONArray(key);
-                    List<Boolean> flags = new ArrayList<>();
-                    for (int i = 0; i < arr.length(); i++) flags.add(arr.getInt(i) != 0);
-                    stickyMap.put(key, flags);
-                }
-            }
-
-            // Mapping from gesture data field name to sticky section key
-            String[][] fieldToKey = {
-                {"singleTapAction", "single"},
-                {"longPressAction", "long"},
-                {"doubleTapAction", "double"},
-                {"singleTap2ndFingerAction", "single_2nd"},
-                {"doubleTap2ndFingerAction", "double_2nd"},
-                {"singleTapDragAction", "single_drag"},
-                {"longPressDragAction", "long_drag"},
-                {"doubleTapDragAction", "double_drag"},
-                {"singleTap2ndFingerDragAction", "single_2nd_drag"},
-                {"doubleTap2ndFingerDragAction", "double_2nd_drag"},
-            };
-
-            Binding[] defaults = {
-                Binding.MOUSE_LEFT_BUTTON, Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
-                Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
-                Binding.NONE, Binding.MOUSE_LEFT_BUTTON, Binding.NONE,
-                Binding.NONE, Binding.NONE,
-            };
-
-            BindPackage[] targets = {
-                gestureSingleTapAction, gestureLongPressAction, gestureDoubleTapAction,
-                gestureSingleTap2ndFingerAction, gestureDoubleTap2ndFingerAction,
-                gestureSingleTapDragAction, gestureLongPressDragAction, gestureDoubleTapDragAction,
-                gestureSingleTap2ndFingerDragAction, gestureDoubleTap2ndFingerDragAction,
-            };
-
-            for (int i = 0; i < fieldToKey.length; i++) {
-                String field = fieldToKey[i][0];
-                String key = fieldToKey[i][1];
-                Binding def = defaults[i];
-                if (gestureData.has(field)) {
-                    List<Binding> bindings = parseGestureBindingList(gestureData, field, def);
-                    List<Boolean> sticky = stickyMap.containsKey(key) ? stickyMap.get(key) : new ArrayList<Boolean>();
-                    targets[i].clear();
-                    for (int j = 0; j < bindings.size(); j++) {
-                        targets[i].add(bindings.get(j));
-                        if (j < sticky.size() && sticky.get(j) != null && sticky.get(j)) {
-                            targets[i].setSticky(j, true);
-                        }
-                    }
-                    targets[i].sync();
-                }
-            }
+            if (gestureData.has("singleTapAction"))
+                gestureSingleTapAction = BindPackage.fromJSON(gestureData.getJSONObject("singleTapAction"), Binding.MOUSE_LEFT_BUTTON);
+            if (gestureData.has("longPressAction"))
+                gestureLongPressAction = BindPackage.fromJSON(gestureData.getJSONObject("longPressAction"), Binding.MOUSE_RIGHT_BUTTON);
+            if (gestureData.has("doubleTapAction"))
+                gestureDoubleTapAction = BindPackage.fromJSON(gestureData.getJSONObject("doubleTapAction"), Binding.NONE);
+            if (gestureData.has("singleTap2ndFingerAction"))
+                gestureSingleTap2ndFingerAction = BindPackage.fromJSON(gestureData.getJSONObject("singleTap2ndFingerAction"), Binding.MOUSE_RIGHT_BUTTON);
+            if (gestureData.has("doubleTap2ndFingerAction"))
+                gestureDoubleTap2ndFingerAction = BindPackage.fromJSON(gestureData.getJSONObject("doubleTap2ndFingerAction"), Binding.NONE);
+            if (gestureData.has("singleTapDragAction"))
+                gestureSingleTapDragAction = BindPackage.fromJSON(gestureData.getJSONObject("singleTapDragAction"), Binding.NONE);
+            if (gestureData.has("longPressDragAction"))
+                gestureLongPressDragAction = BindPackage.fromJSON(gestureData.getJSONObject("longPressDragAction"), Binding.MOUSE_LEFT_BUTTON);
+            if (gestureData.has("doubleTapDragAction"))
+                gestureDoubleTapDragAction = BindPackage.fromJSON(gestureData.getJSONObject("doubleTapDragAction"), Binding.NONE);
+            if (gestureData.has("singleTap2ndFingerDragAction"))
+                gestureSingleTap2ndFingerDragAction = BindPackage.fromJSON(gestureData.getJSONObject("singleTap2ndFingerDragAction"), Binding.NONE);
+            if (gestureData.has("doubleTap2ndFingerDragAction"))
+                gestureDoubleTap2ndFingerDragAction = BindPackage.fromJSON(gestureData.getJSONObject("doubleTap2ndFingerDragAction"), Binding.NONE);
 
 
 
@@ -734,29 +623,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         }
     }
 
-    private static List<Binding> parseGestureBindingList(JSONObject obj, String key, Binding defaultBinding) {
-        try {
-            JSONArray arr = obj.optJSONArray(key);
-            if (arr != null) {
-                List<Binding> result = new ArrayList<>();
-                for (int i = 0; i < arr.length(); i++) {
-                    result.add(parseBinding(arr.getString(i), defaultBinding));
-                }
-                return result;
-            }
-        } catch (JSONException ignored) {}
-        Binding single = parseBinding(obj.optString(key, null), defaultBinding);
-        return new ArrayList<>(Collections.singletonList(single));
-    }
-
-    private static JSONArray bindingListToJSONArray(List<Binding> bindings) {
-        JSONArray arr = new JSONArray();
-        for (Binding b : bindings) {
-            if (b != null && b != Binding.NONE) arr.put(b.name());
-        }
-        return arr;
-    }
-
     public static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
@@ -768,6 +634,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     }
 
     public void save() {
+        ensureGestureSettingsLoaded();
         File file = getProfileFile(context, id);
 
         try {
@@ -784,7 +651,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (dragThreshold != 10) data.put("dragThreshold", dragThreshold);
             if (doubleTapDistance != 50) data.put("doubleTapDistance", doubleTapDistance);
             if (gestureThreshold != 20) data.put("gestureThreshold", gestureThreshold);
-            if (strokeWidth != 0.2f) data.put("strokeWidth", strokeWidth);
+            if (strokeWidth != 0.15f) data.put("strokeWidth", strokeWidth);
             data.put("cornerRadius", cornerRadius);
             data.put("fillAlphaInactive", fillAlphaInactive);
 
@@ -814,46 +681,28 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             unifiedGestureData.put("mouseMode", mouseMode.name());
             unifiedGestureData.put("inputMode", inputMode.name());
             unifiedGestureData.put("dragMode", dragMode.name());
-            unifiedGestureData.put("singleTapAction", gestureSingleTapAction.toJSONArray());
-            unifiedGestureData.put("longPressAction", gestureLongPressAction.toJSONArray());
-            unifiedGestureData.put("doubleTapAction", gestureDoubleTapAction.toJSONArray());
-            unifiedGestureData.put("singleTap2ndFingerAction", gestureSingleTap2ndFingerAction.toJSONArray());
-            unifiedGestureData.put("doubleTap2ndFingerAction", gestureDoubleTap2ndFingerAction.toJSONArray());
-            unifiedGestureData.put("singleTapDragAction", gestureSingleTapDragAction.toJSONArray());
-            unifiedGestureData.put("longPressDragAction", gestureLongPressDragAction.toJSONArray());
-            unifiedGestureData.put("doubleTapDragAction", gestureDoubleTapDragAction.toJSONArray());
-            unifiedGestureData.put("singleTap2ndFingerDragAction", gestureSingleTap2ndFingerDragAction.toJSONArray());
-            unifiedGestureData.put("doubleTap2ndFingerDragAction", gestureDoubleTap2ndFingerDragAction.toJSONArray());
+            unifiedGestureData.put("singleTapAction", gestureSingleTapAction.toJSON());
+            unifiedGestureData.put("longPressAction", gestureLongPressAction.toJSON());
+            unifiedGestureData.put("doubleTapAction", gestureDoubleTapAction.toJSON());
+            unifiedGestureData.put("singleTap2ndFingerAction", gestureSingleTap2ndFingerAction.toJSON());
+            unifiedGestureData.put("doubleTap2ndFingerAction", gestureDoubleTap2ndFingerAction.toJSON());
+            unifiedGestureData.put("singleTapDragAction", gestureSingleTapDragAction.toJSON());
+            unifiedGestureData.put("longPressDragAction", gestureLongPressDragAction.toJSON());
+            unifiedGestureData.put("doubleTapDragAction", gestureDoubleTapDragAction.toJSON());
+            unifiedGestureData.put("singleTap2ndFingerDragAction", gestureSingleTap2ndFingerDragAction.toJSON());
+            unifiedGestureData.put("doubleTap2ndFingerDragAction", gestureDoubleTap2ndFingerDragAction.toJSON());
             unifiedGestureData.put("doubleTapTimeout", doubleTapTimeout);
             unifiedGestureData.put("longPressTimeout", longPressTimeout);
             unifiedGestureData.put("dragThreshold", dragThreshold);
             unifiedGestureData.put("singleTapDelay", singleTapDelay);
             unifiedGestureData.put("cursorSpeed", Float.valueOf(cursorSpeed));
             unifiedGestureData.put("touchActivationMode", touchActivationMode.name());
-            // Save per-section sticky flags
-            {
-                BindPackage[] bps = {
-                    gestureSingleTapAction, gestureLongPressAction, gestureDoubleTapAction,
-                    gestureSingleTap2ndFingerAction, gestureDoubleTap2ndFingerAction,
-                    gestureSingleTapDragAction, gestureLongPressDragAction, gestureDoubleTapDragAction,
-                    gestureSingleTap2ndFingerDragAction, gestureDoubleTap2ndFingerDragAction,
-                };
-                String[] keys = {
-                    "single", "long", "double",
-                    "single_2nd", "double_2nd",
-                    "single_drag", "long_drag", "double_drag",
-                    "single_2nd_drag", "double_2nd_drag",
-                };
-                JSONObject stickyObj = new JSONObject();
-                for (int i = 0; i < bps.length; i++) {
-                    JSONArray arr = bps[i].stickyToJSONArray();
-                    if (arr.length() > 0) stickyObj.put(keys[i], arr);
-                }
-                if (stickyObj.length() > 0) unifiedGestureData.put("bindingSticky", stickyObj);
-            }
             data.put("gestureSettings", unifiedGestureData);
 
-            FileUtils.writeString(file, data.toString());
+            String jsonStr = data.toString();
+            if (gestureSingleTapAction.isToggleSwitch())
+                android.util.Log.w("Winlator_Gesture", "SAVE: singleTapAction has toggleSwitch=true JSON="+jsonStr.substring(0, Math.min(500, jsonStr.length())));
+            FileUtils.writeString(file, jsonStr);
         }
         catch (JSONException e) {}
     }
@@ -922,7 +771,11 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         virtualGamepad = false;
 
         File file = getProfileFile(context, id);
-        if (!file.isFile()) return;
+        Log.w("Winlator_Controls", "loadElements: loading profile from " + file.getAbsolutePath());
+        if (!file.isFile()) {
+            Log.w("Winlator_Controls", "loadElements: file not found, returning");
+            return;
+        }
 
         try {
             JSONObject profileJSONObject = new JSONObject(FileUtils.readString(file));
@@ -932,20 +785,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (profileJSONObject.has("buttonLongPressHaptic")) buttonLongPressHaptic = clamp(profileJSONObject.getInt("buttonLongPressHaptic"), 0, 5);
             if (profileJSONObject.has("buttonGestureHaptic")) buttonGestureHaptic = clamp(profileJSONObject.getInt("buttonGestureHaptic"), 0, 5);
             if (profileJSONObject.has("gestureLongPressHaptic")) gestureLongPressHaptic = clamp(profileJSONObject.getInt("gestureLongPressHaptic"), 0, 5);
-            else if (profileJSONObject.has("hapticFeedbackEnabled")) {
-                if (!profileJSONObject.getBoolean("hapticFeedbackEnabled")) {
-                    buttonLongPressHaptic = 0;
-                    buttonGestureHaptic = 0;
-                    gestureLongPressHaptic = 0;
-                }
-            }
-            else if (profileJSONObject.has("longPressHapticEnabled")) {
-                if (!profileJSONObject.getBoolean("longPressHapticEnabled")) {
-                    buttonLongPressHaptic = 0;
-                    buttonGestureHaptic = 0;
-                    gestureLongPressHaptic = 0;
-                }
-            }
             if (profileJSONObject.has("dragThreshold")) dragThreshold = clamp(profileJSONObject.getInt("dragThreshold"), 0, 30);
             if (profileJSONObject.has("strokeWidth")) strokeWidth = (float)profileJSONObject.getDouble("strokeWidth");
             if (profileJSONObject.has("fillAlphaInactive")) fillAlphaInactive = profileJSONObject.getInt("fillAlphaInactive");
@@ -953,12 +792,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (profileJSONObject.has("gestureSettings")) {
                 loadUnifiedGestureSettingsFromJson(profileJSONObject.getJSONObject("gestureSettings"));
             }
-            else if (profileJSONObject.has("touchscreenGestures")) {
-                loadGestureSettingsFromJson(profileJSONObject.getJSONObject("touchscreenGestures"));
-            }
             gestureSettingsLoaded = true;
 
             JSONArray elementsJSONArray = profileJSONObject.getJSONArray("elements");
+            Log.w("Winlator_Controls", "loadElements: found " + elementsJSONArray.length() + " elements in JSON");
             for (int i = 0; i < elementsJSONArray.length(); i++) {
                 JSONObject elementJSONObject = elementsJSONArray.getJSONObject(i);
                 ControlElement element = new ControlElement(inputControlsView);
@@ -991,71 +828,38 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 if (elementJSONObject.has("elementHeight")) element.setElementHeight((float)elementJSONObject.getDouble("elementHeight"));
                 if (elementJSONObject.has("cornerRadius")) element.setCornerRadius((float)elementJSONObject.getDouble("cornerRadius"));
                 if (elementJSONObject.has("dpadCornerRadius")) element.setDpadCornerRadius((float)elementJSONObject.getDouble("dpadCornerRadius"));
-                element.setToggleSwitch(elementJSONObject.getBoolean("toggleSwitch"));
-                if (elementJSONObject.has("autoRepeat")) element.setAutoRepeat(elementJSONObject.getBoolean("autoRepeat"));
-                if (elementJSONObject.has("autoRepeatIntervalMs"))
-                    element.setAutoRepeatIntervalMs(elementJSONObject.getInt("autoRepeatIntervalMs"));
-                else if (elementJSONObject.has("autoRepeatRateHz"))
-                    element.setAutoRepeatIntervalMs(1000 / elementJSONObject.getInt("autoRepeatRateHz"));
                 if (elementJSONObject.has("passthroughTouch")) element.setPassthroughTouch(elementJSONObject.getBoolean("passthroughTouch"));
                 if (elementJSONObject.has("opacity")) element.setOpacity((float)elementJSONObject.getDouble("opacity"));
                 element.setX((int)(elementJSONObject.getDouble("x") * inputControlsView.getMaxWidth()));
                 element.setY((int)(elementJSONObject.getDouble("y") * inputControlsView.getMaxHeight()));
                 element.setScale((float)elementJSONObject.getDouble("scale"));
                 element.setText(elementJSONObject.getString("text"));
+                Log.w("Winlator_Controls", "loadElements: element[" + i + "] type=" + element.getType() + " text=" + element.getText());
                 element.setIconId(elementJSONObject.getInt("iconId"));
                 if (elementJSONObject.has("customIconData")) element.setCustomIconData(elementJSONObject.getString("customIconData"));
                 if (elementJSONObject.has("range")) element.setRange(ControlElement.Range.valueOf(elementJSONObject.getString("range")));
                 if (elementJSONObject.has("orientation")) element.setOrientation((byte)elementJSONObject.getInt("orientation"));
 
                 boolean hasGamepadBinding = true;
-                JSONArray bindingsJSONArray = elementJSONObject.getJSONArray("bindings");
-                JSONArray firstSeq = bindingsJSONArray.optJSONArray(0);
-                if (firstSeq != null) {
-                    for (int j = 0; j < bindingsJSONArray.length(); j++) {
-                        JSONArray seqArray = bindingsJSONArray.getJSONArray(j);
-                        List<Binding> seqList = new ArrayList<>();
-                        for (int k = 0; k < seqArray.length(); k++) {
-                            Binding binding = Binding.fromString(seqArray.getString(k));
-                            seqList.add(binding);
-                            if (!binding.isGamepad()) hasGamepadBinding = false;
-                        }
-                        element.setBindingSequence(j, seqList);
-                    }
-                } else {
-                    for (int j = 0; j < bindingsJSONArray.length(); j++) {
-                        Binding binding = Binding.fromString(bindingsJSONArray.getString(j));
-                        element.setBindingAt(j, binding);
-                        if (!binding.isGamepad()) hasGamepadBinding = false;
+                JSONArray slotPackagesArray = elementJSONObject.getJSONArray("slotPackages");
+                for (int j = 0; j < slotPackagesArray.length(); j++) {
+                    JSONObject pkgObj = slotPackagesArray.getJSONObject(j);
+                    BindPackage pkg = BindPackage.fromJSON(pkgObj, Binding.NONE);
+                    element.setSlotPackage(j, pkg);
+                    for (int k = 0; k < pkg.size(); k++) {
+                        Binding b = pkg.get(k);
+                        if (b != null && !b.isGamepad()) hasGamepadBinding = false;
                     }
                 }
 
-                if (elementJSONObject.has("longPressBindings")) {
-                    JSONArray lpArray = elementJSONObject.getJSONArray("longPressBindings");
-                    List<Binding> lpList = new ArrayList<>();
-                    for (int k = 0; k < lpArray.length(); k++) {
-                        lpList.add(Binding.fromString(lpArray.getString(k)));
-                    }
-                    element.setLongPressBindings(lpList);
+                if (elementJSONObject.has("longPressPackage")) {
+                    JSONObject lpObj = elementJSONObject.getJSONObject("longPressPackage");
+                    element.setLongPressPackage(BindPackage.fromJSON(lpObj, Binding.NONE));
                 }
 
-                if (elementJSONObject.has("gestureBindings")) {
-                    JSONArray gArray = elementJSONObject.getJSONArray("gestureBindings");
-                    List<Binding> gList = new ArrayList<>();
-                    for (int k = 0; k < gArray.length(); k++) {
-                        gList.add(Binding.fromString(gArray.getString(k)));
-                    }
-                    element.setGestureBindings(gList);
-                }
-
-                if (elementJSONObject.has("bindingSticky")) {
-                    JSONArray stickyArray = elementJSONObject.getJSONArray("bindingSticky");
-                    for (int j = 0; j < stickyArray.length(); j++) {
-                        JSONArray seqArray = stickyArray.getJSONArray(j);
-                        for (int k = 0; k < seqArray.length(); k++) {
-                            element.setBindingSticky(j, k, seqArray.getBoolean(k));
-                        }
-                    }
+                if (elementJSONObject.has("gesturePackage")) {
+                    JSONObject gObj = elementJSONObject.getJSONObject("gesturePackage");
+                    element.setGesturePackage(BindPackage.fromJSON(gObj, Binding.NONE));
                 }
 
                 if (!virtualGamepad && hasGamepadBinding) virtualGamepad = true;
@@ -1064,6 +868,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             elementsLoaded = true;
         }
         catch (JSONException e) {
+            Log.w("Winlator_Controls", "loadElements: JSONException: " + e.getMessage());
             e.printStackTrace();
         }
     }

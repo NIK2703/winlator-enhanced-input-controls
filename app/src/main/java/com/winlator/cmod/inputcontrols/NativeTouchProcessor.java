@@ -117,6 +117,44 @@ public class NativeTouchProcessor {
         public int stSingleTapDrag2nd;
         public int stDoubleTapDrag2nd;
 
+        // Per-section toggle bitmasks for gesture bindings.
+        // Bit i is set if the i-th non-NONE binding in the section is a toggle switch.
+        public int tgSingleTap;
+        public int tgLongPress;
+        public int tgDoubleTap;
+        public int tgSingleTapDrag;
+        public int tgLongPressDrag;
+        public int tgDoubleTapDrag;
+        public int tgSingleTap2nd;
+        public int tgDoubleTap2nd;
+        public int tgSingleTapDrag2nd;
+        public int tgDoubleTapDrag2nd;
+
+        // Per-section auto-repeat bitmasks for gesture bindings.
+        // Bit i is set if the i-th non-NONE binding in the section should auto-repeat.
+        public int arSingleTap;
+        public int arLongPress;
+        public int arDoubleTap;
+        public int arSingleTapDrag;
+        public int arLongPressDrag;
+        public int arDoubleTapDrag;
+        public int arSingleTap2nd;
+        public int arDoubleTap2nd;
+        public int arSingleTapDrag2nd;
+        public int arDoubleTapDrag2nd;
+
+        // Per-section auto-repeat interval in ms for gesture bindings.
+        public int arSingleTapIntervalMs;
+        public int arLongPressIntervalMs;
+        public int arDoubleTapIntervalMs;
+        public int arSingleTapDragIntervalMs;
+        public int arLongPressDragIntervalMs;
+        public int arDoubleTapDragIntervalMs;
+        public int arSingleTap2ndIntervalMs;
+        public int arDoubleTap2ndIntervalMs;
+        public int arSingleTapDrag2ndIntervalMs;
+        public int arDoubleTapDrag2ndIntervalMs;
+
         // Render config (shared across all elements)
         public int colorPrimary = 0xFFFFFFFF;
         public int colorSecondary = 0xFF0277BD;
@@ -140,7 +178,7 @@ public class NativeTouchProcessor {
         public int[] elementGesture;
         public boolean toggleSwitch;
         public boolean autoRepeat;
-        public int autoRepeatIntervalMs = 100;
+        public int autoRepeatIntervalMs = 200;
         public float opacity;
         public int buttonLongPressHaptic = 1;
         public int buttonGestureHaptic = 1;
@@ -191,6 +229,7 @@ public class NativeTouchProcessor {
         } catch (Exception e) {
             loaded = false;
         }
+        Log.w("Winlator_Controls", "NativeTouchProcessor: library loaded=" + loaded);
     }
 
     public boolean isLoaded() { return loaded; }
@@ -237,8 +276,10 @@ public class NativeTouchProcessor {
 
     public void init(NativeConfig config) {
         if (!loaded) {
+            Log.w("Winlator_Controls", "init: native library not loaded, aborting");
             return;
         }
+        Log.w("Winlator_Controls", "init: called with config touchMode=" + config.touchMode + " inputMode=" + config.inputMode + " screen=" + config.screenW + "x" + config.screenH);
         nativeInit(config);
         dispatchPacked = new int[128]; // max 32 actions × 4 ints
         nativeSetDispatchPacked(dispatchPacked);
@@ -255,8 +296,12 @@ public class NativeTouchProcessor {
     }
 
     public void setElements(NativeElement[] elements) {
-        if (!loaded) return;
+        if (!loaded) {
+            Log.w("Winlator_Controls", "setElements: native library not loaded");
+            return;
+        }
         elementCount = (elements != null) ? elements.length : 0;
+        Log.w("Winlator_Controls", "setElements: setting " + elementCount + " elements");
         nativeSetElements(elements);
     }
 
@@ -385,6 +430,41 @@ public class NativeTouchProcessor {
         c.stSingleTapDrag2nd = profile.getGestureSingleTap2ndFingerDragAction().encodeStickyBitmask();
         c.stDoubleTapDrag2nd = profile.getGestureDoubleTap2ndFingerDragAction().encodeStickyBitmask();
 
+        // Toggle bitmasks from BindPackage
+        c.tgSingleTap = profile.getGestureSingleTapAction().encodeToggleBitmask();
+        c.tgLongPress = profile.getGestureLongPressAction().encodeToggleBitmask();
+        c.tgDoubleTap = profile.getGestureDoubleTapAction().encodeToggleBitmask();
+        c.tgSingleTapDrag = profile.getGestureSingleTapDragAction().encodeToggleBitmask();
+        c.tgLongPressDrag = profile.getGestureLongPressDragAction().encodeToggleBitmask();
+        c.tgDoubleTapDrag = profile.getGestureDoubleTapDragAction().encodeToggleBitmask();
+        c.tgSingleTap2nd = profile.getGestureSingleTap2ndFingerAction().encodeToggleBitmask();
+        c.tgDoubleTap2nd = profile.getGestureDoubleTap2ndFingerAction().encodeToggleBitmask();
+        c.tgSingleTapDrag2nd = profile.getGestureSingleTap2ndFingerDragAction().encodeToggleBitmask();
+        c.tgDoubleTapDrag2nd = profile.getGestureDoubleTap2ndFingerDragAction().encodeToggleBitmask();
+
+        // Auto-repeat bitmasks and intervals from BindPackage
+        c.arSingleTap = profile.getGestureSingleTapAction().encodeAutoRepeatBitmask();
+        c.arLongPress = profile.getGestureLongPressAction().encodeAutoRepeatBitmask();
+        c.arDoubleTap = profile.getGestureDoubleTapAction().encodeAutoRepeatBitmask();
+        c.arSingleTapDrag = profile.getGestureSingleTapDragAction().encodeAutoRepeatBitmask();
+        c.arLongPressDrag = profile.getGestureLongPressDragAction().encodeAutoRepeatBitmask();
+        c.arDoubleTapDrag = profile.getGestureDoubleTapDragAction().encodeAutoRepeatBitmask();
+        c.arSingleTap2nd = profile.getGestureSingleTap2ndFingerAction().encodeAutoRepeatBitmask();
+        c.arDoubleTap2nd = profile.getGestureDoubleTap2ndFingerAction().encodeAutoRepeatBitmask();
+        c.arSingleTapDrag2nd = profile.getGestureSingleTap2ndFingerDragAction().encodeAutoRepeatBitmask();
+        c.arDoubleTapDrag2nd = profile.getGestureDoubleTap2ndFingerDragAction().encodeAutoRepeatBitmask();
+
+        c.arSingleTapIntervalMs = profile.getGestureSingleTapAction().getAutoRepeatIntervalMs();
+        c.arLongPressIntervalMs = profile.getGestureLongPressAction().getAutoRepeatIntervalMs();
+        c.arDoubleTapIntervalMs = profile.getGestureDoubleTapAction().getAutoRepeatIntervalMs();
+        c.arSingleTapDragIntervalMs = profile.getGestureSingleTapDragAction().getAutoRepeatIntervalMs();
+        c.arLongPressDragIntervalMs = profile.getGestureLongPressDragAction().getAutoRepeatIntervalMs();
+        c.arDoubleTapDragIntervalMs = profile.getGestureDoubleTapDragAction().getAutoRepeatIntervalMs();
+        c.arSingleTap2ndIntervalMs = profile.getGestureSingleTap2ndFingerAction().getAutoRepeatIntervalMs();
+        c.arDoubleTap2ndIntervalMs = profile.getGestureDoubleTap2ndFingerAction().getAutoRepeatIntervalMs();
+        c.arSingleTapDrag2ndIntervalMs = profile.getGestureSingleTap2ndFingerDragAction().getAutoRepeatIntervalMs();
+        c.arDoubleTapDrag2ndIntervalMs = profile.getGestureDoubleTap2ndFingerDragAction().getAutoRepeatIntervalMs();
+
         // Render config
         c.colorPrimary = 0xFFFFFFFF;
         c.colorSecondary = 0xFF0277BD;
@@ -399,7 +479,11 @@ public class NativeTouchProcessor {
     }
 
     public static NativeElement[] buildNativeElements(List<ControlElement> elements, TouchActivationMode activationMode, ControlsProfile profile) {
-        if (elements == null) return null;
+        if (elements == null) {
+            Log.w("Winlator_Controls", "buildNativeElements: elements list is null");
+            return null;
+        }
+        Log.w("Winlator_Controls", "buildNativeElements: processing " + elements.size() + " elements");
         NativeElement[] arr = new NativeElement[elements.size()];
         ControlsProfile p = profile;
         for (int i = 0; i < elements.size(); i++) {
@@ -415,9 +499,19 @@ public class NativeTouchProcessor {
             ne.cornerRadius = ce.getEffectiveCornerRadius();
             ne.passthroughTouch = ce.isPassthroughTouch();
             ne.activationMode = activationMode != null ? activationMode.ordinal() : 0;
-            ne.toggleSwitch = ce.isToggleSwitch();
-            ne.autoRepeat = ce.isAutoRepeat();
-            ne.autoRepeatIntervalMs = ce.getAutoRepeatIntervalMs();
+            ne.toggleSwitch = ce.hasAnySlotToggle() || ce.isLongPressToggle() || ce.isGestureToggle();
+            if (ce.getType() == ControlElement.Type.BUTTON) {
+                Log.w("Winlator_Button", "buildNativeElements: BUTTON idx="+i+" toggleSwitch="+ne.toggleSwitch+" text="+ce.getText());
+            }
+            ne.autoRepeat = ce.hasAnySlotAutoRepeat();
+            ne.autoRepeatIntervalMs = 200;
+            int bc = ce.getBindingCount();
+            for (int j = 0; j < bc && j < 4; j++) {
+                if (ce.getSlotAutoRepeat(j)) {
+                    ne.autoRepeatIntervalMs = ce.getSlotAutoRepeatIntervalMs(j);
+                    break;
+                }
+            }
             ne.opacity = ce.getEffectiveOpacity();
 
             ne.buttonLongPressHaptic = p != null ? p.getButtonLongPressHaptic() : 1;
@@ -481,7 +575,8 @@ public class NativeTouchProcessor {
             }
             ne.bindingSticky = new int[ce.getBindingCount()];
             for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
-                ne.bindingSticky[j] = ce.isBindingSticky(j, 0) ? 1 : 0;
+                BindPackage pkg = ce.getSlotPackage(j);
+                ne.bindingSticky[j] = pkg != null ? pkg.encodeStickyBitmask() : 0;
             }
             arr[i] = ne;
         }

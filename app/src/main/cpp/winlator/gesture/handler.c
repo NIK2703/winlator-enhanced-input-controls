@@ -89,6 +89,7 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     }
     bool is_first = (g_state.gesture_main_ptr_id < 0);
     bool is_second = !is_first && (f->ptr_id != g_state.gesture_main_ptr_id);
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_gesture_down ptr=%d role=%s", f->ptr_id, is_first ? "main" : "second");
 
     if (is_first) {
         g_state.gesture_post_double_tap_drag = false;
@@ -208,6 +209,19 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     if (is_first) {
         g_state.scrolling = false;
         g_state.scroll_accum_y = 0;
+    } else if (is_second) {
+        // Save and release ongoing first-finger drag before processing second finger
+        TouchFinger* main_finger = find_finger(g_state.gesture_main_ptr_id);
+        if (main_finger && main_finger->active) {
+            main_finger->pending_resume_action_count = 0;
+            if (g_state.gesture_is_action_held) {
+                for (int i = 0; i < g_state.gesture_held_count && i < 8; i++) {
+                    main_finger->pending_resume_action[i] = g_state.gesture_held_actions[i];
+                    main_finger->pending_resume_action_count++;
+                }
+            }
+        }
+        release_held_actions(result);
     }
 
     if (g_state.sim_touch_screen) {
@@ -258,6 +272,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     bool first_btn_gest_swipe = false;
     bool first_btn_gest_lp = false;
     bool first_btn_gest_timer = false;
+    bool first_btn_vis_lp = false;
     if (saved_tb->count > 0) {
         int first_idx = saved_tb->element_indices[0];
         if (first_idx >= 0 && first_idx < g_state.element_count) {
@@ -553,6 +568,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 // handle_gesture_up
 // ============================================================
 void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_gesture_up ptr=%d", f->ptr_id);
     int pi = (uint32_t)f->ptr_id % MAX_FINGERS;
     TrackedButtons* tb = &g_state.tracked[pi];
     bool had_tracked = false;
@@ -653,7 +669,22 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
         }
     } else {
         // TP up handling
+        // Clear pending resume if main finger lifts during drag-pause
+        if (f->ptr_id == g_state.gesture_main_ptr_id) {
+            f->pending_resume_action_count = 0;
+        }
         touchpad_finger_up(f, result, time_ms);
+
+        // Restore interrupted first-finger drag on second-finger up
+        if (f->is_second_finger) {
+            TouchFinger* main = find_finger(g_state.gesture_main_ptr_id);
+            if (main && main->pending_resume_action_count > 0) {
+                execute_actions_hold(result, main->pending_resume_action, main->pending_resume_action_count);
+                main->pending_resume_action_count = 0;
+                main->state = GESTURE_STATE_DRAGGING;
+            }
+            g_state.gesture_second_ptr_id = -1;
+        }
 
         if (g_state.finger_pointer_left == f->ptr_id) {
             g_state.pending_left_release_time = time_ms + DELAYED_RELEASE_MS;

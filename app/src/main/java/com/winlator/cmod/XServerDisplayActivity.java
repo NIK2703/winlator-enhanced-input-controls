@@ -143,21 +143,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
     public static void updateGestureConfig() {
         XServerDisplayActivity activity = activeInstance;
         if (activity == null) return;
-        activity.inputControlsManager.loadProfiles(true);
         ControlsProfile profile = activity.inputControlsView != null ? activity.inputControlsView.getProfile() : null;
         if (profile != null) {
-            ControlsProfile reloaded = activity.inputControlsManager.getProfile(profile.id);
-            if (reloaded != null) {
-                activity.touchpadView.setProfile(reloaded);
-                activity.inputControlsView.setProfile(reloaded);
-                if (activity.nativeTouchProcessor != null) {
-                    NativeTouchProcessor.NativeConfig updatedConfig =
-                        NativeTouchProcessor.buildNativeConfig(reloaded,
-                            activity.xServer.screenInfo.width,
-                            activity.xServer.screenInfo.height,
-                            activity.globalCursorSpeed);
-                    activity.nativeTouchProcessor.updateConfig(updatedConfig);
-                }
+            profile.forceReloadGestureSettings();
+            if (activity.nativeTouchProcessor != null) {
+                NativeTouchProcessor.NativeConfig updatedConfig =
+                    NativeTouchProcessor.buildNativeConfig(profile,
+                        activity.xServer.screenInfo.width,
+                        activity.xServer.screenInfo.height,
+                        activity.globalCursorSpeed);
+                activity.nativeTouchProcessor.updateConfig(updatedConfig);
             }
         }
     }
@@ -1577,10 +1572,12 @@ private void applySidebarSettings() {
         }
     }
     private void showInputControls(ControlsProfile profile) {
+        Log.w("Winlator_Controls", "showInputControls: profile id="+profile.id+" name="+profile.getName()+" mouseMode="+profile.getMouseMode()+" touchMode="+profile.getInputMode()+" elements="+(profile.getElements()!=null?profile.getElements().size():0));
         inputControlsView.setShowTouchscreenControls(true);
         inputControlsView.setVisibility(View.VISIBLE);
         inputControlsView.requestFocus();
         inputControlsView.setProfile(profile);
+        Log.w("Winlator_Controls", "showInputControls: profile set");
 
         touchpadView.setProfile(profile);
         touchpadView.setSensitivity(profile.getCursorSpeed() * globalCursorSpeed);
@@ -1619,6 +1616,7 @@ private void applySidebarSettings() {
                 }
             }
             nativeTouchProcessor.init(nativeConfig);
+            Log.w("Winlator_Controls", "showInputControls: native touch processor init");
 
             // Start tick timer early (for long-press / double-tap timeouts)
             final int tickIntervalMs = 1000 / Math.max(preferences.getInt("native_tick_rate_hz", 60), 1);
@@ -1634,6 +1632,7 @@ private void applySidebarSettings() {
             }
             handler.removeCallbacks(nativeTickRunnable);
             handler.postDelayed(nativeTickRunnable, tickIntervalMs);
+            Log.w("Winlator_Controls", "showInputControls: tick started, interval="+tickIntervalMs+"ms");
 
             // Defer element loading & param setting until view is laid out (needs dimensions)
             inputControlsView.post(() -> {
@@ -1651,6 +1650,7 @@ private void applySidebarSettings() {
                 }
                 doElementSetup(profile);
             });
+            Log.w("Winlator_Controls", "showInputControls: element setup posted");
         }
 
         inputControlsView.invalidate();
@@ -1663,17 +1663,20 @@ private void applySidebarSettings() {
                        xServer.screenInfo.width / 100;
         if (snapSize <= 0) snapSize = 10;
         inputControlsView.setSnappingSize(snapSize);
+        Log.w("Winlator_Controls", "doElementSetup: viewWidth="+viewWidth+" snapSize="+snapSize);
 
         if (!profile.isElementsLoaded()) {
             profile.loadElements(inputControlsView);
         }
 
         List<ControlElement> elements = profile.getElements();
+        Log.w("Winlator_Controls", "doElementSetup: element count from profile="+(elements!=null?elements.size():0));
 
         if (elements != null && !elements.isEmpty()) {
             TouchActivationMode actMode = profile.getTouchActivationMode();
             NativeTouchProcessor.NativeElement[] nativeElements =
                 NativeTouchProcessor.buildNativeElements(elements, actMode, profile);
+            Log.w("Winlator_Controls", "doElementSetup: buildNativeElements called, native elements="+nativeElements.length);
             nativeTouchProcessor.setElements(nativeElements);
         }
 

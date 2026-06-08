@@ -180,11 +180,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             ControlElement.Type type = element.getType();
             ControlElement.Shape shape = element.getShape();
             view.findViewById(R.id.LLShape).setVisibility(View.GONE);
-            view.findViewById(R.id.CBToggleSwitch).setVisibility(View.GONE);
             view.findViewById(R.id.CBPassthroughTouch).setVisibility(View.GONE);
-            view.findViewById(R.id.CBAutoRepeat).setVisibility(View.GONE);
-            view.findViewById(R.id.LLRepeatRate).setVisibility(View.GONE);
-            view.findViewById(R.id.SBRepeatRate).setVisibility(View.GONE);
             view.findViewById(R.id.LLCustomTextIcon).setVisibility(View.GONE);
             view.findViewById(R.id.LLRangeOptions).setVisibility(View.GONE);
             view.findViewById(R.id.LLRectDimensions).setVisibility(View.GONE);
@@ -193,13 +189,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
 
             if (type == ControlElement.Type.BUTTON) {
                 view.findViewById(R.id.LLShape).setVisibility(View.VISIBLE);
-                view.findViewById(R.id.CBToggleSwitch).setVisibility(View.VISIBLE);
                 view.findViewById(R.id.CBPassthroughTouch).setVisibility(View.VISIBLE);
-                view.findViewById(R.id.CBAutoRepeat).setVisibility(View.VISIBLE);
-                if (element.isAutoRepeat()) {
-                    view.findViewById(R.id.LLRepeatRate).setVisibility(View.VISIBLE);
-                    view.findViewById(R.id.SBRepeatRate).setVisibility(View.VISIBLE);
-                }
                 view.findViewById(R.id.LLCustomTextIcon).setVisibility(View.VISIBLE);
                 if (shape == ControlElement.Shape.RECT) {
                     view.findViewById(R.id.LLRectDimensions).setVisibility(View.VISIBLE);
@@ -217,6 +207,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                 view.findViewById(R.id.LLElementCornerRadius).setVisibility(View.VISIBLE);
             }
 
+            view.findViewById(R.id.CBToggleSwitch).setVisibility(View.VISIBLE);
             loadBindingSpinners(element, view);
         };
 
@@ -383,9 +374,11 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         sbDPadRadius.setProgress((int)(element.getDpadCornerRadius() * 10));
 
         CheckBox cbToggleSwitch = view.findViewById(R.id.CBToggleSwitch);
-        cbToggleSwitch.setChecked(element.isToggleSwitch());
+        cbToggleSwitch.setChecked(element.hasAnySlotToggle());
         cbToggleSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            element.setToggleSwitch(isChecked);
+            for (int s = 0; s < element.getBindingCount() && s < 4; s++) {
+                element.setSlotToggle(s, isChecked);
+            }
             profile.save();
         });
 
@@ -394,33 +387,6 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         cbPassthrough.setOnCheckedChangeListener((buttonView, isChecked) -> {
             element.setPassthroughTouch(isChecked);
             profile.save();
-        });
-
-        CheckBox cbAutoRepeat = view.findViewById(R.id.CBAutoRepeat);
-        cbAutoRepeat.setChecked(element.isAutoRepeat());
-        cbAutoRepeat.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            element.setAutoRepeat(isChecked);
-            profile.save();
-            updateLayout.run();
-        });
-
-        TextView tvRepeatRate = view.findViewById(R.id.ETRepeatRate);
-        SeekBar sbRepeatRate = view.findViewById(R.id.SBRepeatRate);
-        int progress = Math.round(element.getAutoRepeatIntervalMs() / 10.0f) - 1;
-        sbRepeatRate.setProgress(progress);
-        tvRepeatRate.setText(String.valueOf((progress + 1) * 10));
-        sbRepeatRate.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                int value = (progress + 1) * 10;
-                tvRepeatRate.setText(String.valueOf(value));
-                if (fromUser) {
-                    element.setAutoRepeatIntervalMs(value);
-                    profile.save();
-                }
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
         final EditText etCustomText = view.findViewById(R.id.ETCustomText);
@@ -689,7 +655,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         ControlElement.Type type = element.getType();
         if (type == ControlElement.Type.BUTTON) {
             loadBindingSection(element, container, 0, R.string.binding);
-            if (!element.isAutoRepeat())
+            if (!element.getSlotAutoRepeat(0))
                 loadLongPressBindingSection(element, container);
             loadGestureBindingSection(element, container);
         }
@@ -702,12 +668,8 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
     }
 
     private void loadBindingSection(final ControlElement element, LinearLayout container, final int index, int titleResId) {
-        BindPackage bp = new BindPackage(element.getBindingSequence(index), element.getBindingSticky(index));
+        BindPackage bp = element.getSlotPackage(index);
         View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, getString(titleResId), 0, bp, () -> {
-            element.setBindingSequence(index, new ArrayList<>(bp.getBindings()));
-            List<Boolean> flags = bp.getStickyFlags();
-            for (int i = 0; i < flags.size(); i++)
-                element.setBindingSticky(index, i, flags.get(i));
             profile.save();
             inputControlsView.invalidate();
         });
@@ -715,9 +677,8 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
     }
 
     private void loadLongPressBindingSection(final ControlElement element, LinearLayout container) {
-        BindPackage bp = new BindPackage(element.getLongPressBindings());
+        BindPackage bp = element.getLongPressPackage();
         View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Long Press", 0, bp, () -> {
-            element.setLongPressBindings(new ArrayList<>(bp.getBindings()));
             profile.save();
             inputControlsView.invalidate();
         });
@@ -725,9 +686,8 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
     }
 
     private void loadGestureBindingSection(final ControlElement element, LinearLayout container) {
-        BindPackage bp = new BindPackage(element.getGestureBindings());
+        BindPackage bp = element.getGesturePackage();
         View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Gesture", 0, bp, () -> {
-            element.setGestureBindings(new ArrayList<>(bp.getBindings()));
             profile.save();
             inputControlsView.invalidate();
         });

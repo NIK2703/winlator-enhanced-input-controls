@@ -38,6 +38,9 @@ typedef struct {
     BindingType type;
     int keycode;  // X11 keycode for keyboard bindings
     int modifiers; // 1 = sticky (hold on press), 0 = tap (press+release)
+    bool toggle;   // 1 = toggle switch (press on first activation, release on second)
+    bool auto_repeat;
+    int auto_repeat_interval_ms;
 } TouchBinding;
 
 typedef enum {
@@ -111,6 +114,9 @@ typedef struct {
     TouchBinding element_long_press[8];
     int element_gesture_count;
     TouchBinding element_gesture[8];
+
+    // --- Long press visual state ---
+    bool visual_long_press_active;
 
     // --- Range button state ---
     int range_ordinal;

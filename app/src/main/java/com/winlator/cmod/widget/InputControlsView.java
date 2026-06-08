@@ -33,6 +33,7 @@ import com.winlator.cmod.BuildConfig;
 import com.winlator.cmod.R;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlElement;
+import com.winlator.cmod.inputcontrols.BindPackage;
 import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
@@ -79,8 +80,8 @@ public class InputControlsView extends View {
     private XServer xServer;
     private NativeTouchProcessor nativeTouchProcessor;
     private com.winlator.cmod.renderer.ElementOverlayRenderer elementOverlayRenderer;
-    private static final int VISUAL_STRIDE = 56;
-    private static final long VISUAL_THROTTLE_MS = 16;
+    private static final int VISUAL_STRIDE = 60;
+    private static long visualThrottleMs = 0;
     private long lastInvalidateMs = 0;
     private final Bitmap[] icons = new Bitmap[40];
     private Timer mouseMoveTimer;
@@ -279,6 +280,7 @@ public class InputControlsView extends View {
             }
         }
         readyToDraw = true;
+        Log.w("Winlator_Controls", "onDraw: profile=" + (profile != null) + " showTouchscreenControls=" + showTouchscreenControls + " elements=" + (profile != null && profile.isElementsLoaded() ? profile.getElements().size() : "N/A") + " cachedRenderingEnabled=" + cachedRenderingEnabled);
 
         if (editMode) {
             drawGrid(canvas);
@@ -292,18 +294,28 @@ public class InputControlsView extends View {
         if (profile != null && showTouchscreenControls && !isFocusedOnStick()) {
             if (!profile.isElementsLoaded()) profile.loadElements(this);
             if (cachedRenderingEnabled) {
+                int renderedCount = 0;
                 for (ControlElement element : profile.getElements()) {
-                    if (!cachesPreBuilt) element.buildCache();
-                    element.drawCached(canvas);
+                    try {
+                        if (!cachesPreBuilt) element.buildCache();
+                        element.drawCached(canvas);
+                        renderedCount++;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
-                cachesPreBuilt = true;
-                skipDiskCache = false;
+                if (renderedCount > 0) cachesPreBuilt = true;
             }
             else {
                 for (ControlElement element : profile.getElements()) {
-                    element.draw(canvas);
+                    try {
+                        element.draw(canvas);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
             }
+            skipDiskCache = false;
         }
 
         super.onDraw(canvas);
@@ -403,17 +415,10 @@ public class InputControlsView extends View {
             element.setType(selectedElement.getType());
             element.setBindingCount(selectedElement.getBindingCount());
             for (int i = 0; i < element.getBindingCount(); i++) {
-                element.setBindingSequence(i, new ArrayList<>(selectedElement.getBindingSequence(i)));
-                List<Boolean> stickySeq = selectedElement.getBindingSticky(i);
-                for (int j = 0; j < stickySeq.size(); j++) {
-                    element.setBindingSticky(i, j, stickySeq.get(j));
-                }
+                element.setSlotPackage(i, new BindPackage(selectedElement.getSlotPackage(i)));
             }
             element.setShape(selectedElement.getShape());
-            element.setToggleSwitch(selectedElement.isToggleSwitch());
             element.setPassthroughTouch(selectedElement.isPassthroughTouch());
-            element.setAutoRepeat(selectedElement.isAutoRepeat());
-            element.setAutoRepeatIntervalMs(selectedElement.getAutoRepeatIntervalMs());
             element.setScale(selectedElement.getScale());
             element.setText(selectedElement.getText());
             element.setIconId(selectedElement.getIconId());
@@ -425,12 +430,8 @@ public class InputControlsView extends View {
             element.setElementHeight(selectedElement.getElementHeight());
             element.setCornerRadius(selectedElement.getCornerRadius());
             element.setDpadCornerRadius(selectedElement.getDpadCornerRadius());
-            if (selectedElement.hasLongPressBinding()) {
-                element.setLongPressBindings(new ArrayList<>(selectedElement.getLongPressBindings()));
-            }
-            if (selectedElement.hasGestureBinding()) {
-                element.setGestureBindings(new ArrayList<>(selectedElement.getGestureBindings()));
-            }
+            element.setLongPressPackage(new BindPackage(selectedElement.getLongPressPackage()));
+            element.setGesturePackage(new BindPackage(selectedElement.getGesturePackage()));
             element.setX(cursor.x);
             element.setY(cursor.y);
             profile.addElement(element);
@@ -482,6 +483,7 @@ public class InputControlsView extends View {
     public synchronized void setProfile(ControlsProfile profile) {
         if (profile != null) {
             this.profile = profile;
+            Log.w("Winlator_Controls", "setProfile: name=" + profile.getName() + " elements=" + (profile.isElementsLoaded() ? profile.getElements().size() : "not_loaded"));
             deselectAllElements();
         }
         else this.profile = null;
@@ -499,6 +501,7 @@ public class InputControlsView extends View {
 
     public void setShowTouchscreenControls(boolean showTouchscreenControls) {
         this.showTouchscreenControls = showTouchscreenControls;
+        Log.w("Winlator_Controls", "setShowTouchscreenControls: " + showTouchscreenControls);
     }
 
     public float getOverlayOpacity() {
@@ -561,20 +564,38 @@ public class InputControlsView extends View {
 
     private void syncVisualStates() {
         if (profile == null) return;
+        if (visualThrottleMs == 0) {
+            float refreshRate = 60.0f;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                android.view.Display display = getDisplay();
+                if (display != null) refreshRate = display.getMode().getRefreshRate();
+            } else {
+                android.view.WindowManager wm = (android.view.WindowManager)getContext().getSystemService(Context.WINDOW_SERVICE);
+                if (wm != null) refreshRate = wm.getDefaultDisplay().getRefreshRate();
+            }
+            visualThrottleMs = (long)(1000.0f / refreshRate);
+            if (visualThrottleMs < 4) visualThrottleMs = 4;
+        }
         long now = System.currentTimeMillis();
-        boolean shouldInvalidate = (now - lastInvalidateMs) >= VISUAL_THROTTLE_MS;
+        boolean shouldInvalidate = (now - lastInvalidateMs) >= visualThrottleMs;
         if (!shouldInvalidate) return;
         List<ControlElement> elements = profile.getElements();
         int count = elements.size();
-        if (count == 0) return;
+        if (count == 0) {
+            lastInvalidateMs = now;
+            invalidate();
+            return;
+        }
         float[] pos = nativeTouchProcessor.syncPositions;
         int[] st = nativeTouchProcessor.syncStates;
         float[] scroll = nativeTouchProcessor.syncScrollOffsets;
         int n = nativeTouchProcessor.syncVisualState(pos, st, scroll);
         if (n > count) n = count;
+        int activeCount = 0;
         for (int i = 0; i < n; i++) {
             ControlElement e = elements.get(i);
             int flags = st[i];
+            if ((flags & 1) != 0) activeCount++;
             e.syncVisualState(
                 (flags & 1) != 0,
                 pos[i*2], pos[i*2+1],
@@ -585,11 +606,13 @@ public class InputControlsView extends View {
                 scroll[i]
             );
         }
+        Log.w("Winlator_Controls", "syncVisualStates: synced=" + n + " active=" + activeCount);
         lastInvalidateMs = now;
         invalidate();
     }
 
     public void tick(long timeMs) {
+        Log.w("Winlator_Controls", "tick: start timeMs=" + timeMs);
         if (nativeTouchProcessor != null) {
             nativeTouchProcessor.tick(timeMs);
             syncVisualStates();
@@ -790,6 +813,11 @@ public class InputControlsView extends View {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         resetTouchscreenTimeout();
+        {
+            int actionIndex = event.getActionIndex();
+            int pointerId = event.getPointerId(actionIndex);
+            Log.w("Winlator_Controls", "onTouchEvent: action=" + event.getActionMasked() + " pointerId=" + pointerId + " x=" + event.getX(actionIndex) + " y=" + event.getY(actionIndex));
+        }
 
         // Route through native processor
         if (nativeTouchProcessor != null && !editMode) {

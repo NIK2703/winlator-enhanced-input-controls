@@ -157,6 +157,7 @@ bool finger_has_engaged_element(int ptr_id) {
 }
 
 void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_element_down[%d] type=%d ptr=%d x=%.0f y=%.0f", (int)(e - g_state.elements), e->type, ptr_id, x, y);
     //LOG_SHARED("handle_element_down type=%d ptr=%d x=%.0f y=%.0f cur_ptr=%d engaged=%d b0=%d",
     //    e->type, ptr_id, x, y, e->current_ptr_id, e->engaged, e->bindings[0].type);
     // Java ControlElement.handleTouchDown: if (currentPointerId == -1 && containsPoint(x, y))
@@ -214,6 +215,7 @@ void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, To
 }
 
 void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* result) {
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_element_up[%d] type=%d ptr=%d", (int)(e - g_state.elements), e->type, e->current_ptr_id);
     //__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "UP type=%d ptr=%d lp_trig=%d swipe=%d b0=%d",
     //    e->type, e->current_ptr_id, e->gesture_long_press_triggered, e->gesture_swipe_triggered, e->bindings[0].type);
     switch (e->type) {
@@ -238,6 +240,7 @@ void suppress_element_gestures(TouchElement* e, TouchActionResult* result) {
     e->gesture_long_press_triggered = false;
     e->gesture_swipe_triggered = false;
     e->gesture_timer_armed = false;
+    e->visual_long_press_active = false;
     e->gesture_suppressed = true;
 }
 
@@ -252,6 +255,7 @@ void release_element_bindings(TouchElement* e, TouchActionResult* result) {
     e->gesture_long_press_triggered = false;
     e->gesture_swipe_triggered = false;
     e->gesture_timer_armed = false;
+    e->visual_long_press_active = false;
     e->current_ptr_id = -1;
     e->engaged = false;
     e->visual_active = false;
@@ -312,5 +316,29 @@ void build_spatial_grid(void) {
             g_state.spatial_grid_count[cell] = cnt + 1;
         }
     }
+}
+
+void element_reset_runtime(TouchElement* e) {
+    e->current_ptr_id = -1;
+    e->engaged = false;
+    e->gesture_suppressed = false;
+    e->visual_active = false;
+    e->visual_long_press_active = false;
+    e->selected = false;
+    e->long_press_arm = false;
+    e->gesture_long_press_triggered = false;
+    e->gesture_swipe_triggered = false;
+    e->gesture_timer_armed = false;
+    e->gesture_swipe_direction = 0;
+    e->auto_repeat_primary_pressed = false;
+    e->auto_repeat_last_time = 0;
+    e->stick_value_x = 0.0f;
+    e->stick_value_y = 0.0f;
+    e->trackpad_vel_x = 0.0f;
+    e->trackpad_vel_y = 0.0f;
+    e->range_scrolling = false;
+    e->range_hold_pressed = false;
+    e->range_pending_tap_release = false;
+    for (int p = 0; p < MAX_PETALS; p++) e->petal_active[p] = false;
 }
 

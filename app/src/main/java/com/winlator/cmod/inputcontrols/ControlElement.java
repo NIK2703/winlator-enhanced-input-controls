@@ -117,7 +117,7 @@ public class ControlElement {
     private List<List<Binding>> bindings = new ArrayList<>();
     private List<List<Boolean>> bindingSticky = new ArrayList<>();
     private boolean autoRepeat = false;
-    private int autoRepeatIntervalMs = 100;
+    private int autoRepeatIntervalMs = 200;
     private float scale = 1.0f;
     private short x;
     private short y;
@@ -152,6 +152,9 @@ public class ControlElement {
     private boolean displayTextDirty = true;
     private List<Binding> longPressBindings = new ArrayList<>();
     private List<Binding> gestureBindings = new ArrayList<>();
+    private BindPackage[] slotPackages;
+    private BindPackage longPressPackageVal;
+    private BindPackage gesturePackageVal;
     private boolean buildingCache;
     private boolean active;
     private Range range;
@@ -182,6 +185,10 @@ public class ControlElement {
             bindings.add(new ArrayList<Binding>());
             bindingSticky.add(new ArrayList<Boolean>());
         }
+        slotPackages = new BindPackage[4];
+        for (int i = 0; i < 4; i++) slotPackages[i] = new BindPackage();
+        longPressPackageVal = new BindPackage();
+        gesturePackageVal = new BindPackage();
         currentPosition = new PointF();
         refreshProfileCache();
     }
@@ -560,6 +567,105 @@ public class ControlElement {
         return true;
     }
 
+    public BindPackage getSlotPackage(int index) {
+        if (slotPackages != null && index >= 0 && index < slotPackages.length) {
+            return slotPackages[index];
+        }
+        return new BindPackage();
+    }
+
+    public void setSlotPackage(int index, BindPackage pkg) {
+        if (slotPackages != null && index >= 0 && index < slotPackages.length) {
+            slotPackages[index] = pkg;
+            while (bindings.size() <= index) {
+                bindings.add(new ArrayList<Binding>());
+                bindingSticky.add(new ArrayList<Boolean>());
+            }
+            List<Binding> seq = bindings.get(index);
+            seq.clear();
+            if (pkg != null) {
+                for (int k = 0; k < pkg.size(); k++) {
+                    seq.add(pkg.get(k));
+                }
+            }
+            invalidateElementCache();
+        }
+    }
+
+    public BindPackage getLongPressPackage() {
+        return longPressPackageVal != null ? longPressPackageVal : new BindPackage();
+    }
+
+    public void setLongPressPackage(BindPackage pkg) {
+        longPressPackageVal = pkg;
+        longPressBindings.clear();
+        if (pkg != null) {
+            for (int k = 0; k < pkg.size(); k++) {
+                longPressBindings.add(pkg.get(k));
+            }
+        }
+    }
+
+    public BindPackage getGesturePackage() {
+        return gesturePackageVal != null ? gesturePackageVal : new BindPackage();
+    }
+
+    public void setGesturePackage(BindPackage pkg) {
+        gesturePackageVal = pkg;
+        gestureBindings.clear();
+        if (pkg != null) {
+            for (int k = 0; k < pkg.size(); k++) {
+                gestureBindings.add(pkg.get(k));
+            }
+        }
+    }
+
+    public boolean hasAnySlotToggle() {
+        if (slotPackages != null) {
+            for (BindPackage pkg : slotPackages) {
+                if (pkg != null && pkg.isToggleSwitch()) return true;
+            }
+        }
+        return false;
+    }
+
+    public void setSlotToggle(int slot, boolean toggle) {
+        if (slotPackages != null && slot >= 0 && slot < slotPackages.length && slotPackages[slot] != null) {
+            slotPackages[slot].setToggleSwitch(toggle);
+        }
+    }
+
+    public boolean isLongPressToggle() {
+        return longPressPackageVal != null && longPressPackageVal.isToggleSwitch();
+    }
+
+    public boolean isGestureToggle() {
+        return gesturePackageVal != null && gesturePackageVal.isToggleSwitch();
+    }
+
+    public boolean hasAnySlotAutoRepeat() {
+        if (slotPackages != null) {
+            for (BindPackage pkg : slotPackages) {
+                if (pkg != null && pkg.isAutoRepeat()) return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean getSlotAutoRepeat(int slot) {
+        if (slotPackages != null && slot >= 0 && slot < slotPackages.length && slotPackages[slot] != null) {
+            return slotPackages[slot].isAutoRepeat();
+        }
+        return false;
+    }
+
+    public int getSlotAutoRepeatIntervalMs(int slot) {
+        if (slotPackages != null && slot >= 0 && slot < slotPackages.length && slotPackages[slot] != null) {
+            return slotPackages[slot].getAutoRepeatIntervalMs();
+        }
+        return 100;
+    }
+
     public float getScale() {
         return scale;
     }
@@ -720,7 +826,13 @@ public class ControlElement {
         }
         if (!displayTextDirty && cachedDisplayText != null) return cachedDisplayText;
         displayTextDirty = false;
+
         Binding binding = getBindingAt(0);
+        if (binding == Binding.NONE && slotPackages != null && slotPackages.length > 0 && slotPackages[0] != null && !slotPackages[0].isEmpty()) {
+            binding = slotPackages[0].get(0);
+        }
+        if (binding == null) binding = Binding.NONE;
+
         String display = binding.toString().replace("NUMPAD ", "NP").replace("BUTTON ", "");
         if (display.length() > 7) {
             String[] parts = display.split(" ");
@@ -860,7 +972,8 @@ public class ControlElement {
         int pid = p != null ? p.id : 0;
         String prefix = layer == LAYER_FILL ? "f_" : "c_";
         String raw = pid + "|" + type.ordinal() + "|" + shape.ordinal() + "|" + elementWidth + "|" + elementHeight
-            + "|" + getEffectiveCornerRadius() + "|" + scale;
+            + "|" + getEffectiveCornerRadius() + "|" + scale
+            + "|" + cachedStrokeWidth + "|" + cachedFillAlphaInactive;
         if (layer == LAYER_FILL || layer == LAYER_COMBINED) {
             raw += "|" + getDisplayText() + "|" + iconId;
             if (hasCustomIcon()) raw += "|" + customIconData;
@@ -870,7 +983,7 @@ public class ControlElement {
 
     private String visualKey(int layer) {
         float effOp = getEffectiveOpacity();
-        String base = type.ordinal() + "_" + shape.ordinal() + "_" + elementWidth + "_" + elementHeight + "_" + getEffectiveCornerRadius() + "_" + scale + "_" + (int)(effOp * 255);
+        String base = type.ordinal() + "_" + shape.ordinal() + "_" + elementWidth + "_" + elementHeight + "_" + getEffectiveCornerRadius() + "_" + scale + "_" + (int)(effOp * 255) + "_" + cachedStrokeWidth + "_" + cachedFillAlphaInactive;
         String customSuffix = hasCustomIcon() ? "_" + customIconData.hashCode() : "";
         switch (layer) {
             case 0: return base + "_" + getDisplayText() + "_" + iconId + customSuffix + "_fill";
@@ -1786,8 +1899,6 @@ public class ControlElement {
             elementJSONObject.put("x", (float)x / inputControlsView.getMaxWidth());
             elementJSONObject.put("y", (float)y / inputControlsView.getMaxHeight());
             elementJSONObject.put("toggleSwitch", toggleSwitch);
-            elementJSONObject.put("autoRepeat", autoRepeat);
-            elementJSONObject.put("autoRepeatIntervalMs", autoRepeatIntervalMs);
 
             JSONArray stickyArray = new JSONArray();
             for (List<Boolean> seq : bindingSticky) {
@@ -1819,6 +1930,16 @@ public class ControlElement {
                 }
                 elementJSONObject.put("gestureBindings", gArray);
             }
+
+            JSONArray slotPackagesArray = new JSONArray();
+            if (slotPackages != null) {
+                for (BindPackage pkg : slotPackages) {
+                    slotPackagesArray.put(pkg != null ? pkg.toJSON() : new BindPackage().toJSON());
+                }
+            }
+            elementJSONObject.put("slotPackages", slotPackagesArray);
+            if (longPressPackageVal != null) elementJSONObject.put("longPressPackage", longPressPackageVal.toJSON());
+            if (gesturePackageVal != null) elementJSONObject.put("gesturePackage", gesturePackageVal.toJSON());
 
             if (type == Type.RANGE_BUTTON && range != null) {
                 elementJSONObject.put("range", range.name());

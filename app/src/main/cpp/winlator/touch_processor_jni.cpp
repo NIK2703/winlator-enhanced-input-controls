@@ -16,6 +16,7 @@ typedef struct {
     int32_t visual_active;       // 0 or 1
     int32_t petal_active[4];     // 0 or 1 each
     float range_scroll_offset;
+    int32_t visual_long_press;   // 0 or 1 — long press activation visual
     // --- Render fields (Phase 1: native rendering support) ---
     float opacity;
     float corner_radius;
@@ -45,6 +46,7 @@ static void visual_state_flush(void) {
         g_visual_buffer[i].petal_active[2] = g_state.elements[i].petal_active[2] ? 1 : 0;
         g_visual_buffer[i].petal_active[3] = g_state.elements[i].petal_active[3] ? 1 : 0;
         g_visual_buffer[i].range_scroll_offset = g_state.elements[i].range_scroll_offset;
+        g_visual_buffer[i].visual_long_press = g_state.elements[i].visual_long_press_active ? 1 : 0;
         // --- Render fields ---
         g_visual_buffer[i].opacity = g_state.elements[i].opacity;
         g_visual_buffer[i].corner_radius = g_state.elements[i].corner_radius;
@@ -71,20 +73,25 @@ static jint nativeSyncVisualState(JNIEnv* env, jclass clazz, jfloatArray positio
     jfloat* scroll = scrollOffsets ? env->GetFloatArrayElements(scrollOffsets, NULL) : NULL;
     int max = env->GetArrayLength(positions) / 2;
     if (n > max) n = max;
+    int active_count = 0;
     for (int i = 0; i < n; i++) {
         pos[i*2] = g_state.elements[i].visual_x;
         pos[i*2+1] = g_state.elements[i].visual_y;
         int flags = g_state.elements[i].visual_active ? 1 : 0;
+        if (g_state.elements[i].visual_active) active_count++;
         if (g_state.elements[i].petal_active[0]) flags |= 2;
         if (g_state.elements[i].petal_active[1]) flags |= 4;
         if (g_state.elements[i].petal_active[2]) flags |= 8;
         if (g_state.elements[i].petal_active[3]) flags |= 16;
+        if (g_state.elements[i].element_long_press_count > 0 && g_state.elements[i].visual_long_press_active) flags |= 32;
         st[i] = flags;
         if (scroll) scroll[i] = g_state.elements[i].range_scroll_offset;
     }
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "nativeSyncVisualState: count=%d active=%d", n, active_count);
     env->ReleaseFloatArrayElements(positions, pos, 0);
     env->ReleaseIntArrayElements(states, st, 0);
     if (scroll) env->ReleaseFloatArrayElements(scrollOffsets, scroll, 0);
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "nativeSyncVisualState: count=%d active=%d", n, active_count);
     return (jint)n;
 }
 
@@ -141,6 +148,42 @@ struct CachedFieldIDs {
     jfieldID stDoubleTap2nd;
     jfieldID stSingleTapDrag2nd;
     jfieldID stDoubleTapDrag2nd;
+
+    // Toggle bitmasks for gesture bindings
+    jfieldID tgSingleTap;
+    jfieldID tgLongPress;
+    jfieldID tgDoubleTap;
+    jfieldID tgSingleTapDrag;
+    jfieldID tgLongPressDrag;
+    jfieldID tgDoubleTapDrag;
+    jfieldID tgSingleTap2nd;
+    jfieldID tgDoubleTap2nd;
+    jfieldID tgSingleTapDrag2nd;
+    jfieldID tgDoubleTapDrag2nd;
+
+    // Auto-repeat bitmasks for gesture bindings
+    jfieldID arSingleTap;
+    jfieldID arLongPress;
+    jfieldID arDoubleTap;
+    jfieldID arSingleTapDrag;
+    jfieldID arLongPressDrag;
+    jfieldID arDoubleTapDrag;
+    jfieldID arSingleTap2nd;
+    jfieldID arDoubleTap2nd;
+    jfieldID arSingleTapDrag2nd;
+    jfieldID arDoubleTapDrag2nd;
+
+    // Auto-repeat interval fields for gesture bindings
+    jfieldID arSingleTapIntervalMs;
+    jfieldID arLongPressIntervalMs;
+    jfieldID arDoubleTapIntervalMs;
+    jfieldID arSingleTapDragIntervalMs;
+    jfieldID arLongPressDragIntervalMs;
+    jfieldID arDoubleTapDragIntervalMs;
+    jfieldID arSingleTap2ndIntervalMs;
+    jfieldID arDoubleTap2ndIntervalMs;
+    jfieldID arSingleTapDrag2ndIntervalMs;
+    jfieldID arDoubleTapDrag2ndIntervalMs;
 
     // Render config fields
     jfieldID colorPrimary;
@@ -433,6 +476,71 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
                 sticky_slots[i].slot->arr[j].modifiers = 1;
     }
 
+    struct ToggleSlotPair { jfieldID fid; GestureBindingSlot* slot; };
+    ToggleSlotPair toggle_slots[] = {
+        { g_config.tgSingleTap, &c->ts[GESTURE_SINGLE_TAP] },
+        { g_config.tgLongPress, &c->ts[GESTURE_LONG_PRESS] },
+        { g_config.tgDoubleTap, &c->ts[GESTURE_DOUBLE_TAP] },
+        { g_config.tgSingleTapDrag, &c->ts[GESTURE_SINGLE_TAP_DRAG] },
+        { g_config.tgLongPressDrag, &c->ts[GESTURE_LONG_PRESS_DRAG] },
+        { g_config.tgDoubleTapDrag, &c->ts[GESTURE_DOUBLE_TAP_DRAG] },
+        { g_config.tgSingleTap2nd, &c->ts[GESTURE_SINGLE_2ND] },
+        { g_config.tgDoubleTap2nd, &c->ts[GESTURE_DOUBLE_2ND] },
+        { g_config.tgSingleTapDrag2nd, &c->ts[GESTURE_SINGLE_DRAG_2ND] },
+        { g_config.tgDoubleTapDrag2nd, &c->ts[GESTURE_DOUBLE_DRAG_2ND] },
+        { g_config.tgSingleTap, &c->tp[GESTURE_SINGLE_TAP] },
+        { g_config.tgLongPress, &c->tp[GESTURE_LONG_PRESS] },
+        { g_config.tgDoubleTap, &c->tp[GESTURE_DOUBLE_TAP] },
+        { g_config.tgSingleTapDrag, &c->tp[GESTURE_SINGLE_TAP_DRAG] },
+        { g_config.tgLongPressDrag, &c->tp[GESTURE_LONG_PRESS_DRAG] },
+        { g_config.tgDoubleTapDrag, &c->tp[GESTURE_DOUBLE_TAP_DRAG] },
+        { g_config.tgSingleTap2nd, &c->tp[GESTURE_SINGLE_2ND] },
+        { g_config.tgDoubleTap2nd, &c->tp[GESTURE_DOUBLE_2ND] },
+        { g_config.tgSingleTapDrag2nd, &c->tp[GESTURE_SINGLE_DRAG_2ND] },
+        { g_config.tgDoubleTapDrag2nd, &c->tp[GESTURE_DOUBLE_DRAG_2ND] },
+    };
+    for (int i = 0; i < (int)(sizeof(toggle_slots)/sizeof(toggle_slots[0])); i++) {
+        int mask = env->GetIntField(config, toggle_slots[i].fid);
+        for (int j = 0; j < toggle_slots[i].slot->count; j++)
+            if (mask & (1 << j))
+                toggle_slots[i].slot->arr[j].toggle = true;
+    }
+
+    // Phase 4: auto-repeat bitmasks + intervals (per-binding, like toggle)
+    struct AutoRepeatSlotPair { jfieldID fid; GestureBindingSlot* slot; jfieldID interval_fid; };
+    AutoRepeatSlotPair ar_slots[] = {
+        { g_config.arSingleTap, &c->ts[GESTURE_SINGLE_TAP], g_config.arSingleTapIntervalMs },
+        { g_config.arLongPress, &c->ts[GESTURE_LONG_PRESS], g_config.arLongPressIntervalMs },
+        { g_config.arDoubleTap, &c->ts[GESTURE_DOUBLE_TAP], g_config.arDoubleTapIntervalMs },
+        { g_config.arSingleTapDrag, &c->ts[GESTURE_SINGLE_TAP_DRAG], g_config.arSingleTapDragIntervalMs },
+        { g_config.arLongPressDrag, &c->ts[GESTURE_LONG_PRESS_DRAG], g_config.arLongPressDragIntervalMs },
+        { g_config.arDoubleTapDrag, &c->ts[GESTURE_DOUBLE_TAP_DRAG], g_config.arDoubleTapDragIntervalMs },
+        { g_config.arSingleTap2nd, &c->ts[GESTURE_SINGLE_2ND], g_config.arSingleTap2ndIntervalMs },
+        { g_config.arDoubleTap2nd, &c->ts[GESTURE_DOUBLE_2ND], g_config.arDoubleTap2ndIntervalMs },
+        { g_config.arSingleTapDrag2nd, &c->ts[GESTURE_SINGLE_DRAG_2ND], g_config.arSingleTapDrag2ndIntervalMs },
+        { g_config.arDoubleTapDrag2nd, &c->ts[GESTURE_DOUBLE_DRAG_2ND], g_config.arDoubleTapDrag2ndIntervalMs },
+        { g_config.arSingleTap, &c->tp[GESTURE_SINGLE_TAP], g_config.arSingleTapIntervalMs },
+        { g_config.arLongPress, &c->tp[GESTURE_LONG_PRESS], g_config.arLongPressIntervalMs },
+        { g_config.arDoubleTap, &c->tp[GESTURE_DOUBLE_TAP], g_config.arDoubleTapIntervalMs },
+        { g_config.arSingleTapDrag, &c->tp[GESTURE_SINGLE_TAP_DRAG], g_config.arSingleTapDragIntervalMs },
+        { g_config.arLongPressDrag, &c->tp[GESTURE_LONG_PRESS_DRAG], g_config.arLongPressDragIntervalMs },
+        { g_config.arDoubleTapDrag, &c->tp[GESTURE_DOUBLE_TAP_DRAG], g_config.arDoubleTapDragIntervalMs },
+        { g_config.arSingleTap2nd, &c->tp[GESTURE_SINGLE_2ND], g_config.arSingleTap2ndIntervalMs },
+        { g_config.arDoubleTap2nd, &c->tp[GESTURE_DOUBLE_2ND], g_config.arDoubleTap2ndIntervalMs },
+        { g_config.arSingleTapDrag2nd, &c->tp[GESTURE_SINGLE_DRAG_2ND], g_config.arSingleTapDrag2ndIntervalMs },
+        { g_config.arDoubleTapDrag2nd, &c->tp[GESTURE_DOUBLE_DRAG_2ND], g_config.arDoubleTapDrag2ndIntervalMs },
+    };
+    for (int i = 0; i < (int)(sizeof(ar_slots)/sizeof(ar_slots[0])); i++) {
+        int mask = env->GetIntField(config, ar_slots[i].fid);
+        int interval = env->GetIntField(config, ar_slots[i].interval_fid);
+        if (interval <= 0) interval = 100;
+        for (int j = 0; j < ar_slots[i].slot->count; j++) {
+            if (mask & (1 << j))
+                ar_slots[i].slot->arr[j].auto_repeat = true;
+            ar_slots[i].slot->arr[j].auto_repeat_interval_ms = interval;
+        }
+    }
+
     c->color_primary = (uint32_t)env->GetIntField(config, g_config.colorPrimary);
     c->color_secondary = (uint32_t)env->GetIntField(config, g_config.colorSecondary);
     c->stroke_width_default = env->GetFloatField(config, g_config.strokeWidthDefault);
@@ -527,6 +635,57 @@ static void cache_config_field_ids(JNIEnv* env, jobject config) {
         JNI_CHECK(env, stickies[i].name);
     }
 
+    struct { jfieldID* dst; const char* name; } toggles[] = {
+        { &g_config.tgSingleTap, "tgSingleTap" },
+        { &g_config.tgLongPress, "tgLongPress" },
+        { &g_config.tgDoubleTap, "tgDoubleTap" },
+        { &g_config.tgSingleTapDrag, "tgSingleTapDrag" },
+        { &g_config.tgLongPressDrag, "tgLongPressDrag" },
+        { &g_config.tgDoubleTapDrag, "tgDoubleTapDrag" },
+        { &g_config.tgSingleTap2nd, "tgSingleTap2nd" },
+        { &g_config.tgDoubleTap2nd, "tgDoubleTap2nd" },
+        { &g_config.tgSingleTapDrag2nd, "tgSingleTapDrag2nd" },
+        { &g_config.tgDoubleTapDrag2nd, "tgDoubleTapDrag2nd" },
+    };
+    for (int i = 0; i < (int)(sizeof(toggles)/sizeof(toggles[0])); i++) {
+        *toggles[i].dst = env->GetFieldID(cls, toggles[i].name, "I");
+        JNI_CHECK(env, toggles[i].name);
+    }
+
+    struct { jfieldID* dst; const char* name; } auto_repeats[] = {
+        { &g_config.arSingleTap, "arSingleTap" },
+        { &g_config.arLongPress, "arLongPress" },
+        { &g_config.arDoubleTap, "arDoubleTap" },
+        { &g_config.arSingleTapDrag, "arSingleTapDrag" },
+        { &g_config.arLongPressDrag, "arLongPressDrag" },
+        { &g_config.arDoubleTapDrag, "arDoubleTapDrag" },
+        { &g_config.arSingleTap2nd, "arSingleTap2nd" },
+        { &g_config.arDoubleTap2nd, "arDoubleTap2nd" },
+        { &g_config.arSingleTapDrag2nd, "arSingleTapDrag2nd" },
+        { &g_config.arDoubleTapDrag2nd, "arDoubleTapDrag2nd" },
+    };
+    for (int i = 0; i < (int)(sizeof(auto_repeats)/sizeof(auto_repeats[0])); i++) {
+        *auto_repeats[i].dst = env->GetFieldID(cls, auto_repeats[i].name, "I");
+        JNI_CHECK(env, auto_repeats[i].name);
+    }
+
+    struct { jfieldID* dst; const char* name; } ar_intervals[] = {
+        { &g_config.arSingleTapIntervalMs, "arSingleTapIntervalMs" },
+        { &g_config.arLongPressIntervalMs, "arLongPressIntervalMs" },
+        { &g_config.arDoubleTapIntervalMs, "arDoubleTapIntervalMs" },
+        { &g_config.arSingleTapDragIntervalMs, "arSingleTapDragIntervalMs" },
+        { &g_config.arLongPressDragIntervalMs, "arLongPressDragIntervalMs" },
+        { &g_config.arDoubleTapDragIntervalMs, "arDoubleTapDragIntervalMs" },
+        { &g_config.arSingleTap2ndIntervalMs, "arSingleTap2ndIntervalMs" },
+        { &g_config.arDoubleTap2ndIntervalMs, "arDoubleTap2ndIntervalMs" },
+        { &g_config.arSingleTapDrag2ndIntervalMs, "arSingleTapDrag2ndIntervalMs" },
+        { &g_config.arDoubleTapDrag2ndIntervalMs, "arDoubleTapDrag2ndIntervalMs" },
+    };
+    for (int i = 0; i < (int)(sizeof(ar_intervals)/sizeof(ar_intervals[0])); i++) {
+        *ar_intervals[i].dst = env->GetFieldID(cls, ar_intervals[i].name, "I");
+        JNI_CHECK(env, ar_intervals[i].name);
+    }
+
     env->DeleteLocalRef(cls);
     g_config_cached = true;
 }
@@ -538,6 +697,11 @@ static void nativeInit(JNIEnv* env, jclass clazz, jobject config) {
     memset(&c, 0, sizeof(c));
     read_config_from_java(env, config, &c);
     touch_processor_init(&c);
+
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "nativeInit: touch_mode=%d input_mode=%d screen=%dx%d caps={gesture=%d drag=%d dt=%d lp=%d lpt=%d}",
+        c.touch_mode, c.input_mode, c.screen_w, c.screen_h,
+        c.caps_has_gesture_bindings, c.caps_has_drag_bindings,
+        c.caps_has_double_tap, c.caps_has_long_press, c.caps_has_long_press_timer);
 }
 
 #pragma pack(push, 1)
@@ -624,6 +788,7 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
     }
 
     jsize len = env->GetArrayLength(elements);
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "nativeSetElements: array_len=%d", (int)len);
     if (len > MAX_ELEMENTS) len = MAX_ELEMENTS;
 
     TouchElement elems[MAX_ELEMENTS];
@@ -640,6 +805,7 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
         elems[i].w = env->GetFloatField(je, g_elem.w);
         elems[i].h = env->GetFloatField(je, g_elem.h);
         elems[i].scale = env->GetFloatField(je, g_elem.scale);
+        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "  elem[%d] type=%d x=%d y=%d scale=%.2f", i, (int)elems[i].type, elems[i].x, elems[i].y, elems[i].scale);
         elems[i].passthrough_touch = env->GetBooleanField(je, g_elem.passthroughTouch);
         elems[i].activation_mode = (ActivationMode)env->GetIntField(je, g_elem.activationMode);
         elems[i].toggle_switch = env->GetBooleanField(je, g_elem.toggleSwitch);
@@ -702,6 +868,7 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
         for (int p = 0; p < MAX_PETALS; p++) elems[i].petal_active[p] = false;
 
         env->DeleteLocalRef(je);
+        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "  elem[%d] type=%d x=%d y=%d scale=%.2f", i, (int)elems[i].type, elems[i].x, elems[i].y, elems[i].scale);
     }
 
     touch_processor_set_elements(elems, len);

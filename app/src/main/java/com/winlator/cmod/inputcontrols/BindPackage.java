@@ -2,6 +2,7 @@ package com.winlator.cmod.inputcontrols;
 
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,6 +14,9 @@ public class BindPackage {
 
     private final List<Binding> bindings = new ArrayList<>();
     private final List<Boolean> stickyFlags = new ArrayList<>();
+    private boolean toggleSwitch = false;
+    private boolean autoRepeat = false;
+    private int autoRepeatIntervalMs = 200;
 
     public BindPackage() {}
 
@@ -21,6 +25,8 @@ public class BindPackage {
             this.bindings.add(b);
             this.stickyFlags.add(false);
         }
+        this.toggleSwitch = false;
+        this.autoRepeat = false;
     }
 
     public BindPackage(List<Binding> bindings, List<Boolean> stickyFlags) {
@@ -28,11 +34,16 @@ public class BindPackage {
             this.bindings.add(bindings.get(i));
             this.stickyFlags.add(i < stickyFlags.size() && stickyFlags.get(i) != null && stickyFlags.get(i));
         }
+        this.toggleSwitch = false;
+        this.autoRepeat = false;
     }
 
     public BindPackage(BindPackage other) {
         this.bindings.addAll(other.bindings);
         this.stickyFlags.addAll(other.stickyFlags);
+        this.toggleSwitch = other.toggleSwitch;
+        this.autoRepeat = other.autoRepeat;
+        this.autoRepeatIntervalMs = other.autoRepeatIntervalMs;
     }
 
     public List<Binding> getBindings() {
@@ -42,6 +53,15 @@ public class BindPackage {
     public List<Boolean> getStickyFlags() {
         return Collections.unmodifiableList(stickyFlags);
     }
+
+    public boolean isToggleSwitch() { return toggleSwitch; }
+
+    public void setToggleSwitch(boolean toggleSwitch) { this.toggleSwitch = toggleSwitch; }
+
+    public boolean isAutoRepeat() { return autoRepeat; }
+    public void setAutoRepeat(boolean autoRepeat) { this.autoRepeat = autoRepeat; }
+    public int getAutoRepeatIntervalMs() { return autoRepeatIntervalMs; }
+    public void setAutoRepeatIntervalMs(int autoRepeatIntervalMs) { this.autoRepeatIntervalMs = autoRepeatIntervalMs; }
 
     public Binding get(int index) {
         return index >= 0 && index < bindings.size() ? bindings.get(index) : Binding.NONE;
@@ -61,6 +81,9 @@ public class BindPackage {
     public void clear() {
         bindings.clear();
         stickyFlags.clear();
+        this.toggleSwitch = false;
+        this.autoRepeat = false;
+        this.autoRepeatIntervalMs = 200;
     }
 
     public void add(Binding binding) {
@@ -159,12 +182,76 @@ public class BindPackage {
         return mask;
     }
 
+    public int encodeToggleBitmask() {
+        int mask = 0;
+        int nonNoneIdx = 0;
+        for (int i = 0; i < bindings.size(); i++) {
+            Binding b = bindings.get(i);
+            if (b == null || b == Binding.NONE) continue;
+            if (toggleSwitch) {
+                mask |= (1 << nonNoneIdx);
+            }
+            nonNoneIdx++;
+        }
+        return mask;
+    }
+
+    public int encodeAutoRepeatBitmask() {
+        int mask = 0;
+        int nonNoneIdx = 0;
+        for (int i = 0; i < bindings.size(); i++) {
+            Binding b = bindings.get(i);
+            if (b == null || b == Binding.NONE) continue;
+            if (autoRepeat) {
+                mask |= (1 << nonNoneIdx);
+            }
+            nonNoneIdx++;
+        }
+        return mask;
+    }
+
     public JSONArray toJSONArray() {
         JSONArray arr = new JSONArray();
         for (Binding b : bindings) {
             if (b != null && b != Binding.NONE) arr.put(b.name());
         }
         return arr;
+    }
+
+    public JSONObject toJSON() {
+        JSONObject obj = new JSONObject();
+        try {
+            JSONArray bindingsArr = new JSONArray();
+            JSONArray stickyArr = new JSONArray();
+            for (int i = 0; i < bindings.size(); i++) {
+                Binding b = bindings.get(i);
+                if (b != null && b != Binding.NONE) {
+                    bindingsArr.put(b.name());
+                    stickyArr.put(isSticky(i));
+                }
+            }
+            obj.put("bindings", bindingsArr);
+            obj.put("sticky", stickyArr);
+            obj.put("toggleSwitch", toggleSwitch);
+            obj.put("autoRepeat", autoRepeat);
+            obj.put("autoRepeatIntervalMs", autoRepeatIntervalMs);
+        } catch (JSONException e) {}
+        return obj;
+    }
+
+    public static BindPackage fromJSON(JSONObject obj, Binding defaultBinding) {
+        JSONArray bindingsArray = obj.optJSONArray("bindings");
+        BindPackage bp = fromJSONArray(bindingsArray, defaultBinding);
+        bp.setToggleSwitch(obj.optBoolean("toggleSwitch", false));
+        bp.setAutoRepeat(obj.optBoolean("autoRepeat", false));
+        bp.setAutoRepeatIntervalMs(obj.optInt("autoRepeatIntervalMs", 200));
+        JSONArray stickyArray = obj.optJSONArray("sticky");
+        if (stickyArray != null) {
+            for (int i = 0; i < stickyArray.length() && i < bp.size(); i++) {
+                bp.setSticky(i, stickyArray.optBoolean(i, false));
+            }
+        }
+        return bp;
     }
 
     public JSONArray stickyToJSONArray() {
@@ -187,7 +274,6 @@ public class BindPackage {
                 }
             }
         }
-        if (bp.isEmpty()) bp.add(Binding.NONE);
         return bp;
     }
 

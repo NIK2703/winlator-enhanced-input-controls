@@ -7,6 +7,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <android/log.h>
+
+#define TP_LOG(prio, tag, fmt, ...) __android_log_print(prio, tag, fmt, ##__VA_ARGS__)
+#ifndef LOG_TAG
+#define LOG_TAG "Winlator_Touch"
+#endif
 #define MAX_TRACKED_PER_POINTER 8
 #define TWO_FINGER_SCROLL_DIST 350
 #define SCROLL_ACCUM_THRESHOLD 100
@@ -20,6 +26,7 @@
 
 // Scheduled actions (non-blocking replacement for delay_ms)
 #define MAX_SCHEDULED_ACTIONS 32
+#define MAX_HELD_ACTIONS 16
 
 typedef struct {
     uint64_t scheduled_time_ms;
@@ -71,6 +78,16 @@ typedef struct {
     TouchBinding gesture_held_actions[16];
     int gesture_held_count;
     bool gesture_is_action_held;
+
+    // Toggle actions (persist across finger-ups until explicitly toggled off)
+    TouchBinding gesture_toggled_actions[16];
+    int gesture_toggled_count;
+
+    // Gesture auto-repeat last fire time per toggled action (indexed by gesture_toggled_actions[])
+    uint64_t gesture_auto_repeat_last_time[16];
+
+    // Gesture auto-repeat last fire time per held action (indexed by gesture_held_actions[])
+    uint64_t gesture_auto_repeat_last_time_held[16];
 
     // Second-finger double-tap state (global, survives finger deactivation between taps)
     // Mirrors Java TouchpadGestureHandler secondFingerDoubleTapWaiting, pendingSecondTapAction, etc.
@@ -203,29 +220,17 @@ typedef struct {
 static inline GestureModeBindings get_mode_bindings(void) {
     GestureModeBindings b;
     const TouchProcessorConfig* c = &g_state.cfg;
-    if (c->touch_mode == TOUCH_MODE_TOUCHSCREEN) {
-        b.single_tap        = c->ts_single_tap;        b.single_tap_count        = c->ts_single_tap_count;
-        b.long_press        = c->ts_long_press;        b.long_press_count        = c->ts_long_press_count;
-        b.double_tap        = c->ts_double_tap;        b.double_tap_count        = c->ts_double_tap_count;
-        b.single_tap_drag   = c->ts_single_tap_drag;   b.single_tap_drag_count   = c->ts_single_tap_drag_count;
-        b.long_press_drag   = c->ts_long_press_drag;   b.long_press_drag_count   = c->ts_long_press_drag_count;
-        b.double_tap_drag   = c->ts_double_tap_drag;   b.double_tap_drag_count   = c->ts_double_tap_drag_count;
-        b.single_2nd        = c->ts_single_2nd;        b.single_2nd_count        = c->ts_single_2nd_count;
-        b.double_2nd        = c->ts_double_2nd;        b.double_2nd_count        = c->ts_double_2nd_count;
-        b.single_drag_2nd   = c->ts_single_drag_2nd;   b.single_drag_2nd_count   = c->ts_single_drag_2nd_count;
-        b.double_drag_2nd   = c->ts_double_drag_2nd;   b.double_drag_2nd_count   = c->ts_double_drag_2nd_count;
-    } else {
-        b.single_tap        = c->tp_single_tap;        b.single_tap_count        = c->tp_single_tap_count;
-        b.long_press        = c->tp_long_press;        b.long_press_count        = c->tp_long_press_count;
-        b.double_tap        = c->tp_double_tap;        b.double_tap_count        = c->tp_double_tap_count;
-        b.single_tap_drag   = c->tp_single_tap_drag;   b.single_tap_drag_count   = c->tp_single_tap_drag_count;
-        b.long_press_drag   = c->tp_long_press_drag;   b.long_press_drag_count   = c->tp_long_press_drag_count;
-        b.double_tap_drag   = c->tp_double_tap_drag;   b.double_tap_drag_count   = c->tp_double_tap_drag_count;
-        b.single_2nd        = c->tp_single_2nd;        b.single_2nd_count        = c->tp_single_2nd_count;
-        b.double_2nd        = c->tp_double_2nd;        b.double_2nd_count        = c->tp_double_2nd_count;
-        b.single_drag_2nd   = c->tp_single_drag_2nd;   b.single_drag_2nd_count   = c->tp_single_drag_2nd_count;
-        b.double_drag_2nd   = c->tp_double_drag_2nd;   b.double_drag_2nd_count   = c->tp_double_drag_2nd_count;
-    }
+    const GestureBindingSlot* slots = (c->touch_mode == TOUCH_MODE_TOUCHSCREEN) ? c->ts : c->tp;
+    b.single_tap        = slots[GESTURE_SINGLE_TAP].arr;        b.single_tap_count        = slots[GESTURE_SINGLE_TAP].count;
+    b.long_press        = slots[GESTURE_LONG_PRESS].arr;        b.long_press_count        = slots[GESTURE_LONG_PRESS].count;
+    b.double_tap        = slots[GESTURE_DOUBLE_TAP].arr;        b.double_tap_count        = slots[GESTURE_DOUBLE_TAP].count;
+    b.single_tap_drag   = slots[GESTURE_SINGLE_TAP_DRAG].arr;   b.single_tap_drag_count   = slots[GESTURE_SINGLE_TAP_DRAG].count;
+    b.long_press_drag   = slots[GESTURE_LONG_PRESS_DRAG].arr;   b.long_press_drag_count   = slots[GESTURE_LONG_PRESS_DRAG].count;
+    b.double_tap_drag   = slots[GESTURE_DOUBLE_TAP_DRAG].arr;   b.double_tap_drag_count   = slots[GESTURE_DOUBLE_TAP_DRAG].count;
+    b.single_2nd        = slots[GESTURE_SINGLE_2ND].arr;        b.single_2nd_count        = slots[GESTURE_SINGLE_2ND].count;
+    b.double_2nd        = slots[GESTURE_DOUBLE_2ND].arr;        b.double_2nd_count        = slots[GESTURE_DOUBLE_2ND].count;
+    b.single_drag_2nd   = slots[GESTURE_SINGLE_DRAG_2ND].arr;   b.single_drag_2nd_count   = slots[GESTURE_SINGLE_DRAG_2ND].count;
+    b.double_drag_2nd   = slots[GESTURE_DOUBLE_DRAG_2ND].arr;   b.double_drag_2nd_count   = slots[GESTURE_DOUBLE_DRAG_2ND].count;
     return b;
 }
 
@@ -318,6 +323,15 @@ static inline void gesture_clear_deferred_tap(void) {
 
 static inline void gesture_clear_pending_long_press(void) {
     g_state.gesture_pending_deferred_long_press_count = 0;
+}
+
+static inline void gesture_clear_second_finger_globals(void) {
+    g_state.gesture_second_active = false;
+    g_state.gesture_second_ptr_id = -1;
+    g_state.gesture_deferred_second_finger_tap = false;
+    g_state.gesture_post_double_tap_drag = false;
+    g_state.gesture_second_main_ref_x = 0;
+    g_state.gesture_second_main_ref_y = 0;
 }
 
 static inline void gesture_clear_second_finger_state(void) {
@@ -467,5 +481,8 @@ void process_scheduled_actions(TouchActionResult* result, uint64_t time_ms);
 
 // Spatial grid
 void build_spatial_grid(void);
+
+// Element runtime reset (defined in element/shared.c)
+void element_reset_runtime(TouchElement* e);
 
 #endif // TOUCH_PROCESSOR_INTERNAL_H

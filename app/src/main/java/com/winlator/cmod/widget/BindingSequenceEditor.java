@@ -1,11 +1,16 @@
 package com.winlator.cmod.widget;
 
+import android.app.AlertDialog;
 import android.content.Context;
+import android.os.Build;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import com.winlator.cmod.R;
@@ -53,6 +58,55 @@ public class BindingSequenceEditor {
             leftGroup.addView(btHelp);
         }
         titleRow.addView(leftGroup);
+
+        {
+            ImageView btMenu = new ImageView(context);
+            int menuSize = (int) UnitUtils.dpToPx(22);
+            LinearLayout.LayoutParams lpMenu = new LinearLayout.LayoutParams(menuSize, menuSize);
+            lpMenu.leftMargin = (int) UnitUtils.dpToPx(4);
+            btMenu.setLayoutParams(lpMenu);
+            btMenu.setImageResource(android.R.drawable.ic_menu_more);
+            btMenu.setColorFilter(0xffe0e0e0);
+            btMenu.setOnClickListener((v) -> {
+                PopupMenu popupMenu = new PopupMenu(context, v);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) popupMenu.setForceShowIcon(true);
+                MenuItem toggleItem = popupMenu.getMenu().add(0, 1, 0, "Toggle Switch");
+                toggleItem.setCheckable(true);
+                toggleItem.setChecked(bp.isToggleSwitch());
+                toggleItem.setOnMenuItemClickListener((menuItem) -> {
+                    boolean newState = !bp.isToggleSwitch();
+                    bp.setToggleSwitch(newState);
+                    menuItem.setChecked(newState);
+                    if (onChanged != null) onChanged.run();
+                    return true;
+                });
+
+                MenuItem autoRepeatItem = popupMenu.getMenu().add(0, 2, 0, "Auto Repeat");
+                autoRepeatItem.setCheckable(true);
+                autoRepeatItem.setChecked(bp.isAutoRepeat());
+
+                MenuItem intervalItem = popupMenu.getMenu().add(0, 3, 0, "Interval: " + bp.getAutoRepeatIntervalMs() + "ms");
+                intervalItem.setEnabled(bp.isAutoRepeat());
+
+                autoRepeatItem.setOnMenuItemClickListener((menuItem) -> {
+                    boolean newState = !bp.isAutoRepeat();
+                    bp.setAutoRepeat(newState);
+                    menuItem.setChecked(newState);
+                    intervalItem.setEnabled(newState);
+                    if (onChanged != null) onChanged.run();
+                    if (newState) showIntervalDialog(context, intervalItem, bp, onChanged);
+                    return true;
+                });
+
+                intervalItem.setOnMenuItemClickListener((menuItem) -> {
+                    showIntervalDialog(context, intervalItem, bp, onChanged);
+                    return true;
+                });
+
+                popupMenu.show();
+            });
+            titleRow.addView(btMenu);
+        }
 
         section.addView(titleRow);
 
@@ -117,6 +171,13 @@ public class BindingSequenceEditor {
             bp.add(Binding.NONE);
             if (onChanged != null) onChanged.run();
             if (populateRef[0] != null) populateRef[0].run();
+
+            int lastIndex = bp.size() - 1;
+            if (lastIndex >= 0 && lastIndex < llItems.getChildCount()) {
+                View lastRow = llItems.getChildAt(lastIndex);
+                TextView btBinding = lastRow.findViewById(R.id.BTBinding);
+                if (btBinding != null) btBinding.performClick();
+            }
         });
         section.addView(btAdd);
 
@@ -128,5 +189,44 @@ public class BindingSequenceEditor {
         populateRef[0].run();
 
         return section;
+    }
+
+    private static void showIntervalDialog(Context context, MenuItem intervalItem, BindPackage bp, Runnable onChanged) {
+        LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) UnitUtils.dpToPx(20);
+        layout.setPadding(pad, pad, pad, pad);
+
+        SeekBar seekBar = new SeekBar(context);
+        seekBar.setMax(95);
+        int cur = bp.getAutoRepeatIntervalMs();
+        seekBar.setProgress(Math.max(0, cur / 10 - 5));
+        layout.addView(seekBar);
+
+        TextView tvValue = new TextView(context);
+        tvValue.setText(String.valueOf(cur) + "ms");
+        tvValue.setGravity(android.view.Gravity.CENTER);
+        tvValue.setTextSize(18);
+        layout.addView(tvValue);
+
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar s, int progress, boolean fromUser) {
+                tvValue.setText(String.valueOf((progress + 5) * 10) + "ms");
+            }
+            @Override public void onStartTrackingTouch(SeekBar s) {}
+            @Override public void onStopTrackingTouch(SeekBar s) {}
+        });
+
+        new AlertDialog.Builder(context)
+            .setTitle("Repeat Interval")
+            .setView(layout)
+            .setPositiveButton("OK", (dialog, which) -> {
+                int value = (seekBar.getProgress() + 5) * 10;
+                bp.setAutoRepeatIntervalMs(value);
+                intervalItem.setTitle("Interval: " + value + "ms");
+                if (onChanged != null) onChanged.run();
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 }

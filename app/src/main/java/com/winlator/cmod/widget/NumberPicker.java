@@ -1,7 +1,10 @@
 package com.winlator.cmod.widget;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.TypedArray;
+import android.graphics.Color;
+import android.preference.PreferenceManager;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
@@ -41,6 +44,12 @@ public class NumberPicker extends FrameLayout implements View.OnTouchListener {
         editText = findViewById(R.id.EditText);
         findViewById(R.id.BTDecrement).setOnTouchListener(this);
         findViewById(R.id.BTIncrement).setOnTouchListener(this);
+
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        if (preferences.getBoolean("dark_mode", true)) {
+            editText.setTextColor(Color.WHITE);
+            editText.setBackgroundResource(R.drawable.edit_text_dark);
+        }
 
         editText.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}

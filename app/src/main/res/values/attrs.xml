@@ -18,6 +18,7 @@
         <attr name="colorSecondary" format="color" /> <!-- Defines colorSecondary attribute -->
     </declare-styleable>
 
+    <attr name="tabLayoutBackground" format="reference" />
     <attr name="extraKeysButtonTextColor" format="reference" />
     <attr name="extraKeysButtonActiveTextColor" format="reference" />
     <attr name="extraKeysButtonBackgroundColor" format="reference" />
