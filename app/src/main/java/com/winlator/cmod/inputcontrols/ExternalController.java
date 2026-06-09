@@ -66,7 +66,7 @@ public class ExternalController {
 
 
 
-    public static final HashMap<Byte, Byte> buttonMappings = new HashMap<>();
+    public final HashMap<Byte, Byte> buttonMappings = new HashMap<>();
 
 
     private boolean triggerLPressedViaButton = false;
@@ -160,17 +160,19 @@ public class ExternalController {
     private void processJoystickInput(MotionEvent event, int historyPos) {
         state.thumbLX = getCenteredAxis(event, MotionEvent.AXIS_X, historyPos);
         state.thumbLY = getCenteredAxis(event, MotionEvent.AXIS_Y, historyPos);
-        state.thumbRX = getCenteredAxis(event, MotionEvent.AXIS_Z, historyPos);
-        state.thumbRY = getCenteredAxis(event, MotionEvent.AXIS_RZ, historyPos);
+        state.thumbRX = getCenteredAxis(event, MotionEvent.AXIS_RX, historyPos);
+        if (state.thumbRX == 0f) state.thumbRX = getCenteredAxis(event, MotionEvent.AXIS_Z, historyPos);
+        state.thumbRY = getCenteredAxis(event, MotionEvent.AXIS_RY, historyPos);
+        if (state.thumbRY == 0f) state.thumbRY = getCenteredAxis(event, MotionEvent.AXIS_RZ, historyPos);
 
         if (historyPos == -1) {
             float axisX = getCenteredAxis(event, MotionEvent.AXIS_HAT_X, historyPos);
             float axisY = getCenteredAxis(event, MotionEvent.AXIS_HAT_Y, historyPos);
 
-            state.dpad[0] = axisY == -1.0f && Math.abs(state.thumbLY) < ControlElement.STICK_DEAD_ZONE;
-            state.dpad[1] = axisX == 1.0f && Math.abs(state.thumbLX) < ControlElement.STICK_DEAD_ZONE;
-            state.dpad[2] = axisY == 1.0f && Math.abs(state.thumbLY) < ControlElement.STICK_DEAD_ZONE;
-            state.dpad[3] = axisX == -1.0f && Math.abs(state.thumbLX) < ControlElement.STICK_DEAD_ZONE;
+            state.dpad[0] = axisY == -1.0f;
+            state.dpad[1] = axisX == 1.0f;
+            state.dpad[2] = axisY == 1.0f;
+            state.dpad[3] = axisX == -1.0f;
         }
     }
 
@@ -181,8 +183,8 @@ public class ExternalController {
         float r = event.getAxisValue(MotionEvent.AXIS_RTRIGGER) == 0f ? event.getAxisValue(MotionEvent.AXIS_GAS) : event.getAxisValue(MotionEvent.AXIS_RTRIGGER);
         state.triggerL = l;
         state.triggerR = r;
-        state.setPressed(IDX_BUTTON_L2, l == 1.0f);
-        state.setPressed(IDX_BUTTON_R2, r == 1.0f);
+        state.setPressed(IDX_BUTTON_L2, l >= 0.5f);
+        state.setPressed(IDX_BUTTON_R2, r >= 0.5f);
     }
 
     public boolean isXboxController() {
@@ -247,26 +249,31 @@ public class ExternalController {
         int buttonIdx = getButtonIdxByKeyCode(keyCode);
         if (buttonIdx != -1) {
             if (buttonIdx == IDX_BUTTON_L2) {
+                state.triggerL = pressed ? 1.0f : 0f;
+                state.setPressed(buttonIdx, pressed);
                 return true;
             } else if (buttonIdx == IDX_BUTTON_R2) {
-                return true;
-            } else
+                state.triggerR = pressed ? 1.0f : 0f;
                 state.setPressed(buttonIdx, pressed);
+                return true;
+            } else {
+                state.setPressed(buttonIdx, pressed);
+            }
             return true;
         }
 
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_UP:
-                state.dpad[0] = pressed && Math.abs(state.thumbLY) < ControlElement.STICK_DEAD_ZONE;
+                state.dpad[0] = pressed;
                 return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                state.dpad[1] = pressed && Math.abs(state.thumbLX) < ControlElement.STICK_DEAD_ZONE;
+                state.dpad[1] = pressed;
                 return true;
             case KeyEvent.KEYCODE_DPAD_DOWN:
-                state.dpad[2] = pressed && Math.abs(state.thumbLY) < ControlElement.STICK_DEAD_ZONE;
+                state.dpad[2] = pressed;
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
-                state.dpad[3] = pressed && Math.abs(state.thumbLX) < ControlElement.STICK_DEAD_ZONE;
+                state.dpad[3] = pressed;
                 return true;
         }
         return false;
@@ -299,7 +306,7 @@ public class ExternalController {
     public static ExternalController getController(int deviceId) {
         int[] deviceIds = InputDevice.getDeviceIds();
         for (int i = deviceIds.length-1; i >= 0; i--) {
-            if (deviceIds[i] == deviceId || deviceId == 0) {
+            if (deviceIds[i] == deviceId) {
                 InputDevice device = InputDevice.getDevice(deviceIds[i]);
                 if (isGameController(device)) {
                     ExternalController controller = new ExternalController();

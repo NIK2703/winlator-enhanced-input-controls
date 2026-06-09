@@ -27,7 +27,6 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     if (g_state.cfg.xform_scale_y <= 0.0f) g_state.cfg.xform_scale_y = 1.0f;
     g_state.cfg.bindings_generation = 1;
     compute_gesture_caps(&g_state.cfg);
-    init_bezier_lut();
 }
 
 void touch_processor_update_config(const TouchProcessorConfig* config) {
@@ -35,11 +34,28 @@ void touch_processor_update_config(const TouchProcessorConfig* config) {
     compute_gesture_caps(&g_state.cfg);
     g_state.cfg.bindings_generation++;
 
+    // Clear stale gesture state from previous mode on switch
+    g_state.gesture_post_double_tap_drag = false;
+    g_state.gesture_second_active = false;
+    g_state.gesture_second_ptr_id = -1;
+    g_state.gesture_double_tap_waiting = false;
+    g_state.gesture_double_tap_consumed = false;
+    g_state.gesture_deferred_second_finger_tap = false;
+    g_state.gesture_main_ptr_id = -1;
+    g_state.second_double_tap_waiting = false;
+    gesture_clear_deferred_tap();
+    gesture_clear_pending_long_press();
+    gesture_clear_second_finger_state();
+
     for (int i = 0; i < MAX_FINGERS; i++) {
         TouchFinger* f = &g_state.fingers[i];
         if (!f->active) continue;
-        FingerBindings* fb = &f->bindings;
-        setup_main_finger_bindings(fb);
+        if (f->is_second_finger) {
+            setup_second_finger_bindings(f);
+        } else {
+            FingerBindings* fb = &f->bindings;
+            setup_main_finger_bindings(fb);
+        }
         f->bindings_generation = g_state.cfg.bindings_generation;
         touch_finger_cache_bs(f);
     }
@@ -59,7 +75,14 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
     g_state.cfg.caps_has_auto_repeat_buttons = false;
     g_state.cfg.caps_has_mouse_left_element = false;
     g_state.cfg.caps_has_passthrough_elements = false;
-    g_state.activation_mode = (n > 0) ? g_state.elements[0].activation_mode : ACTIVATION_LOCK;
+    bool has_track = false, has_hover = false;
+    for (int i = 0; i < n; i++) {
+        if (g_state.elements[i].activation_mode == ACTIVATION_TRACK) has_track = true;
+        if (g_state.elements[i].activation_mode == ACTIVATION_HOVER) has_hover = true;
+    }
+    if (has_hover) g_state.activation_mode = ACTIVATION_HOVER;
+    else if (has_track) g_state.activation_mode = ACTIVATION_TRACK;
+    else g_state.activation_mode = ACTIVATION_LOCK;
 
     for (int i = 0; i < n; i++) {
         TouchElement* e = &g_state.elements[i];
@@ -87,6 +110,7 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
             g_state.cfg.caps_has_any_element_long_press = true;
         if (e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE)
             g_state.cfg.caps_has_any_element_gesture = true;
+        e->cached_has_auto_repeat = element_has_auto_repeat(e);
         if (e->cached_has_auto_repeat)
             g_state.cfg.caps_has_auto_repeat_buttons = true;
         if (e->bindings[0].type == BINDING_MOUSE_LEFT)
@@ -95,16 +119,19 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
             g_state.cfg.caps_has_passthrough_elements = true;
         float hs_snap = g_state.snapping_size > 0.0f ? g_state.snapping_size : 1.0f;
         element_compute_snapped_hwhh(e, hs_snap);
-
-        e->cached_has_auto_repeat = element_has_auto_repeat(e);
         e->cached_has_long_press = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
         e->cached_has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
         e->cached_has_any_binding = e->bindings[0].type != BINDING_NONE
                                  || e->bindings[1].type != BINDING_NONE
                                  || e->bindings[2].type != BINDING_NONE
                                  || e->bindings[3].type != BINDING_NONE;
-        e->cached_auto_repeat_interval = e->bindings[0].auto_repeat_interval_ms > 0
-            ? e->bindings[0].auto_repeat_interval_ms : 100;
+        e->cached_auto_repeat_interval = 100;
+        for (int k = 0; k < 4; k++) {
+            if ((e->bindings[k].toggle || e->bindings[k].auto_repeat) && e->bindings[k].auto_repeat_interval_ms > 0) {
+                e->cached_auto_repeat_interval = e->bindings[k].auto_repeat_interval_ms;
+                break;
+            }
+        }
         e->cached_lp_has_toggle = false;
         for (int k = 0; k < e->element_long_press_count; k++)
             if (e->element_long_press[k].toggle) { e->cached_lp_has_toggle = true; break; }
@@ -140,8 +167,16 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
 void touch_processor_set_snapping_size(float size) {
     g_state.snapping_size = size;
     for (int i = 0; i < g_state.element_count; i++) {
-        element_compute_snapped_hwhh(&g_state.elements[i], size);
+        TouchElement* e = &g_state.elements[i];
+        element_compute_snapped_hwhh(e, size);
+        e->cached_left = e->x - e->hw;
+        e->cached_right = e->x + e->hw;
+        e->cached_top = e->y - e->hh;
+        e->cached_bottom = e->y + e->hh;
+        e->cached_hw_sq = e->hw * e->hw;
     }
+    mark_all_dirty();
+    build_spatial_grid();
 }
 
 void touch_processor_set_resolution_scale(float scale) { g_state.resolution_scale = scale; }
@@ -248,6 +283,9 @@ TouchActionResult touch_processor_on_finger_up(int ptr_id, float x, float y, uin
         handle_gesture_up(f, x, y, time_ms, &result);
     TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "on_finger_up: after handle_gesture_up active=%d ptr_id=%d",
         f->active, f->ptr_id);
+    if (__builtin_expect(f->single_tap_deferred, 0)) {
+        return result; // gesture_tick will handle cleanup via deferred tap
+    }
     deactivate_finger(f);
     g_state.free_finger_hint = (int)(f - g_state.fingers);
     return result;
@@ -265,8 +303,34 @@ void touch_processor_on_finger_cancel(int ptr_id) {
     if (tb->ptr_id == ptr_id) {
         for (int j = 0; j < tb->count; j++) {
             int idx = tb->element_indices[j];
+            if (idx >= 0 && idx < g_state.element_count) {
+                TouchElement* e = &g_state.elements[idx];
+                release_element_bindings(e, &cancel_result);
+                // release_element_bindings preserves toggle bindings when selected=true.
+                // On cancel we must force-release everything to avoid stuck keys.
+                if (e->selected) {
+                    for (int k = 0; k < 4; k++) {
+                        if (e->bindings[k].type != BINDING_NONE)
+                            release_binding(&cancel_result, &e->bindings[k]);
+                    }
+                    e->selected = false;
+                    e->visual_active = false;
+                    mark_element_dirty(e);
+                }
+                if (e->gesture_toggled) {
+                    release_bindings_list(&cancel_result, e->element_gesture, e->element_gesture_count);
+                    e->gesture_toggled = false;
+                }
+                if (e->lp_toggled) {
+                    release_bindings_list(&cancel_result, e->element_long_press, e->element_long_press_count);
+                    e->lp_toggled = false;
+                }
+            }
+        }
+        for (int j = 0; j < tb->count; j++) {
+            int idx = tb->element_indices[j];
             if (idx >= 0 && idx < g_state.element_count)
-                release_element_bindings(&g_state.elements[idx], &cancel_result);
+                g_state.elements[idx].current_ptr_id = -1;
         }
         tb->count = 0;
         tb->ptr_id = -1;
@@ -275,15 +339,40 @@ void touch_processor_on_finger_cancel(int ptr_id) {
 
     // Release any engaged elements not in tracked list
     for (int i = 0; i < g_state.element_count; i++) {
-        if (g_state.elements[i].current_ptr_id == ptr_id)
+        if (g_state.elements[i].current_ptr_id == ptr_id) {
             release_element_bindings(&g_state.elements[i], &cancel_result);
+            TouchElement* e = &g_state.elements[i];
+            if (e->selected) {
+                for (int k = 0; k < 4; k++) {
+                    if (e->bindings[k].type != BINDING_NONE)
+                        release_binding(&cancel_result, &e->bindings[k]);
+                }
+                e->selected = false;
+                e->visual_active = false;
+                mark_element_dirty(e);
+            }
+            if (e->gesture_toggled) {
+                release_bindings_list(&cancel_result, e->element_gesture, e->element_gesture_count);
+                e->gesture_toggled = false;
+            }
+            if (e->lp_toggled) {
+                release_bindings_list(&cancel_result, e->element_long_press, e->element_long_press_count);
+                e->lp_toggled = false;
+            }
+        }
     }
+
+    // Release and clear global gesture toggle state
+    for (int t = 0; t < g_state.gesture_toggled_count; t++)
+        release_binding(&cancel_result, &g_state.gesture_toggled_actions[t]);
+    g_state.gesture_toggled_count = 0;
 
     // Clear global gesture state if this was the main or second finger
     if (f->ptr_id == g_state.gesture_main_ptr_id) {
         g_state.gesture_main_ptr_id = -1;
         g_state.gesture_post_double_tap_drag = false;
         g_state.gesture_double_tap_consumed = false;
+        g_state.gesture_double_tap_waiting = false;
         gesture_clear_deferred_tap();
         gesture_clear_pending_long_press();
         if (!g_state.gesture_second_active)
@@ -309,7 +398,7 @@ static inline void process_delayed_actions(TouchActionResult* restrict result, u
         g_state.pointer_left_enabled = true;
     }
     if (g_state.pending_right_release_time > 0 && time_ms >= g_state.pending_right_release_time) {
-        add_action(result, ACT_POINTER_BUTTON_RELEASE, 1, 0, 0);
+        add_action(result, ACT_POINTER_BUTTON_RELEASE, 2, 0, 0);
         g_state.pending_right_release_time = 0;
         g_state.pending_right_release_ptr_id = -1;
         g_state.pointer_right_enabled = true;
@@ -321,9 +410,11 @@ static inline void process_delayed_actions(TouchActionResult* restrict result, u
             if (sf) {
                 add_action(result, ACT_POINTER_MOVE, (int)g_state.last_touch_x, (int)g_state.last_touch_y, 0);
                 add_action(result, ACT_POINTER_BUTTON_PRESS, 0, 0, 0);
+                g_state.sim_click_release_time = time_ms + CLICK_DELAY_MS;
             }
         }
         g_state.sim_click_press_time = 0;
+        g_state.sim_click_ptr_id = -1;
     }
 
     if (g_state.sim_click_release_time > 0 && time_ms >= g_state.sim_click_release_time) {
@@ -331,6 +422,7 @@ static inline void process_delayed_actions(TouchActionResult* restrict result, u
             add_action(result, ACT_POINTER_BUTTON_RELEASE, 0, 0, 0);
         g_state.sim_click_release_time = 0;
         g_state.sim_continue_click = false;
+        g_state.sim_click_ptr_id = -1;
     }
 }
 
@@ -339,6 +431,7 @@ static inline void process_auto_repeat_burst(TouchActionResult* restrict result,
     for (int i = 0; i < count; i++) {
         TouchBinding* b = &actions[i];
         if (!b->auto_repeat) continue;
+        if (b->toggle) continue;
         int interval_ms = b->auto_repeat_interval_ms;
         if (interval_ms <= 0) continue;
 
@@ -391,9 +484,20 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
         if (e->cached_has_auto_repeat && (e->cached_has_toggle ? e->selected : (e->current_ptr_id >= 0 && e->engaged))) {
             if (e->cached_has_toggle && e->selected) {
                 // Burst mode: press+release all bindings at interval with binding delay
+                // Cannot use execute_actions() here — it skips toggle bindings when
+                // gesture_is_down_event is false (tick context).
                 int interval_ms = e->cached_auto_repeat_interval;
                 if (e->auto_repeat_last_time == 0 || time_ms - e->auto_repeat_last_time >= (uint64_t)interval_ms) {
-                    execute_actions(&result, e->bindings, 4);
+                    // Burst all toggle and non-toggle auto_repeat bindings at element level.
+                    // Non-toggle AR bindings are no longer added to gesture_held_actions
+                    // by the select path — they're owned entirely by the element layer.
+                    for (int k = 0; k < 4; k++) {
+                        TouchBinding* tb = &e->bindings[k];
+                        if (tb->type == BINDING_NONE) continue;
+                        if (!tb->auto_repeat) continue;
+                        release_binding(&result, tb);
+                        press_binding(&result, tb, true);
+                    }
                     e->auto_repeat_last_time = time_ms;
                 }
             } else {
@@ -442,9 +546,13 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
                     if (e->lp_toggled) {
                         release_bindings_list(&result, e->element_long_press, e->element_long_press_count);
                         e->lp_toggled = false;
+                        if (e->defer_primary && e->bindings[0].type != BINDING_NONE)
+                            release_binding(&result, &e->bindings[0]);
                     } else {
                         press_bindings_list(&result, e->element_long_press, e->element_long_press_count);
                         if (e->cached_lp_has_toggle) e->lp_toggled = true;
+                        if (e->defer_primary && e->bindings[0].type != BINDING_NONE)
+                            press_binding(&result, &e->bindings[0], true);
                     }
                     if (e->button_long_press_haptic > 0)
                         add_action(&result, ACT_HAPTIC, e->button_long_press_haptic, 0, 0);
@@ -470,9 +578,13 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
                     if (e->gesture_toggled) {
                         release_bindings_list(&result, e->element_gesture, e->element_gesture_count);
                         e->gesture_toggled = false;
+                        if (e->defer_primary && e->bindings[0].type != BINDING_NONE)
+                            release_binding(&result, &e->bindings[0]);
                     } else {
                         press_bindings_list(&result, e->element_gesture, e->element_gesture_count);
                         if (e->cached_gesture_has_toggle) e->gesture_toggled = true;
+                        if (e->defer_primary && e->bindings[0].type != BINDING_NONE)
+                            press_binding(&result, &e->bindings[0], true);
                     }
                     if (e->button_gesture_haptic > 0)
                         add_action(&result, ACT_HAPTIC, e->button_gesture_haptic, 0, 0);
@@ -584,6 +696,7 @@ void touch_processor_reset(void) {
     for (int i = 0; i < g_state.element_count; i++)
         element_reset_runtime(&g_state.elements[i]);
     mark_all_dirty();
+    build_spatial_grid();
     activation_reset();
 }
 

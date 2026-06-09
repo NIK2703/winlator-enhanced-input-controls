@@ -379,6 +379,7 @@ static void dispatch_actions_batch(JNIEnv* env, const TouchActionResult* r) {
 
     env->ReleaseIntArrayElements(g_dispatch_packed, packed, 0);
     env->CallVoidMethod(g_dispatch_obj, g_dispatchAllActions, n);
+    JNI_CHECK(env, "dispatchAllActions");
 }
 
 extern "C" {
@@ -543,6 +544,7 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
 }
 
 static void cache_config_field_ids(JNIEnv* env, jobject config) {
+    if (g_config.configClass) env->DeleteGlobalRef(g_config.configClass);
     jclass cls = env->GetObjectClass(config);
     if (!cls) { TP_LOG(ANDROID_LOG_ERROR, "Winlator_JNI", "nativeInit: GetObjectClass failed"); return; }
     g_config.configClass = (jclass)env->NewGlobalRef(cls);
@@ -687,6 +689,7 @@ static void cache_config_field_ids(JNIEnv* env, jobject config) {
 
 static void nativeInit(JNIEnv* env, jclass clazz, jobject config) {
     if (!g_config_cached) cache_config_field_ids(env, config);
+    if (!g_config_cached) return;
 
     TouchProcessorConfig c;
     memset(&c, 0, sizeof(c));
@@ -1054,6 +1057,7 @@ static void nativeRegisterDispatcher(JNIEnv* env, jclass clazz, jobject dispatch
     g_dispatch_obj = env->NewGlobalRef(dispatcher);
     jclass dcls = env->GetObjectClass(dispatcher);
     g_dispatchAllActions = env->GetMethodID(dcls, "dispatchAllActions", "(I)V");
+    JNI_CHECK(env, "dispatchAllActions");
     env->DeleteLocalRef(dcls);
 }
 

@@ -32,12 +32,9 @@ void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger
         __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "DT_CONFIRM: skipped - not waiting");
         return;
     }
-    __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "DT_CONFIRM: pending_dbl=%d pending_deferred_dbl=%d Dd_cnt=%d has_s=%d has_d=%d",
+    __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "DT_CONFIRM: pending_dbl=%d pending_deferred_dbl=%d",
         g_state.gesture_pending_double_count,
-        g_state.gesture_pending_deferred_double_count,
-        f->bindings.double_tap_drag_count,
-        f->cached_has_active_single_tap,
-        f->cached_has_active_double_tap);
+        g_state.gesture_pending_deferred_double_count);
     g_state.gesture_double_tap_waiting = false;
     g_state.gesture_deferred_tap_count = 0;
 
@@ -45,19 +42,17 @@ void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger
         g_state.gesture_pending_double_count = g_state.gesture_pending_deferred_double_count;
         for (int _i = 0; _i < g_state.gesture_pending_deferred_double_count; _i++)
             g_state.gesture_pending_double[_i] = g_state.gesture_pending_deferred_double[_i];
-        g_state.gesture_pending_deferred_double_count = 0;
     }
     g_state.gesture_pending_deferred_double_count = 0;
 
     bool has_dt = g_state.gesture_pending_double_count > 0;
     bool has_dt_drag = f->bindings.double_tap_drag_count > 0;
 
-    __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "DT_CONFIRM: has_dt=%d has_dt_drag=%d", has_dt, has_dt_drag);
-
     if (has_dt) {
-        GesturePairPlan d_plan = resolve_double_tap_pair(f);
-        __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "DT_CONFIRM: d_plan pulse_on_up=%d drag_avail=%d",
-            d_plan.pulse_on_up, d_plan.drag_available);
+        GesturePairPlan d_plan = gesture_decide_branch(gesture_branch_params(
+            true, has_dt_drag, false, false,
+            g_state.cfg.is_ts, false, 0, false
+        ));
 
         confirm_double_tap(result, d_plan,
             g_state.gesture_pending_double, g_state.gesture_pending_double_count,
@@ -70,9 +65,6 @@ void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger
     } else {
         g_state.gesture_post_double_tap_drag = has_dt_drag;
     }
-    __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "DT_CONFIRM: done deferred_dbl=%d post_dtd=%d",
-        g_state.gesture_pending_deferred_double_count,
-        g_state.gesture_post_double_tap_drag);
 }
 
 // ---- TS finger-down pre-hold ----
@@ -95,16 +87,16 @@ static inline void cleanup_main_finger(TouchFinger* f) {
     g_state.gesture_double_tap_consumed = false;
     if (!g_state.gesture_second_active)
         g_state.gesture_deferred_second_finger_tap = false;
-    f->active = false;
+    deactivate_finger(f);
 }
 
 // ---- Second-finger SDTW confirm (extracted from touchpad_finger_down) ----
 static inline bool confirm_second_double_tap(TouchFinger* f, TouchActionResult* restrict result, uint64_t time_ms) {
     if (!g_state.second_double_tap_waiting) return false;
+    if (!f->cached_has_active_double_tap && !f->cached_has_active_double_tap_drag)
+        return false;  // stale SDTW — don't consume, let timeout handle it
     g_state.second_double_tap_waiting = false;
     g_state.second_tap_fallback_count = 0;
-    if (!f->cached_has_active_double_tap && !f->cached_has_active_double_tap_drag)
-        return false;  // ST-only with stale SDTW: fall through to normal processing
     GesturePairPlan d_plan = resolve_double_tap_pair(f);
     confirm_double_tap(result, d_plan,
         f->bindings.double_tap, f->bindings.double_tap_count,
@@ -112,7 +104,6 @@ static inline bool confirm_second_double_tap(TouchFinger* f, TouchActionResult* 
         &g_state.pending_second_double_count, 8,
         f->cached_has_active_double_tap_drag,
         &g_state.gesture_post_double_tap_drag);
-    g_state.second_tap_fallback_count = 0;
     f->cached_has_long_press_timer = false;
     f->down_time_ms = time_ms;
     g_state.gesture_handler_active = finger_has_gesture(f);
@@ -232,7 +223,10 @@ void touchpad_finger_down(TouchFinger* f, TouchActionResult* restrict result, ui
         // Global DT_WAITING check
         if (confirm_second_finger_global_dt(f, result)) return;
 
-        release_held_actions(result);
+        // Don't release held actions during stale SDTW (confirm_second_double_tap
+        // returned false without consuming SDTW) — let timeout handle it.
+        if (!g_state.second_double_tap_waiting)
+            release_held_actions(result);
 
         g_state.second_tap_fallback_count = 0;
         // Save S2 as SDTW fallback unless only Dd2 is present (no D2).
@@ -295,6 +289,8 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* restrict result, uint
         gesture_clear_second_finger_globals();
 
         f->state = GESTURE_STATE_IDLE;
+        g_state.active_finger_count--;
+        g_state.finger_by_ptr_id[f->ptr_id] = NULL;
         f->active = false;
         return;
     }
@@ -349,7 +345,15 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* restrict result, uint
         }
 
         case GESTURE_STATE_DRAGGING: {
-            execute_deferred_double(result);
+            if (g_state.gesture_pending_deferred_double_count > 0
+                && (g_state.gesture_is_action_held
+                    ? !bindings_equal(
+                        g_state.gesture_pending_deferred_double,
+                        g_state.gesture_pending_deferred_double_count,
+                        g_state.gesture_held_actions,
+                        g_state.gesture_held_count)
+                    : true))
+                execute_deferred_double(result);
             gesture_clear_pending_long_press();
             release_held_actions(result);
             goto L_CLEANUP;
@@ -365,6 +369,18 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* restrict result, uint
         }
 
         default: {
+            // Element finger (IDLE state) with double_tap bindings:
+            // allow entering DT_WAITING so double-tap works on elements.
+            if (f->state == GESTURE_STATE_IDLE
+                && (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag)
+                && !g_state.gesture_double_tap_waiting) {
+                handle_tap_up(f, result, time_ms);
+                if (f->single_tap_deferred) {
+                    return;
+                }
+                tap_up_cleanup(f, result);
+                return;
+            }
             if (g_state.gesture_post_double_tap_drag) {
                 g_state.gesture_post_double_tap_drag = false;
                 release_held_actions(result);

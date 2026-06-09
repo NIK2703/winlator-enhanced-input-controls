@@ -162,7 +162,7 @@ typedef struct {
 extern TouchProcessorState g_state;
 
 static inline bool element_is_toggle_active(const TouchElement* e) {
-    return e->cached_has_toggle && e->selected;
+    return (e->cached_has_toggle && e->selected) || e->lp_toggled || e->gesture_toggled;
 }
 
 static inline void mark_element_dirty(TouchElement* e) {
@@ -282,6 +282,7 @@ static inline void setup_second_finger_bindings(TouchFinger* f) {
     // If no second-finger bindings exist in current mode, skip setup entirely
     if (!(g_state.cfg.caps_mode_mask & g_state.cfg.caps_second_mask)) {
         memset(fb, 0, sizeof(*fb));
+        touch_finger_cache_bs(f);
         return;
     }
     const GestureModeBindings* mb = get_mode_bindings();
@@ -316,6 +317,7 @@ static inline void element_compute_snapped_hwhh(TouchElement* e, float snap) {
 // --- Finger deactivation (dedup on_finger_up / on_finger_cancel) ---
 
 static inline void deactivate_finger(TouchFinger* f) {
+    if (__builtin_expect(!f->active, 0)) return;
     g_state.finger_by_ptr_id[f->ptr_id] = NULL;
     g_state.active_finger_count--;
     f->active = false;
@@ -332,6 +334,16 @@ void execute_actions(TouchActionResult* restrict result, const TouchBinding* act
 void execute_actions_hold(TouchActionResult* restrict result, const TouchBinding* actions, int count);
 void release_binding(TouchActionResult* restrict result, const TouchBinding* b);
 void press_binding(TouchActionResult* restrict result, const TouchBinding* b, bool hold);
+
+// --- Binding comparison helper ---
+
+static inline bool bindings_equal(const TouchBinding* a, int a_count, const TouchBinding* b, int b_count) {
+    if (a_count != b_count) return false;
+    for (int i = 0; i < a_count; i++)
+        if (a[i].type != b[i].type || a[i].keycode != b[i].keycode)
+            return false;
+    return true;
+}
 
 // --- Cleanup helpers (reduce repetitive zeroing patterns) ---
 
@@ -358,6 +370,8 @@ static inline void tap_up_cleanup(TouchFinger* f, TouchActionResult* restrict re
         || g_state.cfg.is_tp)
         release_held_actions(result);
     g_state.gesture_main_ptr_id = -1;
+    g_state.finger_by_ptr_id[f->ptr_id] = NULL;
+    g_state.active_finger_count--;
     f->active = false;
 }
 
@@ -403,8 +417,6 @@ static inline bool element_has_auto_repeat(const TouchElement* e) {
 
 #define BINDING_GAMEPAD_COUNT 24
 
-#define SWAP_F(a, b) do { float _t_ = (a); (a) = (b); (b) = _t_; } while(0)
-
 static inline bool is_keyboard_binding(const TouchBinding* b) {
     return b->type >= BINDING_KEYBOARD_FIRST && b->type <= BINDING_KEYBOARD_LAST;
 }
@@ -422,7 +434,6 @@ TouchElement* hit_test_element(float x, float y);
 void touch_finger_cache_bs(TouchFinger* f);
 int detect_swipe_dir(float dx, float dy, float threshold);
 bool is_mouse_move_binding(const TouchBinding* b);
-float cubic_bezier_interpolate(float x, float cpx1, float cpy1);
 float cubic_bezier_interpolate_trackpad(float x);
 void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, TouchActionResult* restrict result);
 void release_element_bindings(TouchElement* e, TouchActionResult* restrict result);

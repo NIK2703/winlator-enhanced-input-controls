@@ -61,11 +61,10 @@ void activation_activate_at(float x, float y) {
 
 void activation_deactivate_all(void) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_deactivate_all count=%d", g_state.element_count);
-    const bool has_toggle = g_state.cfg.caps_has_element_toggle;
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
-        // Toggle buttons that are still selected keep their visual activation
-        if (!has_toggle || !element_is_toggle_active(e))
+        // Elements with any active toggle keep their visual activation
+        if (!element_is_toggle_active(e))
             e->visual_active = false;
     }
     mark_all_dirty();
@@ -84,17 +83,70 @@ int activation_hovered_for_ptr(int ptr_id) {
 
 // --- Legacy Java-compatible handlers ---
 
-static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* restrict result) {
+static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* restrict result, uint64_t time_ms) {
     if (btn->selected) {
-        if (btn->bindings[0].type != BINDING_NONE)
-            release_binding(result, &btn->bindings[0]);
+        // Release stale gesture/long-press toggles that lingered after finger-up
+        if (btn->gesture_toggled && !btn->gesture_swipe_triggered) {
+            release_bindings_list(result, btn->element_gesture, btn->element_gesture_count);
+            btn->gesture_toggled = false;
+        }
+        if (btn->lp_toggled && !btn->gesture_long_press_triggered) {
+            release_bindings_list(result, btn->element_long_press, btn->element_long_press_count);
+            btn->lp_toggled = false;
+        }
+        // Don't deselect via slide-over if another toggle is still active
+        if (btn->lp_toggled || btn->gesture_toggled) {
+            btn->visual_active = true;
+            TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=1 (blocked_other_toggle)", (int)(btn - g_state.elements));
+            mark_element_dirty(btn);
+            return;
+        }
+        // Release all bindings across all 4 slots
+        for (int k = 0; k < 4; k++) {
+            TouchBinding* tb = &btn->bindings[k];
+            if (tb->type == BINDING_NONE) continue;
+            release_binding(result, tb);
+            if (tb->toggle) {
+                // Clean up gesture_toggled_actions for toggle bindings (safety net)
+                for (int t = 0; t < g_state.gesture_toggled_count; t++) {
+                    if (g_state.gesture_toggled_actions[t].type == tb->type &&
+                        g_state.gesture_toggled_actions[t].keycode == tb->keycode) {
+                        g_state.gesture_toggled_actions[t] = g_state.gesture_toggled_actions[--g_state.gesture_toggled_count];
+                        g_state.gesture_auto_repeat_last_time[t] = g_state.gesture_auto_repeat_last_time[g_state.gesture_toggled_count];
+                        break;
+                    }
+                }
+            } else if (tb->auto_repeat) {
+                // Clean up gesture_held_actions for non-toggle auto_repeat bindings
+                for (int t = 0; t < g_state.gesture_held_count; t++) {
+                    if (g_state.gesture_held_actions[t].type == tb->type &&
+                        g_state.gesture_held_actions[t].keycode == tb->keycode) {
+                        g_state.gesture_held_actions[t] = g_state.gesture_held_actions[--g_state.gesture_held_count];
+                        g_state.gesture_auto_repeat_last_time_held[t] = g_state.gesture_auto_repeat_last_time_held[g_state.gesture_held_count];
+                        break;
+                    }
+                }
+            }
+        }
+        if (g_state.gesture_held_count == 0)
+            g_state.gesture_is_action_held = false;
         btn->selected = false;
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=0 (deselect)", (int)(btn - g_state.elements));
         btn->visual_active = false;
     } else {
-        if (btn->bindings[0].type != BINDING_NONE)
-            press_binding(result, &btn->bindings[0], true);
+        // execute_actions would add non-toggle AR bindings to gesture_held_actions,
+        // creating a fragile dependency on release_held_actions. Process all
+        // bindings manually for full ownership within the element layer.
+        for (int k = 0; k < 4; k++) {
+            TouchBinding* tb = &btn->bindings[k];
+            if (tb->type == BINDING_NONE) continue;
+            if (tb->toggle || tb->auto_repeat)
+                press_binding(result, tb, true);
+            else
+                press_binding(result, tb, false); // tap
+        }
         btn->selected = true;
+        btn->auto_repeat_last_time = time_ms;
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=1 (select)", (int)(btn - g_state.elements));
         btn->visual_active = true;
     }
@@ -276,6 +328,8 @@ lock_handler: {
 #endif
                         tb->element_indices[tb->count++] = btn_idx;
                         handle_element_down(btn, ptr_id, x, y, time_ms, result);
+                        if (btn->cached_has_toggle && btn->cached_has_auto_repeat)
+                            btn->gesture_timer_armed = true;
                     } else {
 #ifndef NDEBUG
                         __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "DOWN_HOVER[%d] already tracked count=%d", btn_idx, tb->count);
@@ -331,8 +385,11 @@ lock_handler_move: {
             if (tb->ptr_id == ptr_id && tb->count > 0) {
                 TouchElement* btn = hit_test_element(x, y);
                 if (btn && btn->type == ELEM_BUTTON) {
-                    if (btn->cached_has_toggle) {
-                        toggle_slide_over(btn, result);
+                    if (btn->cached_has_toggle && !btn->gesture_timer_armed) {
+                        toggle_slide_over(btn, result, time_ms);
+                        btn->gesture_timer_armed = true;
+                    } else if (btn->cached_has_toggle) {
+                        // Already handled by gesture handler — skip to avoid dual activation
                     } else {
                         bool already = false;
                         for (int j = 0; j < tb->count; j++) {
@@ -380,15 +437,29 @@ lock_handler_move: {
                         __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "MOVE_HOVER deactivate prev[%d]", prev_idx);
 #endif
                         release_element_bindings(&g_state.elements[prev_idx], result);
+                        // Clear engagement so element can be re-entered
+                        g_state.elements[prev_idx].current_ptr_id = -1;
+                        g_state.elements[prev_idx].engaged = false;
+                        TouchFinger* hover_f = find_finger(ptr_id);
+                        if (hover_f) {
+                            for (int ei = 0; ei < hover_f->engaged_elem_count; ei++) {
+                                if (hover_f->engaged_elem_indices[ei] == prev_idx) {
+                                    hover_f->engaged_elem_indices[ei] = hover_f->engaged_elem_indices[hover_f->engaged_elem_count - 1];
+                                    hover_f->engaged_elem_count--;
+                                    break;
+                                }
+                            }
+                        }
                     }
                     // Activate current
                     if (btn && btn->type == ELEM_BUTTON) {
-                        if (btn->cached_has_toggle) {
+                        if (btn->cached_has_toggle && !btn->gesture_timer_armed) {
 #ifndef NDEBUG
                             __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "MOVE_HOVER curr[%d] toggle_slide_over", curr_idx);
 #endif
-                            toggle_slide_over(btn, result);
-                            g_state.hovered_element_per_ptr[pid_slot] = -1;
+                            toggle_slide_over(btn, result, time_ms);
+                            btn->gesture_timer_armed = true;
+                            g_state.hovered_element_per_ptr[pid_slot] = curr_idx;
                         } else {
                             bool already = false;
                             for (int j = 0; j < tb->count; j++) {
@@ -463,6 +534,9 @@ bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchA
 #ifndef NDEBUG
             __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "UP_HOVER ptr=%d slot=%d", ptr_id, pid_slot);
 #endif
+            g_state.tracked[pid_slot].count = 0;
+            g_state.tracked[pid_slot].ptr_id = -1;
+            g_state.hovered_element_per_ptr[pid_slot] = -1;
 up_release:
             handled = release_engaged_elements(ptr_id, x, y, time_ms, result);
             break;
@@ -489,6 +563,14 @@ up_release:
             break;
         }
     }
+    // Reset gesture_timer_armed for toggle elements not currently touched
+    if (g_state.cfg.caps_has_element_toggle) {
+        for (int i = 0; i < g_state.element_count; i++) {
+            if (!g_state.elements[i].cached_has_toggle) continue;
+            if (g_state.elements[i].current_ptr_id >= 0) continue;
+            g_state.elements[i].gesture_timer_armed = false;
+        }
+    }
     g_state.hovered_element_per_ptr[pid_slot] = -1;
 #ifndef NDEBUG
     __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "UP ptr=%d slot=%d hovered=-1", ptr_id, pid_slot);
@@ -503,11 +585,10 @@ void activation_reset(void) {
         g_state.tracked[i].count = 0;
         g_state.hovered_element_per_ptr[i] = -1;
     }
-    const bool has_toggle = g_state.cfg.caps_has_element_toggle;
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
-        // Toggle buttons that are still selected keep their visual activation
-        if (!has_toggle || !element_is_toggle_active(e))
+        // Elements with any active toggle keep their visual activation
+        if (!element_is_toggle_active(e))
             e->visual_active = false;
     }
     mark_all_dirty();

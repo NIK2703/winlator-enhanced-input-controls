@@ -26,16 +26,16 @@ static inline bool resolve_drag_binding(
 }
 
 // Minimal drag start — no binding change, just state transition.
-static inline void start_drag_no_binding(TouchFinger* f) {
-    on_drag_start(f);
+static inline void start_drag_no_binding(TouchFinger* f, TouchActionResult* restrict result) {
+    on_drag_start(f, result);
     f->state = GESTURE_STATE_DRAGGING;
 }
 
-static inline void mark_second_finger_dragging(TouchFinger* exclude) {
+static inline void mark_second_finger_dragging(TouchFinger* exclude, TouchActionResult* restrict result) {
     for (int _si = 0; _si < MAX_FINGERS; _si++) {
         TouchFinger* _sf = &g_state.fingers[_si];
         if (_sf->active && _sf->ptr_id == g_state.gesture_second_ptr_id && _sf != exclude) {
-            start_drag_no_binding(_sf);
+            start_drag_no_binding(_sf, result);
             break;
         }
     }
@@ -50,14 +50,6 @@ static inline GesturePairPlan resolve_long_press_pair(const TouchFinger* f) {
         f->is_second_finger,
         0, false
     ));
-}
-
-static bool bindings_equal(const TouchBinding* a, int a_count, const TouchBinding* b, int b_count) {
-    if (a_count != b_count) return false;
-    for (int i = 0; i < a_count; i++)
-        if (a[i].type != b[i].type || a[i].keycode != b[i].keycode)
-            return false;
-    return true;
 }
 
 // Full drag start with binding: compare against currently-held actions,
@@ -90,11 +82,16 @@ static inline void start_drag_with_binding(TouchFinger* f,
             g_state.gesture_is_action_held = true;
         execute_actions_hold(result, drag_binding, drag_count);
     }
-    start_drag_no_binding(f);
+    start_drag_no_binding(f, result);
 }
 
-void on_drag_start(TouchFinger* f) {
+void on_drag_start(TouchFinger* f, TouchActionResult* restrict result) {
     f->single_tap_hold_delay_ms = 0;
+    // Execute pending second-finger D2 before clearing, so D2 isn't silently
+    // lost when the second finger transitions to DRAGGING (two-finger DTD).
+    if (g_state.pending_second_double_count > 0) {
+        execute_actions(result, g_state.pending_second_double, g_state.pending_second_double_count);
+    }
     gesture_clear_second_finger_state();
     g_state.gesture_deferred_tap_count = 0;
     g_state.gesture_pending_double_count = 0;
@@ -144,7 +141,7 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
     if (f->state == GESTURE_STATE_LONG_PRESSING) {
         // Early exit: no L or Ld bindings in current mode — shouldn't reach here, but guard anyway
         if (!current_mode_has_gesture(GESTURE_LONG_PRESS) && !current_mode_has_gesture(GESTURE_LONG_PRESS_DRAG)) {
-            start_drag_no_binding(f);
+            start_drag_no_binding(f, result);
             return;
         }
         gesture_clear_pending_long_press();
@@ -153,7 +150,7 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
                 NULL, 0, NULL, 0,
                 false, false,
                 &drag_binding, &drag_count)) {
-            start_drag_no_binding(f);
+            start_drag_no_binding(f, result);
             return;
         }
     } else if (g_state.gesture_post_double_tap_drag) {
@@ -187,7 +184,7 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
             g_state.gesture_pending_deferred_double_count = 0;
         g_state.gesture_post_double_tap_drag = false;
         if (g_state.gesture_second_active) {
-            mark_second_finger_dragging(f);
+            mark_second_finger_dragging(f, result);
         }
     } else if (g_state.gesture_pending_deferred_double_count > 0) {
         // DT confirmed without Dd — prevent Sd from firing on drag.
@@ -201,7 +198,7 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         // Skip resolve_drag_binding if no second-finger drag binding at all
         if (!current_mode_has_gesture(GESTURE_SINGLE_DRAG_2ND) && !current_mode_has_gesture(GESTURE_DOUBLE_DRAG_2ND)
             && !current_mode_has_gesture(GESTURE_SINGLE_2ND) && !current_mode_has_gesture(GESTURE_DOUBLE_2ND)) {
-            start_drag_no_binding(f);
+            start_drag_no_binding(f, result);
             return;
         }
         // Unified second-finger drag resolution (TS/TP).
@@ -213,7 +210,7 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         if (g_state.gesture_is_action_held
             && (!fb->single_tap_drag_count || f->cached_has_active_double_tap)) {
             g_state.gesture_pending_double_count = 0;
-            start_drag_no_binding(f);
+            start_drag_no_binding(f, result);
             return;
         }
         // TP mode zeroes single_tap_drag on the finger; read from config directly.
@@ -232,7 +229,7 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
     } else if (!g_state.gesture_second_active) {
         // Early exit: nothing to resolve for main finger
         if (!current_mode_has_gesture(GESTURE_SINGLE_TAP) && !current_mode_has_gesture(GESTURE_SINGLE_TAP_DRAG)) {
-            start_drag_no_binding(f);
+            start_drag_no_binding(f, result);
             return;
         }
         // Main-finger drag (handles both TS and TP first-finger).
@@ -257,6 +254,14 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
 
 // ---- gesture_tick ----
 void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
+    // caps gate: must run before the gesture-bindings early return so that
+    // stale DT/SDTW flags are cleaned up even when switching to a no-gesture mode.
+    if (!g_state.cfg.caps_has_double_tap) {
+        g_state.second_double_tap_waiting = false;
+        g_state.gesture_double_tap_waiting = false;
+        g_state.gesture_pending_deferred_double_count = 0;
+    }
+
     if (!g_state.cfg.caps_has_gesture_bindings) return;
 
     TouchFinger* restrict fingers = g_state.fingers;
@@ -271,6 +276,9 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
             // the entire timeout, AND no other action (e.g. DT) is currently held.
             bool cancel_lp = f->cached_has_moved_beyond_threshold
                           || g_state.gesture_is_action_held;
+            if (__builtin_expect(cancel_lp, 0)) {
+                f->cached_has_long_press_timer = false;
+            }
 
             if (!cancel_lp && time_ms - f->down_time_ms >= g_state.cfg.long_press_timeout_ms) {
                 g_state.gesture_handler_active = false;
@@ -327,19 +335,13 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
         }
     }
 
-    // caps gate
-    if (!g_state.cfg.caps_has_double_tap) {
-        g_state.second_double_tap_waiting = false;
-        g_state.gesture_double_tap_waiting = false;
-        g_state.gesture_pending_deferred_double_count = 0;
-    }
-
     // SDTW timeout — second-finger double-tap expired, fire ST fallback
     {
         uint32_t sdtw_mask = GESTURE_MASK(GESTURE_DOUBLE_2ND) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND);
         if ((g_state.cfg.caps_mode_mask & sdtw_mask) && g_state.second_double_tap_waiting
             && time_ms - g_state.second_tap_fallback_time >= g_state.cfg.double_tap_timeout_ms) {
             g_state.second_double_tap_waiting = false;
+            g_state.pending_second_double_count = 0;
             if (g_state.second_tap_fallback_count > 0) {
                 execute_actions(result, g_state.second_tap_fallback, g_state.second_tap_fallback_count);
                 g_state.second_tap_fallback_count = 0;

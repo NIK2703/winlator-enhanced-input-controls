@@ -277,6 +277,10 @@ public class InputControlsView extends View {
             snappingSize = newSnapSize;
             if (nativeTouchProcessor != null) {
                 nativeTouchProcessor.setSnappingSize(snappingSize);
+                if (profile != null) {
+                    NativeTouchProcessor.NativeConfig config = NativeTouchProcessor.buildNativeConfig(profile, getMaxWidth(), getMaxHeight());
+                    nativeTouchProcessor.updateConfig(config);
+                }
             }
         }
         readyToDraw = true;
@@ -767,31 +771,11 @@ public class InputControlsView extends View {
     }
 
     @Override
-    public boolean dispatchGenericMotionEvent(MotionEvent event) {
-
-        return super.dispatchGenericMotionEvent(event);
-    }
-
-    @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
         if (!editMode && profile != null) {
             ExternalController controller = profile.getController(event.getDeviceId());
 
             if (controller != null && controller.updateStateFromMotionEvent(event)) {
-                ExternalControllerBinding controllerBinding;
-
-                controllerBinding = controller.getControllerBinding(KeyEvent.KEYCODE_BUTTON_L2);
-                if (controllerBinding != null) {
-                    handleInputEvent(controller, controllerBinding.getBinding(), controller.state.isPressed(ExternalController.IDX_BUTTON_L2));
-                }
-
-                controllerBinding = controller.getControllerBinding(KeyEvent.KEYCODE_BUTTON_R2);
-                if (controllerBinding != null) {
-                    handleInputEvent(controller, controllerBinding.getBinding(), controller.state.isPressed(ExternalController.IDX_BUTTON_R2));
-                }
-
-
-
                 processJoystickInput(controller);
 
                 return true;
@@ -828,6 +812,13 @@ public class InputControlsView extends View {
                     return true;
                 }
                 case MotionEvent.ACTION_MOVE: {
+                    int historySize = event.getHistorySize();
+                    for (int h = 0; h < historySize; h++) {
+                        for (int i = 0; i < event.getPointerCount(); i++) {
+                            int pid = event.getPointerId(i);
+                            nativeTouchProcessor.onFingerMove(pid, event.getHistoricalX(i, h), event.getHistoricalY(i, h), event.getHistoricalEventTime(h));
+                        }
+                    }
                     for (int i = 0; i < event.getPointerCount(); i++) {
                         int pid = event.getPointerId(i);
                         nativeTouchProcessor.onFingerMove(pid, event.getX(i), event.getY(i), event.getEventTime());

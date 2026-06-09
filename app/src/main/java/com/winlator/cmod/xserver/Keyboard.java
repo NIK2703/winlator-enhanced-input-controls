@@ -10,10 +10,11 @@ import com.winlator.cmod.inputcontrols.ExternalController;
 import java.util.ArrayList;
 
 public class Keyboard {
+    private int syntheticShiftCount = 0;
     public static final byte KEYSYMS_PER_KEYCODE = 2;
-    public static final short KEYS_COUNT = 248;
     public static final short MAX_KEYCODE = 255;
     public static final short MIN_KEYCODE = 8;
+    public static final short KEYS_COUNT = (short)((MAX_KEYCODE - MIN_KEYCODE + 1) * KEYSYMS_PER_KEYCODE);
     public final int[] keysyms = new int[KEYS_COUNT];
     private final Bitmask modifiersMask = new Bitmask();
     private final XKeycode[] keycodeMap = createKeycodeMap();
@@ -119,11 +120,19 @@ public class Keyboard {
             if (xKeycode == null) return false;
 
             if (action == KeyEvent.ACTION_DOWN) {
-                boolean shiftPressed = event.isShiftPressed() || keyCode == KeyEvent.KEYCODE_AT || keyCode == KeyEvent.KEYCODE_STAR || keyCode == KeyEvent.KEYCODE_POUND || keyCode == KeyEvent.KEYCODE_PLUS;
-                if (shiftPressed) xServer.injectKeyPress(XKeycode.KEY_SHIFT_L);
+                boolean shiftNeeded = keyCode == KeyEvent.KEYCODE_AT || keyCode == KeyEvent.KEYCODE_STAR || keyCode == KeyEvent.KEYCODE_POUND || keyCode == KeyEvent.KEYCODE_PLUS;
+                if (shiftNeeded && !event.isShiftPressed() && syntheticShiftCount == 0) {
+                    xServer.injectKeyPress(XKeycode.KEY_SHIFT_L);
+                    syntheticShiftCount++;
+                }
                 xServer.injectKeyPress(xKeycode, xKeycode != XKeycode.KEY_ENTER ? event.getUnicodeChar() : 0);
             } else if (action == KeyEvent.ACTION_UP) {
-                xServer.injectKeyRelease(XKeycode.KEY_SHIFT_L);
+                if (syntheticShiftCount > 0) {
+                    syntheticShiftCount--;
+                    if (syntheticShiftCount == 0) {
+                        xServer.injectKeyRelease(XKeycode.KEY_SHIFT_L);
+                    }
+                }
                 xServer.injectKeyRelease(xKeycode);
             }
         }

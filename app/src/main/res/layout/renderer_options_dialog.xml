@@ -153,15 +153,7 @@
                         android:layout_height="wrap_content"
                         android:text="Off" />
                 </LinearLayout>
-                <TextView
-                    android:id="@+id/TVGridCycleWarning"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Use on your own risk"
-                    android:textColor="#FF6B6B"
-                    android:textSize="12sp"
-                    android:visibility="gone" />
-            </LinearLayout>
+                </LinearLayout>
 
         </LinearLayout>
     </ScrollView>

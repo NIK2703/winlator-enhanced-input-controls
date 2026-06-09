@@ -349,7 +349,7 @@ public class ControlElement {
     }
 
     public void setOpacity(float opacity) {
-        this.opacity = opacity < 0 ? -1f : Math.max(opacity, 0.1f);
+        this.opacity = opacity < 0 ? -1f : Math.max(0.1f, Math.min(opacity, 1.0f));
         invalidateElementCachesKeepDisk();
     }
 
@@ -762,7 +762,7 @@ public class ControlElement {
                 halfWidth = snappingSize * ((bindings.size() * 4) / 2);
                 halfHeight = snappingSize * 2;
 
-                if (orientation == 1) {
+                if (orientation != 0) {
                     int tmp = halfWidth;
                     halfWidth = halfHeight;
                     halfHeight = tmp;

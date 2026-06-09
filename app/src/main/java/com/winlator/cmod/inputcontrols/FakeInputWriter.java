@@ -11,7 +11,7 @@ import java.nio.channels.FileChannel;
 public class FakeInputWriter {
     private static final String TAG = "FakeInputWriter";
     private static final int EVENT_SIZE = 24;
-    private static final int MAX_EVENTS_PER_UPDATE = 20; // Buttons + axes + sync
+    private static final int MAX_EVENTS_PER_UPDATE = 40; // Buttons (10*2) + axes (8) + triggers (2) + hat (2) + sync = 33 max
     private static final int BUFFER_SIZE = EVENT_SIZE * MAX_EVENTS_PER_UPDATE;
 
     public static final short EV_SYN = 0x00;
@@ -185,6 +185,7 @@ public class FakeInputWriter {
     }
 
     private void writeEvent(short type, short code, int value) {
+        if (buffer.remaining() < 16) return;
         long timeMs = System.currentTimeMillis();
         buffer.putLong(timeMs / 1000);
         buffer.putLong((timeMs % 1000) * 1000);
@@ -211,7 +212,7 @@ public class FakeInputWriter {
         writeEvent(EV_ABS, code, value);
     }
 
-    public void writeGamepadState(GamepadState state) {
+    public synchronized void writeGamepadState(GamepadState state) {
         if (!isOpen && !open())
             return;
 

@@ -5,8 +5,8 @@ bool is_mouse_move_binding(const TouchBinding* b) {
 }
 
 bool point_in_element(float px, float py, const TouchElement* e) {
-    if (px < e->cached_left || px >= e->cached_right) return false;
-    if (py < e->cached_top || py >= e->cached_bottom) return false;
+    if (px < e->cached_left || px > e->cached_right) return false;
+    if (py < e->cached_top || py > e->cached_bottom) return false;
     if (e->shape == SHAPE_CIRCLE) {
         float dx = px - e->x, dy = py - e->y;
         if (dx * dx + dy * dy > e->cached_hw_sq) return false;
@@ -17,29 +17,27 @@ bool point_in_element(float px, float py, const TouchElement* e) {
 TouchElement* hit_test_element(float x, float y) {
     // Use spatial grid if available
     if (g_state.grid_cell_w > 0.0f && g_state.grid_cell_h > 0.0f) {
-        // Early exit: point outside spatial grid bounds cannot hit any element
-        if (x < g_state.grid_min_x || x > g_state.grid_max_x ||
-            y < g_state.grid_min_y || y > g_state.grid_max_y)
-            return NULL;
+        if (x >= g_state.grid_min_x && x <= g_state.grid_max_x &&
+            y >= g_state.grid_min_y && y <= g_state.grid_max_y) {
+            int col = (int)((x - g_state.grid_min_x) / g_state.grid_cell_w);
+            int row = (int)((y - g_state.grid_min_y) / g_state.grid_cell_h);
 
-        int col = (int)((x - g_state.grid_min_x) / g_state.grid_cell_w);
-        int row = (int)((y - g_state.grid_min_y) / g_state.grid_cell_h);
-        
-        if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
-            int min_c = col > 0 ? col - 1 : 0;
-            int max_c = col < GRID_COLS - 1 ? col + 1 : GRID_COLS - 1;
-            int min_r = row > 0 ? row - 1 : 0;
-            int max_r = row < GRID_ROWS - 1 ? row + 1 : GRID_ROWS - 1;
-            
-            for (int r = max_r; r >= min_r; r--) {
-                for (int c = max_c; c >= min_c; c--) {
-                    int cell = r * GRID_COLS + c;
-                    int cnt = g_state.spatial_grid_count[cell];
-                    if (cnt > MAX_ELEMENTS) cnt = MAX_ELEMENTS;
-                    for (int j = cnt - 1; j >= 0; j--) {
-                        TouchElement* e = &g_state.elements[g_state.spatial_grid[cell][j]];
-                        if (point_in_element(x, y, e))
-                            return e;
+            if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
+                int min_c = col > 0 ? col - 1 : 0;
+                int max_c = col < GRID_COLS - 1 ? col + 1 : GRID_COLS - 1;
+                int min_r = row > 0 ? row - 1 : 0;
+                int max_r = row < GRID_ROWS - 1 ? row + 1 : GRID_ROWS - 1;
+
+                for (int r = max_r; r >= min_r; r--) {
+                    for (int c = max_c; c >= min_c; c--) {
+                        int cell = r * GRID_COLS + c;
+                        int cnt = g_state.spatial_grid_count[cell];
+                        if (cnt > MAX_ELEMENTS) cnt = MAX_ELEMENTS;
+                        for (int j = cnt - 1; j >= 0; j--) {
+                            TouchElement* e = &g_state.elements[g_state.spatial_grid[cell][j]];
+                            if (point_in_element(x, y, e))
+                                return e;
+                        }
                     }
                 }
             }
@@ -55,33 +53,6 @@ TouchElement* hit_test_element(float x, float y) {
             return e;
     }
     return NULL;
-}
-
-// Cubic bezier interpolation: given input x in [0,1] and control points (0,0), (cpx1,cpy1), (0.45,0.95), (1,1),
-// find t where B_x(t) ≈ |x|, then return B_y(t) preserving sign.
-// Control points match Java's CubicBezierInterpolator.set(0.075f, 0.95f, 0.45f, 0.95f).
-float cubic_bezier_interpolate(float x, float cpx1, float cpy1) {
-    float abs_x = fabsf(x);
-    if (abs_x <= 0.0001f) return 0.0f;
-    if (abs_x >= 1.0f) return x > 0 ? 1.0f : -1.0f;
-
-    float lo = 0.0f, hi = 1.0f;
-    for (int i = 0; i < 16; i++) {
-        float mid = (lo + hi) * 0.5f;
-        float omt = 1.0f - mid;
-        float m2 = mid * mid;
-        float m3 = m2 * mid;
-        float omt2 = omt * omt;
-        float bx = 3.0f * omt2 * mid * cpx1 + 3.0f * omt * m2 * 0.45f + m3;
-        if (bx < abs_x) lo = mid;
-        else hi = mid;
-    }
-    float t = (lo + hi) * 0.5f;
-    float omt = 1.0f - t;
-    float t2 = t * t;
-    float t3 = t2 * t;
-    float by = 3.0f * omt * omt * t * cpy1 + 3.0f * omt * t2 * 0.95f + t3;
-    return x > 0 ? by : -by;
 }
 
 #define BEZIER_LUT_SIZE 256
@@ -141,8 +112,6 @@ void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, To
         const TouchBinding* b = &e->bindings[i];
         if (b->type == BINDING_NONE) continue;
         bool active = states[i];
-        if (mouse_move[i])
-            active = active || states[(i + 2) % 4];
         if (active != e->petal_active[i]) {
             e->petal_active[i] = active;
             if (active) press_binding(result, b, true);
@@ -204,8 +173,11 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     e->long_press_arm = false;
     e->gesture_timer_armed = false;
     e->gesture_suppressed = false;
-    e->gesture_toggled = false;
-    e->lp_toggled = false;
+    // Preserve toggle state across touches — don't clear if any toggle is active
+    if (!element_is_toggle_active(e)) {
+        e->gesture_toggled = false;
+        e->lp_toggled = false;
+    }
 
     element_down_table[e->type](e, ptr_id, x, y, time_ms, result);
 
@@ -213,7 +185,7 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     TouchFinger* f = find_finger(ptr_id);
     if (__builtin_expect(f != NULL, 1)) {
         uint8_t cnt = f->engaged_elem_count;
-        if (__builtin_expect(cnt < 4, 1)) {
+        if (__builtin_expect(cnt < 16, 1)) {
             f->engaged_elem_indices[cnt] = elem_idx;
             f->engaged_elem_count = cnt + 1;
         }
@@ -243,8 +215,8 @@ void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     element_up_table[e->type](e, x, y, time_ms, result);
     e->engaged = false;
     e->current_ptr_id = -1;
-    // Toggle buttons that are still selected keep their visual activation
-    if (!(e->cached_has_toggle && e->selected))
+    // Toggle buttons that still have any active toggle keep their visual activation
+    if (!element_is_toggle_active(e))
         e->visual_active = false;
     mark_element_dirty(e);
     // Clean up leaked gesture flags: element-specific up may early-return
@@ -317,7 +289,7 @@ void release_element_bindings(TouchElement* e, TouchActionResult* restrict resul
     e->visual_long_press_active = false;
     e->current_ptr_id = -1;
     e->engaged = false;
-    if (!(e->cached_has_toggle && e->selected) && !e->lp_toggled && !e->gesture_toggled)
+    if (!element_is_toggle_active(e))
         e->visual_active = false;
     mark_element_dirty(e);
 }
@@ -411,6 +383,8 @@ void element_reset_runtime(TouchElement* e) {
     e->long_press_arm = false;
     e->gesture_long_press_triggered = false;
     e->gesture_swipe_triggered = false;
+    e->gesture_toggled = false;
+    e->lp_toggled = false;
     e->gesture_timer_armed = false;
     e->auto_repeat_primary_pressed = false;
     e->auto_repeat_last_time = 0;

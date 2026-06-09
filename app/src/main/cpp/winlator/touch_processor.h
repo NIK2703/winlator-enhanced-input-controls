@@ -136,6 +136,7 @@ typedef enum {
         bool gesture_timer_armed;
         bool lp_toggled;
         bool gesture_toggled;
+        bool defer_primary;
         bool auto_repeat_primary_pressed;
         bool visual_long_press_active;
         bool cached_lp_has_toggle;
@@ -252,7 +253,7 @@ typedef struct {
     uint32_t bindings_generation;
 
     // Engaged element indices for optimized element scan in gesture handler
-    int16_t engaged_elem_indices[4];
+    int16_t engaged_elem_indices[16];
     uint8_t engaged_elem_count;
 
     // Second-finger resume (touchscreen)
@@ -441,7 +442,7 @@ typedef struct {
 } TouchAction;
 
 typedef struct {
-    TouchAction actions[32];
+    TouchAction actions[64];
     int count;
 } TouchActionResult;
 

@@ -8,7 +8,7 @@ void XrInputInit(struct XrEngine* engine, struct XrInput* input)
 {
     if (input->Initialized)
         return;
-    memset(input, 0, sizeof(input));
+    memset(input, 0, sizeof(*input));
 
     input->ActionSet = XrInputCreateActionSet(engine->Instance, "running_action_set", "Actionset");
     input->IndexLeft = XrInputCreateAction(input->ActionSet, XR_ACTION_TYPE_BOOLEAN_INPUT, "index_left", "Index left", 0, NULL);
@@ -165,11 +165,13 @@ uint32_t XrInputGetButtonState(struct XrInput* input, int controller)
 
 XrVector2f XrInputGetJoystickState(struct XrInput* input, int controller)
 {
+    if (controller < 0 || controller >= 2) { XrVector2f zero = {0,0}; return zero; }
     return input->JoystickState[controller].currentState;
 }
 
 XrPosef XrInputGetPose(struct XrInput* input, int controller)
 {
+    if (controller < 0 || controller >= 2) { XrPosef zero = {{{0}}}; return zero; }
     return input->ControllerPose[controller].pose;
 }
 
@@ -261,7 +263,7 @@ void XrInputVibrate(struct XrInput* input, int duration, int chan, float intensi
 {
     for (int i = 0; i < 2; ++i)
     {
-        int channel = i & chan;
+        int channel = (chan >> i) & 1;
         if (channel)
         {
             if (input->VibrationChannelDuration[channel] > 0.0f)

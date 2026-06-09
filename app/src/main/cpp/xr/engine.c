@@ -8,7 +8,7 @@ void XrEngineInit(struct XrEngine* engine, void* system, const char* name, int v
 {
     if (engine->Initialized)
         return;
-    memset(engine, 0, sizeof(engine));
+    memset(engine, 0, sizeof(*engine));
 
 #ifdef ANDROID
     PFN_xrInitializeLoaderKHR xrInitializeLoaderKHR;

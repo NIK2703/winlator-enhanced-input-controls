@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -58,10 +59,10 @@ public class WinHandler {
     private final DatagramPacket sendPacket = new DatagramPacket(sendData.array(), 64);
     private final DatagramPacket receivePacket = new DatagramPacket(receiveData.array(), 64);
     private final ArrayDeque<Runnable> actions = new ArrayDeque<>();
-    private boolean initReceived = false;
+    private volatile boolean initReceived = false;
     private boolean running = false;
     private OnGetProcessInfoListener onGetProcessInfoListener;
-    private final Map<Integer, ExternalController> controllers = new HashMap<>(); // map deviceId -> controller
+    private final Map<Integer, ExternalController> controllers = new ConcurrentHashMap<>(); // map deviceId -> controller
     private InetAddress localhost;
     private byte inputType = DEFAULT_INPUT_TYPE;
     private final XServerDisplayActivity activity;
@@ -71,8 +72,8 @@ public class WinHandler {
     private static final int MAX_CONTROLLERS = 4;
     private static final int OSC_DEVICE_ID = -1;
     private FakeInputWriter[] writers = new FakeInputWriter[MAX_CONTROLLERS];
-    private Map<Integer, Integer> deviceToSlot = new HashMap<>();
-    private Set<Integer> usedSlots = new HashSet<>();
+    private Map<Integer, Integer> deviceToSlot = new ConcurrentHashMap<>();
+    private Set<Integer> usedSlots = ConcurrentHashMap.newKeySet();
     private String fakeInputBasePath;
     private LocalServerSocket vibrationServer;
     private volatile boolean vibrationRunning = false;
@@ -92,6 +93,7 @@ public class WinHandler {
         this.inputDeviceListener = new InputManager.InputDeviceListener() {
             @Override
             public void onInputDeviceAdded(int deviceId) {
+                deviceToSlot.remove(deviceId);
             }
 
             @Override
@@ -502,6 +504,7 @@ public class WinHandler {
                 break;
             }
             case RequestCodes.RELEASE_GAMEPAD: {
+                break;
             }
             case RequestCodes.CURSOR_POS_FEEDBACK: {
                 short x = receiveData.getShort();
@@ -617,13 +620,13 @@ public class WinHandler {
 
         for (int slot = 0; slot < MAX_CONTROLLERS; slot++) {
             if (!usedSlots.contains(slot)) {
-                usedSlots.add(slot);
                 deviceToSlot.put(deviceId, slot);
                 if (fakeInputBasePath != null && writers[slot] == null) {
                     writers[slot] = new FakeInputWriter(fakeInputBasePath, slot);
                     writers[slot].open();
 
                 }
+                usedSlots.add(slot);
                 return slot;
             }
         }
@@ -635,7 +638,7 @@ public class WinHandler {
         Integer slot = deviceToSlot.remove(deviceId);
         if (slot != null) {
             if (fallbackSlot == slot) fallbackSlot = -1;
-            if (writers[slot] != null) {
+            if (writers != null && slot >= 0 && slot < writers.length && writers[slot] != null) {
                 writers[slot].destroy();
                 writers[slot] = null;
             }

@@ -3,9 +3,9 @@
 static int pointer_button_idx(const TouchBinding* b);
 static void release_non_modifiers_first(TouchActionResult* restrict result, const TouchBinding* actions, int count);
 
-// Keyboard modifier keycodes (X11): 0x25=Left Shift, 0x32=Left Ctrl, 0x40=Left Alt
-#define MOD_KEYCODE_SHIFT 0x25
-#define MOD_KEYCODE_CTRL  0x32
+// Keyboard modifier keycodes (X11): 0x25=KEY_CTRL_L(37), 0x32=KEY_SHIFT_L(50), 0x40=KEY_ALT_L(64)
+#define MOD_KEYCODE_CTRL  0x25
+#define MOD_KEYCODE_SHIFT 0x32
 #define MOD_KEYCODE_ALT   0x40
 
 bool is_modifier_binding(const TouchBinding* b) {
@@ -23,7 +23,10 @@ static uint64_t current_time_ms() {
 }
 
 static int schedule_action(TouchBinding binding, int action_type, uint64_t delay_from_now_ms) {
-    if (g_state.scheduled_action_count >= MAX_SCHEDULED_ACTIONS) return -1;
+    if (g_state.scheduled_action_count >= MAX_SCHEDULED_ACTIONS) {
+        __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "schedule_action: overflow (type=%d)", action_type);
+        return -1;
+    }
     int idx = g_state.scheduled_action_count++;
     g_state.scheduled_actions[idx].binding = binding;
     g_state.scheduled_actions[idx].action_type = action_type;
@@ -33,7 +36,10 @@ static int schedule_action(TouchBinding binding, int action_type, uint64_t delay
 }
 
 void add_action(TouchActionResult* restrict r, ActionType type, int a0, int a1, int a2) {
-    if (r->count >= 32) return;
+    if (__builtin_expect(r->count >= (int)(sizeof(r->actions) / sizeof(r->actions[0])), 0)) {
+        __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "add_action: buffer overflow (type=%d)", type);
+        return;
+    }
     r->actions[r->count].type = type;
     switch (type) {
         case ACT_POINTER_MOVE: r->actions[r->count].pointer_move.x = a0; r->actions[r->count].pointer_move.y = a1; break;
@@ -119,8 +125,6 @@ static void execute_actions_impl(TouchActionResult* restrict result, const Touch
                         add_action(result, ACT_POINTER_BUTTON_RELEASE, pointer_button_idx(b), 0, 0);
                     else if (is_gamepad_binding(b))
                         add_action(result, ACT_GAMEPAD_STATE, b->type - BINDING_GAMEPAD_BASE, 0, 0);
-                    else if (is_mouse_move_binding(b))
-                        add_action(result, ACT_STOP_MOUSE_MOVE, 0, 0, 0);
                     for (int t = 0; t < g_state.gesture_toggled_count; t++) {
                         if (g_state.gesture_toggled_actions[t].type == b->type &&
                             g_state.gesture_toggled_actions[t].keycode == b->keycode) {
@@ -142,13 +146,6 @@ static void execute_actions_impl(TouchActionResult* restrict result, const Touch
                             add_action(result, ACT_POINTER_BUTTON_PRESS, pointer_button_idx(b), 0, 0);
                         else if (is_gamepad_binding(b))
                             add_action(result, ACT_GAMEPAD_STATE, b->type - BINDING_GAMEPAD_BASE, 1, 0);
-                        else if (is_mouse_move_binding(b)) {
-                            static const int move_dx[] = { -1, 1, 0, 0 };
-                            static const int move_dy[] = { 0, 0, -1, 1 };
-                            int idx = b->type - BINDING_MOUSE_MOVE_LEFT;
-                            if (idx >= 0 && idx < 4)
-                                add_action(result, ACT_START_MOUSE_MOVE, move_dx[idx], move_dy[idx], 1);
-                        }
                     }
                     if (g_state.gesture_toggled_count < MAX_HELD_ACTIONS)
                         g_state.gesture_toggled_actions[g_state.gesture_toggled_count++] = *b;
@@ -321,6 +318,7 @@ void press_binding(TouchActionResult* restrict result, const TouchBinding* b, bo
 
 void process_scheduled_actions(TouchActionResult* restrict result, uint64_t time_ms) {
     if (g_state.scheduled_action_count == 0) return;
+    int old_count = g_state.scheduled_action_count;
     ScheduledAction* sched_actions = g_state.scheduled_actions;
     for (int i = 0; i < g_state.scheduled_action_count; i++) {
         if (__builtin_expect(sched_actions[i].binding.type == BINDING_NONE, 0)) continue;
@@ -359,4 +357,8 @@ void process_scheduled_actions(TouchActionResult* restrict result, uint64_t time
         }
     }
     g_state.scheduled_action_count = write_idx;
+    for (int i = write_idx; i < old_count; i++) {
+        sched_actions[i].active = false;
+        sched_actions[i].binding.type = BINDING_NONE;
+    }
 }

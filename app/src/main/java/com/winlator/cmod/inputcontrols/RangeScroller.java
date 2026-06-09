@@ -65,8 +65,8 @@ public class RangeScroller {
                     scrollOffset = -currentOffset % scrollSize;
                     if (scrollOffset < 0) scrollOffset = scrollSize + scrollOffset;
                     updateRangeIndex();
-                    lastPosition = position;
                 }
+                lastPosition = position;
             }
         } else {
             isActionDown = false;
@@ -87,11 +87,11 @@ public class RangeScroller {
 
     private void updateRangeIndex() {
         ControlElement.Range range = element.getRange();
-        byte from = (byte)Math.floor((scrollOffset / getElementSize()) % range.max);
-        if (from < 0) from = (byte)(range.max + from);
-        byte to = (byte)(from + element.getBindingCount() + 1);
-        rangeIndexFrom = from;
-        rangeIndexTo = to;
+        int from = (int)Math.floor((scrollOffset / getElementSize()) % range.max);
+        if (from < 0) from = range.max + from;
+        int to = from + element.getBindingCount();
+        rangeIndexFrom = (byte)from;
+        rangeIndexTo = (byte)to;
     }
 
     private int getIndexByPosition(float x, float y) {

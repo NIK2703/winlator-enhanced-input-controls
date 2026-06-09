@@ -24,7 +24,7 @@ void XrRendererInit(struct XrEngine* engine, struct XrRenderer* renderer)
     {
         XrRendererDestroy(engine, renderer);
     }
-    memset(renderer, 0, sizeof(renderer));
+    memset(renderer, 0, sizeof(*renderer));
 
     if (engine->PlatformFlag[PLATFORM_EXTENSION_PASSTHROUGH])
     {

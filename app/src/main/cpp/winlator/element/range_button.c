@@ -8,10 +8,10 @@ int range_keycode(int ordinal, int index) {
     static const int function[12]= {67,68,69,70,71,72,73,74,75,76,95,96};
     static const int numpad[10]  = {87,88,89,83,84,85,79,80,81,90};
     switch (ordinal) {
-        case 0: if (index >= 0 && index < 26) return alphabet[index];
-        case 1: if (index >= 0 && index < 10) return number[index];
-        case 2: if (index >= 0 && index < 12) return function[index];
-        case 3: if (index >= 0 && index < 10) return numpad[index];
+        case 0: if (index >= 0 && index < 26) return alphabet[index]; break;
+        case 1: if (index >= 0 && index < 10) return number[index]; break;
+        case 2: if (index >= 0 && index < 12) return function[index]; break;
+        case 3: if (index >= 0 && index < 10) return numpad[index]; break;
     }
     return 0;
 }
@@ -32,7 +32,7 @@ void element_range_button_down(TouchElement* e, int ptr_id, float x, float y, ui
     float left = e->x - cw;
     float top  = e->y - ch;
 
-    float offset = e->range_orientation == 0 ? x - left - e->range_current_offset : y - top - e->range_current_offset;
+    float offset = e->range_orientation == 0 ? x - left + e->range_current_offset : y - top + e->range_current_offset;
     int index = (int)floorf(offset / element_size);
     if (e->range_max > 0) index %= e->range_max;
     if (index < 0) index += e->range_max;
@@ -71,7 +71,7 @@ void element_range_button_move(TouchElement* e, float x, float y, uint64_t time_
         float inv_scroll_size = 1.0f / scroll_size;
 
         e->range_current_offset += delta;
-        float offset_mod = e->range_current_offset - ((int)(e->range_current_offset * inv_scroll_size)) * scroll_size;
+        float offset_mod = e->range_current_offset - floorf(e->range_current_offset * inv_scroll_size) * scroll_size;
         e->range_scroll_offset = -offset_mod;
         e->range_last_position = pos;
         mark_element_dirty(e);

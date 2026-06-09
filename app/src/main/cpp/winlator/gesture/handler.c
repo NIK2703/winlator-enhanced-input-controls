@@ -79,6 +79,16 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
         }
     }
 
+    // When DT_WAITING is active, confirm DT before any element engagement.
+    // This ensures double-tap on element areas triggers D/Dd bindings rather
+    // than engaging the element (stick, dpad, lock, button, etc.).
+    if (__builtin_expect(g_state.gesture_double_tap_waiting, 0)) {
+        if (check_confirm_dt_waiting(f, result, NULL, false)) {
+            g_state.gesture_main_ptr_id = f->ptr_id;
+            return;
+        }
+    }
+
     // Grid-accelerated hit-test (3x3 cells around the touch point)
     if (g_state.grid_cell_w > 0.0f && g_state.grid_cell_h > 0.0f) {
         int cx = (int)((x - g_state.grid_min_x) * g_state.grid_inv_cell_w);
@@ -146,15 +156,25 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     if (btn && btn->type == ELEM_BUTTON) {
         if (btn->activation_mode == ACTIVATION_TRACK || btn->activation_mode == ACTIVATION_HOVER) {
             TrackedButtons* tb = &g_state.tracked[(uint32_t)f->ptr_id % MAX_FINGERS];
-            tb->ptr_id = f->ptr_id;
+            if (tb->ptr_id != f->ptr_id) {
+                tb->count = 0;
+                tb->ptr_id = f->ptr_id;
+            }
             bool already = false;
             for (int j = 0; j < tb->count; j++) {
                 if (tb->element_indices[j] == (int)(btn - g_state.elements)) { already = true; break; }
             }
             if (!already) {
+                int16_t prev_ptr = btn->current_ptr_id;
                 handle_element_down(btn, f->ptr_id, x, y, time_ms, result);
-                if (btn->engaged && tb->count < MAX_TRACKED_PER_POINTER)
+                // Toggle+AR elements in TRACK mode: don't add to tracked list so
+                // slide-over section can re-enter on Move. Use gesture_timer_armed
+                // to prevent immediate re-trigger instead.
+                if (btn->cached_has_toggle && btn->cached_has_auto_repeat && btn->activation_mode == ACTIVATION_TRACK) {
+                    btn->gesture_timer_armed = true;
+                } else if (prev_ptr != f->ptr_id && btn->current_ptr_id == f->ptr_id && tb->count < MAX_TRACKED_PER_POINTER) {
                     tb->element_indices[tb->count++] = (int)(btn - g_state.elements);
+                }
             }
             if (btn->activation_mode == ACTIVATION_HOVER)
                 g_state.hovered_element_per_ptr[(uint32_t)f->ptr_id % MAX_FINGERS] = (int)(btn - g_state.elements);
@@ -237,18 +257,24 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 
             // restore second-finger bindings if deferred and still active
             if (was_second_deferred && g_state.gesture_second_ptr_id >= 0) {
+                TouchFinger* sf = find_finger(g_state.gesture_second_ptr_id);
+                if (sf) {
+                    sf->is_second_finger = true;
+                    setup_second_finger_bindings(sf);
+                }
                 g_state.gesture_second_active = true;
-                f->is_second_finger = true;
-                setup_second_finger_bindings(f);
             }
             return;
         }
 
         // was_second_deferred without DT — only restore if second finger is still active
         if (!__builtin_expect(g_state.gesture_double_tap_waiting, 0) && was_second_deferred && g_state.gesture_second_ptr_id >= 0) {
+            TouchFinger* sf = find_finger(g_state.gesture_second_ptr_id);
+            if (sf) {
+                sf->is_second_finger = true;
+                setup_second_finger_bindings(sf);
+            }
             g_state.gesture_second_active = true;
-            f->is_second_finger = true;
-            setup_second_finger_bindings(f);
         }
 
         f->original_ptr_id = f->ptr_id;
@@ -263,6 +289,11 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     // TS SECOND FINGER
     // ============================================================
     if (g_state.cfg.is_ts && is_second) {
+        // Guard: 3rd+ finger while second is already active
+        if (__builtin_expect(g_state.gesture_second_active, 0)) {
+            f->state = GESTURE_STATE_IDLE;
+            return;
+        }
         // Early exit: no second-finger gesture bindings in TS mode and no pending DT
         if (!(g_state.cfg.caps_ts_mask & (GESTURE_MASK(GESTURE_SINGLE_2ND) | GESTURE_MASK(GESTURE_DOUBLE_2ND)
             | GESTURE_MASK(GESTURE_SINGLE_DRAG_2ND) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND)))
@@ -292,7 +323,7 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     if (is_first) {
         g_state.scrolling = false;
         g_state.scroll_accum_y = 0;
-    } else if (is_second) {
+    } else if (is_second && !g_state.gesture_second_active) {
         save_pending_resume_action(main_finger);
         release_held_actions(result);
     }
@@ -410,32 +441,64 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                     if (tb->element_indices[j] == (int)(toggle_btn - g_state.elements)) { already_tracked = true; break; }
                 }
                 if (!already_tracked && !toggle_btn->gesture_timer_armed) {
-                    int tbi = (int)(toggle_btn - g_state.elements);
-                    if (toggle_btn->selected) {
-#ifndef NDEBUG
-                        __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "gesture_toggle[%d] DESELECT", tbi);
-#endif
-                        if (toggle_btn->bindings[0].type != BINDING_NONE)
-                            release_binding(result, &toggle_btn->bindings[0]);
-                        toggle_btn->selected = false;
-                        toggle_btn->visual_active = false;
+                    if (toggle_btn->cached_has_auto_repeat) {
+                        // Toggle+AR: use full element path (all 4 slots)
+                        if (mode == ACTIVATION_TRACK) {
+                            // Must clear engagement guard before re-entry, otherwise
+                            // handle_element_down (shared.c:159) is a no-op and the
+                            // toggle can never be deselected via slide-over.
+                            if (toggle_btn->current_ptr_id >= 0) {
+                                int16_t eidx = (int16_t)(toggle_btn - g_state.elements);
+                                for (int ei = 0; ei < f->engaged_elem_count; ei++) {
+                                    if (f->engaged_elem_indices[ei] == eidx) {
+                                        f->engaged_elem_indices[ei] = f->engaged_elem_indices[--f->engaged_elem_count];
+                                        break;
+                                    }
+                                }
+                                toggle_btn->current_ptr_id = -1;
+                                toggle_btn->engaged = false;
+                            }
+                            handle_element_down(toggle_btn, f->ptr_id, x, y, time_ms, result);
+                            toggle_btn->gesture_timer_armed = true;
+                            mark_element_dirty(toggle_btn);
+                        }
+                        // HOVER toggle+AR: skip — handled by HOVER section below
                     } else {
+                        // Pure toggle (non-AR): existing binding[0] only logic
+                        int tbi = (int)(toggle_btn - g_state.elements);
+                        if (toggle_btn->selected) {
+                            // Don't deselect via gesture slide-over if another toggle is still active
+                            if (toggle_btn->lp_toggled || toggle_btn->gesture_toggled) {
+                                toggle_btn->visual_active = true;
+                                toggle_btn->gesture_timer_armed = true;
+                                mark_element_dirty(toggle_btn);
+                            } else {
 #ifndef NDEBUG
-                        __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "gesture_toggle[%d] SELECT", tbi);
+                                __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "gesture_toggle[%d] DESELECT", tbi);
 #endif
-                        if (toggle_btn->bindings[0].type != BINDING_NONE)
-                            press_binding(result, &toggle_btn->bindings[0], true);
-                        toggle_btn->selected = true;
-                        toggle_btn->visual_active = true;
+                                if (toggle_btn->bindings[0].type != BINDING_NONE)
+                                    release_binding(result, &toggle_btn->bindings[0]);
+                                toggle_btn->selected = false;
+                                toggle_btn->visual_active = false;
+                            }
+                        } else {
+#ifndef NDEBUG
+                            __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "gesture_toggle[%d] SELECT", tbi);
+#endif
+                            if (toggle_btn->bindings[0].type != BINDING_NONE)
+                                press_binding(result, &toggle_btn->bindings[0], true);
+                            toggle_btn->selected = true;
+                            toggle_btn->visual_active = true;
+                        }
+                        toggle_btn->gesture_timer_armed = true;
+                        mark_element_dirty(toggle_btn);
                     }
-                    toggle_btn->gesture_timer_armed = true;
-                    mark_element_dirty(toggle_btn);
                 }
             }
         } else {
             // Finger not on a toggle — reset gates so re-entry can toggle again
             for (int i = 0; i < g_state.element_count; i++)
-                if (g_state.elements[i].cached_has_toggle)
+                if (g_state.elements[i].cached_has_toggle && g_state.elements[i].current_ptr_id == f->ptr_id)
                     g_state.elements[i].gesture_timer_armed = false;
         }
     }
@@ -506,9 +569,22 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                         if (!curr->gesture_timer_armed) {
                             curr->gesture_timer_armed = true;
                             if (curr->selected) {
-                                release_binding(result, &curr->bindings[0]);
-                                curr->selected = false;
-                                curr->visual_active = false;
+                                // Release stale gesture/long-press toggles
+                                if (curr->gesture_toggled && !curr->gesture_swipe_triggered) {
+                                    release_bindings_list(result, curr->element_gesture, curr->element_gesture_count);
+                                    curr->gesture_toggled = false;
+                                }
+                                if (curr->lp_toggled && !curr->gesture_long_press_triggered) {
+                                    release_bindings_list(result, curr->element_long_press, curr->element_long_press_count);
+                                    curr->lp_toggled = false;
+                                }
+                                if (curr->lp_toggled || curr->gesture_toggled) {
+                                    curr->visual_active = true;
+                                } else {
+                                    release_binding(result, &curr->bindings[0]);
+                                    curr->selected = false;
+                                    curr->visual_active = false;
+                                }
                             } else {
                                 press_binding(result, &curr->bindings[0], true);
                                 curr->selected = true;
@@ -516,7 +592,10 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                             }
                         }
                     } else if (curr->cached_has_toggle && curr->cached_has_auto_repeat) {
-                        handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
+                        if (!curr->gesture_timer_armed) {
+                            handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
+                            curr->gesture_timer_armed = true;
+                        }
                     } else if (!curr->cached_has_toggle) {
                         // Skip handle_element_down on re-entry of the first tracked
                         // button — the re-entry block below handles full re-init.
@@ -526,32 +605,39 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                     // Suppress gestures on non-initial button (match old path)
                     // When re-entering the first tracked button, reinitialize it
                     // while preserving gesture state to prevent re-trigger.
-                    if (already && tb->count > 0 && curr_idx == tb->element_indices[0] && !curr->cached_has_toggle) {
-                        bool had_gest_swipe = curr->gesture_swipe_triggered;
-                        bool had_gest_lp = curr->gesture_long_press_triggered;
-                        bool had_gest_toggled = curr->gesture_toggled;
-                        bool had_lp_toggled = curr->lp_toggled;
-                        bool had_lp_arm = curr->long_press_arm;
-                        bool had_gest_timer = curr->gesture_timer_armed;
-                        // Release gesture bindings before re-init so they aren't leaked
-                        if (had_gest_swipe && !had_gest_toggled)
-                            release_bindings_list(result, curr->element_gesture, curr->element_gesture_count);
-                        if (had_gest_lp && !had_lp_toggled)
-                            release_bindings_list(result, curr->element_long_press, curr->element_long_press_count);
-                        curr->current_ptr_id = -1;
-                        curr->engaged = false;
-                        handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
-                        // Re-press gesture bindings if they were active
-                        if (had_gest_swipe && !had_gest_toggled)
-                            press_bindings_list(result, curr->element_gesture, curr->element_gesture_count);
-                        if (had_gest_lp && !had_lp_toggled)
-                            press_bindings_list(result, curr->element_long_press, curr->element_long_press_count);
-                        curr->gesture_swipe_triggered = had_gest_swipe;
-                        curr->gesture_long_press_triggered = had_gest_lp;
-                        curr->long_press_arm = had_lp_arm;
-                        curr->gesture_timer_armed = had_gest_timer;
-                        curr->gesture_toggled = had_gest_toggled;
-                        curr->lp_toggled = had_lp_toggled;
+                    // For toggle buttons with active toggle state, also preserve
+                    // so that suppress_element_gestures doesn't clear toggles.
+                    if (already && tb->count > 0 && curr_idx == tb->element_indices[0]
+                        && !curr->gesture_timer_armed) {
+                        if (!curr->cached_has_toggle || element_is_toggle_active(curr)) {
+                            bool had_gest_swipe = curr->gesture_swipe_triggered;
+                            bool had_gest_lp = curr->gesture_long_press_triggered;
+                            bool had_gest_toggled = curr->gesture_toggled;
+                            bool had_lp_toggled = curr->lp_toggled;
+                            bool had_lp_arm = curr->long_press_arm;
+                            bool had_gest_timer = curr->gesture_timer_armed;
+                            // Release gesture bindings before re-init so they aren't leaked
+                            if (had_gest_swipe && !had_gest_toggled)
+                                release_bindings_list(result, curr->element_gesture, curr->element_gesture_count);
+                            if (had_gest_lp && !had_lp_toggled)
+                                release_bindings_list(result, curr->element_long_press, curr->element_long_press_count);
+                            curr->current_ptr_id = -1;
+                            curr->engaged = false;
+                            handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
+                            // Re-press gesture bindings if they were active
+                            if (had_gest_swipe && !had_gest_toggled)
+                                press_bindings_list(result, curr->element_gesture, curr->element_gesture_count);
+                            if (had_gest_lp && !had_lp_toggled)
+                                press_bindings_list(result, curr->element_long_press, curr->element_long_press_count);
+                            curr->gesture_swipe_triggered = had_gest_swipe;
+                            curr->gesture_long_press_triggered = had_gest_lp;
+                            curr->long_press_arm = had_lp_arm;
+                            curr->gesture_timer_armed = had_gest_timer;
+                            curr->gesture_toggled = had_gest_toggled;
+                            curr->lp_toggled = had_lp_toggled;
+                        } else {
+                            suppress_element_gestures(curr, result);
+                        }
                     } else if (tb->count > 1 || already) {
                         suppress_element_gestures(curr, result);
                     }
@@ -865,6 +951,7 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
     if (g_state.cfg.caps_has_element_toggle) {
         for (int i = 0; i < element_count; i++) {
             if (!elements[i].cached_has_toggle) continue;
+            if (elements[i].current_ptr_id >= 0) continue; // Still touched by another finger
             elements[i].gesture_timer_armed = false;
         }
     }
@@ -884,16 +971,28 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
         finger_up->engaged_elem_count = 0;
     }
     if (had_tracked || had_element) {
-        g_state.main_ptr_id = -1;
-        f->active = false;
-        return;
+        // Allow DT_WAITING to be entered even for element fingers,
+        // so double-tap can work with on-screen controls.
+        // touchpad_finger_up checks f->state — element fingers may be
+        // in IDLE (never entered touchpad_finger_down), so only proceed
+        // if gesture_double_tap_waiting is already active (second tap-up),
+        // or if the finger has double-tap bindings (first tap-up entering DT_WAITING).
+        bool can_enter_dt = g_state.gesture_double_tap_waiting
+            || g_state.gesture_post_double_tap_drag
+            || g_state.second_double_tap_waiting
+            || (f->cached_has_active_double_tap && f->state == GESTURE_STATE_IDLE);
+        if (!can_enter_dt) {
+            g_state.main_ptr_id = -1;
+            deactivate_finger(f);
+            return;
+        }
     }
 
     // Gesture up: skip gesture-specific handling if no gestures in current mode
     if (!current_mode_has_gestures() && !__builtin_expect(g_state.gesture_double_tap_waiting, 0)
         && !__builtin_expect(g_state.gesture_post_double_tap_drag, 0)
         && !__builtin_expect(g_state.second_double_tap_waiting, 0)) {
-        f->active = false;
+        deactivate_finger(f);
         g_state.main_ptr_id = -1;
         return;
     }
@@ -908,7 +1007,7 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
         } else if (g_state.second_double_tap_waiting) {
             g_state.second_double_tap_waiting = false;
             g_state.second_tap_fallback_count = 0;
-            f->active = false;
+            deactivate_finger(f);
         } else if (f->double_tap_original_id_set && g_state.gesture_main_ptr_id >= 0
                    && f->ptr_id == f->original_ptr_id) {
             if (!g_state.gesture_second_active) {
@@ -925,12 +1024,15 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
                 g_state.gesture_post_double_tap_drag = false;
                 release_held_actions(result);
             }
-            f->active = false;
+            deactivate_finger(f);
         } else if (g_state.gesture_second_active && f->ptr_id != g_state.gesture_main_ptr_id) {
             touchpad_finger_up(f, result, time_ms);
             cleanup_second_finger_up(result);
+        } else if (f->state == GESTURE_STATE_IDLE
+                   && (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag)) {
+            touchpad_finger_up(f, result, time_ms);
         } else {
-            f->active = false;
+            deactivate_finger(f);
         }
     } else {
         // TP up handling

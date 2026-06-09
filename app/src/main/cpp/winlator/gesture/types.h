@@ -97,7 +97,7 @@ static inline GesturePairPlan gesture_decide_branch(GestureBranchParams bp) {
 void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result);
 
 // Gesture handler state machine
-void on_drag_start(TouchFinger* f);
+void on_drag_start(TouchFinger* f, TouchActionResult* restrict result);
 bool gesture_is_within_tap_distance(float x, float y);
 void gesture_cancel_double_tap_wait(TouchActionResult* restrict result);
 void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* restrict result);

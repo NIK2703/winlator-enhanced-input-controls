@@ -95,7 +95,6 @@ public class RendererOptionsDialog extends ContentDialog {
         if (cycleInterval < 0) cycleInterval = oled ? 240 : 0;
         sbGridCycleInterval.setProgress(cycleInterval);
         tvGridCycleInterval.setText(cycleInterval > 0 ? cycleInterval + "s" : "Off");
-        updateGridCycleWarning(oled, cycleInterval);
         groupGridDarken.setVisibility(cbGridRendering.isChecked() ? View.VISIBLE : View.GONE);
 
         cbGridRendering.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -115,7 +114,6 @@ public class RendererOptionsDialog extends ContentDialog {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 tvGridCycleInterval.setText(progress > 0 ? progress + "s" : "Off");
-                updateGridCycleWarning(oled, progress);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -193,12 +191,6 @@ public class RendererOptionsDialog extends ContentDialog {
             }
         }
         cb.setText("Half Resolution Grid Rendering");
-    }
-
-    private void updateGridCycleWarning(boolean oled, int progress) {
-        TextView tv = findViewById(R.id.TVGridCycleWarning);
-        if (tv == null) return;
-        tv.setVisibility(oled && progress == 0 ? View.VISIBLE : View.GONE);
     }
 
     public static boolean isOledDisplay(Context context) {

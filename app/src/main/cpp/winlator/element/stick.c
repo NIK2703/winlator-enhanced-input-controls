@@ -18,7 +18,7 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
     float dx = x - e->x;
     float dy = y - e->y;
     float dist_sq = dx*dx + dy*dy;
-    if (__builtin_expect(dist_sq < DEAD_ZONE_SQ, 0)) return;
+    if (__builtin_expect(dist_sq < DEAD_ZONE_SQ * radius * radius, 0)) return;
     float dist = sqrtf(dist_sq);
     float inv_dist = 1.0f / dist;
     float nx, ny;
@@ -48,7 +48,7 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
         e->stick_value_x = nx;
         e->stick_value_y = ny;
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Stick", "MOVE values idx=%d type=%d stick_value_x=%f stick_value_y=%f", (int)(e - g_state.elements), e->type, e->stick_value_x, e->stick_value_y);
-        int is_left = !e->cached_bind0_is_right_stick;
+        int is_left = e->cached_bind0_is_right_stick;
         //TP_LOG(ANDROID_LOG_DEBUG, "Winlator_StickBinding",
         //    "stick_move GAMEPAD AXIS is_left=%d axis_x=%f axis_y=%f",
         //    is_left, axis_x, axis_y);
@@ -78,6 +78,6 @@ void element_stick_up(TouchElement* e, float x, float y, uint64_t time_ms, Touch
         }
     }
     if (e->cached_bind0_is_gamepad) {
-        add_action(result, ACT_GAMEPAD_AXIS, !e->cached_bind0_is_right_stick, 0, 0);
+        add_action(result, ACT_GAMEPAD_AXIS, e->cached_bind0_is_right_stick, 0, 0);
     }
 }

@@ -209,7 +209,9 @@ public class Container {
     }
 
     public byte getControllerMapping(XrControllerMapping input) {
-        return (byte) controllerMapping.charAt(input.ordinal());
+        if (input.ordinal() >= controllerMapping.length()) return 0;
+        int c = controllerMapping.charAt(input.ordinal());
+        return (byte)(c >= 128 ? 0 : c);
     }
 
     public void setControllerMapping(String controllerMapping) {
@@ -671,10 +673,10 @@ public class Container {
 
     public boolean hasEnvVar(String keyValue) {
         if (envVars == null || envVars.isEmpty()) return false;
-        String[] vars = envVars.split(",");
+        String[] vars = envVars.split(" ");
         for (String var : vars) {
             if (var.trim().equalsIgnoreCase(keyValue.trim())) {
-                return true; // Found the variable
+                return true;
             }
         }
         return false;

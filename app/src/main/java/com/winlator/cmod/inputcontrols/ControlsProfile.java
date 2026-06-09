@@ -258,7 +258,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
     public void setLongPressDelay(int longPressDelay) {
         ensureGestureSettingsLoaded();
-        this.longPressDelay = longPressDelay;
+        this.longPressDelay = clamp(longPressDelay, 50, 1000);
     }
 
     public int getButtonLongPressHaptic() {
@@ -635,6 +635,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             data.put("cursorSpeed", Float.valueOf(cursorSpeed));
 
             if (bindingDelay > 0) data.put("bindingDelay", bindingDelay);
+            if (longPressDelay < 50) longPressDelay = 200;
             data.put("longPressDelay", longPressDelay);
             if (buttonLongPressHaptic != 1) data.put("buttonLongPressHaptic", buttonLongPressHaptic);
             if (buttonGestureHaptic != 5) data.put("buttonGestureHaptic", buttonGestureHaptic);
@@ -649,6 +650,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             JSONArray elementsJSONArray = new JSONArray();
             if (!elementsLoaded && file.isFile()) {
                 JSONObject profileJSONObject = new JSONObject(FileUtils.readString(file));
+                if (profileJSONObject.has("longPressDelay")) longPressDelay = profileJSONObject.getInt("longPressDelay");
+                if (profileJSONObject.has("gestureThreshold")) gestureThreshold = profileJSONObject.getInt("gestureThreshold");
+                if (profileJSONObject.has("doubleTapDistance")) doubleTapDistance = profileJSONObject.getInt("doubleTapDistance");
                 elementsJSONArray = profileJSONObject.getJSONArray("elements");
             }
             else for (ControlElement element : elements) elementsJSONArray.put(element.toJSONObject());
