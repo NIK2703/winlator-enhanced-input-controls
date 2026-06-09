@@ -77,32 +77,64 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
             }
         }
     }
-    int cx = (int)((x - g_state.grid_min_x) * g_state.grid_inv_cell_w);
-    int cy = (int)((y - g_state.grid_min_y) * g_state.grid_inv_cell_h);
-    int start_cx = cx - 1 < 0 ? 0 : cx - 1;
-    int end_cx = cx + 1 >= GRID_COLS ? GRID_COLS - 1 : cx + 1;
-    int start_cy = cy - 1 < 0 ? 0 : cy - 1;
-    int end_cy = cy + 1 >= GRID_ROWS ? GRID_ROWS - 1 : cy + 1;
-    for (int r = start_cy; r <= end_cy; r++) {
-        for (int c = start_cx; c <= end_cx; c++) {
-            int cell_idx = r * GRID_COLS + c;
-            for (int j = g_state.grid_cell_start[cell_idx]; j < g_state.grid_cell_start[cell_idx + 1]; j++) {
-                TouchElement* pe = &g_state.elements[g_state.grid_cell_to_elems[j]];
-                if (!point_in_element(x, y, pe)) continue;
 
-                if (has_passthrough && __builtin_expect(pe->passthrough_touch, 0))
-                    g_state.passthrough_active = true;
+    // Grid-accelerated hit-test (3x3 cells around the touch point)
+    if (g_state.grid_cell_w > 0.0f && g_state.grid_cell_h > 0.0f) {
+        int cx = (int)((x - g_state.grid_min_x) * g_state.grid_inv_cell_w);
+        int cy = (int)((y - g_state.grid_min_y) * g_state.grid_inv_cell_h);
+        if (cx >= 0 && cx < GRID_COLS && cy >= 0 && cy < GRID_ROWS) {
+            int start_cx = cx - 1 < 0 ? 0 : cx - 1;
+            int end_cx = cx + 1 >= GRID_COLS ? GRID_COLS - 1 : cx + 1;
+            int start_cy = cy - 1 < 0 ? 0 : cy - 1;
+            int end_cy = cy + 1 >= GRID_ROWS ? GRID_ROWS - 1 : cy + 1;
+            for (int r = start_cy; r <= end_cy; r++) {
+                for (int c = start_cx; c <= end_cx; c++) {
+                    int cell_idx = r * GRID_COLS + c;
+                    for (int j = g_state.grid_cell_start[cell_idx]; j < g_state.grid_cell_start[cell_idx + 1]; j++) {
+                        TouchElement* pe = &g_state.elements[g_state.grid_cell_to_elems[j]];
+                        if (!point_in_element(x, y, pe)) continue;
 
-                ActivationMode am = pe->activation_mode;
-                if (__builtin_expect(am == ACTIVATION_LOCK, 0)) {
+                        if (has_passthrough && __builtin_expect(pe->passthrough_touch, 0))
+                            g_state.passthrough_active = true;
+
+                        ActivationMode am = pe->activation_mode;
+                        if (__builtin_expect(am == ACTIVATION_LOCK, 0)) {
+                            handle_element_down(pe, f->ptr_id, x, y, time_ms, result);
+                            found_lock = true;
+                        } else if (__builtin_expect(pe->type != ELEM_BUTTON, 0)) {
+                            handle_element_down(pe, f->ptr_id, x, y, time_ms, result);
+                            if (pe->engaged && !pe->passthrough_touch) handled = true;
+                        } else if (btn == NULL) {
+                            btn = pe;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: linear scan for elements missed by the grid (stale grid, edge cells, etc.)
+    if (!found_lock && !handled) {
+        for (int i = 0; i < element_count; i++) {
+            TouchElement* pe = &elements[i];
+            if (!point_in_element(x, y, pe)) continue;
+
+            if (has_passthrough && __builtin_expect(pe->passthrough_touch, 0))
+                g_state.passthrough_active = true;
+
+            ActivationMode am = pe->activation_mode;
+            if (__builtin_expect(am == ACTIVATION_LOCK, 0)) {
+                if (!found_lock) {
                     handle_element_down(pe, f->ptr_id, x, y, time_ms, result);
                     found_lock = true;
-                } else if (__builtin_expect(pe->type != ELEM_BUTTON, 0)) {
+                }
+            } else if (__builtin_expect(pe->type != ELEM_BUTTON, 0)) {
+                if (!handled) {
                     handle_element_down(pe, f->ptr_id, x, y, time_ms, result);
                     if (pe->engaged && !pe->passthrough_touch) handled = true;
-                } else if (btn == NULL) {
-                    btn = pe;
                 }
+            } else if (btn == NULL) {
+                btn = pe;
             }
         }
     }

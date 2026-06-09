@@ -372,6 +372,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     public void setRendererSwapRB(boolean val) { rendererCfgHolder.setRendererSwapRB(val); if (isEditMode()) rendererCfgHolder.saveData();  }
                     public boolean getGridRendering() { return rendererCfgHolder.isGridRendering(); }
                     public void setGridRendering(boolean val) { rendererCfgHolder.setGridRendering(val); if (isEditMode()) rendererCfgHolder.saveData(); }
+                    public String getScreenSize() { return rendererCfgHolder.getScreenSize(); }
                     public float getGridDarken() { return rendererCfgHolder.getGridDarken(); }
                     public void setGridDarken(float val) { rendererCfgHolder.setGridDarken(val); if (isEditMode()) rendererCfgHolder.saveData(); }
                     public int getGridCycleInterval() { return rendererCfgHolder.getGridCycleInterval(); }

@@ -1,7 +1,11 @@
 package com.winlator.cmod.contentdialog;
 
 import android.content.Context;
+import android.hardware.display.DisplayManager;
+import android.os.Build;
+import android.view.Display;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
@@ -10,6 +14,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.core.AppUtils;
 
 public class RendererOptionsDialog extends ContentDialog {
 
@@ -45,6 +50,7 @@ public class RendererOptionsDialog extends ContentDialog {
         void setGridDarken(float v);
         int getGridCycleInterval();
         void setGridCycleInterval(int v);
+        String getScreenSize();
     }
 
     private static final String[] PRESENT_MODE_IDS    = {"fifo", "mailbox"};
@@ -80,12 +86,16 @@ public class RendererOptionsDialog extends ContentDialog {
         TextView tvGridCycleInterval = findViewById(R.id.TVGridCycleInterval);
 
         cbGridRendering.setChecked(config.getGridRendering());
+        updateGridPreviewText(cbGridRendering, config);
         int darkenProgress = Math.round(config.getGridDarken() * 100);
         sbGridDarken.setProgress(darkenProgress);
         tvGridDarken.setText(darkenProgress + "%");
+        boolean oled = isOledDisplay(ctx);
         int cycleInterval = config.getGridCycleInterval();
+        if (cycleInterval < 0) cycleInterval = oled ? 240 : 0;
         sbGridCycleInterval.setProgress(cycleInterval);
         tvGridCycleInterval.setText(cycleInterval > 0 ? cycleInterval + "s" : "Off");
+        updateGridCycleWarning(oled, cycleInterval);
         groupGridDarken.setVisibility(cbGridRendering.isChecked() ? View.VISIBLE : View.GONE);
 
         cbGridRendering.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -105,6 +115,7 @@ public class RendererOptionsDialog extends ContentDialog {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 tvGridCycleInterval.setText(progress > 0 ? progress + "s" : "Off");
+                updateGridCycleWarning(oled, progress);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -150,6 +161,57 @@ public class RendererOptionsDialog extends ContentDialog {
             config.setGridDarken(sbGridDarken.getProgress() / 100.0f);
             config.setGridCycleInterval(sbGridCycleInterval.getProgress());
         });
+    }
+
+    private static String computeGridResolution(String screenSize) {
+        try {
+            String[] parts = screenSize.split("x");
+            if (parts.length != 2) return null;
+            int origW = Integer.parseInt(parts[0]);
+            int origH = Integer.parseInt(parts[1]);
+            int deviceWidth = AppUtils.getScreenWidth();
+            int deviceHeight = AppUtils.getScreenHeight();
+            int landscapeW = Math.max(deviceWidth, deviceHeight);
+            int landscapeH = Math.min(deviceWidth, deviceHeight);
+            int gridH = landscapeH / 2;
+            int gridW = (int)((float)gridH * origW / origH);
+            int maxW = landscapeW / 2;
+            if (gridW > maxW) gridW = maxW;
+            if ((gridW & 1) != 0) gridW++;
+            if ((gridH & 1) != 0) gridH++;
+            return gridW + "x" + gridH;
+        } catch (Exception e) { return null; }
+    }
+
+    private static void updateGridPreviewText(CheckBox cb, Config config) {
+        String screenSize = config.getScreenSize();
+        if (screenSize != null && !screenSize.isEmpty()) {
+            String gridRes = computeGridResolution(screenSize);
+            if (gridRes != null) {
+                cb.setText("Half Resolution Grid Rendering (" + gridRes + ")");
+                return;
+            }
+        }
+        cb.setText("Half Resolution Grid Rendering");
+    }
+
+    private void updateGridCycleWarning(boolean oled, int progress) {
+        TextView tv = findViewById(R.id.TVGridCycleWarning);
+        if (tv == null) return;
+        tv.setVisibility(oled && progress == 0 ? View.VISIBLE : View.GONE);
+    }
+
+    public static boolean isOledDisplay(Context context) {
+        try {
+            Display display = ((WindowManager)context.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                Display.HdrCapabilities hdrCaps = display.getHdrCapabilities();
+                if (hdrCaps != null && hdrCaps.getSupportedHdrTypes().length > 0) return true;
+            }
+            String name = display.getName();
+            if (name != null && (name.contains("OLED") || name.contains("AMOLED") || name.contains("POLED"))) return true;
+        } catch (Exception e) {}
+        return false;
     }
 
     public static int toVkPresentMode(String mode) {

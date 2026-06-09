@@ -65,20 +65,37 @@ public class BindingSequenceEditor {
             final int colorAccent = context.getResources().getColor(R.color.colorAccent, context.getTheme());
             int iconSize = (int) UnitUtils.dpToPx(28);
 
+            LinearLayout toggleGroup = new LinearLayout(context);
+            toggleGroup.setOrientation(LinearLayout.HORIZONTAL);
+            toggleGroup.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
             ImageView btToggle = new ImageView(context);
-            LinearLayout.LayoutParams lpToggle = new LinearLayout.LayoutParams(iconSize, iconSize);
-            lpToggle.leftMargin = (int) UnitUtils.dpToPx(4);
-            btToggle.setLayoutParams(lpToggle);
+            btToggle.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
             btToggle.setScaleType(ImageView.ScaleType.CENTER);
             btToggle.setImageResource(R.drawable.icon_toggle);
             btToggle.setColorFilter(bp.isToggleSwitch() ? colorAccent : 0xff888888);
-            btToggle.setOnClickListener((v) -> {
+            toggleGroup.addView(btToggle);
+
+            TextView tvToggleLabel = new TextView(context);
+            tvToggleLabel.setText("Switch");
+            tvToggleLabel.setTextColor(bp.isToggleSwitch() ? colorAccent : 0xff888888);
+            tvToggleLabel.setTextSize(12);
+            tvToggleLabel.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams lpToggleLabel = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT);
+            lpToggleLabel.leftMargin = (int) UnitUtils.dpToPx(2);
+            tvToggleLabel.setLayoutParams(lpToggleLabel);
+            toggleGroup.addView(tvToggleLabel);
+
+            toggleGroup.setOnClickListener((v) -> {
                 boolean newState = !bp.isToggleSwitch();
                 bp.setToggleSwitch(newState);
                 btToggle.setColorFilter(newState ? colorAccent : 0xff888888);
+                tvToggleLabel.setTextColor(newState ? colorAccent : 0xff888888);
                 if (onChanged != null) onChanged.run();
             });
-            titleRow.addView(btToggle);
+            titleRow.addView(toggleGroup);
 
             LinearLayout autoRepeatGroup = new LinearLayout(context);
             autoRepeatGroup.setOrientation(LinearLayout.HORIZONTAL);
@@ -92,9 +109,8 @@ public class BindingSequenceEditor {
             autoRepeatGroup.addView(btAutoRepeat);
 
             TextView tvInterval = new TextView(context);
-            tvInterval.setText(bp.getAutoRepeatIntervalMs() + "ms");
+            tvInterval.setText("Repeat" + (bp.isAutoRepeat() ? " (" + bp.getAutoRepeatIntervalMs() + "ms)" : ""));
             tvInterval.setTextColor(bp.isAutoRepeat() ? colorAccent : 0xff888888);
-            tvInterval.setVisibility(bp.isAutoRepeat() ? View.VISIBLE : View.GONE);
             tvInterval.setTextSize(12);
             tvInterval.setGravity(android.view.Gravity.CENTER_VERTICAL);
             LinearLayout.LayoutParams lpInterval = new LinearLayout.LayoutParams(
@@ -109,10 +125,10 @@ public class BindingSequenceEditor {
                 bp.setAutoRepeat(newState);
                 btAutoRepeat.setColorFilter(newState ? colorAccent : 0xff888888);
                 tvInterval.setTextColor(newState ? colorAccent : 0xff888888);
-                tvInterval.setVisibility(newState ? View.VISIBLE : View.GONE);
+                tvInterval.setText("Repeat" + (newState ? " (" + bp.getAutoRepeatIntervalMs() + "ms)" : ""));
                 if (newState) {
                     showIntervalDialog(context, bp, () -> {
-                        tvInterval.setText(bp.getAutoRepeatIntervalMs() + "ms");
+                        tvInterval.setText("Repeat (" + bp.getAutoRepeatIntervalMs() + "ms)");
                         if (onChanged != null) onChanged.run();
                     });
                 }

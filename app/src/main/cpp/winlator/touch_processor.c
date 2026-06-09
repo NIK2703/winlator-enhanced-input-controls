@@ -93,8 +93,6 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
             g_state.cfg.caps_has_any_element_long_press = true;
         if (e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE)
             g_state.cfg.caps_has_any_element_gesture = true;
-        if (e->cached_has_auto_repeat)
-            g_state.cfg.caps_has_auto_repeat_buttons = true;
         if (e->bindings[0].type == BINDING_MOUSE_LEFT)
             g_state.cfg.caps_has_mouse_left_element = true;
         if (e->passthrough_touch)
@@ -103,6 +101,8 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
         element_compute_snapped_hwhh(e, hs_snap);
 
         e->cached_has_auto_repeat = element_has_auto_repeat(e);
+        if (e->cached_has_auto_repeat)
+            g_state.cfg.caps_has_auto_repeat_buttons = true;
         e->cached_has_long_press = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
         e->cached_has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
         e->cached_has_any_binding = e->bindings[0].type != BINDING_NONE
@@ -148,8 +148,15 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
 void touch_processor_set_snapping_size(float size) {
     g_state.snapping_size = size;
     for (int i = 0; i < g_state.element_count; i++) {
-        element_compute_snapped_hwhh(&g_state.elements[i], size);
+        TouchElement* e = &g_state.elements[i];
+        element_compute_snapped_hwhh(e, size);
+        e->cached_left = e->x - e->hw;
+        e->cached_right = e->x + e->hw;
+        e->cached_top = e->y - e->hh;
+        e->cached_bottom = e->y + e->hh;
+        e->cached_hw_sq = e->hw * e->hw;
     }
+    build_spatial_grid();
 }
 
 void touch_processor_set_resolution_scale(float scale) { g_state.resolution_scale = scale; }

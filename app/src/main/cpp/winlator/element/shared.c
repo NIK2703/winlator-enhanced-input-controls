@@ -15,34 +15,35 @@ __attribute__((hot))
 TouchElement* hit_test_element(float x, float y) {
     // Use spatial grid if available
     if (g_state.grid_cell_w > 0.0f && g_state.grid_cell_h > 0.0f) {
-        // Early exit: point outside spatial grid bounds cannot hit any element
-        if (x < g_state.grid_min_x || x > g_state.grid_max_x ||
-            y < g_state.grid_min_y || y > g_state.grid_max_y)
-            return NULL;
-
-        int col = (int)((x - g_state.grid_min_x) * g_state.grid_inv_cell_w);
-        int row = (int)((y - g_state.grid_min_y) * g_state.grid_inv_cell_h);
+        // Only use grid acceleration when the point is within grid bounds
+        bool in_bounds = x >= g_state.grid_min_x && x <= g_state.grid_max_x &&
+                         y >= g_state.grid_min_y && y <= g_state.grid_max_y;
+        if (in_bounds) {
+            int col = (int)((x - g_state.grid_min_x) * g_state.grid_inv_cell_w);
+            int row = (int)((y - g_state.grid_min_y) * g_state.grid_inv_cell_h);
         
-        if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
-            int min_c = col > 0 ? col - 1 : 0;
-            int max_c = col < GRID_COLS - 1 ? col + 1 : GRID_COLS - 1;
-            int min_r = row > 0 ? row - 1 : 0;
-            int max_r = row < GRID_ROWS - 1 ? row + 1 : GRID_ROWS - 1;
-            
-            for (int r = max_r; r >= min_r; r--) {
-                for (int c = max_c; c >= min_c; c--) {
-                    int cell = r * GRID_COLS + c;
-                    for (int j = g_state.grid_cell_start[cell]; j < g_state.grid_cell_start[cell + 1]; j++) {
-                        TouchElement* e = &g_state.elements[g_state.grid_cell_to_elems[j]];
-                        if (point_in_element(x, y, e))
-                            return e;
+            if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
+                int min_c = col > 0 ? col - 1 : 0;
+                int max_c = col < GRID_COLS - 1 ? col + 1 : GRID_COLS - 1;
+                int min_r = row > 0 ? row - 1 : 0;
+                int max_r = row < GRID_ROWS - 1 ? row + 1 : GRID_ROWS - 1;
+                
+                for (int r = max_r; r >= min_r; r--) {
+                    for (int c = max_c; c >= min_c; c--) {
+                        int cell = r * GRID_COLS + c;
+                        for (int j = g_state.grid_cell_start[cell]; j < g_state.grid_cell_start[cell + 1]; j++) {
+                            TouchElement* e = &g_state.elements[g_state.grid_cell_to_elems[j]];
+                            if (point_in_element(x, y, e))
+                                return e;
+                        }
                     }
                 }
             }
         }
     }
     
-    // Fallback: linear scan
+    // Linear scan fallback: catches elements missed by the grid (stale grid,
+    // touch outside grid bounds, element center more than 1 cell from touch)
     for (int i = g_state.element_count - 1; i >= 0; i--) {
         TouchElement* e = &g_state.elements[i];
         if (__builtin_expect(i - 4 >= 0, 1))

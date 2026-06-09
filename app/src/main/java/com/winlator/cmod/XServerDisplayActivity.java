@@ -476,6 +476,9 @@ if (enableLogs) {
             gridCycleInterval = shortcut != null
                 ? shortcut.getGridCycleInterval()
                 : container.getGridCycleInterval();
+            if (gridCycleInterval < 0) {
+                gridCycleInterval = com.winlator.cmod.contentdialog.RendererOptionsDialog.isOledDisplay(this) ? 240 : 0;
+            }
         }
 
         this.graphicsDriverConfig = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);

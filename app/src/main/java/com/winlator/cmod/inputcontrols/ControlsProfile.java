@@ -76,14 +76,14 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
     // === Unified gesture bindings (primary storage) ===
     private BindPackage gestureSingleTapAction = BindPackage.fromSingle(Binding.MOUSE_LEFT_BUTTON);
-    private BindPackage gestureLongPressAction = BindPackage.fromSingle(Binding.MOUSE_RIGHT_BUTTON);
+    private BindPackage gestureLongPressAction = new BindPackage();
     private BindPackage gestureDoubleTapAction = new BindPackage();
     private BindPackage gestureSingleTap2ndFingerAction = BindPackage.fromSingle(Binding.MOUSE_RIGHT_BUTTON);
     private BindPackage gestureDoubleTap2ndFingerAction = new BindPackage();
     private BindPackage gestureSingleTapDragAction = new BindPackage();
-    private BindPackage gestureLongPressDragAction = BindPackage.fromSingle(Binding.MOUSE_LEFT_BUTTON);
+    private BindPackage gestureLongPressDragAction = new BindPackage();
     private BindPackage gestureDoubleTapDragAction = new BindPackage();
-    private BindPackage gestureSingleTap2ndFingerDragAction = new BindPackage();
+    private BindPackage gestureSingleTap2ndFingerDragAction = BindPackage.fromSingle(Binding.MOUSE_LEFT_BUTTON);
     private BindPackage gestureDoubleTap2ndFingerDragAction = new BindPackage();
 
     private boolean gestureSettingsLoaded = false;
@@ -515,10 +515,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 "singleTapDragAction", "longPressDragAction", "doubleTapDragAction",
                 "singleTap2ndFingerAction", "doubleTap2ndFingerAction",
                 "singleTap2ndFingerDragAction", "doubleTap2ndFingerDragAction"};
-            Binding[] gestureDefaults = {Binding.MOUSE_LEFT_BUTTON, Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
-                Binding.NONE, Binding.MOUSE_LEFT_BUTTON, Binding.NONE,
+            Binding[] gestureDefaults = {Binding.MOUSE_LEFT_BUTTON, Binding.NONE, Binding.NONE,
+                Binding.NONE, Binding.NONE, Binding.NONE,
                 Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
-                Binding.NONE, Binding.NONE};
+                Binding.MOUSE_LEFT_BUTTON, Binding.NONE};
 
             for (int i = 0; i < gestureKeys.length; i++) {
                 if (gestureData.has(gestureKeys[i])) {
@@ -560,10 +560,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 "singleTapDragAction", "longPressDragAction", "doubleTapDragAction",
                 "singleTap2ndFingerAction", "doubleTap2ndFingerAction",
                 "singleTap2ndFingerDragAction", "doubleTap2ndFingerDragAction"};
-            Binding[] gestureDefaults = {Binding.MOUSE_LEFT_BUTTON, Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
-                Binding.NONE, Binding.MOUSE_LEFT_BUTTON, Binding.NONE,
+            Binding[] gestureDefaults = {Binding.MOUSE_LEFT_BUTTON, Binding.NONE, Binding.NONE,
+                Binding.NONE, Binding.NONE, Binding.NONE,
                 Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
-                Binding.NONE, Binding.NONE};
+                Binding.MOUSE_LEFT_BUTTON, Binding.NONE};
 
             for (int i = 0; i < gestureKeys.length; i++) {
                 if (gestureData.has(gestureKeys[i])) {

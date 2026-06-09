@@ -82,7 +82,7 @@ public class Container {
     private boolean exclusiveXInput = true;
     private boolean gridRendering = false;
     private float gridDarken = 0.25f;
-    private int gridCycleInterval = 0;
+    private int gridCycleInterval = -1;
 
     private ContainerManager containerManager;
 
@@ -459,7 +459,7 @@ public class Container {
             data.put("exclusiveXInput", exclusiveXInput);
             if (gridRendering) data.put("gridRendering", true);
             if (gridDarken != 0.25f) data.put("gridDarken", gridDarken);
-            if (gridCycleInterval > 0) data.put("gridCycleInterval", gridCycleInterval);
+            data.put("gridCycleInterval", gridCycleInterval);
             if (!WineInfo.isMainWineVersion(wineVersion)) data.put("wineVersion", wineVersion);
             FileUtils.writeString(getConfigFile(), data.toString());
         }
