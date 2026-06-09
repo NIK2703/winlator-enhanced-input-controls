@@ -13,6 +13,23 @@ public enum Binding {
     public final XKeycode keycode;
     private final String displayName;
     private static final HashMap<String, Binding> lookup = new HashMap<>();
+    public static final int ORD_MOUSE_MOVE_LEFT = MOUSE_MOVE_LEFT.ordinal();
+    public static final int ORD_MOUSE_MOVE_RIGHT = MOUSE_MOVE_RIGHT.ordinal();
+    public static final int ORD_MOUSE_MOVE_UP = MOUSE_MOVE_UP.ordinal();
+    public static final int ORD_MOUSE_MOVE_DOWN = MOUSE_MOVE_DOWN.ordinal();
+    public static final int ORD_GAMEPAD_BUTTON_A = GAMEPAD_BUTTON_A.ordinal();
+    public static final int ORD_GAMEPAD_LEFT_THUMB_UP = GAMEPAD_LEFT_THUMB_UP.ordinal();
+    public static final int ORD_GAMEPAD_LEFT_THUMB_DOWN = GAMEPAD_LEFT_THUMB_DOWN.ordinal();
+    public static final int ORD_GAMEPAD_LEFT_THUMB_LEFT = GAMEPAD_LEFT_THUMB_LEFT.ordinal();
+    public static final int ORD_GAMEPAD_LEFT_THUMB_RIGHT = GAMEPAD_LEFT_THUMB_RIGHT.ordinal();
+    public static final int ORD_GAMEPAD_RIGHT_THUMB_UP = GAMEPAD_RIGHT_THUMB_UP.ordinal();
+    public static final int ORD_GAMEPAD_RIGHT_THUMB_DOWN = GAMEPAD_RIGHT_THUMB_DOWN.ordinal();
+    public static final int ORD_GAMEPAD_RIGHT_THUMB_LEFT = GAMEPAD_RIGHT_THUMB_LEFT.ordinal();
+    public static final int ORD_GAMEPAD_RIGHT_THUMB_RIGHT = GAMEPAD_RIGHT_THUMB_RIGHT.ordinal();
+    public static final int ORD_GAMEPAD_DPAD_UP = GAMEPAD_DPAD_UP.ordinal();
+    public static final int ORD_GAMEPAD_DPAD_RIGHT = GAMEPAD_DPAD_RIGHT.ordinal();
+    public static final int ORD_GAMEPAD_DPAD_DOWN = GAMEPAD_DPAD_DOWN.ordinal();
+    public static final int ORD_GAMEPAD_DPAD_LEFT = GAMEPAD_DPAD_LEFT.ordinal();
 
     Binding() {
         XKeycode keycode;

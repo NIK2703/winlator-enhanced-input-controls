@@ -42,6 +42,7 @@ import com.winlator.cmod.inputcontrols.ExternalControllerBinding;
 import com.winlator.cmod.inputcontrols.GamepadState;
 import com.winlator.cmod.math.Mathf;
 
+import java.nio.ByteBuffer;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.Pointer;
@@ -60,16 +61,7 @@ public class InputControlsView extends View {
     public static final float DEFAULT_OVERLAY_OPACITY = 0.4f;
     public static boolean skipDiskCache = false;
     private static final byte MOUSE_WHEEL_DELTA = 120;
-    private static final int[] JOYSTICK_AXES = {
-            MotionEvent.AXIS_X, MotionEvent.AXIS_Y,
-            MotionEvent.AXIS_Z, MotionEvent.AXIS_RZ,
-            MotionEvent.AXIS_HAT_X, MotionEvent.AXIS_HAT_Y
-    };
     private boolean editMode = false;
-    private final int[] batchPtrIds = new int[10];
-    private final float[] batchXs = new float[10];
-    private final float[] batchYs = new float[10];
-    private static final boolean DEBUG = false;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path = new Path();
     private final ColorFilter colorFilter = new PorterDuffColorFilter(0xffffffff, PorterDuff.Mode.SRC_IN);
@@ -88,6 +80,7 @@ public class InputControlsView extends View {
     private XServer xServer;
     private NativeTouchProcessor nativeTouchProcessor;
     private com.winlator.cmod.renderer.ElementOverlayRenderer elementOverlayRenderer;
+    private static final int VISUAL_STRIDE = 60;
     private static long visualThrottleMs = 0;
     private long lastInvalidateMs = 0;
     private final Bitmap[] icons = new Bitmap[40];
@@ -570,7 +563,7 @@ public class InputControlsView extends View {
     }
 
     private void syncVisualStates() {
-        if (profile == null || nativeTouchProcessor == null) return;
+        if (profile == null) return;
         if (visualThrottleMs == 0) {
             float refreshRate = 60.0f;
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -593,33 +586,33 @@ public class InputControlsView extends View {
             invalidate();
             return;
         }
-        int n = nativeTouchProcessor.syncVisualState(
-            nativeTouchProcessor.syncPositions,
-            nativeTouchProcessor.syncStates,
-            nativeTouchProcessor.syncScrollOffsets);
+        float[] pos = nativeTouchProcessor.syncPositions;
+        int[] st = nativeTouchProcessor.syncStates;
+        float[] scroll = nativeTouchProcessor.syncScrollOffsets;
+        int n = nativeTouchProcessor.syncVisualState(pos, st, scroll);
         if (n > count) n = count;
         int activeCount = 0;
         for (int i = 0; i < n; i++) {
             ControlElement e = elements.get(i);
-            float px = nativeTouchProcessor.syncPositions[i * 2];
-            float py = nativeTouchProcessor.syncPositions[i * 2 + 1];
-            int state = nativeTouchProcessor.syncStates[i];
-            float scrollOff = nativeTouchProcessor.syncScrollOffsets[i];
-            if ((state & 1) != 0) activeCount++;
+            int flags = st[i];
+            if ((flags & 1) != 0) activeCount++;
             e.syncVisualState(
-                (state & 1) != 0, px, py,
-                (state & 2) != 0, (state & 4) != 0,
-                (state & 8) != 0, (state & 16) != 0,
-                scrollOff
+                (flags & 1) != 0,
+                pos[i*2], pos[i*2+1],
+                (flags & 2) != 0,
+                (flags & 4) != 0,
+                (flags & 8) != 0,
+                (flags & 16) != 0,
+                scroll[i]
             );
         }
-        if (DEBUG) Log.w("Winlator_Controls", "syncVisualStates: synced=" + n + " active=" + activeCount);
+        Log.w("Winlator_Controls", "syncVisualStates: synced=" + n + " active=" + activeCount);
         lastInvalidateMs = now;
         invalidate();
     }
 
     public void tick(long timeMs) {
-        if (DEBUG) Log.w("Winlator_Controls", "tick: start timeMs=" + timeMs);
+        Log.w("Winlator_Controls", "tick: start timeMs=" + timeMs);
         if (nativeTouchProcessor != null) {
             nativeTouchProcessor.tick(timeMs);
             syncVisualStates();
@@ -721,29 +714,31 @@ public class InputControlsView extends View {
     }
 
     private void processJoystickInput(ExternalController controller) {
-        for (int i = 0; i < JOYSTICK_AXES.length; i++) {
-            float value;
-            if (i == 0) value = controller.state.thumbLX;
-            else if (i == 1) value = controller.state.thumbLY;
-            else if (i == 2) value = controller.state.thumbRX;
-            else if (i == 3) value = controller.state.thumbRY;
-            else if (i == 4) value = controller.state.getDPadX();
-            else value = controller.state.getDPadY();
+        final int[] axes = {
+                MotionEvent.AXIS_X, MotionEvent.AXIS_Y,
+                MotionEvent.AXIS_Z, MotionEvent.AXIS_RZ,
+                MotionEvent.AXIS_HAT_X, MotionEvent.AXIS_HAT_Y
+        };
+        final float[] values = {
+                controller.state.thumbLX, controller.state.thumbLY,
+                controller.state.thumbRX, controller.state.thumbRY,
+                controller.state.getDPadX(), controller.state.getDPadY()
+        };
 
+        for (int i = 0; i < axes.length; i++) {
+            float value = values[i];
             if (Math.abs(value) > ControlElement.STICK_DEAD_ZONE) {
                 byte sign = Mathf.sign(value);
-                int keyCode = ExternalControllerBinding.getKeyCodeForAxis(JOYSTICK_AXES[i], sign);
+                int keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
                 ExternalControllerBinding controllerBinding = controller.getControllerBinding(keyCode);
-                if (DEBUG) Log.d("Winlator_StickBinding", "processJoystickInput axis="+JOYSTICK_AXES[i]+" val="+value+" sign="+sign+" keyCode="+keyCode+" binding="+(controllerBinding != null ? controllerBinding.getBinding() : "null")+" isDown=true");
                 if (controllerBinding != null) {
                     handleInputEvent(controller, controllerBinding.getBinding(), true, value, false);
                 }
             } else {
                 for (byte sign = -1; sign <= 1; sign += 2) {
-                    int keyCode = ExternalControllerBinding.getKeyCodeForAxis(JOYSTICK_AXES[i], sign);
+                    int keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
                     ExternalControllerBinding controllerBinding = controller.getControllerBinding(keyCode);
                     if (controllerBinding != null) {
-                        if (DEBUG) Log.d("Winlator_StickBinding", "processJoystickInput axis="+JOYSTICK_AXES[i]+" val="+value+" sign="+sign+" keyCode="+keyCode+" binding="+controllerBinding.getBinding()+" isDown=false (deadzone release)");
                         handleInputEvent(controller, controllerBinding.getBinding(), false, value, false);
                     }
                 }
@@ -779,17 +774,10 @@ public class InputControlsView extends View {
 
     @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
-        if (DEBUG) Log.d("Winlator_StickBinding", "onGenericMotionEvent deviceId="+event.getDeviceId()+" src="+event.getSource()+" action="+event.getAction()+
-                " AXIS_X="+event.getAxisValue(MotionEvent.AXIS_X)+" AXIS_Y="+event.getAxisValue(MotionEvent.AXIS_Y)+
-                " AXIS_Z="+event.getAxisValue(MotionEvent.AXIS_Z)+" AXIS_RZ="+event.getAxisValue(MotionEvent.AXIS_RZ));
-
         if (!editMode && profile != null) {
             ExternalController controller = profile.getController(event.getDeviceId());
 
             if (controller != null && controller.updateStateFromMotionEvent(event)) {
-                if (DEBUG) Log.d("Winlator_StickBinding", "onGenericMotionEvent controller="+controller.getName()+" bindingsCount="+controller.getControllerBindingCount()+
-                        " rawState(thumbLX="+controller.state.thumbLX+" thumbLY="+controller.state.thumbLY+
-                        " thumbRX="+controller.state.thumbRX+" thumbRY="+controller.state.thumbRY+")");
                 ExternalControllerBinding controllerBinding;
 
                 controllerBinding = controller.getControllerBinding(KeyEvent.KEYCODE_BUTTON_L2);
@@ -819,7 +807,7 @@ public class InputControlsView extends View {
         {
             int actionIndex = event.getActionIndex();
             int pointerId = event.getPointerId(actionIndex);
-            if (DEBUG) Log.w("Winlator_Controls", "onTouchEvent: action=" + event.getActionMasked() + " pointerId=" + pointerId + " x=" + event.getX(actionIndex) + " y=" + event.getY(actionIndex));
+            Log.w("Winlator_Controls", "onTouchEvent: action=" + event.getActionMasked() + " pointerId=" + pointerId + " x=" + event.getX(actionIndex) + " y=" + event.getY(actionIndex));
         }
 
         // Route through native processor
@@ -840,14 +828,10 @@ public class InputControlsView extends View {
                     return true;
                 }
                 case MotionEvent.ACTION_MOVE: {
-                    int pc = Math.min(event.getPointerCount(), 10);
-                    for (int i = 0; i < pc; i++) {
-                        batchPtrIds[i] = event.getPointerId(i);
-                        batchXs[i] = event.getX(i);
-                        batchYs[i] = event.getY(i);
+                    for (int i = 0; i < event.getPointerCount(); i++) {
+                        int pid = event.getPointerId(i);
+                        nativeTouchProcessor.onFingerMove(pid, event.getX(i), event.getY(i), event.getEventTime());
                     }
-                    for (int i = pc; i < 10; i++) batchPtrIds[i] = -1;
-                    nativeTouchProcessor.onFingerBatch(1, batchPtrIds, batchXs, batchYs, event.getEventTime());
                     syncVisualStates();
                     if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
                         elementOverlayRenderer.scheduleRender();
@@ -1010,29 +994,23 @@ public class InputControlsView extends View {
             else if (binding == Binding.GAMEPAD_LEFT_THUMB_UP || binding == Binding.GAMEPAD_LEFT_THUMB_DOWN) {
                 float val = (isActionDown && offset == 0) ? 1.0f : Math.abs(offset);
                 state.thumbLY = isActionDown ? (binding == Binding.GAMEPAD_LEFT_THUMB_UP ? -val : val) : 0;
-                Log.d("Winlator_StickBinding", "handleInputEvent "+binding+" isDown="+isActionDown+" offset="+offset+" val="+val+" -> thumbLY="+state.thumbLY);
             }
             else if (binding == Binding.GAMEPAD_LEFT_THUMB_LEFT || binding == Binding.GAMEPAD_LEFT_THUMB_RIGHT) {
                 float val = (isActionDown && offset == 0) ? 1.0f : Math.abs(offset);
                 state.thumbLX = isActionDown ? (binding == Binding.GAMEPAD_LEFT_THUMB_LEFT ? -val : val) : 0;
-                Log.d("Winlator_StickBinding", "handleInputEvent "+binding+" isDown="+isActionDown+" offset="+offset+" val="+val+" -> thumbLX="+state.thumbLX);
             }
             else if (binding == Binding.GAMEPAD_RIGHT_THUMB_UP || binding == Binding.GAMEPAD_RIGHT_THUMB_DOWN) {
                 float val = (isActionDown && offset == 0) ? 1.0f : Math.abs(offset);
                 state.thumbRY = isActionDown ? (binding == Binding.GAMEPAD_RIGHT_THUMB_UP ? -val : val) : 0;
-                Log.d("Winlator_StickBinding", "handleInputEvent "+binding+" isDown="+isActionDown+" offset="+offset+" val="+val+" -> thumbRY="+state.thumbRY);
             }
             else if (binding == Binding.GAMEPAD_RIGHT_THUMB_LEFT || binding == Binding.GAMEPAD_RIGHT_THUMB_RIGHT) {
                 float val = (isActionDown && offset == 0) ? 1.0f : Math.abs(offset);
                 state.thumbRX = isActionDown ? (binding == Binding.GAMEPAD_RIGHT_THUMB_LEFT ? -val : val) : 0;
-                Log.d("Winlator_StickBinding", "handleInputEvent "+binding+" isDown="+isActionDown+" offset="+offset+" val="+val+" -> thumbRX="+state.thumbRX);
             }
             else if (binding == Binding.GAMEPAD_DPAD_UP || binding == Binding.GAMEPAD_DPAD_RIGHT ||
                      binding == Binding.GAMEPAD_DPAD_DOWN || binding == Binding.GAMEPAD_DPAD_LEFT) {
                 state.dpad[binding.ordinal() - Binding.GAMEPAD_DPAD_UP.ordinal()] = isActionDown;
             }
-
-            Log.d("Winlator_StickBinding", "handleInputEvent stateAfter: thumbLX="+state.thumbLX+" thumbLY="+state.thumbLY+" thumbRX="+state.thumbRX+" thumbRY="+state.thumbRY+" sendUpdate="+sendUpdate);
 
             if (winHandler != null && sendUpdate) {
                 if (controller != null)

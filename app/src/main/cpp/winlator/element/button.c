@@ -6,27 +6,18 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     (void)ptr_id; (void)x; (void)y; (void)time_ms;
     TouchProcessorState* s = &g_state;
     bool has_primary = e->bindings[0].type != BINDING_NONE;
-    int idx = (int)(e - g_state.elements);
-    int mode = e->activation_mode;
-#ifndef NDEBUG
-    __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "DOWN[%d] ptr=%d b0=%d tog=%d auto=%d sel=%d mode=%s",
-        idx, ptr_id, e->bindings[0].type, e->cached_has_toggle, e->cached_has_auto_repeat,
-        e->selected, mode == 0 ? "LOCK" : mode == 1 ? "TRACK" : "HOVER");
-#endif
+    __android_log_print(ANDROID_LOG_WARN, LOG_TAG, "DOWN ptr=%d b0=%d TOGGLE_SWITCH=%d auto=%d arm=%d lp_cnt=%d delay=%d",
+        ptr_id, e->bindings[0].type, e->cached_has_toggle, e->cached_has_auto_repeat,
+        e->long_press_arm, e->element_long_press_count, s->cfg.long_press_delay_ms);
 
     // Toggle + Auto-repeat mode: burst mode — press+release all bindings at interval
     if (e->cached_has_toggle && e->cached_has_auto_repeat) {
         if (e->selected) {
-#ifndef NDEBUG
-            __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "DOWN[%d] -> toggle_auto_deselect", idx);
-#endif
             e->auto_repeat_primary_pressed = false;
             e->selected = false;
             e->visual_active = false;
+            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] visual=0 (toggle_auto_deselect)", (int)(e - g_state.elements));
         } else {
-#ifndef NDEBUG
-            __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "DOWN[%d] -> toggle_auto_select", idx);
-#endif
             execute_actions(result, e->bindings, 4);
             e->selected = true;
             e->auto_repeat_last_time = time_ms;
@@ -36,16 +27,20 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
 
     // Normal toggle switch (non-auto-repeat)
     if (e->cached_has_toggle && e->selected) {
-        if (mode == ACTIVATION_TRACK || mode == ACTIVATION_HOVER) {
-#ifndef NDEBUG
-            __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "DOWN[%d] -> toggle_sel_track stay_visual", idx);
-#endif
+        if (e->activation_mode == ACTIVATION_HOVER) {
+            // HOVER mode: toggle ON from previous touch — switch OFF on re-entry
+            if (has_primary)
+                release_binding(result, &e->bindings[0]);
+            e->selected = false;
+            e->visual_active = false;
+            return;
+        }
+        if (e->activation_mode == ACTIVATION_TRACK) {
+            // TRACK mode: set auto_repeat flag so MOVE doesn't release
             e->auto_repeat_primary_pressed = true;
             return;
         }
-#ifndef NDEBUG
-        __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "DOWN[%d] -> toggle_sel_lock release", idx);
-#endif
+        // LOCK mode: release binding and keep selected for UP flip
         if (has_primary)
             release_binding(result, &e->bindings[0]);
         return;
@@ -53,9 +48,6 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
 
     // Auto-repeat (non-toggle): press primary immediately
     if (e->cached_has_auto_repeat) {
-#ifndef NDEBUG
-        __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "DOWN[%d] -> auto_repeat has_p=%d", idx, has_primary);
-#endif
         if (has_primary) {
             press_binding(result, &e->bindings[0], true);
             e->auto_repeat_primary_pressed = true;
@@ -64,41 +56,36 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
         return;
     }
 
-    bool arm_lp = e->cached_has_long_press && !e->cached_has_toggle && !e->lp_toggled;
-    bool defer_primary = (e->cached_has_long_press || e->cached_has_gesture) && !e->cached_has_toggle && !e->lp_toggled && !e->gesture_toggled;
+    bool arm_lp = e->cached_has_long_press && !e->cached_has_toggle;
+    bool defer_primary = (e->cached_has_long_press || e->cached_has_gesture) && !e->cached_has_toggle;
     e->long_press_arm = arm_lp;
-#ifndef NDEBUG
-    __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "DOWN[%d] arm_lp=%d defer=%d has_lp=%d has_gest=%d tog=%d",
-        idx, arm_lp, defer_primary, e->cached_has_long_press, e->cached_has_gesture, e->cached_has_toggle);
-#endif
+    TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "DOWN arm_lp=%d has_lp=%d has_gesture=%d defer=%d tog=%d lp_cnt=%d lp0=%d",
+        arm_lp, e->cached_has_long_press, e->cached_has_gesture, defer_primary, e->cached_has_toggle, e->element_long_press_count,
+        e->element_long_press[0].type);
 
     if (defer_primary) {
-        if (!has_primary && !e->gesture_toggled && !e->lp_toggled) {
-#ifndef NDEBUG
-            __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "DOWN[%d] -> defer_primary visual=0", idx);
-#endif
+        if (!has_primary) {
             e->visual_active = false;
+            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (defer_primary)", (int)(e - g_state.elements), e->bindings[0].type);
         }
         return;
     }
 
     if (has_primary) {
-#ifndef NDEBUG
-        __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "DOWN[%d] -> normal_press sticky=%d mode=%s", idx, e->primary_sticky_mask,
-            mode == 0 ? "LOCK" : mode == 1 ? "TRACK" : "HOVER");
-#endif
+        // Release previously sticky-held bindings before re-pressing
         for (int k = 0; k < 4; k++)
             if (e->bindings[k].type != BINDING_NONE && (e->primary_sticky_mask & (1 << k)))
                 release_binding(result, &e->bindings[k]);
 
         press_binding(result, &e->bindings[0], true);
-        if (e->cached_has_toggle && (mode == ACTIVATION_TRACK || mode == ACTIVATION_HOVER))
+        if (e->cached_has_toggle && (e->activation_mode == ACTIVATION_TRACK || e->activation_mode == ACTIVATION_HOVER)) {
             e->auto_repeat_primary_pressed = true;
-    } else if (!e->cached_has_toggle && !e->gesture_toggled && !e->lp_toggled) {
-#ifndef NDEBUG
-        __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "DOWN[%d] -> no_primary visual=0", idx);
-#endif
+            if (e->activation_mode == ACTIVATION_HOVER)
+                e->selected = true;
+        }
+    } else if (!e->cached_has_toggle) {
         e->visual_active = false;
+        TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (no_primary)", (int)(e - g_state.elements), e->bindings[0].type);
     }
 }
 
@@ -106,49 +93,37 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
     (void)time_ms;
     TouchProcessorState* s = &g_state;
     bool has_primary = e->bindings[0].type != BINDING_NONE;
-    int idx = (int)(e - g_state.elements);
     float dx = x - e->down_x;
     float dy = y - e->down_y;
     if (dx == 0.0f && dy == 0.0f) return;
     bool inside = point_in_element(x, y, e);
-#ifndef NDEBUG
-    __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "MOVE[%d] sup=%d swipe=%d tog=%d inside=%d",
-        idx, e->gesture_suppressed, e->gesture_swipe_triggered, e->gesture_toggled, inside);
-#endif
+    //TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "MOVE arm=%d lp_trig=%d inside=%d b0=%d",
+    //    e->long_press_arm, e->gesture_long_press_triggered, inside, e->bindings[0].type);
 
     // Java: gesture binding check — hasGestureBinding() && !gestureTriggered && !longPressTriggered
-    if (!e->gesture_suppressed && !e->gesture_swipe_triggered && !e->gesture_long_press_triggered) {
-        const bool has_gesture = e->cached_has_gesture;
+    // Also skip if any gesture/long-press already fired on this finger.
+    TouchFinger* _gf = find_finger(e->current_ptr_id);
+    if (!e->gesture_suppressed && !e->gesture_swipe_triggered && !e->gesture_long_press_triggered
+        && (_gf == NULL || !_gf->gesture_activated_in_touch))
+    {
+        bool has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
         if (has_gesture) {
+            float gesture_threshold = s->cfg.gesture_threshold_px > 0 ?
+                (float)s->cfg.gesture_threshold_px : 20.0f;
             float dx_sq = dx * dx, dy_sq = dy * dy;
             float dist_sq = dx_sq + dy_sq;
-            if (dist_sq > g_state.gesture_threshold_sq) {
+            if (dist_sq > gesture_threshold * gesture_threshold) {
                 e->gesture_swipe_triggered = true;
+                if (_gf) _gf->gesture_activated_in_touch = true;
                 e->long_press_arm = false;
                 e->gesture_long_press_triggered = false;
                 if (e->button_gesture_haptic > 0)
                     add_action(result, ACT_HAPTIC, e->button_gesture_haptic, 0, 0);
                 if (e->gesture_toggled) {
-#ifndef NDEBUG
-                    __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "MOVE[%d] TOGGLE_OFF FIRING", idx);
-#endif
                     release_bindings_list(result, e->element_gesture, e->element_gesture_count);
                     e->gesture_toggled = false;
-                    if (!element_is_toggle_active(e)) {
-                        e->visual_active = false;
-#ifndef NDEBUG
-                        __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "MOVE[%d] TOGGLE_OFF visual=0", idx);
-#endif
-                    }
                 } else {
-#ifndef NDEBUG
-                    __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "MOVE[%d] TOGGLE_ON FIRING", idx);
-#endif
                     press_bindings_list(result, e->element_gesture, e->element_gesture_count);
-                    // Set gesture_toggled when any gesture binding has toggle=true.
-                    // This keeps gesture bindings held after finger UP — only the
-                    // next gesture swipe toggles them OFF. Works even when the element
-                    // itself is not a toggle switch (cached_has_toggle==false).
                     for (int k = 0; k < e->element_gesture_count; k++)
                         if (e->element_gesture[k].toggle) { e->gesture_toggled = true; break; }
                 }
@@ -228,25 +203,21 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
     if (!has_primary
         && !e->cached_has_toggle
         && !e->gesture_swipe_triggered
-        && !e->gesture_toggled
         && !e->gesture_long_press_triggered
         && !e->gesture_timer_armed) {
         e->visual_active = false;
-#ifndef NDEBUG
-        __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "MOVE[%d] -> none_primary visual=0", idx);
-#endif
+        TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (none_primary)", (int)(e - g_state.elements), e->bindings[0].type);
     }
 
     // HOVER mode: non-toggle buttons are only visually active when finger is inside.
-    // Keep visual active when a gesture swipe is in-flight — otherwise the
-    // gesture handler's restore mechanism fights against this override every frame,
-    // causing a visual flicker for gesture-only buttons.
-    if (e->activation_mode == ACTIVATION_HOVER && !element_is_toggle_active(e)
-        && !e->gesture_swipe_triggered && !inside) {
-#ifndef NDEBUG
-        __android_log_print(ANDROID_LOG_WARN, "Winlator_Button", "MOVE[%d] -> hover_outside visual=0", idx);
-#endif
+    // Without this, handle_element_move (shared.c:194) keeps visual_active=true for ALL
+    // engaged elements, causing previously-hovered buttons to stay highlighted.
+    // Gesture flags are NOT checked here — the first_btn_has_gesture save/restore
+    // mechanism in handle_gesture_move can toggle them, and a gesture trigger from an
+    // earlier move should not keep a visually non-hovered button illuminated.
+    if (e->activation_mode == ACTIVATION_HOVER && !e->cached_has_toggle && !inside) {
         e->visual_active = false;
+        TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (hover_outside)", (int)(e - g_state.elements), e->bindings[0].type);
     }
 }
 
@@ -271,15 +242,25 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     if (e->cached_has_toggle && !e->cached_has_auto_repeat && has_primary) {
         if (e->activation_mode == ACTIVATION_TRACK || e->activation_mode == ACTIVATION_HOVER) {
             if (e->auto_repeat_primary_pressed) {
-                // Direct press: flip toggle state on each UP
                 e->auto_repeat_primary_pressed = false;
-                e->selected = !e->selected;
-                if (e->selected) {
-                    return;
+                if (e->activation_mode != ACTIVATION_HOVER) {
+                    // TRACK mode: flip toggle state on each UP
+                    e->selected = !e->selected;
+                    if (e->selected) {
+                        if (e->gesture_swipe_triggered && !e->gesture_toggled)
+                            release_bindings_list(result, e->element_gesture, e->element_gesture_count);
+                        if (e->gesture_long_press_triggered && !e->lp_toggled)
+                            release_bindings_list(result, e->element_long_press, e->element_long_press_count);
+                        e->gesture_swipe_triggered = false;
+                        e->gesture_long_press_triggered = false;
+                        e->gesture_timer_armed = false;
+                        return;
+                    }
+                    if (has_primary)
+                        release_binding(result, &e->bindings[0]);
                 }
-                if (has_primary)
-                    release_binding(result, &e->bindings[0]);
-            } else {
+                // HOVER mode: no-op — toggle managed on DOWN/MOVE entry
+            } else if (e->activation_mode != ACTIVATION_HOVER) {
                 // Slide-over: release on UP (momentary, not persistent)
                 if (e->selected) {
                     if (has_primary)
@@ -288,10 +269,18 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
                     e->visual_active = false;
                 }
             }
+            // HOVER slide-over: no-op — toggle managed on MOVE entry
             return;
         }
         e->selected = !e->selected;
         if (e->selected) {
+            if (e->gesture_swipe_triggered && !e->gesture_toggled)
+                release_bindings_list(result, e->element_gesture, e->element_gesture_count);
+            if (e->gesture_long_press_triggered && !e->lp_toggled)
+                release_bindings_list(result, e->element_long_press, e->element_long_press_count);
+            e->gesture_swipe_triggered = false;
+            e->gesture_long_press_triggered = false;
+            e->gesture_timer_armed = false;
             return;
         }
     }
@@ -319,7 +308,7 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
         if (!e->gesture_toggled)
             release_bindings_list(result, e->element_gesture, e->element_gesture_count);
     } else {
-        bool defer_primary = (e->cached_has_long_press || e->cached_has_gesture) && !e->cached_has_toggle && !e->lp_toggled && !e->gesture_toggled;
+        bool defer_primary = (e->cached_has_long_press || e->cached_has_gesture) && !e->cached_has_toggle;
 
         if (defer_primary) {
             // Primary was NOT pressed on DOWN — press+release as tap on UP
@@ -335,7 +324,5 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     }
 
 cleanup:
-    e->gesture_swipe_triggered = false;
-    e->gesture_long_press_triggered = false;
     e->gesture_timer_armed = false;
 }

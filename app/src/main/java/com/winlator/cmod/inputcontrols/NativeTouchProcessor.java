@@ -196,7 +196,6 @@ public class NativeTouchProcessor {
     private InputControlsView inputControlsView;
     private boolean running;
     private static final String TAG = "NativeTouchProc";
-    private static final boolean DEBUG = false;
     private Handler handler;
     private InputMode inputMode;
     private boolean hapticEnabled;
@@ -246,7 +245,6 @@ public class NativeTouchProcessor {
     private static native void nativeOnFingerDown(int ptrId, float x, float y, long timeMs);
     private static native void nativeOnFingerMove(int ptrId, float x, float y, long timeMs);
     private static native void nativeOnFingerUp(int ptrId, float x, float y, long timeMs);
-    private static native void nativeOnFingerBatch(int actionType, int[] ptrIds, float[] xs, float[] ys, long timeMs);
     private static native void nativeTick(long timeMs);
     private static native void nativeReset();
     private static native ByteBuffer nativeGetVisualBuffer();
@@ -679,11 +677,6 @@ public class NativeTouchProcessor {
         nativeOnFingerUp(ptrId, x, y, eventTime);
     }
 
-    public void onFingerBatch(int actionType, int[] ptrIds, float[] xs, float[] ys, long eventTime) {
-        if (!loaded || !running) return;
-        nativeOnFingerBatch(actionType, ptrIds, xs, ys, eventTime);
-    }
-
     public void tick(long eventTime) {
         if (!loaded || !running) return;
         nativeTick(eventTime);
@@ -792,14 +785,14 @@ public class NativeTouchProcessor {
     }
 
     public void gamepadState(int btn, boolean isDown) {
-        if (DEBUG) Log.d("Winlator_StickBinding", "NTP.gamepadState btn="+btn+" isDown="+isDown);
+        Log.d("Winlator_StickBinding", "NTP.gamepadState btn="+btn+" isDown="+isDown);
         if (xServer.getWinHandler() != null) {
             xServer.getWinHandler().sendGamepadState(btn, isDown);
         }
     }
 
     public void gamepadAxis(int isLeft, int axisX, int axisY) {
-        if (DEBUG) Log.d("Winlator_StickBinding", "NTP.gamepadAxis isLeft="+isLeft+" axisX="+axisX+" axisY="+axisY);
+        Log.d("Winlator_StickBinding", "NTP.gamepadAxis isLeft="+isLeft+" axisX="+axisX+" axisY="+axisY);
         if (xServer.getWinHandler() != null) {
             xServer.getWinHandler().sendGamepadAxis(isLeft != 0, axisX, axisY);
         }
@@ -814,7 +807,7 @@ public class NativeTouchProcessor {
             int a0 = buf[base + 1];
             int a1 = buf[base + 2];
             int a2 = buf[base + 3];
-            if ((type == 13 || type == 14) && DEBUG) {
+            if (type == 13 || type == 14) {
                 Log.d("Winlator_StickBinding", "NTP.dispatchAllActions type="+type+" a0="+a0+" a1="+a1+" a2="+a2);
             }
             switch (type) {

@@ -1,6 +1,5 @@
 package com.winlator.cmod.inputcontrols;
 
-import android.util.Log;
 
 import java.io.File;
 import java.io.RandomAccessFile;
@@ -216,12 +215,6 @@ public class FakeInputWriter {
         if (!isOpen && !open())
             return;
 
-        Log.d("Winlator_FakeInput", "writeGamepadState slot="+eventFile.getName());
-        Log.d("Winlator_StickBinding", "FakeInputWriter.writeGamepadState thumbLX="+state.thumbLX+" ("+(int)(state.thumbLX*32767)+")"+
-                " thumbLY="+state.thumbLY+" ("+(int)(state.thumbLY*32767)+")"+
-                " thumbRX="+state.thumbRX+" ("+(int)(state.thumbRX*32767)+")"+
-                " thumbRY="+state.thumbRY+" ("+(int)(state.thumbRY*32767)+")"+
-                " buttons="+state.buttons);
         buffer.clear();
         hasChanges = false;
 

@@ -1,6 +1,5 @@
 package com.winlator.cmod.xserver;
 
-import android.util.Log;
 
 import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.winhandler.MouseEventFlags;
@@ -137,7 +136,6 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
 
     @Override
     public void onPointerButtonPress(Pointer.Button button) {
-        Log.d("Winlator_InputDev", "onPointerButtonPress button="+button+" mode="+inputMode);
         if (inputMode == InputMode.RELATIVE) {
             WinHandler winHandler = xServer.getWinHandler();
             int wheelDelta = button == Pointer.Button.BUTTON_SCROLL_UP ? MOUSE_WHEEL_DELTA : (button == Pointer.Button.BUTTON_SCROLL_DOWN ? -MOUSE_WHEEL_DELTA : 0);
@@ -166,7 +164,6 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
 
     @Override
     public void onPointerButtonRelease(Pointer.Button button) {
-        Log.d("Winlator_InputDev", "onPointerButtonRelease button="+button+" mode="+inputMode);
         if (inputMode == InputMode.RELATIVE) {
             WinHandler winHandler = xServer.getWinHandler();
             winHandler.mouseEvent(MouseEventFlags.getFlagFor(button, false), 0, 0, 0);
@@ -196,7 +193,6 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
 
     @Override
     public void onPointerMove(short x, short y) {
-        Log.d("Winlator_InputDev", "onPointerMove x="+x+" y="+y);
         updatePointWindow();
         Bitmask eventMask = createPointerEventMask();
         Window grabWindow = xServer.grabManager.getWindow();
@@ -213,7 +209,6 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
 
     @Override
     public void onKeyPress(byte keycode, int keysym) {
-        Log.d("Winlator_InputDev", "onKeyPress keycode="+keycode+" keysym="+keysym);
         Window focusedWindow = xServer.windowManager.getFocusedWindow();
         if (focusedWindow == null) return;
         updatePointWindow();
@@ -246,7 +241,6 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
 
     @Override
     public void onKeyRelease(byte keycode) {
-        Log.d("Winlator_InputDev", "onKeyRelease keycode="+keycode);
         Window focusedWindow = xServer.windowManager.getFocusedWindow();
         if (focusedWindow == null) return;
         updatePointWindow();

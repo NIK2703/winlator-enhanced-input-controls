@@ -1,5 +1,7 @@
 #include "../touch_processor_internal.h"
 
+#define DEAD_ZONE_SQ (STICK_DEAD_ZONE * STICK_DEAD_ZONE)
+
 void element_stick_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Stick", "DOWN idx=%d type=%d ptr_id=%d x=%f y=%f", (int)(e - g_state.elements), e->type, ptr_id, x, y);
     (void)ptr_id;
@@ -15,8 +17,9 @@ void element_stick_move(TouchElement* e, float x, float y, uint64_t time_ms, Tou
     float radius = s->snapping_size * 6.0f * e->scale;
     float dx = x - e->x;
     float dy = y - e->y;
-    float dist = sqrtf(dx*dx + dy*dy);
-    if (dist < 0.0001f) return;
+    float dist_sq = dx*dx + dy*dy;
+    if (__builtin_expect(dist_sq < DEAD_ZONE_SQ, 0)) return;
+    float dist = sqrtf(dist_sq);
     float inv_dist = 1.0f / dist;
     float nx, ny;
     if (dist > radius) {

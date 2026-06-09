@@ -45,7 +45,7 @@ static inline void cleanup_second_finger_up(TouchActionResult* restrict result) 
     g_state.gesture_second_ptr_id = -1;
 }
 
-static inline void schedule_pending_release(uint64_t* time_field, int16_t* ptr_field, int16_t* id_field, int16_t ptr_id, uint64_t time_ms) {
+static inline void schedule_pending_release(uint64_t* time_field, int* ptr_field, int* id_field, int ptr_id, uint64_t time_ms) {
     if (*id_field == ptr_id) {
         *time_field = time_ms + DELAYED_RELEASE_MS;
         *ptr_field = ptr_id;
@@ -58,6 +58,7 @@ static inline void schedule_pending_release(uint64_t* time_field, int16_t* ptr_f
 // ============================================================
 __attribute__((hot))
 void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+    f->gesture_activated_in_touch = false;
     g_state.main_ptr_id = f->ptr_id;
 
     g_state.passthrough_active = false;
@@ -145,6 +146,7 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     if (btn && btn->type == ELEM_BUTTON) {
         if (btn->activation_mode == ACTIVATION_TRACK || btn->activation_mode == ACTIVATION_HOVER) {
             TrackedButtons* tb = &g_state.tracked[(uint32_t)f->ptr_id % MAX_FINGERS];
+            tb->ptr_id = f->ptr_id;
             bool already = false;
             for (int j = 0; j < tb->count; j++) {
                 if (tb->element_indices[j] == (int)(btn - g_state.elements)) { already = true; break; }
@@ -357,6 +359,10 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
         int saved_pi = (uint32_t)f->ptr_id % MAX_FINGERS;
         saved_hovered_idx = g_state.hovered_element_per_ptr[saved_pi];
         TrackedButtons* saved_tb = &g_state.tracked[saved_pi];
+        if (saved_tb->ptr_id != f->ptr_id) {
+            saved_tb->ptr_id = f->ptr_id;
+            saved_tb->count = 0;
+        }
         if (saved_tb->count > 0) {
             int first_idx = saved_tb->element_indices[0];
             if (first_idx >= 0 && first_idx < g_state.element_count) {
@@ -438,6 +444,10 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     if (has_track_hover) {
         int pi = (uint32_t)f->ptr_id % MAX_FINGERS;
         TrackedButtons* tb = &g_state.tracked[pi];
+        if (tb->ptr_id != f->ptr_id) {
+            tb->ptr_id = f->ptr_id;
+            tb->count = 0;
+        }
 
         if (g_state.activation_mode == ACTIVATION_HOVER) {
             // HOVER transition: release previous element, activate current
@@ -477,34 +487,74 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                     if (!already && tb->count < MAX_TRACKED_PER_POINTER) {
                         tb->element_indices[tb->count] = curr_idx;
                         tb->count++;
-                        // Clear first button's gesture state when second is tracked
+                        // Clear first button's gesture state when second is tracked,
+                        // but only if gesture hasn't already fired — otherwise the
+                        // restore block won't revive it when entering via empty space
+                        // (saved_hovered_idx < 0).
                         if (tb->count == 2) {
                             TouchElement* first = &g_state.elements[tb->element_indices[0]];
-                            first->long_press_arm = false;
-                            first->gesture_long_press_triggered = false;
-                            first->gesture_timer_armed = false;
+                            if (!first->gesture_swipe_triggered && !first->gesture_long_press_triggered) {
+                                first->long_press_arm = false;
+                                first->gesture_swipe_triggered = false;
+                                first->gesture_long_press_triggered = false;
+                                first->gesture_timer_armed = false;
+                            }
                         }
                     }
                     // Activate current button (guard in handle_element_down prevents re-engagement)
                     if (curr->cached_has_toggle && !curr->cached_has_auto_repeat) {
-                        curr->gesture_timer_armed = true;
-                        if (curr->selected) {
-                            release_binding(result, &curr->bindings[0]);
-                            curr->selected = false;
-                            curr->visual_active = false;
-                        } else {
-                            press_binding(result, &curr->bindings[0], true);
-                            curr->selected = true;
-                            curr->visual_active = true;
+                        if (!curr->gesture_timer_armed) {
+                            curr->gesture_timer_armed = true;
+                            if (curr->selected) {
+                                release_binding(result, &curr->bindings[0]);
+                                curr->selected = false;
+                                curr->visual_active = false;
+                            } else {
+                                press_binding(result, &curr->bindings[0], true);
+                                curr->selected = true;
+                                curr->visual_active = true;
+                            }
                         }
                     } else if (curr->cached_has_toggle && curr->cached_has_auto_repeat) {
                         handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
                     } else if (!curr->cached_has_toggle) {
-                        handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
+                        // Skip handle_element_down on re-entry of the first tracked
+                        // button — the re-entry block below handles full re-init.
+                        if (!(already && tb->count > 0 && curr_idx == tb->element_indices[0]))
+                            handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
                     }
                     // Suppress gestures on non-initial button (match old path)
-                    if (tb->count > 1 || already)
+                    // When re-entering the first tracked button, reinitialize it
+                    // while preserving gesture state to prevent re-trigger.
+                    if (already && tb->count > 0 && curr_idx == tb->element_indices[0] && !curr->cached_has_toggle) {
+                        bool had_gest_swipe = curr->gesture_swipe_triggered;
+                        bool had_gest_lp = curr->gesture_long_press_triggered;
+                        bool had_gest_toggled = curr->gesture_toggled;
+                        bool had_lp_toggled = curr->lp_toggled;
+                        bool had_lp_arm = curr->long_press_arm;
+                        bool had_gest_timer = curr->gesture_timer_armed;
+                        // Release gesture bindings before re-init so they aren't leaked
+                        if (had_gest_swipe && !had_gest_toggled)
+                            release_bindings_list(result, curr->element_gesture, curr->element_gesture_count);
+                        if (had_gest_lp && !had_lp_toggled)
+                            release_bindings_list(result, curr->element_long_press, curr->element_long_press_count);
+                        curr->current_ptr_id = -1;
+                        curr->engaged = false;
+                        handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
+                        // Re-press gesture bindings if they were active
+                        if (had_gest_swipe && !had_gest_toggled)
+                            press_bindings_list(result, curr->element_gesture, curr->element_gesture_count);
+                        if (had_gest_lp && !had_lp_toggled)
+                            press_bindings_list(result, curr->element_long_press, curr->element_long_press_count);
+                        curr->gesture_swipe_triggered = had_gest_swipe;
+                        curr->gesture_long_press_triggered = had_gest_lp;
+                        curr->long_press_arm = had_lp_arm;
+                        curr->gesture_timer_armed = had_gest_timer;
+                        curr->gesture_toggled = had_gest_toggled;
+                        curr->lp_toggled = had_lp_toggled;
+                    } else if (tb->count > 1 || already) {
                         suppress_element_gestures(curr, result);
+                    }
                 }
                 g_state.hovered_element_per_ptr[pi] = curr_idx;
             }
@@ -520,12 +570,31 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                             first_btn_lp_arm, first_btn_gest_lp, first_btn_gest_timer);
 #endif
                         prev->long_press_arm = first_btn_lp_arm;
+                        prev->gesture_swipe_triggered = first_btn_gest_swipe;
                         prev->gesture_long_press_triggered = first_btn_gest_lp;
                         prev->gesture_timer_armed = first_btn_gest_timer;
-                        prev->current_ptr_id = f->ptr_id;
-                        prev->engaged = true;
-                        prev->visual_active = true;
+                        if (first_btn_gest_swipe || first_btn_gest_lp) {
+                            prev->current_ptr_id = f->ptr_id;
+                            prev->engaged = true;
+                            prev->visual_active = true;
+                            // Re-press gesture bindings that release_element_bindings released
+                            if (first_btn_gest_swipe && !prev->gesture_toggled)
+                                press_bindings_list(result, prev->element_gesture, prev->element_gesture_count);
+                            if (first_btn_gest_lp && !prev->lp_toggled)
+                                press_bindings_list(result, prev->element_long_press, prev->element_long_press_count);
+                        }
                     }
+                }
+            }
+            // Enable gesture detection on first tracked HOVER button.
+            // handle_element_move is normally blocked by skip_buttons (line 389)
+            // and the tracked non-passthrough return (line 625). Route it here
+            // so element_button_move can check swipe thresholds and fire gesture
+            // bindings on the hovered button.
+            if (curr_idx >= 0 && tb->count > 0 && curr_idx == tb->element_indices[0]) {
+                if (!g_state.elements[curr_idx].cached_has_toggle) {
+                    handle_element_move(&g_state.elements[curr_idx], x, y, time_ms, result);
+                    had_element_move = true;
                 }
             }
         } else if (tb->count > 0) {
@@ -567,11 +636,17 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                                     first_btn_lp_arm, first_btn_gest_lp, first_btn_gest_timer);
 #endif
                                 prev->long_press_arm = first_btn_lp_arm;
+                                prev->gesture_swipe_triggered = first_btn_gest_swipe;
                                 prev->gesture_long_press_triggered = first_btn_gest_lp;
                                 prev->gesture_timer_armed = first_btn_gest_timer;
                                 prev->current_ptr_id = f->ptr_id;
                                 prev->engaged = true;
                                 prev->visual_active = true;
+                                // Re-press gesture bindings that release_element_bindings released
+                                if (first_btn_gest_swipe && !prev->gesture_toggled)
+                                    press_bindings_list(result, prev->element_gesture, prev->element_gesture_count);
+                                if (first_btn_gest_lp && !prev->lp_toggled)
+                                    press_bindings_list(result, prev->element_long_press, prev->element_long_press_count);
                             }
                         }
                     }
@@ -748,7 +823,7 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
     TrackedButtons* tb = &g_state.tracked[pi];
     bool had_tracked = false;
     if (g_state.cfg.caps_has_track_hover_buttons) {
-        if (tb->count > 0) {
+        if (tb->ptr_id == f->ptr_id && tb->count > 0) {
             if (tb->count > 1) {
                 for (int j = 0; j < tb->count; j++) {
                     int idx = tb->element_indices[j];

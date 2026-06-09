@@ -42,9 +42,6 @@ public class TouchpadView extends View {
 
     private Handler timeoutHandler;
     private Runnable hideControlsRunnable;
-    private final int[] touchpadBatchPtrIds = new int[10];
-    private final float[] touchpadBatchXs = new float[10];
-    private final float[] touchpadBatchYs = new float[10];
 
     @SuppressLint("ResourceType")
     public TouchpadView(Context context, XServer xServer, Handler timeoutHandler, Runnable hideControlsRunnable) {
@@ -146,14 +143,10 @@ public class TouchpadView extends View {
                     break;
                 }
                 case MotionEvent.ACTION_MOVE: {
-                    int pc = Math.min(event.getPointerCount(), 10);
-                    for (int i = 0; i < pc; i++) {
-                        touchpadBatchPtrIds[i] = event.getPointerId(i);
-                        touchpadBatchXs[i] = event.getX(i);
-                        touchpadBatchYs[i] = event.getY(i);
+                    for (int i = 0; i < event.getPointerCount(); i++) {
+                        int pid = event.getPointerId(i);
+                        nativeTouchProcessor.onFingerMove(pid, event.getX(i), event.getY(i), event.getEventTime());
                     }
-                    for (int i = pc; i < 10; i++) touchpadBatchPtrIds[i] = -1;
-                    nativeTouchProcessor.onFingerBatch(1, touchpadBatchPtrIds, touchpadBatchXs, touchpadBatchYs, event.getEventTime());
                     break;
                 }
                 case MotionEvent.ACTION_UP:

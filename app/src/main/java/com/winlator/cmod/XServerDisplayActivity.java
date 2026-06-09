@@ -693,6 +693,17 @@ if (enableLogs) {
         }
         ProcessHelper.resumeAllWineProcesses();
         inputControlsView.setOverlayOpacity(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY));
+
+        // Restore controls visibility and restart timeout after returning from background
+        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
+        startTouchscreenTimeout();
+
+        // Restart native tick timer if it was stopped
+        if (nativeTouchProcessor != null && nativeTickRunnable != null && handler != null) {
+            handler.removeCallbacks(nativeTickRunnable);
+            int tickIntervalMs = 1000 / Math.max(preferences.getInt("native_tick_rate_hz", 60), 1);
+            handler.postDelayed(nativeTickRunnable, tickIntervalMs);
+        }
     }
 
     @Override
@@ -705,6 +716,11 @@ if (enableLogs) {
             }
         }
         ProcessHelper.pauseAllWineProcesses();
+
+        // Stop tick timer to prevent background gesture state corruption
+        if (nativeTickRunnable != null && handler != null) {
+            handler.removeCallbacks(nativeTickRunnable);
+        }
     }
     private void exit() {
         NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID);
@@ -766,10 +782,15 @@ if (enableLogs) {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus && cursorLock) 
-            touchpadView.requestPointerCapture();
-        else if (!hasFocus) 
+        if (hasFocus) {
+            if (cursorLock) touchpadView.requestPointerCapture();
+        } else {
             touchpadView.releasePointerCapture();
+            // Reset native touch processor to clear stale finger/gesture state
+            if (nativeTouchProcessor != null) {
+                nativeTouchProcessor.reset();
+            }
+        }
     }
     private void setupWineSystemFiles() {
         String appVersion = String.valueOf(AppUtils.getVersionCode(this));
@@ -1943,17 +1964,7 @@ private void applySidebarSettings() {
         boolean handledByWinHandler = false;
         boolean handledByTouchpadView = false;
 
-        Log.d("Winlator_StickBinding", "dispatchGenericMotionEvent deviceId="+event.getDeviceId()+
-                " src="+event.getSource()+" action="+event.getAction()+
-                " isFromJoystick="+event.isFromSource(InputDevice.SOURCE_JOYSTICK)+
-                " isFromGamepad="+event.isFromSource(InputDevice.SOURCE_GAMEPAD));
-
         android.view.InputDevice dev = event.getDevice();
-        if (dev != null) {
-            Log.d("Winlator_StickBinding", "dispatchGenericMotionEvent deviceName="+dev.getName()+
-                    " descriptor="+dev.getDescriptor()+" vendor="+dev.getVendorId()+
-                    " isVirtual="+dev.isVirtual()+" sources="+dev.getSources());
-        }
 
         if (winHandler != null) {
             handledByWinHandler = winHandler.onGenericMotionEvent(event);
@@ -1964,9 +1975,6 @@ private void applySidebarSettings() {
         }
 
         boolean handledBySuper = super.dispatchGenericMotionEvent(event);
-
-        Log.d("Winlator_StickBinding", "dispatchGenericMotionEvent result winHandler="+handledByWinHandler+
-                " touchpad="+handledByTouchpadView+" super="+handledBySuper);
 
         return handledByWinHandler || handledByTouchpadView || handledBySuper;
     }

@@ -81,7 +81,7 @@ public class Container {
     private String emulator;
     private boolean exclusiveXInput = true;
     private boolean gridRendering = false;
-    private float gridDarken = 0.25f;
+    private float gridDarken = 0.5f;
     private int gridCycleInterval = -1;
 
     private ContainerManager containerManager;
@@ -458,7 +458,7 @@ public class Container {
             data.put("controllerMapping", controllerMapping);
             data.put("exclusiveXInput", exclusiveXInput);
             if (gridRendering) data.put("gridRendering", true);
-            if (gridDarken != 0.25f) data.put("gridDarken", gridDarken);
+            if (gridDarken != 0.5f) data.put("gridDarken", gridDarken);
             data.put("gridCycleInterval", gridCycleInterval);
             if (!WineInfo.isMainWineVersion(wineVersion)) data.put("wineVersion", wineVersion);
             FileUtils.writeString(getConfigFile(), data.toString());

@@ -333,7 +333,7 @@ public class Shortcut {
     public float getGridDarken() {
         String v = getExtra("gridDarken", null);
         try { return v != null && !v.isEmpty() ? Float.parseFloat(v) : container.getGridDarken(); }
-        catch (NumberFormatException e) { return 0.25f; }
+        catch (NumberFormatException e) { return 0.5f; }
     }
     public void setGridDarken(float v) {
         putExtra("gridDarken", String.valueOf(Math.max(0.0f, Math.min(1.0f, v))));

@@ -223,10 +223,8 @@ public class WinHandler {
 
     public void mouseEvent(int flags, int dx, int dy, int wheelDelta) {
         if (!initReceived) {
-            Log.d("Winlator_WinH", "mouseEvent SKIP initReceived=false flags="+flags+" dx="+dx+" dy="+dy+" wheel="+wheelDelta);
             return;
         }
-        Log.d("Winlator_WinH", "mouseEvent flags="+flags+" dx="+dx+" dy="+dy+" wheel="+wheelDelta);
         addAction(() -> {
             sendData.rewind();
             sendData.put(RequestCodes.MOUSE_EVENT);
@@ -242,10 +240,8 @@ public class WinHandler {
 
     public void keyboardEvent(byte vkey, int flags) {
         if (!initReceived) {
-            Log.d("Winlator_WinH", "keyboardEvent SKIP initReceived=false vkey="+vkey+" flags="+flags);
             return;
         }
-        Log.d("Winlator_WinH", "keyboardEvent vkey="+vkey+" flags="+flags);
         addAction(() -> {
             sendData.rewind();
             sendData.put(RequestCodes.KEYBOARD_EVENT);
@@ -694,16 +690,11 @@ public class WinHandler {
 
     private ExternalController getController(int deviceId) {
         if (controllers.containsKey(deviceId)) {
-            Log.d("Winlator_StickBinding", "WinHandler.getController CACHED deviceId="+deviceId+" controller="+controllers.get(deviceId).getName());
             return controllers.get(deviceId);
         }
         ExternalController controller = ExternalController.getController(deviceId);
         if (controller != null) {
-            Log.d("Winlator_StickBinding", "WinHandler.getController CREATED deviceId="+deviceId+" name="+controller.getName()+" id="+controller.getId());
             controllers.put(deviceId, controller);
-        } else {
-            Log.d("Winlator_StickBinding", "WinHandler.getController NOT_FOUND deviceId="+deviceId+
-                    " deviceExists="+(android.view.InputDevice.getDevice(deviceId) != null));
         }
         return controller;
     }
@@ -714,9 +705,6 @@ public class WinHandler {
 
         if (controller != null) {
             handled = controller.updateStateFromMotionEvent(event);
-            Log.d("Winlator_StickBinding", "WinHandler.onGenericMotionEvent deviceId="+event.getDeviceId()+
-                    " updateResult="+handled+" action="+event.getAction()+
-                    " isJoystick="+ExternalController.isJoystickDevice(event));
             if (handled)
                 sendGamepadState(controller);
         }
@@ -751,7 +739,6 @@ public class WinHandler {
             } else {
                 state.setPressed(btn, isDown);
             }
-            Log.d("Winlator_StickBinding", "WinHandler.sendGamepadState(btn) btn="+btn+" isDown="+isDown+" state.buttons="+state.buttons+" dpad="+state.dpad[0]+","+state.dpad[1]+","+state.dpad[2]+","+state.dpad[3]);
             sendGamepadState();
         }
     }
@@ -762,7 +749,6 @@ public class WinHandler {
             GamepadState state = profile.getGamepadState();
             float fx = axisX / 32767.0f;
             float fy = axisY / 32767.0f;
-            Log.d("Winlator_StickBinding", "WinHandler.sendGamepadAxis isLeft="+isLeft+" axisX="+axisX+" fx="+fx+" axisY="+axisY+" fy="+fy);
             if (isLeft) {
                 state.thumbLX = fx;
                 state.thumbLY = fy;
