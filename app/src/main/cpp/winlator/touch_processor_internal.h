@@ -423,12 +423,27 @@ static inline void gesture_clear_second_finger_state(void) {
     g_state.second_tap_fallback_count = 0;
     g_state.second_double_tap_waiting = false;
     g_state.pending_second_double_count = 0;
+    // Clear per-finger ctx
+    TouchFinger* sf = find_finger(g_state.gesture_second_ptr_id);
+    if (sf) {
+        g_ctx[(int)(sf - g_state.fingers)].dt_waiting = false;
+    }
 }
 
+// Forward declaration (defined below)
+static inline void copy_bindings_bounded(const TouchBinding* src, int src_count, TouchBinding* dst, int* dst_count, int dst_max);
+
 // Enter second-finger double-tap waiting (SDTW) — analogous to first-finger DT_WAITING.
-static inline void enter_sdtw(uint64_t time_ms) {
+// Populates ctx->pending_double for unified DOWN/TICK paths that use ctx->pending_double
+// regardless of finger role. ctx->fallback is already populated by the DOWN handler.
+static inline void enter_sdtw(TouchFinger* f, uint64_t time_ms) {
     g_state.second_double_tap_waiting = true;
     g_state.second_tap_fallback_time = time_ms;
+    GestureFingerCtx* sdtw_ctx = &g_ctx[(int)(f - g_state.fingers)];
+    sdtw_ctx->dt_waiting = true;
+    sdtw_ctx->dt_wait_start_time = time_ms;
+    copy_bindings_bounded(f->bindings.double_tap, f->bindings.double_tap_count,
+        sdtw_ctx->pending_double, &sdtw_ctx->pending_double_count, 8);
 }
 
 static inline bool finger_has_gesture(const TouchFinger* f) {
@@ -548,9 +563,6 @@ static inline void reset_finger_tap_state(TouchFinger* f) {
     f->cached_has_moved_beyond_threshold = false;
 }
 
-// Gesture — entry points (touch_processor_gesture.c)
-void touchpad_finger_down(TouchFinger* f, TouchActionResult* restrict result, uint64_t time_ms);
-void touchpad_finger_up(TouchFinger* f, TouchActionResult* restrict result, uint64_t time_ms);
 
 // Unified gesture handler (replaces both touchscreen.c and touchpad.c)
 // The only difference between TOUCHPAD and TOUCHSCREEN modes is cursor behavior:
@@ -627,6 +639,50 @@ bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, Touc
 void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 void activation_reset(void);
+
+// ---- Drag helpers (used by base.c and branch.c) ----
+static inline void start_drag_no_binding(TouchFinger* f, TouchActionResult* restrict result) {
+    on_drag_start(f, result);
+    f->state = GESTURE_STATE_DRAGGING;
+}
+
+static inline void mark_second_finger_dragging(TouchFinger* exclude, TouchActionResult* restrict result) {
+    for (int _si = 0; _si < MAX_FINGERS; _si++) {
+        TouchFinger* _sf = &g_state.fingers[_si];
+        if (_sf->active && _sf->ptr_id == g_state.gesture_second_ptr_id && _sf != exclude) {
+            start_drag_no_binding(_sf, result);
+            break;
+        }
+    }
+}
+
+static inline void start_drag_with_binding(TouchFinger* f,
+    TouchActionResult* restrict result,
+    const TouchBinding* drag_binding, int drag_count)
+{
+    bool same_as_held = g_state.gesture_is_action_held;
+    if (same_as_held && drag_binding && g_state.gesture_held_count > 0) {
+        same_as_held = bindings_equal(drag_binding, drag_count,
+                        g_state.gesture_held_actions, g_state.gesture_held_count);
+    }
+    if (!same_as_held) {
+        TouchBinding saved_ar[MAX_HELD_ACTIONS];
+        int saved_ar_count = 0;
+        for (int i = 0; i < g_state.gesture_held_count; i++) {
+            if (g_state.gesture_held_actions[i].auto_repeat) {
+                saved_ar[saved_ar_count++] = g_state.gesture_held_actions[i];
+            }
+        }
+        release_held_actions(result);
+        for (int i = 0; i < saved_ar_count && g_state.gesture_held_count < MAX_HELD_ACTIONS; i++) {
+            g_state.gesture_held_actions[g_state.gesture_held_count++] = saved_ar[i];
+        }
+        if (saved_ar_count > 0)
+            g_state.gesture_is_action_held = true;
+        execute_actions_hold(result, drag_binding, drag_count);
+    }
+    start_drag_no_binding(f, result);
+}
 
 // Scheduled actions
 void process_scheduled_actions(TouchActionResult* restrict result, uint64_t time_ms);

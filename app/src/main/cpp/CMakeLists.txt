@@ -44,11 +44,15 @@ add_library(touch_processor SHARED
         winlator/touch_processor.c
         winlator/touch_processor_jni.cpp
         winlator/touch_processor_activation.c
+        winlator/activation_mode.c
         winlator/gesture/types.h
         winlator/gesture/base.c
         winlator/gesture/handler.c
         winlator/gesture/executor.c
-        winlator/gesture/entry.c
+        # winlator/gesture/entry.c  (removed — all functions migrated)
+        winlator/gesture/unified.c
+        winlator/gesture/branch.c
+        winlator/gesture/branch.h
         winlator/element/shared.c
         winlator/element/button.c
         winlator/element/dpad.c

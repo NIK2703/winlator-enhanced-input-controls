@@ -646,18 +646,20 @@ VkCommandBuffer VulkanRendererContext::beginOneTime() {
 }
 void VulkanRendererContext::endOneTime(VkCommandBuffer cb) {
     vk_.EndCommandBuffer(cb);
-    VkResult fenceResult = vk_.WaitForFences(device, 1, &oneTimeFence, VK_TRUE, FENCE_TIMEOUT_NS);
-    if (fenceResult == VK_TIMEOUT) {
-        RLOG_E("FENCE TIMEOUT in endOneTime (pre-submit wait) - GPU may be hung, continuing");
-        gpuHangDetected.store(true);
-    }
-    vk_.ResetFences(device, 1, &oneTimeFence);
-    VkSubmitInfo si{}; si.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO; si.commandBufferCount=1; si.pCommandBuffers=&cb;
-    vk_.QueueSubmit(graphicsQueue,1,&si,oneTimeFence);
-    fenceResult = vk_.WaitForFences(device,1,&oneTimeFence,VK_TRUE,FENCE_TIMEOUT_NS);
-    if (fenceResult == VK_TIMEOUT) {
-        RLOG_E("FENCE TIMEOUT in endOneTime (post-submit wait) - GPU may be hung, continuing");
-        gpuHangDetected.store(true);
+    { std::lock_guard<std::mutex> lk(oneTimeFenceMutex);
+      VkResult fenceResult = vk_.WaitForFences(device, 1, &oneTimeFence, VK_TRUE, FENCE_TIMEOUT_NS);
+      if (fenceResult == VK_TIMEOUT) {
+          RLOG_E("FENCE TIMEOUT in endOneTime (pre-submit wait) - GPU may be hung, continuing");
+          gpuHangDetected.store(true);
+      }
+      vk_.ResetFences(device, 1, &oneTimeFence);
+      VkSubmitInfo si{}; si.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO; si.commandBufferCount=1; si.pCommandBuffers=&cb;
+      vk_.QueueSubmit(graphicsQueue,1,&si,oneTimeFence);
+      fenceResult = vk_.WaitForFences(device,1,&oneTimeFence,VK_TRUE,FENCE_TIMEOUT_NS);
+      if (fenceResult == VK_TIMEOUT) {
+          RLOG_E("FENCE TIMEOUT in endOneTime (post-submit wait) - GPU may be hung, continuing");
+          gpuHangDetected.store(true);
+      }
     }
     vk_.FreeCommandBuffers(device,cmdPool,1,&cb);
 }
@@ -1063,7 +1065,10 @@ void VulkanRendererContext::renderLoop() {
                   cursorMoved.load(); }); }
         if (!isRunning) break;
 
-        if (swapchain == VK_NULL_HANDLE || cmdBufs.empty()) continue;
+        if (swapchain == VK_NULL_HANDLE || cmdBufs.empty()) {
+            vsyncSignaled.store(false, std::memory_order_relaxed);
+            continue;
+        }
         try { renderFrame(); } catch(...) {}
     }
 }
@@ -1098,7 +1103,6 @@ void VulkanRendererContext::renderFrame() {
     std::shared_lock<std::shared_mutex> frameLock(frameMutex);
 
     vsyncSignaled.store(false,std::memory_order_relaxed);
-    needsRender.store(false,std::memory_order_relaxed);
     cursorMoved.store(false,std::memory_order_relaxed);
     if (surfaceDetached.load(std::memory_order_acquire)) return;
     if (scanoutActive.load()) {
@@ -1239,6 +1243,7 @@ ok=true;}catch(...){}
     si.commandBufferCount=1; si.pCommandBuffers=&cmdBufs[currentFrame];
     si.signalSemaphoreCount=1; si.pSignalSemaphores=sSem;
 
+    needsRender.store(false,std::memory_order_relaxed);
     vk_.ResetFences(device,1,&inFlightFences[currentFrame]);
     if (vk_.QueueSubmit(graphicsQueue,1,&si,inFlightFences[currentFrame])!=VK_SUCCESS) {
         vk_.DestroyFence(device,inFlightFences[currentFrame],nullptr);
@@ -1811,18 +1816,20 @@ void VulkanRendererContext::applyScanoutBuffer() {
         AHardwareBuffer_describe(ahb, &srcDesc);
         if (ensureScanoutLocalAhb((int)srcDesc.width, (int)srcDesc.height, srcDesc.format)) {
             VkImage srcImg = VK_NULL_HANDLE;
-            auto it = ahbTexCache.find(ahb);
-            if (it != ahbTexCache.end()) {
-                srcImg = it->second.img;
-            } else {
-                WinTex tmp{};
-                if (importAHBToWinTex(tmp, ahb)) {
-                    AHBCached cached{tmp.img, tmp.mem, tmp.view, tmp.ds};
-                    AHardwareBuffer_acquire(ahb);
-                    ahbTexCache[ahb] = cached;
-                    ahbCacheLRU.push_back(ahb);
-                    srcImg = cached.img;
-                }
+            { std::lock_guard<std::mutex> lk(ahbTexCacheMutex);
+              auto it = ahbTexCache.find(ahb);
+              if (it != ahbTexCache.end()) {
+                  srcImg = it->second.img;
+              } else {
+                  WinTex tmp{};
+                  if (importAHBToWinTex(tmp, ahb)) {
+                      AHBCached cached{tmp.img, tmp.mem, tmp.view, tmp.ds};
+                      AHardwareBuffer_acquire(ahb);
+                      ahbTexCache[ahb] = cached;
+                      ahbCacheLRU.push_back(ahb);
+                      srcImg = cached.img;
+                  }
+              }
             }
 
             if (srcImg != VK_NULL_HANDLE && scanoutLocalImg != VK_NULL_HANDLE &&
@@ -2016,7 +2023,9 @@ void VulkanRendererContext::setFilterMode(int mode) {
     };
     int dsCount=0;
     for (auto& [id,wt]:texMap) { updateDS(wt.ds, wt.view); if(wt.ds!=VK_NULL_HANDLE) dsCount++; }
-    for (auto& [ahb,cached]:ahbTexCache) { updateDS(cached.ds, cached.view); if(cached.ds!=VK_NULL_HANDLE) dsCount++; }
+    { std::lock_guard<std::mutex> lk(ahbTexCacheMutex);
+      for (auto& [ahb,cached]:ahbTexCache) { updateDS(cached.ds, cached.view); if(cached.ds!=VK_NULL_HANDLE) dsCount++; }
+    }
     if (cursorDS!=VK_NULL_HANDLE&&cursorView!=VK_NULL_HANDLE) { updateDS(cursorDS, cursorView); dsCount++; }
     needsRender.store(true); dirtyCV.notify_one();
 }

@@ -38,7 +38,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     public final XServerView xServerView;
     private final XServer xServer;
-    private long nativeHandle = 0;
+    private volatile long nativeHandle = 0;
 
     public long getNativeHandle() {
         return nativeHandle;
@@ -154,9 +154,14 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private final android.view.Choreographer.FrameCallback vsyncRenderCallback = new android.view.Choreographer.FrameCallback() {
         @Override
         public void doFrame(long frameTimeNs) {
-            long h = nativeHandle;
-            if (h != 0) nativeOnVsync(h, frameTimeNs);
-            if (vsyncRunning) android.view.Choreographer.getInstance().postFrameCallback(this);
+            try {
+                long h = nativeHandle;
+                if (h != 0) nativeOnVsync(h, frameTimeNs);
+            } catch (Exception e) {
+                android.util.Log.e("VulkanRenderer", "vsync callback error", e);
+            } finally {
+                if (vsyncRunning) android.view.Choreographer.getInstance().postFrameCallback(this);
+            }
         }
     };
 

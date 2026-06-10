@@ -939,12 +939,12 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
                 if (elementJSONObject.has("longPressPackage")) {
                     JSONObject lpObj = elementJSONObject.getJSONObject("longPressPackage");
-                    element.setLongPressPackage(BindPackage.fromJSON(lpObj, Binding.NONE));
+                    element.setBindingPackage(ControlElement.BindingSection.LONG_PRESS, BindPackage.fromJSON(lpObj, Binding.NONE));
                 }
 
                 if (elementJSONObject.has("gesturePackage")) {
                     JSONObject gObj = elementJSONObject.getJSONObject("gesturePackage");
-                    element.setGesturePackage(BindPackage.fromJSON(gObj, Binding.NONE));
+                    element.setBindingPackage(ControlElement.BindingSection.GESTURE, BindPackage.fromJSON(gObj, Binding.NONE));
                 }
 
                 if (!virtualGamepad && hasGamepadBinding) virtualGamepad = true;

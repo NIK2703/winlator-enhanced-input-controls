@@ -646,91 +646,47 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         ControlElement.Type type = element.getType();
         boolean showMenu = type == ControlElement.Type.BUTTON;
         if (type == ControlElement.Type.BUTTON) {
-            loadBindingSection(element, container, 0, R.string.binding, showMenu);
-            if (!element.getSlotAutoRepeat(0))
-                loadLongPressBindingSection(element, container, showMenu);
-            loadGestureBindingSection(element, container, showMenu);
+            loadBindingSection(element, container, ControlElement.BindingSection.SLOT_0, R.string.binding, showMenu);
+            if (!element.getBindingAutoRepeat(ControlElement.BindingSection.SLOT_0))
+                loadBindingSection(element, container, ControlElement.BindingSection.LONG_PRESS, "Long Press", showMenu);
+            loadBindingSection(element, container, ControlElement.BindingSection.GESTURE, "Gesture", showMenu);
         }
         else if (type == ControlElement.Type.D_PAD || type == ControlElement.Type.STICK || type == ControlElement.Type.TRACKPAD) {
-            loadBindingSection(element, container, 0, R.string.binding_up, showMenu);
-            loadBindingSection(element, container, 1, R.string.binding_right, showMenu);
-            loadBindingSection(element, container, 2, R.string.binding_down, showMenu);
-            loadBindingSection(element, container, 3, R.string.binding_left, showMenu);
+            loadBindingSection(element, container, ControlElement.BindingSection.SLOT_0, R.string.binding_up, showMenu);
+            loadBindingSection(element, container, ControlElement.BindingSection.SLOT_1, R.string.binding_right, showMenu);
+            loadBindingSection(element, container, ControlElement.BindingSection.SLOT_2, R.string.binding_down, showMenu);
+            loadBindingSection(element, container, ControlElement.BindingSection.SLOT_3, R.string.binding_left, showMenu);
         }
     }
 
-    private void loadBindingSection(final ControlElement element, LinearLayout container, final int index, int titleResId) {
-        loadBindingSection(element, container, index, titleResId, true);
+    private void loadBindingSection(final ControlElement element, LinearLayout container, ControlElement.BindingSection section, int titleResId) {
+        loadBindingSection(element, container, section, titleResId, true);
     }
 
-    private void loadBindingSection(final ControlElement element, LinearLayout container, final int index, int titleResId, boolean showMenu) {
-        BindPackage bp = element.getSlotPackage(index);
-        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, getString(titleResId), 0, bp, () -> {
+    private void loadBindingSection(final ControlElement element, LinearLayout container, ControlElement.BindingSection section, int titleResId, boolean showMenu) {
+        loadBindingSection(element, container, section, getString(titleResId), showMenu);
+    }
+
+    private void loadBindingSection(final ControlElement element, LinearLayout container, ControlElement.BindingSection section, String label, boolean showMenu) {
+        BindPackage bp = element.getBindingPackage(section);
+        View view = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, label, 0, bp, () -> {
+            element.setBindingPackage(section, bp);
             profile.save();
             inputControlsView.invalidate();
         }, showMenu);
-        container.addView(section);
+        container.addView(view);
     }
 
-    private void loadLongPressBindingSection(final ControlElement element, LinearLayout container) {
-        loadLongPressBindingSection(element, container, true);
-    }
-
-    private void loadLongPressBindingSection(final ControlElement element, LinearLayout container, boolean showMenu) {
-        BindPackage bp = element.getLongPressPackage();
-        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Long Press", 0, bp, () -> {
-            profile.save();
-            inputControlsView.invalidate();
-        }, showMenu);
-        container.addView(section);
-    }
-
-    private void loadGestureBindingSection(final ControlElement element, LinearLayout container) {
-        loadGestureBindingSection(element, container, true);
-    }
-
-    private void loadGestureBindingSection(final ControlElement element, LinearLayout container, boolean showMenu) {
-        BindPackage bp = element.getGesturePackage();
-        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(this, "Gesture", 0, bp, () -> {
-            profile.save();
-            inputControlsView.invalidate();
-        }, showMenu);
-        container.addView(section);
-    }
-
-    private void toggleLongPressModifier(ControlElement element, Binding modBinding, boolean add, Runnable populate) {
-        List<Binding> seq = new ArrayList<>(element.getLongPressBindings());
-        if (add) {
-            seq.add(modBinding);
-        } else {
-            seq.remove(modBinding);
-        }
-        element.setLongPressBindings(seq);
-        profile.save();
-        inputControlsView.invalidate();
-        populate.run();
-    }
-
-    private void toggleGestureModifier(ControlElement element, Binding modBinding, boolean add, Runnable populate) {
-        List<Binding> seq = new ArrayList<>(element.getGestureBindings());
-        if (add) {
-            seq.add(modBinding);
-        } else {
-            seq.remove(modBinding);
-        }
-        element.setGestureBindings(seq);
-        profile.save();
-        inputControlsView.invalidate();
-        populate.run();
-    }
-
-    private void toggleModifier(ControlElement element, int seqIndex, Binding modBinding, boolean checked, Runnable populate) {
-        if (checked) {
-            element.addBindingToSequence(seqIndex, modBinding);
-        } else {
-            int idx = element.getBindingSequence(seqIndex).indexOf(modBinding);
-            if (idx >= 0) element.removeBindingFromSequence(seqIndex, idx);
-        }
+    private void toggleBindingModifier(ControlElement element, ControlElement.BindingSection section, Binding modBinding, boolean add, Runnable populate) {
+        BindPackage src = element.getBindingPackage(section);
+        List<Binding> seq = new ArrayList<>(src.getBindings());
+        if (add) seq.add(modBinding);
+        else seq.remove(modBinding);
+        BindPackage newPkg = new BindPackage(seq, src.getStickyFlags());
+        newPkg.setToggleSwitch(src.isToggleSwitch());
+        newPkg.setAutoRepeat(src.isAutoRepeat());
+        newPkg.setAutoRepeatIntervalMs(src.getAutoRepeatIntervalMs());
+        element.setBindingPackage(section, newPkg);
         profile.save();
         inputControlsView.invalidate();
         populate.run();

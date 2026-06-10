@@ -98,6 +98,12 @@ public class ControlElement {
             return names;
         }
     }
+
+    public enum BindingSection {
+        SLOT_0, SLOT_1, SLOT_2, SLOT_3,
+        LONG_PRESS,
+        GESTURE
+    }
     private static final int SHARED_POOL_MAX_SIZE = 64;
     private static final LinkedHashMap<String, Bitmap> sharedPool = new LinkedHashMap<String, Bitmap>(SHARED_POOL_MAX_SIZE + 1, 0.75f, true) {
         @Override
@@ -558,9 +564,12 @@ public class ControlElement {
             }
             List<Binding> seq = bindings.get(index);
             seq.clear();
+            List<Boolean> stickySeq = bindingSticky.get(index);
+            stickySeq.clear();
             if (pkg != null) {
                 for (int k = 0; k < pkg.size(); k++) {
                     seq.add(pkg.get(k));
+                    stickySeq.add(pkg.isSticky(k));
                 }
             }
             invalidateElementCache();
@@ -610,6 +619,94 @@ public class ControlElement {
 
     public boolean isGestureToggle() {
         return gesturePackageVal != null && gesturePackageVal.isToggleSwitch();
+    }
+
+    // === Unified BindingSection dispatch ===
+
+    public BindPackage getBindingPackage(BindingSection section) {
+        switch (section) {
+            case SLOT_0: return getSlotPackage(0);
+            case SLOT_1: return getSlotPackage(1);
+            case SLOT_2: return getSlotPackage(2);
+            case SLOT_3: return getSlotPackage(3);
+            case LONG_PRESS: return getLongPressPackage();
+            case GESTURE: return getGesturePackage();
+            default: return new BindPackage();
+        }
+    }
+
+    public void setBindingPackage(BindingSection section, BindPackage pkg) {
+        switch (section) {
+            case SLOT_0: setSlotPackage(0, pkg); break;
+            case SLOT_1: setSlotPackage(1, pkg); break;
+            case SLOT_2: setSlotPackage(2, pkg); break;
+            case SLOT_3: setSlotPackage(3, pkg); break;
+            case LONG_PRESS: setLongPressPackage(pkg); break;
+            case GESTURE: setGesturePackage(pkg); break;
+        }
+    }
+
+    public List<Binding> getBindingsList(BindingSection section) {
+        switch (section) {
+            case SLOT_0: return getBindingSequence(0);
+            case SLOT_1: return getBindingSequence(1);
+            case SLOT_2: return getBindingSequence(2);
+            case SLOT_3: return getBindingSequence(3);
+            case LONG_PRESS: return getLongPressBindings();
+            case GESTURE: return getGestureBindings();
+            default: return new ArrayList<>();
+        }
+    }
+
+    public boolean isBindingToggle(BindingSection section) {
+        switch (section) {
+            case LONG_PRESS: return isLongPressToggle();
+            case GESTURE: return isGestureToggle();
+            case SLOT_0: case SLOT_1: case SLOT_2: case SLOT_3: {
+                BindPackage pkg = getBindingPackage(section);
+                return pkg != null && pkg.isToggleSwitch();
+            }
+            default: return false;
+        }
+    }
+
+    public boolean getBindingAutoRepeat(BindingSection section) {
+        switch (section) {
+            case SLOT_0: return getSlotAutoRepeat(0);
+            case SLOT_1: return getSlotAutoRepeat(1);
+            case SLOT_2: return getSlotAutoRepeat(2);
+            case SLOT_3: return getSlotAutoRepeat(3);
+            default: return false;
+        }
+    }
+
+    public boolean hasBinding(BindingSection section) {
+        switch (section) {
+            case SLOT_0: case SLOT_1: case SLOT_2: case SLOT_3: {
+                int idx = section.ordinal();
+                List<Binding> seq = idx < bindings.size() ? bindings.get(idx) : null;
+                if (seq != null) {
+                    for (Binding b : seq) {
+                        if (b != null && b != Binding.NONE) return true;
+                    }
+                }
+                BindPackage pkg = getBindingPackage(section);
+                return pkg != null && !pkg.isEmpty();
+            }
+            case LONG_PRESS: return hasLongPressBinding();
+            case GESTURE: return hasGestureBinding();
+            default: return false;
+        }
+    }
+
+    public int computeToggleBitmask(BindingSection section) {
+        int mask = 0, idx = 0;
+        for (Binding b : getBindingsList(section)) {
+            if (b == null || b == Binding.NONE) continue;
+            if (isBindingToggle(section)) mask |= (1 << idx);
+            idx++;
+        }
+        return mask;
     }
 
     public boolean getSlotAutoRepeat(int slot) {

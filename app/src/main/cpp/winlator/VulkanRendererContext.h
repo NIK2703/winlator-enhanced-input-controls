@@ -348,8 +348,10 @@ private:
     std::atomic<bool> gpuHangDetected{false};
     std::mutex        renderMutex;
     std::mutex        dirtyMutex;
+    std::mutex        ahbTexCacheMutex;
     std::condition_variable dirtyCV;
     std::shared_mutex frameMutex;
+    std::mutex        oneTimeFenceMutex;
 
     void createInstance();
     void createSurface();

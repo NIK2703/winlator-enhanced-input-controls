@@ -430,8 +430,8 @@ public class InputControlsView extends View {
             element.setElementHeight(selectedElement.getElementHeight());
             element.setCornerRadius(selectedElement.getCornerRadius());
             element.setDpadCornerRadius(selectedElement.getDpadCornerRadius());
-            element.setLongPressPackage(new BindPackage(selectedElement.getLongPressPackage()));
-            element.setGesturePackage(new BindPackage(selectedElement.getGesturePackage()));
+            element.setBindingPackage(ControlElement.BindingSection.LONG_PRESS, new BindPackage(selectedElement.getBindingPackage(ControlElement.BindingSection.LONG_PRESS)));
+            element.setBindingPackage(ControlElement.BindingSection.GESTURE, new BindPackage(selectedElement.getBindingPackage(ControlElement.BindingSection.GESTURE)));
             element.setX(cursor.x);
             element.setY(cursor.y);
             profile.addElement(element);

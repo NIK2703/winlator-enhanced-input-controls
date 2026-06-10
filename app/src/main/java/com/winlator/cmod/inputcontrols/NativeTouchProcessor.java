@@ -519,8 +519,8 @@ public class NativeTouchProcessor {
                 ne.orientation = ce.getOrientation();
             }
 
-            ne.elementLongPress = bindingListToEncoded(ce.getLongPressBindings());
-            ne.elementGesture = bindingListToEncoded(ce.getGestureBindings());
+            ne.elementLongPress = bindingListToEncoded(ce.getBindingsList(ControlElement.BindingSection.LONG_PRESS));
+            ne.elementGesture = bindingListToEncoded(ce.getBindingsList(ControlElement.BindingSection.GESTURE));
 
             ne.bindingTypes = new int[ce.getBindingCount() * 2];
             for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
@@ -588,24 +588,8 @@ public class NativeTouchProcessor {
                 BindPackage pkg = ce.getSlotPackage(j);
                 ne.bindingAutoRepeatIntervalMs[j] = pkg != null ? pkg.getAutoRepeatIntervalMs() : 100;
             }
-            {
-                int mask = 0, idx = 0;
-                for (Binding b : ce.getLongPressBindings()) {
-                    if (b == null || b == Binding.NONE) continue;
-                    if (ce.isLongPressToggle()) mask |= (1 << idx);
-                    idx++;
-                }
-                ne.longPressToggleBitmask = mask;
-            }
-            {
-                int mask = 0, idx = 0;
-                for (Binding b : ce.getGestureBindings()) {
-                    if (b == null || b == Binding.NONE) continue;
-                    if (ce.isGestureToggle()) mask |= (1 << idx);
-                    idx++;
-                }
-                ne.gestureToggleBitmask = mask;
-            }
+            ne.longPressToggleBitmask = ce.computeToggleBitmask(ControlElement.BindingSection.LONG_PRESS);
+            ne.gestureToggleBitmask = ce.computeToggleBitmask(ControlElement.BindingSection.GESTURE);
             if (ne.bindingToggle != null) {
                 for (int j = 0; j < ne.bindingToggle.length && j < 4; j++) {
                     Log.w("Winlator_Controls", "  elem["+i+"] slot["+j+"] type="+ne.bindingTypes[j*2]+" toggleMask="+ne.bindingToggle[j]+" arMask="+(ne.bindingAutoRepeat != null ? ne.bindingAutoRepeat[j] : -1)+" arInterval="+(ne.bindingAutoRepeatIntervalMs != null ? ne.bindingAutoRepeatIntervalMs[j] : -1));
