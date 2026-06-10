@@ -149,6 +149,11 @@ static const element_up_fn element_up_table[] = {
 };
 
 void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+    // Elements always take priority: cancel any pending double-tap gesture
+    // so the touch engages the element instead of triggering gesture bindings.
+    if (__builtin_expect(g_state.gesture_double_tap_waiting, 0)) {
+        gesture_cancel_double_tap_wait(result);
+    }
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_element_down[%d] type=%d ptr=%d x=%.0f y=%.0f", (int)(e - g_state.elements), e->type, ptr_id, x, y);
     //LOG_SHARED("handle_element_down type=%d ptr=%d x=%.0f y=%.0f cur_ptr=%d engaged=%d b0=%d",
     //    e->type, ptr_id, x, y, e->current_ptr_id, e->engaged, e->bindings[0].type);

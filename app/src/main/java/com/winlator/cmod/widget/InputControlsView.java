@@ -277,10 +277,6 @@ public class InputControlsView extends View {
             snappingSize = newSnapSize;
             if (nativeTouchProcessor != null) {
                 nativeTouchProcessor.setSnappingSize(snappingSize);
-                if (profile != null) {
-                    NativeTouchProcessor.NativeConfig config = NativeTouchProcessor.buildNativeConfig(profile, getMaxWidth(), getMaxHeight());
-                    nativeTouchProcessor.updateConfig(config);
-                }
             }
         }
         readyToDraw = true;

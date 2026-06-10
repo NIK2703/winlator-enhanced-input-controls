@@ -153,14 +153,23 @@ static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* restr
     mark_element_dirty(btn);
 }
 
-static inline void process_engaged_non_buttons(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+static inline void process_engaged_non_buttons(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, bool hover_release) {
     TouchFinger* f = find_finger(ptr_id);
     if (__builtin_expect(f == NULL, 0)) return;
     uint8_t cnt = f->engaged_elem_count;
-    for (uint8_t i = 0; i < cnt; i++) {
+    uint8_t i = 0;
+    while (i < cnt) {
         TouchElement* e = &g_state.elements[f->engaged_elem_indices[i]];
-        if (e->type != ELEM_BUTTON && e->current_ptr_id == ptr_id)
+        if (e->type != ELEM_BUTTON && e->current_ptr_id == ptr_id) {
+            if (hover_release && !point_in_element(x, y, e)) {
+                handle_element_up(e, x, y, time_ms, result);
+                f->engaged_elem_indices[i] = f->engaged_elem_indices[cnt - 1];
+                f->engaged_elem_count = --cnt;
+                continue;
+            }
             handle_element_move(e, x, y, time_ms, result);
+        }
+        i++;
     }
 }
 
@@ -379,7 +388,12 @@ lock_handler_move: {
             break;
         }
         case ACTIVATION_TRACK: {
-            process_engaged_non_buttons(ptr_id, x, y, time_ms, result);
+            process_engaged_non_buttons(ptr_id, x, y, time_ms, result, false);
+            // Non-button: activate new non-button elements at current position
+            TouchElement* track_hit = hit_test_element(x, y);
+            if (track_hit && track_hit->type != ELEM_BUTTON && track_hit->current_ptr_id < 0) {
+                handle_element_down(track_hit, ptr_id, x, y, time_ms, result);
+            }
             // Tracked buttons: check for new button at position
             TrackedButtons* tb = &g_state.tracked[(uint32_t)ptr_id % MAX_FINGERS];
             if (tb->ptr_id == ptr_id && tb->count > 0) {
@@ -416,13 +430,18 @@ lock_handler_move: {
             break;
         }
         case ACTIVATION_HOVER: {
-            process_engaged_non_buttons(ptr_id, x, y, time_ms, result);
+            process_engaged_non_buttons(ptr_id, x, y, time_ms, result, true);
             // Hover transitions: prev.deactivate(), curr.activate()
             int pid_slot = (uint32_t)ptr_id % MAX_FINGERS;
             int prev_idx = g_state.hovered_element_per_ptr[pid_slot];
 #ifndef NDEBUG
             __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "MOVE_HOVER ptr=%d slot=%d prev=%d", ptr_id, pid_slot, prev_idx);
 #endif
+            // Non-button hover: activate new non-button at current position if not already engaged
+            TouchElement* hover_hit = hit_test_element(x, y);
+            if (hover_hit && hover_hit->type != ELEM_BUTTON && hover_hit->current_ptr_id < 0) {
+                handle_element_down(hover_hit, ptr_id, x, y, time_ms, result);
+            }
             TrackedButtons* tb = &g_state.tracked[pid_slot];
             if (tb->ptr_id == ptr_id && tb->count > 0) {
                 TouchElement* btn = hit_test_element(x, y);

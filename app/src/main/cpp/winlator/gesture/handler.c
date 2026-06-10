@@ -79,16 +79,6 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
         }
     }
 
-    // When DT_WAITING is active, confirm DT before any element engagement.
-    // This ensures double-tap on element areas triggers D/Dd bindings rather
-    // than engaging the element (stick, dpad, lock, button, etc.).
-    if (__builtin_expect(g_state.gesture_double_tap_waiting, 0)) {
-        if (check_confirm_dt_waiting(f, result, NULL, false)) {
-            g_state.gesture_main_ptr_id = f->ptr_id;
-            return;
-        }
-    }
-
     // Grid-accelerated hit-test (3x3 cells around the touch point)
     if (g_state.grid_cell_w > 0.0f && g_state.grid_cell_h > 0.0f) {
         int cx = (int)((x - g_state.grid_min_x) * g_state.grid_inv_cell_w);
@@ -971,21 +961,10 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
         finger_up->engaged_elem_count = 0;
     }
     if (had_tracked || had_element) {
-        // Allow DT_WAITING to be entered even for element fingers,
-        // so double-tap can work with on-screen controls.
-        // touchpad_finger_up checks f->state — element fingers may be
-        // in IDLE (never entered touchpad_finger_down), so only proceed
-        // if gesture_double_tap_waiting is already active (second tap-up),
-        // or if the finger has double-tap bindings (first tap-up entering DT_WAITING).
-        bool can_enter_dt = g_state.gesture_double_tap_waiting
-            || g_state.gesture_post_double_tap_drag
-            || g_state.second_double_tap_waiting
-            || (f->cached_has_active_double_tap && f->state == GESTURE_STATE_IDLE);
-        if (!can_enter_dt) {
-            g_state.main_ptr_id = -1;
-            deactivate_finger(f);
-            return;
-        }
+        // Element fingers must NEVER enter gesture states...
+        g_state.main_ptr_id = -1;
+        deactivate_finger(f);
+        return;
     }
 
     // Gesture up: skip gesture-specific handling if no gestures in current mode

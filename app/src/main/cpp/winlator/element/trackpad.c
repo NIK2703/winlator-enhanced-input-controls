@@ -44,7 +44,7 @@ void element_trackpad_move(TouchElement* e, float x, float y, uint64_t time_ms, 
         float interp_x = cubic_bezier_interpolate_trackpad(nx);
         float interp_y = cubic_bezier_interpolate_trackpad(ny);
 
-        int is_left = e->cached_bind0_is_right_stick;
+        int is_left = !e->cached_bind0_is_right_stick;
         add_action(result, ACT_GAMEPAD_AXIS, is_left, (int)(interp_x * 32767), (int)(interp_y * 32767));
 
         e->trackpad_vel_x = interp_x;
@@ -111,7 +111,7 @@ void element_trackpad_up(TouchElement* e, float x, float y, uint64_t time_ms, To
             }
         }
         if (e->cached_bind0_is_gamepad) {
-            add_action(result, ACT_GAMEPAD_AXIS, e->cached_bind0_is_right_stick, 0, 0);
+            add_action(result, ACT_GAMEPAD_AXIS, !e->cached_bind0_is_right_stick, 0, 0);
         }
     }
 }

@@ -431,7 +431,6 @@ static inline void process_auto_repeat_burst(TouchActionResult* restrict result,
     for (int i = 0; i < count; i++) {
         TouchBinding* b = &actions[i];
         if (!b->auto_repeat) continue;
-        if (b->toggle) continue;
         int interval_ms = b->auto_repeat_interval_ms;
         if (interval_ms <= 0) continue;
 

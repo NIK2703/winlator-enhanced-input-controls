@@ -369,18 +369,6 @@ void touchpad_finger_up(TouchFinger* f, TouchActionResult* restrict result, uint
         }
 
         default: {
-            // Element finger (IDLE state) with double_tap bindings:
-            // allow entering DT_WAITING so double-tap works on elements.
-            if (f->state == GESTURE_STATE_IDLE
-                && (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag)
-                && !g_state.gesture_double_tap_waiting) {
-                handle_tap_up(f, result, time_ms);
-                if (f->single_tap_deferred) {
-                    return;
-                }
-                tap_up_cleanup(f, result);
-                return;
-            }
             if (g_state.gesture_post_double_tap_drag) {
                 g_state.gesture_post_double_tap_drag = false;
                 release_held_actions(result);

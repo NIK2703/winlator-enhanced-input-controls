@@ -152,6 +152,24 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         activity.xServer.screenInfo.width,
                         activity.xServer.screenInfo.height,
                         activity.globalCursorSpeed);
+                // Preserve xform scale/view offset across config update
+                int outerW = com.winlator.cmod.core.AppUtils.getScreenWidth();
+                int outerH = com.winlator.cmod.core.AppUtils.getScreenHeight();
+                int innerW = activity.xServer.screenInfo.width;
+                int innerH = activity.xServer.screenInfo.height;
+                boolean fullscreen = activity.xServer.getRenderer() != null && activity.xServer.getRenderer().isFullscreen();
+                if (!fullscreen) {
+                    float aspect = Math.min((float)outerW / innerW, (float)outerH / innerH);
+                    updatedConfig.xformScaleX = 1.0f / aspect;
+                    updatedConfig.xformScaleY = 1.0f / aspect;
+                    updatedConfig.viewOffsetX = (outerW - innerW * aspect) / 2.0f;
+                    updatedConfig.viewOffsetY = (outerH - innerH * aspect) / 2.0f;
+                } else {
+                    updatedConfig.xformScaleX = (float)innerW / outerW;
+                    updatedConfig.xformScaleY = (float)innerH / outerH;
+                    updatedConfig.viewOffsetX = 0;
+                    updatedConfig.viewOffsetY = 0;
+                }
                 activity.nativeTouchProcessor.updateConfig(updatedConfig);
             }
         }
@@ -720,6 +738,11 @@ if (enableLogs) {
         // Stop tick timer to prevent background gesture state corruption
         if (nativeTickRunnable != null && handler != null) {
             handler.removeCallbacks(nativeTickRunnable);
+        }
+
+        // Remove pending hide timeout so controls don't disappear while in background
+        if (timeoutHandler != null && hideControlsRunnable != null) {
+            timeoutHandler.removeCallbacks(hideControlsRunnable);
         }
     }
     private void exit() {
@@ -1771,22 +1794,28 @@ private void applySidebarSettings() {
             handler.postDelayed(nativeTickRunnable, tickIntervalMs);
             Log.w("Winlator_Controls", "showInputControls: tick started, interval="+tickIntervalMs+"ms");
 
-            // Defer element loading & param setting until view is laid out (needs dimensions)
-            inputControlsView.post(() -> {
-                if (inputControlsView.getWidth() <= 0) {
-                    // View not laid out yet — use layout listener to run after measure/layout/draw
-                    inputControlsView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-                        @Override
-                        public void onGlobalLayout() {
-                            if (inputControlsView.getWidth() <= 0) return;
-                            inputControlsView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                            doElementSetup(profile);
-                        }
-                    });
-                    return;
-                }
+            // Set elements immediately if view is already laid out
+            if (inputControlsView.getWidth() > 0 && inputControlsView.getHeight() > 0) {
                 doElementSetup(profile);
-            });
+            }
+            else {
+                // Defer element loading & param setting until view is laid out (needs dimensions)
+                inputControlsView.post(() -> {
+                    if (inputControlsView.getWidth() <= 0) {
+                        // View not laid out yet — use layout listener to run after measure/layout/draw
+                        inputControlsView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                            @Override
+                            public void onGlobalLayout() {
+                                if (inputControlsView.getWidth() <= 0) return;
+                                inputControlsView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                                doElementSetup(profile);
+                            }
+                        });
+                        return;
+                    }
+                    doElementSetup(profile);
+                });
+            }
             Log.w("Winlator_Controls", "showInputControls: element setup posted");
         }
 
