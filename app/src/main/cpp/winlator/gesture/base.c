@@ -45,10 +45,11 @@ static inline GesturePairPlan resolve_long_press_pair(const TouchFinger* f) {
     return gesture_decide_branch(gesture_branch_params(
         f->cached_has_active_long_press,
         f->cached_has_active_long_press_drag,
-        false, false,
+        f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag,
+        false,
         g_state.cfg.is_ts,
         f->is_second_finger,
-        0, false
+        0
     ));
 }
 
@@ -110,7 +111,7 @@ void gesture_cancel_double_tap_wait(TouchActionResult* restrict result) {
         execute_actions(result, g_state.gesture_deferred_tap, g_state.gesture_deferred_tap_count);
         g_state.gesture_deferred_tap_count = 0;
     }
-    g_state.gesture_pending_deferred_double_count = 0;
+    gesture_clear_deferred_tap();
     TouchFinger* mf = find_finger(g_state.gesture_main_ptr_id);
     if (mf) mf->state = GESTURE_STATE_IDLE;
 }
@@ -130,7 +131,6 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         g_state.gesture_is_action_held,
         g_state.cfg.caps_has_drag_bindings);
 
-    g_state.gesture_handler_active = false;
     const bool is_tp = g_state.cfg.is_tp;
     const bool is_ts = g_state.cfg.is_ts;
     const bool caps_has_drag_bindings = g_state.cfg.caps_has_drag_bindings;
@@ -205,14 +205,8 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
         // When S2 is held without D2, fall through to resolve Sd2 (TS).
         // If no single-tap-drag exists, resolve_drag_binding simply returns false.
         bool has_single_and_dt = f->cached_has_active_single_tap
-            && (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag);
-        // Held S2/D2: transition without re-fire if Sd2 unavailable or D2 present.
-        if (g_state.gesture_is_action_held
-            && (!fb->single_tap_drag_count || f->cached_has_active_double_tap)) {
-            g_state.gesture_pending_double_count = 0;
-            start_drag_no_binding(f, result);
-            return;
-        }
+            && f->cached_has_active_double_tap
+            && !f->cached_has_active_double_tap_drag;
         // TP mode zeroes single_tap_drag on the finger; read from config directly.
         const TouchBinding* sd = f->bindings.single_tap_drag;
         int sd_count = f->bindings.single_tap_drag_count;
@@ -220,12 +214,32 @@ void check_start_drag(TouchFinger* f, float dx, float dy, TouchActionResult* res
             sd = g_state.cfg.tp[GESTURE_SINGLE_DRAG_2ND].arr;
             sd_count = g_state.cfg.tp[GESTURE_SINGLE_DRAG_2ND].count;
         }
+        // Check effective drag binding count (config for TP, finger bindings for TS).
+        int eff_sd_count = is_tp ? g_state.cfg.tp[GESTURE_SINGLE_DRAG_2ND].count : fb->single_tap_drag_count;
+        int eff_dd_count = is_tp ? g_state.cfg.tp[GESTURE_DOUBLE_DRAG_2ND].count : fb->double_tap_drag_count;
+        // No drag binding available: early exit with S2 alone instead of
+        // resolving. The D2 early-exit was removed because it prevented Sd2
+        // resolution when D2 was also bound — both Sd2 and Dd2 are now checked.
+        if (g_state.gesture_is_action_held && !eff_sd_count && !eff_dd_count) {
+            g_state.gesture_pending_double_count = 0;
+            start_drag_no_binding(f, result);
+            return;
+        }
+        // Resolve drag binding: Sd2 first, then S2 fallback (press_on_drag),
+        // then Dd2 fallback (use_fallback=true).
         if (!resolve_drag_binding(
                 sd, sd_count,
-                fb->single_tap, fb->single_tap_count, NULL, 0,
-                has_single_and_dt, false,
+                fb->single_tap, fb->single_tap_count,
+                fb->double_tap_drag, fb->double_tap_drag_count,
+                has_single_and_dt, true,
                 &drag_binding, &drag_count))
             return;
+        // S2 held: add drag binding alongside, don't release S2
+        if (g_state.gesture_is_action_held) {
+            execute_actions_hold(result, drag_binding, drag_count);
+            start_drag_no_binding(f, result);
+            return;
+        }
     } else if (!g_state.gesture_second_active) {
         // Early exit: nothing to resolve for main finger
         if (!current_mode_has_gesture(GESTURE_SINGLE_TAP) && !current_mode_has_gesture(GESTURE_SINGLE_TAP_DRAG)) {
@@ -257,7 +271,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
     // caps gate: must run before the gesture-bindings early return so that
     // stale DT/SDTW flags are cleaned up even when switching to a no-gesture mode.
     if (!g_state.cfg.caps_has_double_tap) {
-        g_state.second_double_tap_waiting = false;
+        gesture_clear_second_finger_state();
         g_state.gesture_double_tap_waiting = false;
         g_state.gesture_pending_deferred_double_count = 0;
     }
@@ -281,7 +295,6 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
             }
 
             if (!cancel_lp && time_ms - f->down_time_ms >= g_state.cfg.long_press_timeout_ms) {
-                g_state.gesture_handler_active = false;
                 gesture_clear_second_finger_state();
 
                 GesturePairPlan lp_plan = resolve_long_press_pair(f);
@@ -289,14 +302,14 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
                 if (lp_plan.pulse_on_up) {
                     if (lp_plan.drag_available) {
                         // L with Ld: defer L for drag (fire on finger-up, Ld on drag)
-                        g_state.gesture_pending_deferred_long_press_count = f->bindings.long_press_count;
-                        for (int _li = 0; _li < f->bindings.long_press_count && _li < 8; _li++)
-                            g_state.gesture_pending_deferred_long_press[_li] = f->bindings.long_press[_li];
+                        copy_bindings_bounded(f->bindings.long_press, f->bindings.long_press_count,
+                            g_state.gesture_pending_deferred_long_press,
+                            &g_state.gesture_pending_deferred_long_press_count, 8);
                     } else {
                         // L without Ld: execute immediately (pulse on timer tick)
                         execute_actions(result, f->bindings.long_press, f->bindings.long_press_count);
-                        if (f->cached_has_active_single_tap && !g_state.gesture_is_action_held)
-                            execute_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+                        // LP has won — cancel deferred S to prevent dual-fire
+                        f->cached_has_active_single_tap = false;
                         f->cached_has_long_press_timer = false;
                         f->cached_has_active_long_press = false;
                     }
@@ -321,16 +334,19 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
                 continue;
             }
             f->single_tap_hold_delay_ms = 0;
-            if (!g_state.gesture_is_action_held && !f->cached_has_moved_beyond_threshold)
-                execute_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+            if (!g_state.gesture_is_action_held && !f->cached_has_moved_beyond_threshold) {
+                if (f->is_second_finger)
+                    execute_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+                else
+                    execute_actions_hold(result, f->bindings.single_tap, f->bindings.single_tap_count);
+            }
             g_state.gesture_deferred_tap_count = 0;
             g_state.gesture_pending_double_count = 0;
             // R1 fix: do NOT clear pending_deferred_double_count here.
             // It must survive S hold timer to fire on finger-up.
             // When the delayed hold fires for a second finger, clear SDTW state
             if (f->is_second_finger) {
-                g_state.second_tap_fallback_count = 0;
-                g_state.second_double_tap_waiting = false;
+                gesture_clear_second_finger_state();
             }
         }
     }
@@ -340,11 +356,10 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
         uint32_t sdtw_mask = GESTURE_MASK(GESTURE_DOUBLE_2ND) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND);
         if ((g_state.cfg.caps_mode_mask & sdtw_mask) && g_state.second_double_tap_waiting
             && time_ms - g_state.second_tap_fallback_time >= g_state.cfg.double_tap_timeout_ms) {
-            g_state.second_double_tap_waiting = false;
-            g_state.pending_second_double_count = 0;
-            if (g_state.second_tap_fallback_count > 0) {
-                execute_actions(result, g_state.second_tap_fallback, g_state.second_tap_fallback_count);
-                g_state.second_tap_fallback_count = 0;
+            int fallback_count = g_state.second_tap_fallback_count;
+            gesture_clear_second_finger_state();
+            if (fallback_count > 0) {
+                execute_actions(result, g_state.second_tap_fallback, fallback_count);
             }
             TouchFinger* mf = find_finger(g_state.gesture_main_ptr_id);
             if (mf && mf->state != GESTURE_STATE_DRAGGING)
@@ -424,8 +439,8 @@ static inline void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
 {
     gesture_clear_deferred_tap();
     if (deferred_single && deferred_single_count > 0) {
-        for (int _i = 0; _i < deferred_single_count && _i < 8; _i++)
-            g_state.gesture_deferred_tap[g_state.gesture_deferred_tap_count++] = deferred_single[_i];
+        copy_bindings_bounded(deferred_single, deferred_single_count,
+            g_state.gesture_deferred_tap, &g_state.gesture_deferred_tap_count, 8);
     }
     if (deferred_double && deferred_double_count > 0) {
         for (int _i = 0; _i < deferred_double_count && _i < 8; _i++) {
@@ -446,25 +461,18 @@ bool confirm_double_tap(TouchActionResult* restrict result,
     GesturePairPlan d_plan,
     const TouchBinding* src, int src_count,
     TouchBinding* dst, int* dst_count, int dst_max,
-    bool has_dt_drag,
     bool* out_post_dtd)
 {
     if (d_plan.pulse_on_up) {
-        *dst_count = 0;
-        for (int _i = 0; _i < src_count && _i < dst_max; _i++)
-            dst[_i] = src[_i];
-        *dst_count = src_count;
+        copy_bindings_bounded(src, src_count, dst, dst_count, dst_max);
         *out_post_dtd = true;
         return false; // deferred
     } else {
         execute_actions_hold(result, src, src_count);
         // Still store D bindings in deferred so PATH 1 fires on finger-up
         // (prevents re-entering DT waiting and allows check_start_drag to skip Sd).
-        *dst_count = 0;
-        for (int _i = 0; _i < src_count && _i < dst_max; _i++)
-            dst[_i] = src[_i];
-        *dst_count = src_count;
-        *out_post_dtd = has_dt_drag;
+        copy_bindings_bounded(src, src_count, dst, dst_count, dst_max);
+        *out_post_dtd = d_plan.drag_available;
         return true; // executed now
     }
 }

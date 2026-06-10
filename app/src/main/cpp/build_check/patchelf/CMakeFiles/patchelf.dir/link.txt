@@ -1,0 +1,1 @@
+/usr/bin/g++ -fPIC  -O3 -fomit-frame-pointer -Wno-unused-function -Wimplicit-function-declaration -shared -Wl,-soname,libpatchelf.so -o libpatchelf.so CMakeFiles/patchelf.dir/src/patchelf.cc.o 

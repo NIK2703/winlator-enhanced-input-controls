@@ -1,16 +1,24 @@
 package com.winlator.cmod.xconnector;
 
-
-
 import androidx.annotation.Keep;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ClientSocket {
     public final int fd;
     private final ArrayDeque<Integer> ancillaryFds = new ArrayDeque<>();
+
+    private static final int MAX_PENDING_BYTES = 1024 * 1024;
+    private final ConcurrentLinkedQueue<ByteBuffer> writeQueue = new ConcurrentLinkedQueue<>();
+    private final AtomicInteger pendingBytes = new AtomicInteger(0);
+    private final Object writeSignal = new Object();
+    private volatile boolean running = true;
+    private volatile boolean writeQueueOverflow = false;
+    private Thread writerThread;
 
     static {
         System.loadLibrary("winlator");
@@ -18,6 +26,90 @@ public class ClientSocket {
 
     public ClientSocket(int fd) {
         this.fd = fd;
+        setNonBlocking(fd);
+        startWriterThread();
+    }
+
+    private void startWriterThread() {
+        writerThread = new Thread(this::writeLoop, "socket-writer-" + fd);
+        writerThread.setDaemon(true);
+        writerThread.start();
+    }
+
+    private void writeLoop() {
+        ByteBuffer buf;
+        while (running) {
+            buf = writeQueue.poll();
+            if (buf == null) {
+                synchronized (writeSignal) {
+                    try {
+                        writeSignal.wait(100);
+                    }
+                    catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+                continue;
+            }
+
+            int offset = 0;
+            int remaining = buf.remaining();
+            while (remaining > 0 && running) {
+                int written = write(fd, buf, offset, remaining);
+                if (written > 0) {
+                    offset += written;
+                    remaining -= written;
+                }
+                else if (written == 0) {
+                    try {
+                        Thread.sleep(1);
+                    }
+                    catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+                else {
+                    break;
+                }
+            }
+            pendingBytes.addAndGet(-(buf.limit() - remaining));
+        }
+    }
+
+    public void shutdown() {
+        running = false;
+        synchronized (writeSignal) {
+            writeSignal.notify();
+        }
+    }
+
+    static void writeDirect(int fd, ByteBuffer data) {
+        int offset = 0;
+        int remaining = data.remaining();
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (remaining > 0) {
+            if (System.nanoTime() > deadline) {
+                android.util.Log.w("ClientSocket", "writeDirect timeout after 5s");
+                return;
+            }
+            int written = write(fd, data, offset, remaining);
+            if (written > 0) {
+                offset += written;
+                remaining -= written;
+            }
+            else if (written == 0) {
+                try {
+                    Thread.sleep(1);
+                }
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+            else return;
+        }
     }
 
     public boolean hasAncillaryFds() {
@@ -47,11 +139,35 @@ public class ClientSocket {
     }
 
     public void write(ByteBuffer data) throws IOException {
-        int bytesWritten = write(fd, data, data.limit());
-        if (bytesWritten >= 0) {
-            data.position(bytesWritten);
+        int remaining = data.remaining();
+        if (remaining == 0) return;
+
+        while (pendingBytes.get() + remaining > MAX_PENDING_BYTES) {
+            ByteBuffer dropped = writeQueue.poll();
+            if (dropped == null) break;
+            pendingBytes.addAndGet(-dropped.limit());
+            writeQueueOverflow = true;
+            android.util.Log.w("ClientSocket", "writeQueue overflow: dropping " + dropped.limit() + " bytes");
         }
-        else throw new IOException("Failed to write data.");
+
+        ByteBuffer copy = ByteBuffer.allocateDirect(remaining);
+        copy.put(data);
+        copy.flip();
+
+        writeQueue.add(copy);
+        pendingBytes.addAndGet(remaining);
+
+        synchronized (writeSignal) {
+            writeSignal.notify();
+        }
+    }
+
+    public boolean hasOverflowed() {
+        return writeQueueOverflow;
+    }
+
+    public void resetOverflowFlag() {
+        writeQueueOverflow = false;
     }
 
     public int recvAncillaryMsg(ByteBuffer data) throws IOException {
@@ -75,9 +191,11 @@ public class ClientSocket {
         else throw new IOException("Failed to send ancillary messages.");
     }
 
+    private static native int setNonBlocking(int fd);
+
     private native int read(int fd, ByteBuffer data, int offset, int length);
 
-    private native int write(int fd, ByteBuffer data, int length);
+    private static native int write(int fd, ByteBuffer data, int offset, int length);
 
     private native int recvAncillaryMsg(int clientFd, ByteBuffer data, int offset, int length);
 

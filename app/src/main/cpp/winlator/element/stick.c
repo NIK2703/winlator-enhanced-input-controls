@@ -66,13 +66,7 @@ void element_stick_up(TouchElement* e, float x, float y, uint64_t time_ms, Touch
     e->stick_value_x = 0;
     e->stick_value_y = 0;
     if (e->cached_has_any_binding) {
-        for (int i = 0; i < 4; i++) {
-            if (__builtin_expect(e->petal_active[i], 0)) {
-                e->petal_active[i] = false;
-                if (e->bindings[i].type != BINDING_NONE && !(e->primary_sticky_mask & (1 << i)))
-                    release_binding(result, &e->bindings[i]);
-            }
-        }
+        release_element_petals(e, result);
     }
     if (e->cached_bind0_is_gamepad) {
         add_action(result, ACT_GAMEPAD_AXIS, !e->cached_bind0_is_right_stick, 0, 0);

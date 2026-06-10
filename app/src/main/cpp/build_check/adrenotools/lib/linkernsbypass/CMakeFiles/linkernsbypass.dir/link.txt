@@ -1,0 +1,2 @@
+/usr/bin/ar qc liblinkernsbypass.a CMakeFiles/linkernsbypass.dir/android_linker_ns.cpp.o CMakeFiles/linkernsbypass.dir/elf_soname_patcher.cpp.o
+/usr/bin/ranlib liblinkernsbypass.a

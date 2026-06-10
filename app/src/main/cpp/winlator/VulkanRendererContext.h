@@ -247,7 +247,8 @@ private:
     bool              scanoutNeedsGpuBlit = false;
     bool   scanoutApiLoaded   = false;
     bool   scanoutEnvGpuBlit  = false;
-    bool   scanoutAlwaysGpuBlit = false;
+    bool              scanoutAlwaysGpuBlit = false;
+    AHardwareBuffer*  scanoutPendingRelease = nullptr;
     void*  fnSCCreateFromWin  = nullptr;
     void*  fnSCRelease        = nullptr;
     void*  fnSTCreate         = nullptr;
@@ -344,6 +345,7 @@ private:
     std::thread       renderThread;
     std::atomic<bool> isRunning{false};
     std::atomic<bool> fbResized{false};
+    std::atomic<bool> gpuHangDetected{false};
     std::mutex        renderMutex;
     std::mutex        dirtyMutex;
     std::condition_variable dirtyCV;

@@ -47,7 +47,6 @@ typedef struct {
     bool is_ts;
     bool is_second;
     int  hold_delay_ms;
-    bool is_single_tap_pair;
 } GestureBranchParams;
 
 // Build params for a specific gesture pair.
@@ -55,13 +54,13 @@ static inline GestureBranchParams gesture_branch_params(
     bool has_x, bool has_xd,
     bool has_competing_dt, bool has_competing_lp,
     bool is_ts, bool is_second,
-    int hold_delay_ms, bool is_single_tap_pair
+    int hold_delay_ms
 ) {
     GestureBranchParams p;
     p.has_x = has_x; p.has_xd = has_xd;
     p.has_competing_dt = has_competing_dt; p.has_competing_lp = has_competing_lp;
     p.is_ts = is_ts; p.is_second = is_second;
-    p.hold_delay_ms = hold_delay_ms; p.is_single_tap_pair = is_single_tap_pair;
+    p.hold_delay_ms = hold_delay_ms;
     return p;
 }
 
@@ -111,6 +110,6 @@ bool confirm_double_tap(TouchActionResult* restrict result,
     GesturePairPlan d_plan,
     const TouchBinding* src, int src_count,
     TouchBinding* dst, int* dst_count, int dst_max,
-    bool has_dt_drag, bool* out_post_dtd);
+    bool* out_post_dtd);
 
 #endif // TOUCH_PROCESSOR_GESTURE_TYPES_H

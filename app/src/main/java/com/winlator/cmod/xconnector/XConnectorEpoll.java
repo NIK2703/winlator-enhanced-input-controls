@@ -144,6 +144,7 @@ public class XConnectorEpoll implements Runnable {
             closeFd(client.shutdownFd);
         }
         else removeFdFromEpoll(epollFd, client.clientSocket.fd);
+        client.clientSocket.shutdown();
         closeFd(client.clientSocket.fd);
         connectedClients.remove(client.clientSocket.fd);
     }
@@ -194,12 +195,9 @@ public class XConnectorEpoll implements Runnable {
     }
 
     private void requestShutdown() {
-        try {
-            ByteBuffer data = ByteBuffer.allocateDirect(8);
-            data.asLongBuffer().put(1);
-            (new ClientSocket(shutdownFd)).write(data);
-        }
-        catch (IOException e) {}
+        ByteBuffer data = ByteBuffer.allocateDirect(8);
+        data.asLongBuffer().put(1);
+        ClientSocket.writeDirect(shutdownFd, data);
     }
 
     public static native void closeFd(int fd);

@@ -3,6 +3,8 @@ package com.winlator.cmod.renderer;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Surface;
 import android.widget.Toast;
 
@@ -20,6 +22,7 @@ import com.winlator.cmod.xserver.XLock;
 import com.winlator.cmod.xserver.XServer;
 
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class VulkanRenderer implements WindowManager.OnWindowModificationListener,
                                        Pointer.OnPointerMotionListener {
@@ -68,6 +71,22 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         new java.util.WeakHashMap<>();
     private final java.util.concurrent.atomic.AtomicBoolean scenePending =
         new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final AtomicLong scenePendingTime = new AtomicLong(0);
+    private final AtomicLong lastForceResetTime = new AtomicLong(0);
+    private final Handler watchdogHandler = new Handler(Looper.getMainLooper());
+    private final Runnable watchdogRunnable = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                if (nativeHandle != 0 && !xServerView.isEventExecutorHealthy()) {
+                    android.util.Log.w("VulkanRenderer", "Watchdog detected eventExecutor hang, restarting");
+                    xServerView.restartEventExecutor();
+                }
+            } finally {
+                watchdogHandler.postDelayed(this, 5000);
+            }
+        }
+    };
     private android.view.SurfaceControl scanoutGameSC;
     private android.view.SurfaceControl scanoutCursorSC;
     private android.view.Surface        scanoutGameSurface;
@@ -146,11 +165,28 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     }
 
     public void queueSceneUpdate() {
+        long now = System.nanoTime();
         if (scenePending.compareAndSet(false, true)) {
+            scenePendingTime.set(now);
             xServerView.queueEvent(() -> {
-                scenePending.set(false);
-                updateScene();
+                try {
+                    scenePending.set(false);
+                    updateScene();
+                } catch (Exception e) {
+                    scenePending.set(false);
+                }
             });
+        } else {
+            if (now - scenePendingTime.get() > 10_000_000_000L) {
+                if (lastForceResetTime.get() != 0 && now - lastForceResetTime.get() < 10_000_000_000L) {
+                    return;
+                }
+                if (scenePending.compareAndSet(true, false)) {
+                    lastForceResetTime.set(now);
+                    android.util.Log.w("VulkanRenderer", "scenePending force-reset after 10s timeout");
+                    queueSceneUpdate();
+                }
+            }
         }
     }
 
@@ -238,6 +274,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 }
             });
         });
+        watchdogHandler.postDelayed(watchdogRunnable, 5000);
     }
 
     public void onSurfaceChanged(int width, int height) {
@@ -249,6 +286,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     }
 
     public void onSurfaceDestroyed() {
+        watchdogHandler.removeCallbacks(watchdogRunnable);
         initComplete = false;
         vsyncRunning = false;
         if (initExecutor != null) {
@@ -364,49 +402,53 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     private void pushRenderList(ArrayList<RenderableWindow> list) {
         if (nativeHandle == 0) return;
-        int screenW = xServer.screenInfo.width, screenH = xServer.screenInfo.height;
+        try {
+            int screenW = xServer.screenInfo.width, screenH = xServer.screenInfo.height;
 
-        int start = 0;
-        for (int i = list.size() - 1; i >= 0; i--) {
-            RenderableWindow rw = list.get(i);
-            if (rw.content != null && rw.content.width >= screenW && rw.content.height >= screenH) {
-                start = i; break;
-            }
-        }
-
-        if (nativeMode) {
-            ArrayList<RenderableWindow> ns = new ArrayList<>();
-            for (int i = start; i < list.size(); i++) {
+            int start = 0;
+            for (int i = list.size() - 1; i >= 0; i--) {
                 RenderableWindow rw = list.get(i);
-                if (rw.content != null && !rw.content.isDirectScanout()) ns.add(rw);
+                if (rw.content != null && rw.content.width >= screenW && rw.content.height >= screenH) {
+                    start = i; break;
+                }
             }
-            int n = ns.size();
-            long[] ids = new long[n]; int[] xs = new int[n]; int[] ys = new int[n];
-            for (int i = 0; i < n; i++) {
-                ids[i] = did(ns.get(i).content); xs[i] = ns.get(i).rootX; ys[i] = ns.get(i).rootY;
+
+            if (nativeMode) {
+                ArrayList<RenderableWindow> ns = new ArrayList<>();
+                for (int i = start; i < list.size(); i++) {
+                    RenderableWindow rw = list.get(i);
+                    if (rw.content != null && !rw.content.isDirectScanout()) ns.add(rw);
+                }
+                int n = ns.size();
+                long[] ids = new long[n]; int[] xs = new int[n]; int[] ys = new int[n];
+                for (int i = 0; i < n; i++) {
+                    ids[i] = did(ns.get(i).content); xs[i] = ns.get(i).rootX; ys[i] = ns.get(i).rootY;
+                }
+                nativeSetRenderList(nativeHandle, ids, xs, ys, n);
+                return;
             }
-            nativeSetRenderList(nativeHandle, ids, xs, ys, n);
-            return;
-        }
-        if (fullscreen) {
+            if (fullscreen) {
+                int n = list.size() - start;
+                if (n <= 0) { nativeSetRenderList(nativeHandle, new long[0], new int[0], new int[0], 0); return; }
+                long[] ids = new long[n]; int[] xs = new int[n]; int[] ys = new int[n];
+                for (int i = 0; i < n; i++) {
+                    RenderableWindow rw = list.get(start + i);
+                    ids[i] = did(rw.content); xs[i] = rw.rootX; ys[i] = rw.rootY;
+                }
+                nativeSetRenderList(nativeHandle, ids, xs, ys, n);
+                return;
+            }
+
             int n = list.size() - start;
-            if (n <= 0) { nativeSetRenderList(nativeHandle, new long[0], new int[0], new int[0], 0); return; }
             long[] ids = new long[n]; int[] xs = new int[n]; int[] ys = new int[n];
             for (int i = 0; i < n; i++) {
                 RenderableWindow rw = list.get(start + i);
                 ids[i] = did(rw.content); xs[i] = rw.rootX; ys[i] = rw.rootY;
             }
             nativeSetRenderList(nativeHandle, ids, xs, ys, n);
-            return;
+        } catch (Exception e) {
+            android.util.Log.e("VulkanRenderer", "pushRenderList failed", e);
         }
-
-        int n = list.size() - start;
-        long[] ids = new long[n]; int[] xs = new int[n]; int[] ys = new int[n];
-        for (int i = 0; i < n; i++) {
-            RenderableWindow rw = list.get(start + i);
-            ids[i] = did(rw.content); xs[i] = rw.rootX; ys[i] = rw.rootY;
-        }
-        nativeSetRenderList(nativeHandle, ids, xs, ys, n);
     }
 
     private void sendCursorToNative(Cursor cursor) {
@@ -596,11 +638,6 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     public boolean isCursorVisible() { return cursorVisible; }
 
-    /**
-     * Updates only the visible cursor position in the renderer.
-     * This is useful for relative mouse mode where movement is forwarded to Wine
-     * without necessarily changing the XServer pointer state.
-     */
     public void updateVisualCursorPosition(int x, int y) {
         synchronized (lock) {
             if (nativeHandle == 0) return;

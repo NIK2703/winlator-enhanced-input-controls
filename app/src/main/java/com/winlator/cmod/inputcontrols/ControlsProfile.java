@@ -45,7 +45,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private InputMode inputMode = InputMode.ABSOLUTE;
     private DragMode dragMode = DragMode.AUTO;
     private int doubleTapTimeout = 150;
-    private int longPressTimeout = 150;
+    private int longPressTimeout = 200;
     private int bindingDelay;
     private int longPressDelay = 200;
     private int buttonLongPressHaptic = 1;

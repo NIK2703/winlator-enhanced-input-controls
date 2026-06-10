@@ -745,6 +745,15 @@ if (enableLogs) {
             timeoutHandler.removeCallbacks(hideControlsRunnable);
         }
     }
+    public void onWineKeepaliveTimeout() {
+        Log.w(TAG, "Wine keepalive timeout - wine may be hung, attempting recovery");
+        if (winHandler != null) {
+            if (environment != null) environment.onPause();
+            try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+            if (environment != null) environment.onResume();
+        }
+    }
+
     private void exit() {
         NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID);
         preloaderDialog.showOnUiThread(R.string.shutdown);

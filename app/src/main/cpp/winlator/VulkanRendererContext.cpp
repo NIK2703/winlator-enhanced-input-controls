@@ -9,6 +9,8 @@
 #include "window_vert.h"
 #include "window_frag.h"
 
+#define FENCE_TIMEOUT_NS 5000000000ULL
+
 VulkanRendererContext::VulkanRendererContext(ANativeWindow* win, int cW, int cH, void* aHandle)
     : window(win), surfaceWidth(cW), surfaceHeight(cH), containerWidth(cW), containerHeight(cH),
       adrenotoolsHandle(aHandle)
@@ -51,7 +53,10 @@ VulkanRendererContext::~VulkanRendererContext() {
         vk_.DestroyFence(device, inFlightFences[i], nullptr);
     }
     if (scanoutBlitFence != VK_NULL_HANDLE) {
-        vk_.WaitForFences(device, 1, &scanoutBlitFence, VK_TRUE, UINT64_MAX);
+        VkResult fenceResult = vk_.WaitForFences(device, 1, &scanoutBlitFence, VK_TRUE, FENCE_TIMEOUT_NS);
+        if (fenceResult == VK_TIMEOUT) {
+            RLOG_E("FENCE TIMEOUT on scanoutBlitFence in destructor - GPU hung, destroying fence anyway");
+        }
         vk_.DestroyFence(device, scanoutBlitFence, nullptr);
         scanoutBlitFence = VK_NULL_HANDLE;
     }
@@ -452,6 +457,7 @@ void VulkanRendererContext::ensureElementOverlayTex(int w, int h) {
     if (elementOverlayW == w && elementOverlayH == h && elementOverlayImg != VK_NULL_HANDLE)
         return;
     if (elementOverlayImg != VK_NULL_HANDLE) {
+        RLOG("ensureElementOverlayTex: waiting for device idle before cleanup");
         vk_.DeviceWaitIdle(device);
         cleanupElementOverlay();
     }
@@ -640,11 +646,19 @@ VkCommandBuffer VulkanRendererContext::beginOneTime() {
 }
 void VulkanRendererContext::endOneTime(VkCommandBuffer cb) {
     vk_.EndCommandBuffer(cb);
-    vk_.WaitForFences(device, 1, &oneTimeFence, VK_TRUE, UINT64_MAX);
+    VkResult fenceResult = vk_.WaitForFences(device, 1, &oneTimeFence, VK_TRUE, FENCE_TIMEOUT_NS);
+    if (fenceResult == VK_TIMEOUT) {
+        RLOG_E("FENCE TIMEOUT in endOneTime (pre-submit wait) - GPU may be hung, continuing");
+        gpuHangDetected.store(true);
+    }
     vk_.ResetFences(device, 1, &oneTimeFence);
     VkSubmitInfo si{}; si.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO; si.commandBufferCount=1; si.pCommandBuffers=&cb;
     vk_.QueueSubmit(graphicsQueue,1,&si,oneTimeFence);
-    vk_.WaitForFences(device,1,&oneTimeFence,VK_TRUE,UINT64_MAX);
+    fenceResult = vk_.WaitForFences(device,1,&oneTimeFence,VK_TRUE,FENCE_TIMEOUT_NS);
+    if (fenceResult == VK_TIMEOUT) {
+        RLOG_E("FENCE TIMEOUT in endOneTime (post-submit wait) - GPU may be hung, continuing");
+        gpuHangDetected.store(true);
+    }
     vk_.FreeCommandBuffers(device,cmdPool,1,&cb);
 }
 void VulkanRendererContext::transition(VkCommandBuffer cb, VkImage img,
@@ -1036,8 +1050,12 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
 }
 
 void VulkanRendererContext::renderLoop() {
-
     while (isRunning) {
+        if (gpuHangDetected.load()) {
+            RLOG_E("GPU hang detected, attempting recovery via swapchain recreation");
+            gpuHangDetected.store(false);
+            fbResized.store(true);
+        }
         { std::unique_lock<std::mutex> lk(dirtyMutex);
           dirtyCV.wait(lk,[this]{
               return !isRunning||vsyncSignaled.load()||
@@ -1058,7 +1076,11 @@ void VulkanRendererContext::onVsync() {
 void VulkanRendererContext::flushDeleteQueue() {
     if (deleteQueue.empty()) return;
     if (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, inFlightFences[currentFrame]) == VK_NOT_READY) {
-        vk_.WaitForFences(device,1,&inFlightFences[currentFrame],VK_TRUE,UINT64_MAX);
+        VkResult fenceResult = vk_.WaitForFences(device,1,&inFlightFences[currentFrame],VK_TRUE,FENCE_TIMEOUT_NS);
+        if (fenceResult == VK_TIMEOUT) {
+            RLOG_E("FENCE TIMEOUT in flushDeleteQueue - GPU may be hung, continuing cleanup");
+            gpuHangDetected.store(true);
+        }
     }
     for (auto& wt:deleteQueue) {
         if (!wt.isAHB) {
@@ -1087,8 +1109,6 @@ void VulkanRendererContext::renderFrame() {
 
             std::lock_guard<std::mutex> lk(renderMutex);
             renderList.clear();
-        } else {
-            return;
         }
     } else {
         scanoutBlackFrameDone.store(false);
@@ -1096,25 +1116,51 @@ void VulkanRendererContext::renderFrame() {
     if (surfaceWidth==0||surfaceHeight==0) return;
 
     if (fbResized.load()) {
-        for (auto& f:inFlightFences) vk_.WaitForFences(device,1,&f,VK_TRUE,UINT64_MAX);
+        for (auto& f:inFlightFences) {
+            VkResult fenceResult = vk_.WaitForFences(device,1,&f,VK_TRUE,FENCE_TIMEOUT_NS);
+            if (fenceResult == VK_TIMEOUT) {
+                RLOG_E("FENCE TIMEOUT in renderFrame (fbResized fence wait) - GPU may be hung");
+                gpuHangDetected.store(true);
+            }
+        }
         cleanupSwapchain();
+        for (auto& f:inFlightFences) vk_.DestroyFence(device,f,nullptr);
+        for (auto& s:imgAvailSems) vk_.DestroySemaphore(device,s,nullptr);
+        for (auto& s:renderDoneSems) vk_.DestroySemaphore(device,s,nullptr);
+        imgAvailSems.clear(); renderDoneSems.clear(); inFlightFences.clear();
+        createSyncObjects();
         bool ok=false;
         try{createSwapchain();createFramebuffers();createCmdBufs();imgInFlight.assign(swapchainImages.size(),VK_NULL_HANDLE);
 ok=true;}catch(...){}
         if (ok) fbResized.store(false);
+        if (scanoutActive.load()) {
+            flushDeleteQueue();
+        }
         return;
     }
 
     flushDeleteQueue();
+    if (scanoutActive.load()) return;
     if (currentFrame >= cmdBufs.size() || cmdBufs[currentFrame] == VK_NULL_HANDLE) return;
     bool currentFenceWaited = false;
     if (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, inFlightFences[currentFrame]) == VK_NOT_READY) {
-        vk_.WaitForFences(device,1,&inFlightFences[currentFrame],VK_TRUE,UINT64_MAX);
+        VkResult fenceResult = vk_.WaitForFences(device,1,&inFlightFences[currentFrame],VK_TRUE,FENCE_TIMEOUT_NS);
+        if (fenceResult == VK_TIMEOUT) {
+            RLOG_E("FENCE TIMEOUT in renderFrame (current frame fence) - GPU may be hung, triggering recreation");
+            gpuHangDetected.store(true);
+            fbResized.store(true);
+            return;
+        }
         currentFenceWaited = true;
     }
 
     uint32_t imgIdx;
-    VkResult res=vk_.AcquireNextImageKHR(device,swapchain,UINT64_MAX,imgAvailSems[currentFrame],VK_NULL_HANDLE,&imgIdx);
+    VkResult res=vk_.AcquireNextImageKHR(device,swapchain,5000000000ULL,imgAvailSems[currentFrame],VK_NULL_HANDLE,&imgIdx);
+    if (res==VK_TIMEOUT) {
+        RLOG_E("AcquireNextImageKHR TIMEOUT - triggering swapchain recreation");
+        fbResized.store(true);
+        return;
+    }
     if (res==VK_ERROR_OUT_OF_DATE_KHR||res==VK_ERROR_SURFACE_LOST_KHR){fbResized.store(true);return;}
     if (res!=VK_SUCCESS&&res!=VK_SUBOPTIMAL_KHR) return;
     if (imgIdx >= swapchainFBs.size() || imgIdx >= swapchainImages.size()) {
@@ -1127,7 +1173,13 @@ ok=true;}catch(...){}
     if (imgInFlight[imgIdx]!=VK_NULL_HANDLE &&
         (!currentFenceWaited || imgInFlight[imgIdx] != inFlightFences[currentFrame])) {
         if (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, imgInFlight[imgIdx]) == VK_NOT_READY) {
-            vk_.WaitForFences(device,1,&imgInFlight[imgIdx],VK_TRUE,UINT64_MAX);
+            VkResult fenceResult = vk_.WaitForFences(device,1,&imgInFlight[imgIdx],VK_TRUE,FENCE_TIMEOUT_NS);
+            if (fenceResult == VK_TIMEOUT) {
+                RLOG_E("FENCE TIMEOUT in renderFrame (imgInFlight fence) - GPU may be hung, triggering recreation");
+                gpuHangDetected.store(true);
+                fbResized.store(true);
+                return;
+            }
         }
     }
     imgInFlight[imgIdx]=inFlightFences[currentFrame];
@@ -1214,6 +1266,7 @@ void VulkanRendererContext::detachSurface() {
 
     { std::unique_lock<std::shared_mutex> frameLock(frameMutex); }
 
+    RLOG("detachSurface: waiting for device idle");
     vk_.DeviceWaitIdle(device);
     cleanupSwapchain();
     if (surface != VK_NULL_HANDLE) {
@@ -1459,6 +1512,7 @@ bool VulkanRendererContext::loadScanoutApi() {
 
 void VulkanRendererContext::initScanout() {
     if (scanoutActive.load()) return;
+    if (scanoutPendingRelease) { AHardwareBuffer_release(scanoutPendingRelease); scanoutPendingRelease = nullptr; }
     if (!window || !loadScanoutApi()) {
         SCANOUT_LOG("initScanout: loadApi failed, aborting");
         return;
@@ -1538,7 +1592,10 @@ void VulkanRendererContext::destroyScanout() {
         scanoutLocalAhb = nullptr;
     }
     if (scanoutBlitFence != VK_NULL_HANDLE) {
-        vk_.WaitForFences(device, 1, &scanoutBlitFence, VK_TRUE, UINT64_MAX);
+        VkResult fenceResult = vk_.WaitForFences(device, 1, &scanoutBlitFence, VK_TRUE, FENCE_TIMEOUT_NS);
+        if (fenceResult == VK_TIMEOUT) {
+            RLOG_E("FENCE TIMEOUT on scanoutBlitFence in destroyScanout - GPU hung, destroying fence anyway");
+        }
         vk_.DestroyFence(device, scanoutBlitFence, nullptr);
         scanoutBlitFence = VK_NULL_HANDLE;
     }
@@ -1632,6 +1689,7 @@ bool VulkanRendererContext::ensureScanoutLocalAhb(int w, int h, uint32_t ahbForm
     }
 
     if (scanoutLocalImg != VK_NULL_HANDLE) {
+        RLOG("ensureScanoutLocalAhb: waiting for device idle before cleanup");
         vk_.DeviceWaitIdle(device);
         vk_.DestroyImage(device, scanoutLocalImg, nullptr);
         scanoutLocalImg = VK_NULL_HANDLE;
@@ -1769,7 +1827,17 @@ void VulkanRendererContext::applyScanoutBuffer() {
 
             if (srcImg != VK_NULL_HANDLE && scanoutLocalImg != VK_NULL_HANDLE &&
                 scanoutBlitCb != VK_NULL_HANDLE && scanoutBlitFence != VK_NULL_HANDLE) {
-                vk_.WaitForFences(device, 1, &scanoutBlitFence, VK_TRUE, UINT64_MAX);
+                VkResult fenceResult = vk_.WaitForFences(device, 1, &scanoutBlitFence, VK_TRUE, FENCE_TIMEOUT_NS);
+                if (fenceResult == VK_TIMEOUT) {
+                    RLOG_E("FENCE TIMEOUT on scanoutBlitFence in applyScanoutBuffer - GPU may be hung");
+                    gpuHangDetected.store(true);
+                    fbResized.store(true);
+                    return;
+                }
+                if (scanoutPendingRelease != nullptr) {
+                    AHardwareBuffer_release(scanoutPendingRelease);
+                    scanoutPendingRelease = nullptr;
+                }
                 vk_.ResetFences(device, 1, &scanoutBlitFence);
                 vk_.ResetCommandBuffer(scanoutBlitCb, 0);
 
@@ -1779,9 +1847,9 @@ void VulkanRendererContext::applyScanoutBuffer() {
                 vk_.BeginCommandBuffer(scanoutBlitCb, &bi);
 
                 transition(scanoutBlitCb, srcImg,
-                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    0, VK_ACCESS_TRANSFER_READ_BIT,
-                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
                 transition(scanoutBlitCb, scanoutLocalImg,
                     VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                     0, VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -1801,7 +1869,11 @@ void VulkanRendererContext::applyScanoutBuffer() {
                 si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
                 si.commandBufferCount = 1;
                 si.pCommandBuffers = &scanoutBlitCb;
-                vk_.QueueSubmit(graphicsQueue, 1, &si, scanoutBlitFence);
+                if (vk_.QueueSubmit(graphicsQueue, 1, &si, scanoutBlitFence) != VK_SUCCESS) {
+                    RLOG_E("scanout blit QueueSubmit failed");
+                    vk_.ResetFences(device, 1, &scanoutBlitFence);
+                    return;
+                }
                 presentAhb = scanoutLocalAhb;
             }
         }
@@ -1815,7 +1887,11 @@ void VulkanRendererContext::applyScanoutBuffer() {
     ST_APPLY(t);
     gameFrameDelivered.store(true);
     ST_DELETE(t);
-    AHardwareBuffer_release(ahb);
+    if (presentAhb == ahb) {
+        AHardwareBuffer_release(ahb);
+    } else {
+        scanoutPendingRelease = ahb;
+    }
 }
 
 void VulkanRendererContext::scanoutSetDst(int x, int y, int w, int h) {
@@ -1925,6 +2001,7 @@ void VulkanRendererContext::setFilterMode(int mode) {
         filterMode==2?(cubicSupported?"CUBIC":"LINEAR"):filterMode==1?"NEAREST":"LINEAR", mode==2?(cubicSupported?"CUBIC":"LINEAR"):mode==1?"NEAREST":"LINEAR");
     if (filterMode==mode) { RLOG("setFilterMode: already set, skipping"); return; }
     filterMode=mode;
+    RLOG("setFilterMode: waiting for device idle before sampler recreation");
     vk_.DeviceWaitIdle(device);
     if (sampler!=VK_NULL_HANDLE){vk_.DestroySampler(device,sampler,nullptr);sampler=VK_NULL_HANDLE;}
     createSampler();

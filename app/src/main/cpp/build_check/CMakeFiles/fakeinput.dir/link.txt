@@ -1,0 +1,1 @@
+/usr/bin/g++ -fPIC  -O3 -fomit-frame-pointer -Wno-unused-function -Wimplicit-function-declaration -shared -Wl,-soname,libfakeinput.so -o libfakeinput.so CMakeFiles/fakeinput.dir/winlator/fakeinput.cpp.o  -llog -ldl 

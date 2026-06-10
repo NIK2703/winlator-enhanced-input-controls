@@ -37,11 +37,5 @@ void element_dpad_move(TouchElement* e, float x, float y, uint64_t time_ms, Touc
 void element_dpad_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     (void)x; (void)y; (void)time_ms;
     if (!e->cached_has_any_binding) return;
-    for (int i = 0; i < 4; i++) {
-        if (__builtin_expect(e->petal_active[i], 0)) {
-            e->petal_active[i] = false;
-            if (e->bindings[i].type != BINDING_NONE && !(e->primary_sticky_mask & (1 << i)))
-                release_binding(result, &e->bindings[i]);
-        }
-    }
+    release_element_petals(e, result);
 }

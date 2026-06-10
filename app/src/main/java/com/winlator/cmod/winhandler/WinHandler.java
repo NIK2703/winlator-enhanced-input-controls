@@ -60,6 +60,14 @@ public class WinHandler {
     private final DatagramPacket receivePacket = new DatagramPacket(receiveData.array(), 64);
     private final ArrayDeque<Runnable> actions = new ArrayDeque<>();
     private volatile boolean initReceived = false;
+    private volatile boolean wineKeepaliveReceived = false;
+    private volatile boolean wineKeepaliveFailed = false;
+    private long lastKeepaliveTime = 0;
+    private long startTime = 0;
+    private static final long KEEPALIVE_TIMEOUT_MS = 10000;
+    private static final long KEEPALIVE_INTERVAL_MS = 3000;
+    private Handler keepaliveHandler;
+    private Runnable keepaliveRunnable;
     private boolean running = false;
     private OnGetProcessInfoListener onGetProcessInfoListener;
     private final Map<Integer, ExternalController> controllers = new ConcurrentHashMap<>(); // map deviceId -> controller
@@ -327,12 +335,19 @@ public class WinHandler {
 
     private void startSendThread() {
         Executors.newSingleThreadExecutor().execute(() -> {
+            long initWaitStart = System.currentTimeMillis();
             while (running) {
                 synchronized (actions) {
                     while (initReceived && !actions.isEmpty())
                         actions.poll().run();
+                    if (!initReceived) {
+                        long elapsed = System.currentTimeMillis() - initWaitStart;
+                        if (elapsed > 15000 && elapsed < 16000) {
+                            android.util.Log.w(TAG, "Still waiting for wine INIT after 15s - wine may have crashed");
+                        }
+                    }
                     try {
-                        actions.wait();
+                        actions.wait(1000);
                     } catch (InterruptedException e) {
                     }
                 }
@@ -340,8 +355,46 @@ public class WinHandler {
         });
     }
 
+    private void startKeepaliveMonitor() {
+        keepaliveHandler = new Handler(android.os.Looper.getMainLooper());
+        keepaliveRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!running) return;
+                if (initReceived) {
+                    long now = System.currentTimeMillis();
+                    if (now - lastKeepaliveTime > KEEPALIVE_TIMEOUT_MS) {
+                        if (!wineKeepaliveFailed) {
+                            wineKeepaliveFailed = true;
+                            Log.w(TAG, "Wine keepalive timeout - no response for " + KEEPALIVE_TIMEOUT_MS + "ms");
+                            if (activity != null) {
+                                activity.runOnUiThread(() -> {
+                                    activity.onWineKeepaliveTimeout();
+                                });
+                            }
+                        }
+                    } else {
+                        wineKeepaliveFailed = false;
+                    }
+                }
+                keepaliveHandler.postDelayed(this, KEEPALIVE_INTERVAL_MS);
+            }
+        };
+        keepaliveHandler.postDelayed(keepaliveRunnable, KEEPALIVE_INTERVAL_MS);
+    }
+
+    private void stopKeepaliveMonitor() {
+        if (keepaliveHandler != null && keepaliveRunnable != null) {
+            keepaliveHandler.removeCallbacks(keepaliveRunnable);
+        }
+        initReceived = false;
+        wineKeepaliveReceived = false;
+        wineKeepaliveFailed = false;
+    }
+
     public void stop() {
         running = false;
+        stopKeepaliveMonitor();
         closeFakeInputWriter();
 
         if (socket != null) {
@@ -466,6 +519,8 @@ public class WinHandler {
         switch (requestCode) {
             case RequestCodes.INIT: {
                 initReceived = true;
+                wineKeepaliveReceived = true;
+                lastKeepaliveTime = System.currentTimeMillis();
 
                 preferences = PreferenceManager.getDefaultSharedPreferences(activity.getBaseContext());
 
@@ -507,6 +562,8 @@ public class WinHandler {
                 break;
             }
             case RequestCodes.CURSOR_POS_FEEDBACK: {
+                wineKeepaliveReceived = true;
+                lastKeepaliveTime = System.currentTimeMillis();
                 short x = receiveData.getShort();
                 short y = receiveData.getShort();
                 XServer xServer = activity.getXServer();
@@ -534,7 +591,9 @@ public class WinHandler {
         }
 
         running = true;
+        startTime = System.currentTimeMillis();
         startSendThread();
+        startKeepaliveMonitor();
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 socket = new DatagramSocket(null);

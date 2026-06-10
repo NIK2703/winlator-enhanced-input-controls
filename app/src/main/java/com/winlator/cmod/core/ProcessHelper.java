@@ -17,12 +17,14 @@ import java.util.List;
 import java.util.concurrent.Executors;
 
 public abstract class ProcessHelper {
-    public static final boolean PRINT_DEBUG = true; // FIXME change to false
+    public static final boolean PRINT_DEBUG = false;
     private static final ArrayList<Callback<String>> debugCallbacks = new ArrayList<>();
     private static final byte SIGCONT = 18;
     private static final byte SIGSTOP = 19;
     private static final byte SIGTERM = 15;
     private static final byte SIGKILL = 9;
+    private static final String[] WINE_FILTERS = {"wine", "wine64", "wine-preloader", "wineserver", "box64", "FEXCore"};
+    private static final java.util.HashSet<Integer> stoppedPids = new java.util.HashSet<>();
 
     public static void suspendProcess(int pid) {
         Process.sendSignal(pid, SIGSTOP);
@@ -48,13 +50,22 @@ public abstract class ProcessHelper {
 
     public static void pauseAllWineProcesses() {
         for (String process : listRunningWineProcesses()) {
-            suspendProcess(Integer.parseInt(process));
+            int pid = Integer.parseInt(process);
+            synchronized (stoppedPids) {
+                if (!stoppedPids.contains(pid)) {
+                    suspendProcess(pid);
+                    stoppedPids.add(pid);
+                }
+            }
         }
     }
 
     public static void resumeAllWineProcesses() {
-        for (String process : listRunningWineProcesses()) {
-            resumeProcess(Integer.parseInt(process));
+        synchronized (stoppedPids) {
+            for (int pid : stoppedPids) {
+                resumeProcess(pid);
+            }
+            stoppedPids.clear();
         }
     }
 
@@ -247,15 +258,14 @@ public abstract class ProcessHelper {
 
     public static ArrayList<String> listRunningWineProcesses(){
         File proc = new File("/proc");
-        String[] filters = {"wine", "exe"};
         String[] allPids;
         ArrayList<String> filteredPids = new ArrayList<String>();
-        List<String> filterList = Arrays.asList(filters);
         allPids = proc.list(new FilenameFilter(){
             public boolean accept(File proc, String filename){
                 return new File(proc, filename).isDirectory() && filename.matches("[0-9]+");
             }
         });
+        if (allPids == null) return filteredPids;
 
         for (int index = 0; index < allPids.length; index++){
             String data = "";
@@ -263,11 +273,18 @@ public abstract class ProcessHelper {
                 FileInputStream fr = new FileInputStream(proc + "/" + allPids[index] + "/stat");
                 BufferedReader br = new BufferedReader(new InputStreamReader(fr));
                 data = br.readLine();
-            }
-            catch (IOException e) {}
-            for (String filter : filterList) {
-                if (data.contains(filter))
+                br.close();
+            } catch (IOException e) { continue; }
+            // Extract comm field: everything between first '(' and last ')'
+            int commStart = data.indexOf('(');
+            int commEnd = data.lastIndexOf(')');
+            if (commStart < 0 || commEnd <= commStart) continue;
+            String comm = data.substring(commStart + 1, commEnd);
+            for (String filter : WINE_FILTERS) {
+                if (comm.contains(filter)) {
                     filteredPids.add(allPids[index]);
+                    break;
+                }
             }
         }
         return filteredPids;

@@ -173,21 +173,11 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     e->visual_x = x;
     e->visual_y = y;
     mark_element_dirty(e);
-    e->gesture_swipe_triggered = false;
-    e->gesture_long_press_triggered = false;
-    e->long_press_arm = false;
-    e->gesture_timer_armed = false;
+    clear_element_gesture_flags(e, false);
     e->gesture_suppressed = false;
-    // Clear gesture/lp toggle flags on each new touch to prevent stale bindings
-    // from previous touches persisting. Release any bindings that are still held.
-    if (e->gesture_toggled) {
-        release_bindings_list(result, e->element_gesture, e->element_gesture_count);
-        e->gesture_toggled = false;
-    }
-    if (e->lp_toggled) {
-        release_bindings_list(result, e->element_long_press, e->element_long_press_count);
-        e->lp_toggled = false;
-    }
+    // NOTE: gesture_toggled/lp_toggled are NOT cleared here — toggle switches
+    // persist across touches. Deactivation happens only on re-activation of
+    // the same gesture (LP/swipe) via the timer/move handlers.
 
     element_down_table[e->type](e, ptr_id, x, y, time_ms, result);
 
@@ -200,6 +190,113 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
             f->engaged_elem_count = cnt + 1;
         }
     }
+}
+
+void release_non_toggle_gestures(TouchElement* e, TouchActionResult* restrict result) {
+    if (__builtin_expect(e->gesture_swipe_triggered, 0) && !e->gesture_toggled)
+        release_bindings_list(result, e->element_gesture, e->element_gesture_count);
+    if (__builtin_expect(e->gesture_long_press_triggered, 0) && !e->lp_toggled)
+        release_bindings_list(result, e->element_long_press, e->element_long_press_count);
+}
+
+void toggle_alternate_bindings(TouchElement* e, bool* toggled_flag, bool has_toggle_cache,
+                               TouchBinding* bindings, int count, bool has_primary,
+                               TouchActionResult* restrict result)
+{
+    if (*toggled_flag) {
+        release_bindings_list(result, bindings, count);
+        *toggled_flag = false;
+        if (e->defer_primary && has_primary && !e->cached_has_toggle)
+            release_binding(result, &e->bindings[0]);
+    } else {
+        press_bindings_list(result, bindings, count);
+        if (has_toggle_cache) *toggled_flag = true;
+        if (e->defer_primary && has_primary && !e->cached_has_toggle)
+            press_binding(result, &e->bindings[0], true);
+    }
+}
+
+void clear_element_gesture_flags(TouchElement* e, bool set_suppressed) {
+    e->long_press_arm = false;
+    e->gesture_long_press_triggered = false;
+    e->gesture_swipe_triggered = false;
+    e->gesture_timer_armed = false;
+    e->visual_long_press_active = false;
+    if (set_suppressed) e->gesture_suppressed = true;
+}
+
+void release_toggled_alternate_bindings(TouchElement* e, TouchActionResult* restrict result, bool check_triggered) {
+    if ((!check_triggered || !e->gesture_swipe_triggered) && e->gesture_toggled) {
+        release_bindings_list(result, e->element_gesture, e->element_gesture_count);
+        e->gesture_toggled = false;
+    }
+    if ((!check_triggered || !e->gesture_long_press_triggered) && e->lp_toggled) {
+        release_bindings_list(result, e->element_long_press, e->element_long_press_count);
+        e->lp_toggled = false;
+    }
+}
+
+void release_element_petals(TouchElement* e, TouchActionResult* restrict result) {
+    for (int i = 0; i < 4; i++) {
+        if (__builtin_expect(e->petal_active[i], 0)) {
+            e->petal_active[i] = false;
+            if (e->bindings[i].type != BINDING_NONE && !(e->primary_sticky_mask & (1 << i)))
+                release_binding(result, &e->bindings[i]);
+        }
+    }
+}
+
+void button_auto_repeat_move(TouchElement* e, bool inside, uint64_t time_ms, TouchActionResult* restrict result) {
+    if (!inside && e->auto_repeat_primary_pressed) {
+        if (e->bindings[0].type != BINDING_NONE)
+            release_binding(result, &e->bindings[0]);
+        e->auto_repeat_primary_pressed = false;
+    } else if (inside && !e->auto_repeat_primary_pressed) {
+        if (e->bindings[0].type != BINDING_NONE) {
+            press_binding(result, &e->bindings[0], true);
+            e->auto_repeat_primary_pressed = true;
+        }
+        e->auto_repeat_last_time = time_ms;
+    }
+}
+
+void force_release_element_toggles(TouchElement* e, TouchActionResult* restrict result) {
+    if (e->selected) {
+        for (int k = 0; k < 4; k++) {
+            if (e->bindings[k].type != BINDING_NONE)
+                release_binding(result, &e->bindings[k]);
+        }
+        e->selected = false;
+        e->visual_active = false;
+        mark_element_dirty(e);
+    }
+    if (e->gesture_toggled) {
+        release_bindings_list(result, e->element_gesture, e->element_gesture_count);
+        e->gesture_toggled = false;
+    }
+    if (e->lp_toggled) {
+        release_bindings_list(result, e->element_long_press, e->element_long_press_count);
+        e->lp_toggled = false;
+    }
+}
+
+bool finger_remove_engaged(TouchFinger* f, int16_t elem_idx) {
+    for (uint8_t i = 0; i < f->engaged_elem_count; i++) {
+        if (f->engaged_elem_indices[i] == elem_idx) {
+            f->engaged_elem_indices[i] = f->engaged_elem_indices[--f->engaged_elem_count];
+            return true;
+        }
+    }
+    return false;
+}
+
+TrackedButtons* get_tracked_buttons(int ptr_id) {
+    TrackedButtons* tb = &g_state.tracked[(uint32_t)ptr_id % MAX_FINGERS];
+    if (__builtin_expect(tb->ptr_id != ptr_id, 0)) {
+        tb->count = 0;
+        tb->ptr_id = ptr_id;
+    }
+    return tb;
 }
 
 void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
@@ -235,53 +332,31 @@ void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     // (e.g., toggle buttons that stay selected) without clearing these,
     // leaving gesture bindings pressed forever and breaking future gesture
     // detection on subsequent finger-downs.
-    if (e->gesture_swipe_triggered) {
-        if (!e->gesture_toggled)
-            release_bindings_list(result, e->element_gesture, e->element_gesture_count);
-        e->gesture_swipe_triggered = false;
-    }
-    if (e->gesture_long_press_triggered) {
-        if (!e->lp_toggled)
-            release_bindings_list(result, e->element_long_press, e->element_long_press_count);
-        e->gesture_long_press_triggered = false;
-    }
+    release_non_toggle_gestures(e, result);
+    e->gesture_timer_armed = false;
+    e->gesture_swipe_triggered = false;
+    e->gesture_long_press_triggered = false;
     if (release_ptr_id >= 0) {
         TouchFinger* f = find_finger(release_ptr_id);
-        if (__builtin_expect(f != NULL, 1)) {
-            int16_t idx = (int16_t)(e - g_state.elements);
-            uint8_t cnt = f->engaged_elem_count;
-            for (uint8_t i = 0; i < cnt; i++) {
-                if (f->engaged_elem_indices[i] == idx) {
-                    f->engaged_elem_indices[i] = f->engaged_elem_indices[cnt - 1];
-                    f->engaged_elem_count = cnt - 1;
-                    break;
-                }
-            }
-        }
+        if (__builtin_expect(f != NULL, 1))
+            finger_remove_engaged(f, (int16_t)(e - g_state.elements));
     }
 }
 
 void suppress_element_gestures(TouchElement* e, TouchActionResult* restrict result) {
     if (e->long_press_arm && e->bindings[0].type != BINDING_NONE)
         press_binding(result, &e->bindings[0], true);
-    if (e->lp_toggled) {
-        release_bindings_list(result, e->element_long_press, e->element_long_press_count);
-        e->lp_toggled = false;
-    } else if (e->gesture_long_press_triggered) {
+    // Toggle state (lp_toggled/gesture_toggled) persists across touches and
+    // slide-overs. Do NOT release toggle bindings or clear these flags here —
+    // they are only cleared by the toggle's own LP/gesture alternation or
+    // element_button_down's explicit deselect path.
+    if (!e->lp_toggled && e->gesture_long_press_triggered) {
         release_bindings_list(result, e->element_long_press, e->element_long_press_count);
     }
-    if (e->gesture_toggled) {
-        release_bindings_list(result, e->element_gesture, e->element_gesture_count);
-        e->gesture_toggled = false;
-    } else if (e->gesture_swipe_triggered) {
+    if (!e->gesture_toggled && e->gesture_swipe_triggered) {
         release_bindings_list(result, e->element_gesture, e->element_gesture_count);
     }
-    e->long_press_arm = false;
-    e->gesture_long_press_triggered = false;
-    e->gesture_swipe_triggered = false;
-    e->gesture_timer_armed = false;
-    e->visual_long_press_active = false;
-    e->gesture_suppressed = true;
+    clear_element_gesture_flags(e, true);
 }
 
 void release_element_bindings(TouchElement* e, TouchActionResult* restrict result, bool release_gestures) {
@@ -291,15 +366,8 @@ void release_element_bindings(TouchElement* e, TouchActionResult* restrict resul
         && !((e->bindings[0].toggle || e->cached_has_toggle) && e->selected))
         release_binding(result, &e->bindings[0]);
     if (release_gestures) {
-        if (__builtin_expect(e->gesture_swipe_triggered, 0) && !e->gesture_toggled)
-            release_bindings_list(result, e->element_gesture, e->element_gesture_count);
-        if (__builtin_expect(e->gesture_long_press_triggered, 0) && !e->lp_toggled)
-            release_bindings_list(result, e->element_long_press, e->element_long_press_count);
-        e->long_press_arm = false;
-        e->gesture_long_press_triggered = false;
-        e->gesture_swipe_triggered = false;
-        e->gesture_timer_armed = false;
-        e->visual_long_press_active = false;
+        release_non_toggle_gestures(e, result);
+        clear_element_gesture_flags(e, false);
     } else {
         e->long_press_arm = false;
         e->gesture_timer_armed = false;

@@ -1,0 +1,2 @@
+/usr/bin/ar qc libadrenotools.a CMakeFiles/adrenotools.dir/src/bcenabler.cpp.o CMakeFiles/adrenotools.dir/src/driver.cpp.o
+/usr/bin/ranlib libadrenotools.a

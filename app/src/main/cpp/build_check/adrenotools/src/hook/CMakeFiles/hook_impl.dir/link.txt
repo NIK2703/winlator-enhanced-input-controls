@@ -1,0 +1,1 @@
+/usr/bin/g++ -fPIC  -O3 -fomit-frame-pointer -Wno-unused-function -Wimplicit-function-declaration -shared -Wl,-soname,libhook_impl.so -o libhook_impl.so CMakeFiles/hook_impl.dir/hook_impl.cpp.o  ../../lib/linkernsbypass/liblinkernsbypass.a -llog -landroid -ldl 

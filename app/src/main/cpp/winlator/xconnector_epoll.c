@@ -10,6 +10,8 @@
 #include <malloc.h>
 #include <jni.h>
 #include <android/log.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #define printf(...) __android_log_print(ANDROID_LOG_DEBUG, "System.out", __VA_ARGS__);
 #define MAX_EVENTS 10
@@ -112,10 +114,23 @@ Java_com_winlator_cmod_xconnector_ClientSocket_read(JNIEnv *env, jobject obj, ji
 }
 
 JNIEXPORT jint JNICALL
-Java_com_winlator_cmod_xconnector_ClientSocket_write(JNIEnv *env, jobject obj, jint fd, jobject data,
-                                                jint length) {
+Java_com_winlator_cmod_xconnector_ClientSocket_setNonBlocking(JNIEnv *env, jclass clazz, jint fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) return -1;
+    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_winlator_cmod_xconnector_ClientSocket_write(JNIEnv *env, jclass clazz, jint fd, jobject data,
+                                                jint offset, jint length) {
     char *dataAddr = (*env)->GetDirectBufferAddress(env, data);
-    return write(fd, dataAddr, length);
+    if (dataAddr == NULL) return -1;
+    ssize_t result = write(fd, dataAddr + offset, length);
+    if (result < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
+        return -1;
+    }
+    return (jint)result;
 }
 
 JNIEXPORT jint JNICALL

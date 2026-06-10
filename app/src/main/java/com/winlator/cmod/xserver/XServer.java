@@ -17,7 +17,9 @@ import com.winlator.cmod.xserver.extensions.SyncExtension;
 import com.winlator.cmod.xserver.extensions.XInput2Extension;
 
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class XServer {
@@ -114,6 +116,13 @@ public class XServer {
             lock.lock();
         }
 
+        private SingleXLock(Lockable lockable, boolean alreadyLocked) {
+            this.lock = locks.get(lockable);
+            if (!alreadyLocked) {
+                lock.lock();
+            }
+        }
+
         @Override
         public void close() {
             lock.unlock();
@@ -126,6 +135,13 @@ public class XServer {
         private MultiXLock(Lockable[] lockables) {
             this.lockables = lockables;
             for (Lockable lockable : lockables) locks.get(lockable).lock();
+        }
+
+        private MultiXLock(Lockable[] lockables, boolean alreadyLocked) {
+            this.lockables = lockables;
+            if (!alreadyLocked) {
+                for (Lockable lockable : lockables) locks.get(lockable).lock();
+            }
         }
 
         @Override
@@ -145,7 +161,45 @@ public class XServer {
     }
 
     public XLock lockAll() {
-        return new MultiXLock(Lockable.values());
+        Lockable[] all = Lockable.values();
+        return new MultiXLock(all);
+    }
+
+    public XLock tryLock(long timeoutMs, Lockable... lockables) {
+        Lockable[] sorted = lockables.clone();
+        Arrays.sort(sorted);
+        try {
+            for (Lockable lockable : sorted) {
+                if (!locks.get(lockable).tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
+                    for (int i = 0; i < sorted.length; i++) {
+                        if (sorted[i] == lockable) break;
+                        locks.get(sorted[i]).unlock();
+                    }
+                    return null;
+                }
+            }
+            return new MultiXLock(sorted, true);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            for (Lockable l : sorted) {
+                if (locks.get(l).isHeldByCurrentThread()) {
+                    locks.get(l).unlock();
+                }
+            }
+            return null;
+        }
+    }
+
+    public XLock tryLock(long timeoutMs, Lockable lockable) {
+        try {
+            if (locks.get(lockable).tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
+                return new SingleXLock(lockable, true);
+            }
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
     }
 
     public Extension getExtensionByName(String name) {

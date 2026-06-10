@@ -43,6 +43,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.concurrent.TimeUnit;
 
 public class GuestProgramLauncherComponent extends EnvironmentComponent {
     private String guestExecutable;
@@ -144,7 +145,10 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 extractEmulatorsDlls();
             else
                 extractBox64Files();
-            checkDependencies();
+        }
+        // Don't hold lock during dependency checking - it blocks the UI thread
+        checkDependencies();
+        synchronized (lock) {
             pid = execGuestProgram();
         }
     }
@@ -161,6 +165,14 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
 
+            // Wait with timeout
+            boolean exited = process.waitFor(5, TimeUnit.SECONDS);
+            if (!exited) {
+                process.destroyForcibly();
+                output.append("Timed out waiting for ldd\n");
+                return output.toString();
+            }
+
             String line;
             while ((line = reader.readLine()) != null) {
                 output.append(line).append("\n");
@@ -168,8 +180,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             while ((line = errorReader.readLine()) != null) {
                 output.append(line).append("\n");
             }
-
-            process.waitFor();
         } catch (Exception e) {
             output.append("Error running ldd: ").append(e.getMessage());
         }
@@ -180,11 +190,13 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
     @Override
     public void stop() {
+        int currentPid;
         synchronized (lock) {
-            if (pid != -1) {
-                Process.killProcess(pid);
-                pid = -1;
-            }
+            currentPid = pid;
+            pid = -1;
+        }
+        if (currentPid != -1) {
+            ProcessHelper.killProcess(currentPid);
         }
     }
 
@@ -406,14 +418,18 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     }
 
     public void suspendProcess() {
+        int currentPid;
         synchronized (lock) {
-            if (pid != -1) ProcessHelper.suspendProcess(pid);
+            currentPid = pid;
         }
+        if (currentPid != -1) ProcessHelper.suspendProcess(currentPid);
     }
 
     public void resumeProcess() {
+        int currentPid;
         synchronized (lock) {
-            if (pid != -1) ProcessHelper.resumeProcess(pid);
+            currentPid = pid;
         }
+        if (currentPid != -1) ProcessHelper.resumeProcess(currentPid);
     }
 }
