@@ -436,7 +436,7 @@ int detect_swipe_dir(float dx, float dy, float threshold);
 bool is_mouse_move_binding(const TouchBinding* b);
 float cubic_bezier_interpolate_trackpad(float x);
 void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, TouchActionResult* restrict result);
-void release_element_bindings(TouchElement* e, TouchActionResult* restrict result);
+void release_element_bindings(TouchElement* e, TouchActionResult* restrict result, bool release_gestures);
 void suppress_element_gestures(TouchElement* e, TouchActionResult* restrict result);
 
 // Element dispatchers

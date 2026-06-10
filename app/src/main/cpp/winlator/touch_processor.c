@@ -64,6 +64,19 @@ void touch_processor_update_config(const TouchProcessorConfig* config) {
 void touch_processor_set_elements(const TouchElement* elements, int count) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "touch_processor_set_elements: count=%d", count);
     int n = count < MAX_ELEMENTS ? count : MAX_ELEMENTS;
+
+    // Save toggle state across set_elements to preserve active toggles on config change
+    int old_count = g_state.element_count;
+    bool saved_selected[MAX_ELEMENTS];
+    bool saved_gesture_toggled[MAX_ELEMENTS];
+    bool saved_lp_toggled[MAX_ELEMENTS];
+    int save_n = old_count < n ? old_count : n;
+    for (int i = 0; i < save_n; i++) {
+        saved_selected[i] = g_state.elements[i].selected;
+        saved_gesture_toggled[i] = g_state.elements[i].gesture_toggled;
+        saved_lp_toggled[i] = g_state.elements[i].lp_toggled;
+    }
+
     memcpy(g_state.elements, elements, n * sizeof(TouchElement));
     g_state.element_count = n;
     g_state.button_count = 0;
@@ -113,6 +126,10 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
         e->cached_has_auto_repeat = element_has_auto_repeat(e);
         if (e->cached_has_auto_repeat)
             g_state.cfg.caps_has_auto_repeat_buttons = true;
+        TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "set_elem[%d] type=%d b0.type=%d b0.tog=%d b0.ar=%d caps_tog=%d caps_ar=%d",
+            i, e->type, e->bindings[0].type,
+            e->bindings[0].toggle, e->bindings[0].auto_repeat,
+            g_state.cfg.caps_has_element_toggle, g_state.cfg.caps_has_auto_repeat_buttons);
         if (e->bindings[0].type == BINDING_MOUSE_LEFT)
             g_state.cfg.caps_has_mouse_left_element = true;
         if (e->passthrough_touch)
@@ -158,6 +175,14 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
             if (e->range_orientation == 1) { float _t = e->cached_range_cw; e->cached_range_cw = e->cached_range_ch; e->cached_range_ch = _t; }
             int rbc = e->range_binding_count > 0 ? e->range_binding_count : 1;
             e->cached_range_element_size = (e->range_orientation == 0 ? e->cached_range_cw * 2.0f : e->cached_range_ch * 2.0f) / (float)rbc;
+        }
+    }
+    // Restore toggle state for elements that existed before the update
+    for (int i = 0; i < save_n; i++) {
+        if (g_state.elements[i].cached_has_toggle) {
+            g_state.elements[i].selected = saved_selected[i];
+            g_state.elements[i].gesture_toggled = saved_gesture_toggled[i];
+            g_state.elements[i].lp_toggled = saved_lp_toggled[i];
         }
     }
     mark_all_dirty();
@@ -305,7 +330,7 @@ void touch_processor_on_finger_cancel(int ptr_id) {
             int idx = tb->element_indices[j];
             if (idx >= 0 && idx < g_state.element_count) {
                 TouchElement* e = &g_state.elements[idx];
-                release_element_bindings(e, &cancel_result);
+                release_element_bindings(e, &cancel_result, true);
                 // release_element_bindings preserves toggle bindings when selected=true.
                 // On cancel we must force-release everything to avoid stuck keys.
                 if (e->selected) {
@@ -340,7 +365,7 @@ void touch_processor_on_finger_cancel(int ptr_id) {
     // Release any engaged elements not in tracked list
     for (int i = 0; i < g_state.element_count; i++) {
         if (g_state.elements[i].current_ptr_id == ptr_id) {
-            release_element_bindings(&g_state.elements[i], &cancel_result);
+            release_element_bindings(&g_state.elements[i], &cancel_result, true);
             TouchElement* e = &g_state.elements[i];
             if (e->selected) {
                 for (int k = 0; k < 4; k++) {
@@ -462,6 +487,8 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
     int* button_indices = g_state.button_indices;
     uint32_t lp_delay_ms = g_state.cfg.long_press_delay_ms;
     bool has_auto_repeat_buttons = g_state.cfg.caps_has_auto_repeat_buttons;
+    TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "tick: has_ar=%d btn_cnt=%d elem_cnt=%d",
+        has_auto_repeat_buttons, button_count, g_state.element_count);
     bool has_any_element_long_press = g_state.cfg.caps_has_any_element_long_press;
     bool has_any_element_gesture = g_state.cfg.caps_has_any_element_gesture;
     for (int _bi = 0; _bi < button_count; _bi++) {
@@ -474,11 +501,15 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
 
         if (__builtin_expect(e->engaged && e->current_ptr_id < 0, 0)) {
             e->engaged = false;
-            e->visual_active = false;
+            if (!element_is_toggle_active(e))
+                e->visual_active = false;
             mark_element_dirty(e);
         }
 
-        if (has_auto_repeat_buttons) {
+        // Defensive: also check per-element — global flag can be stale after
+        // touch_processor_reset saves/restores elements but caps_has_auto_repeat_buttons
+        // is a separate field that is restored correctly via saved_cfg.
+        if (has_auto_repeat_buttons || e->cached_has_auto_repeat) {
         // Auto-repeat: burst all bindings (toggle) or alternate primary (non-toggle)
         if (e->cached_has_auto_repeat && (e->cached_has_toggle ? e->selected : (e->current_ptr_id >= 0 && e->engaged))) {
             if (e->cached_has_toggle && e->selected) {
@@ -490,14 +521,24 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
                     // Burst all toggle and non-toggle auto_repeat bindings at element level.
                     // Non-toggle AR bindings are no longer added to gesture_held_actions
                     // by the select path — they're owned entirely by the element layer.
+                    TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick burst elem=%d sel=%d int=%dms t0=%llu now=%llu bcnt=%d",
+                        (int)(e - g_state.elements), e->selected, interval_ms,
+                        (unsigned long long)e->auto_repeat_last_time, (unsigned long long)time_ms,
+                        (e->bindings[0].auto_repeat?1:0)+(e->bindings[1].auto_repeat?1:0)+(e->bindings[2].auto_repeat?1:0)+(e->bindings[3].auto_repeat?1:0));
                     for (int k = 0; k < 4; k++) {
                         TouchBinding* tb = &e->bindings[k];
                         if (tb->type == BINDING_NONE) continue;
                         if (!tb->auto_repeat) continue;
+                        TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick burst[%d] type=%d key=%d ar=%d tog=%d",
+                            k, tb->type, tb->keycode, tb->auto_repeat, tb->toggle);
                         release_binding(&result, tb);
                         press_binding(&result, tb, true);
                     }
                     e->auto_repeat_last_time = time_ms;
+                } else {
+                    TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "tick burst WAIT elem=%d elapsed=%llu need=%d",
+                        (int)(e - g_state.elements),
+                        (unsigned long long)(time_ms - e->auto_repeat_last_time), interval_ms);
                 }
             } else {
                 // Non-toggle auto-repeat: alternate press/release of primary binding
@@ -692,8 +733,26 @@ void touch_processor_reset(void) {
     g_state.scroll_accum_y = 0;
     g_state.gesture_toggled_count = 0;
 
+    // Save toggle state across reset so activation_reset can preserve visual_active
+    bool saved_selected[MAX_ELEMENTS];
+    bool saved_gesture_toggled[MAX_ELEMENTS];
+    bool saved_lp_toggled[MAX_ELEMENTS];
+    for (int i = 0; i < g_state.element_count; i++) {
+        saved_selected[i] = g_state.elements[i].selected;
+        saved_gesture_toggled[i] = g_state.elements[i].gesture_toggled;
+        saved_lp_toggled[i] = g_state.elements[i].lp_toggled;
+    }
+
     for (int i = 0; i < g_state.element_count; i++)
         element_reset_runtime(&g_state.elements[i]);
+
+    // Restore toggle state
+    for (int i = 0; i < g_state.element_count; i++) {
+        g_state.elements[i].selected = saved_selected[i];
+        g_state.elements[i].gesture_toggled = saved_gesture_toggled[i];
+        g_state.elements[i].lp_toggled = saved_lp_toggled[i];
+    }
+
     mark_all_dirty();
     build_spatial_grid();
     activation_reset();

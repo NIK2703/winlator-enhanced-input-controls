@@ -515,7 +515,21 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                     TouchElement* prev = &g_state.elements[prev_idx];
                     if (prev->cached_has_toggle)
                         prev->gesture_timer_armed = false;
-                    release_element_bindings(prev, result);
+                    release_element_bindings(prev, result, false);
+                    // HOVER concept: release gesture bindings on finger leave
+                    if (prev->gesture_swipe_triggered && !prev->gesture_toggled) {
+                        release_bindings_list(result, prev->element_gesture, prev->element_gesture_count);
+                        prev->gesture_swipe_triggered = false;
+                    }
+                    if (prev->gesture_long_press_triggered && !prev->lp_toggled) {
+                        release_bindings_list(result, prev->element_long_press, prev->element_long_press_count);
+                        prev->gesture_long_press_triggered = false;
+                    }
+                    // Prevent restore block from restoring gesture state on prev
+                    first_btn_gest_swipe = false;
+                    first_btn_gest_lp = false;
+                    first_btn_lp_arm = false;
+                    first_btn_gest_timer = false;
                     // Clear engagement so tick stops processing auto-repeat
                     // and handle_element_down can re-engage on re-entry.
                     prev->current_ptr_id = -1;
@@ -614,7 +628,13 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                             curr->current_ptr_id = -1;
                             curr->engaged = false;
                             handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
-                            // Re-press gesture bindings if they were active
+                            // Phase 1.2: handle_element_down always clears gesture_toggled/lp_toggled.
+                            // Re-press toggle-type gesture bindings that were active before the call.
+                            if (had_gest_toggled)
+                                press_bindings_list(result, curr->element_gesture, curr->element_gesture_count);
+                            if (had_lp_toggled)
+                                press_bindings_list(result, curr->element_long_press, curr->element_long_press_count);
+                            // Re-press gesture bindings if they were active (non-toggle)
                             if (had_gest_swipe && !had_gest_toggled)
                                 press_bindings_list(result, curr->element_gesture, curr->element_gesture_count);
                             if (had_gest_lp && !had_lp_toggled)
@@ -654,9 +674,10 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                             prev->engaged = true;
                             prev->visual_active = true;
                             // Re-press gesture bindings that release_element_bindings released
-                            if (first_btn_gest_swipe && !prev->gesture_toggled)
+                            // Only re-press if they were actually released (gesture flags cleared)
+                            if (first_btn_gest_swipe && !prev->gesture_swipe_triggered && !prev->gesture_toggled)
                                 press_bindings_list(result, prev->element_gesture, prev->element_gesture_count);
-                            if (first_btn_gest_lp && !prev->lp_toggled)
+                            if (first_btn_gest_lp && !prev->gesture_long_press_triggered && !prev->lp_toggled)
                                 press_bindings_list(result, prev->element_long_press, prev->element_long_press_count);
                         }
                     }
@@ -719,9 +740,10 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                                 prev->engaged = true;
                                 prev->visual_active = true;
                                 // Re-press gesture bindings that release_element_bindings released
-                                if (first_btn_gest_swipe && !prev->gesture_toggled)
+                                // Only re-press if they were actually released (gesture flags cleared)
+                                if (first_btn_gest_swipe && !prev->gesture_swipe_triggered && !prev->gesture_toggled)
                                     press_bindings_list(result, prev->element_gesture, prev->element_gesture_count);
-                                if (first_btn_gest_lp && !prev->lp_toggled)
+                                if (first_btn_gest_lp && !prev->gesture_long_press_triggered && !prev->lp_toggled)
                                     press_bindings_list(result, prev->element_long_press, prev->element_long_press_count);
                             }
                         }

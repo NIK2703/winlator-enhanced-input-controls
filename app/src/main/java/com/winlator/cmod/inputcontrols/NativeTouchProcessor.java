@@ -606,6 +606,11 @@ public class NativeTouchProcessor {
                 }
                 ne.gestureToggleBitmask = mask;
             }
+            if (ne.bindingToggle != null) {
+                for (int j = 0; j < ne.bindingToggle.length && j < 4; j++) {
+                    Log.w("Winlator_Controls", "  elem["+i+"] slot["+j+"] type="+ne.bindingTypes[j*2]+" toggleMask="+ne.bindingToggle[j]+" arMask="+(ne.bindingAutoRepeat != null ? ne.bindingAutoRepeat[j] : -1)+" arInterval="+(ne.bindingAutoRepeatIntervalMs != null ? ne.bindingAutoRepeatIntervalMs[j] : -1));
+                }
+            }
             arr[i] = ne;
         }
         return arr;

@@ -455,7 +455,7 @@ lock_handler_move: {
 #ifndef NDEBUG
                         __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "MOVE_HOVER deactivate prev[%d]", prev_idx);
 #endif
-                        release_element_bindings(&g_state.elements[prev_idx], result);
+                        release_element_bindings(&g_state.elements[prev_idx], result, false);
                         // Clear engagement so element can be re-entered
                         g_state.elements[prev_idx].current_ptr_id = -1;
                         g_state.elements[prev_idx].engaged = false;

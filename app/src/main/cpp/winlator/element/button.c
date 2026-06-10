@@ -2,8 +2,10 @@
 #define LOG_TAG "Winlator_Button"
 #include "../touch_processor_internal.h"
 
+#define TOGGLE_DEBOUNCE_MS 50
+
 void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
-    (void)ptr_id; (void)x; (void)y; (void)time_ms;
+    (void)ptr_id; (void)x; (void)y;
     TouchProcessorState* s = &g_state;
     bool has_primary = e->bindings[0].type != BINDING_NONE;
     __android_log_print(ANDROID_LOG_WARN, LOG_TAG, "DOWN ptr=%d b0=%d TOGGLE_SWITCH=%d auto=%d arm=%d lp_cnt=%d delay=%d",
@@ -12,7 +14,15 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
 
     // Toggle + Auto-repeat mode: burst mode — press+release all bindings at interval
     if (e->cached_has_toggle && e->cached_has_auto_repeat) {
+        __android_log_print(ANDROID_LOG_WARN, LOG_TAG, "DOWN toggle+AR ptr=%d selected=%d b0.type=%d b0.tog=%d b0.ar=%d b0.int=%d",
+            ptr_id, e->selected, e->bindings[0].type,
+            e->bindings[0].toggle, e->bindings[0].auto_repeat, e->bindings[0].auto_repeat_interval_ms);
         if (e->selected) {
+            // Debounce: prevent rapid toggle flip
+            if (e->toggle_debounce_last_time != 0 && time_ms - e->toggle_debounce_last_time < TOGGLE_DEBOUNCE_MS) {
+                return;
+            }
+            e->toggle_debounce_last_time = time_ms;
             // Release stale gesture/long-press toggles that are no longer active.
             // gesture_swipe_triggered/long_press_triggered are cleared on finger-up,
             // but gesture_toggled/lp_toggled survive because element_is_toggle_active
@@ -54,6 +64,7 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
                 else
                     press_binding(result, tb, false); // tap
             }
+            e->toggle_debounce_last_time = time_ms;
             e->selected = true;
             e->auto_repeat_last_time = time_ms;
         }
@@ -71,6 +82,10 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
         }
         if (e->activation_mode == ACTIVATION_HOVER) {
             // HOVER mode: toggle ON from previous touch — switch OFF on re-entry
+            if (e->toggle_debounce_last_time != 0 && time_ms - e->toggle_debounce_last_time < TOGGLE_DEBOUNCE_MS) {
+                return;
+            }
+            e->toggle_debounce_last_time = time_ms;
             if (has_primary)
                 release_binding(result, &e->bindings[0]);
             e->selected = false;
@@ -82,7 +97,13 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
             e->auto_repeat_primary_pressed = true;
             return;
         }
-        // LOCK mode: release binding and keep selected for UP flip
+        // LOCK mode: release binding and flip selected immediately on DOWN
+        if (e->toggle_debounce_last_time != 0 && time_ms - e->toggle_debounce_last_time < TOGGLE_DEBOUNCE_MS) {
+            return;
+        }
+        e->toggle_debounce_last_time = time_ms;
+        e->selected = false;
+        e->visual_active = false;
         if (has_primary)
             release_binding(result, &e->bindings[0]);
         return;
@@ -107,7 +128,8 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
         e->element_long_press[0].type);
 
     if (defer_primary) {
-        if (!has_primary) {
+        if (!has_primary && !e->gesture_swipe_triggered && !e->gesture_long_press_triggered
+            && !e->gesture_toggled && !e->lp_toggled) {
             e->visual_active = false;
             TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (defer_primary)", (int)(e - g_state.elements), e->bindings[0].type);
         }
@@ -121,10 +143,12 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
                 release_binding(result, &e->bindings[k]);
 
         press_binding(result, &e->bindings[0], true);
-        if (e->cached_has_toggle && (e->activation_mode == ACTIVATION_TRACK || e->activation_mode == ACTIVATION_HOVER)) {
+        if (e->cached_has_toggle && (e->activation_mode == ACTIVATION_TRACK || e->activation_mode == ACTIVATION_HOVER || e->activation_mode == ACTIVATION_LOCK)) {
             e->auto_repeat_primary_pressed = true;
-            if (e->activation_mode == ACTIVATION_HOVER)
+            if (e->activation_mode == ACTIVATION_HOVER || e->activation_mode == ACTIVATION_LOCK) {
                 e->selected = true;
+                e->toggle_debounce_last_time = time_ms;
+            }
         }
     } else if (!e->cached_has_toggle) {
         e->visual_active = false;
@@ -263,18 +287,19 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
         && !e->cached_has_toggle
         && !e->gesture_swipe_triggered
         && !e->gesture_long_press_triggered
+        && !e->gesture_toggled
+        && !e->lp_toggled
         && !e->gesture_timer_armed) {
         e->visual_active = false;
         TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (none_primary)", (int)(e - g_state.elements), e->bindings[0].type);
     }
 
-    // HOVER mode: non-toggle buttons are only visually active when finger is inside.
-    // Without this, handle_element_move (shared.c:194) keeps visual_active=true for ALL
-    // engaged elements, causing previously-hovered buttons to stay highlighted.
-    // Gesture flags are NOT checked here — the first_btn_has_gesture save/restore
-    // mechanism in handle_gesture_move can toggle them, and a gesture trigger from an
-    // earlier move should not keep a visually non-hovered button illuminated.
-    if (e->activation_mode == ACTIVATION_HOVER && !e->cached_has_toggle && !inside) {
+    // HOVER mode: non-toggle buttons are only visually active when finger is inside
+    // (unless gesture/LP is active — see concept: button without primary transfers
+    // visual activation to gesture/LP firing).
+    if (e->activation_mode == ACTIVATION_HOVER && !e->cached_has_toggle && !inside
+        && !e->gesture_swipe_triggered && !e->gesture_long_press_triggered
+        && !e->gesture_toggled && !e->lp_toggled) {
         e->visual_active = false;
         TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (hover_outside)", (int)(e - g_state.elements), e->bindings[0].type);
     }
@@ -309,6 +334,11 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
                         e->visual_active = true;
                         return;
                     }
+                    // Debounce: prevent rapid toggle flip
+                    if (e->toggle_debounce_last_time != 0 && time_ms - e->toggle_debounce_last_time < TOGGLE_DEBOUNCE_MS) {
+                        return;
+                    }
+                    e->toggle_debounce_last_time = time_ms;
                     e->selected = !e->selected;
                     if (e->selected) {
                         if (e->gesture_swipe_triggered && !e->gesture_toggled)
@@ -341,13 +371,9 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
             // HOVER slide-over: no-op — toggle managed on MOVE entry
             return;
         }
-        // Don't deselect if another toggle is still active (LOCK mode)
-        if (e->selected && (e->lp_toggled || e->gesture_toggled)) {
-            e->visual_active = true;
-            return;
-        }
-        e->selected = !e->selected;
+        // LOCK mode: toggle already flipped on DOWN, UP handles cleanup only
         if (e->selected) {
+            // First UP after DOWN1: toggle ON, release stale gesture/LP
             if (e->gesture_swipe_triggered && !e->gesture_toggled)
                 release_bindings_list(result, e->element_gesture, e->element_gesture_count);
             if (e->gesture_long_press_triggered && !e->lp_toggled)
@@ -357,9 +383,7 @@ void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
             e->gesture_timer_armed = false;
             return;
         }
-        // Deselected: release primary (may have been kept held by guard at line 66)
-        if (has_primary)
-            release_binding(result, &e->bindings[0]);
+        // Second UP after DOWN2: toggle already OFF, no-op
         return;
     }
 

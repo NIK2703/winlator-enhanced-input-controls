@@ -819,8 +819,27 @@ public class ControlElement {
         return range.texts[index % range.max];
     }
 
+    public boolean hasAnyAction() {
+        for (int i = 0; i < bindings.size(); i++) {
+            List<Binding> seq = bindings.get(i);
+            if (seq != null) {
+                for (Binding b : seq) {
+                    if (b != null && b != Binding.NONE) return true;
+                }
+            }
+        }
+        if (slotPackages != null) {
+            for (BindPackage pkg : slotPackages) {
+                if (pkg != null && !pkg.isEmpty()) return true;
+            }
+        }
+        if (hasLongPressBinding()) return true;
+        if (hasGestureBinding()) return true;
+        return false;
+    }
+
     public boolean isEngaged() {
-        return active || (hasAnySlotToggle() && selected);
+        return hasAnyAction() && (active || (hasAnySlotToggle() && selected));
     }
 
     public void invalidateElementCache() {

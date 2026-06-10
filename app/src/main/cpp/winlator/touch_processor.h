@@ -127,6 +127,7 @@ typedef enum {
         float down_y;
         uint64_t down_time_ms;
         uint64_t auto_repeat_last_time;
+        uint64_t toggle_debounce_last_time;
         int primary_sticky_mask;
         int button_long_press_haptic;
         int button_gesture_haptic;

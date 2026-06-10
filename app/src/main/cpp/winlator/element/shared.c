@@ -178,9 +178,14 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     e->long_press_arm = false;
     e->gesture_timer_armed = false;
     e->gesture_suppressed = false;
-    // Preserve toggle state across touches — don't clear if any toggle is active
-    if (!element_is_toggle_active(e)) {
+    // Clear gesture/lp toggle flags on each new touch to prevent stale bindings
+    // from previous touches persisting. Release any bindings that are still held.
+    if (e->gesture_toggled) {
+        release_bindings_list(result, e->element_gesture, e->element_gesture_count);
         e->gesture_toggled = false;
+    }
+    if (e->lp_toggled) {
+        release_bindings_list(result, e->element_long_press, e->element_long_press_count);
         e->lp_toggled = false;
     }
 
@@ -203,11 +208,13 @@ void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, To
     e->visual_y = y;
     mark_element_dirty(e);
     element_move_table[e->type](e, x, y, time_ms, result);
-    // HOVER mode: non-toggle buttons are only visually active when finger is inside.
-    // This runs after element_button_move (which may return early on gesture trigger)
-    // and overrides any visual_active=true set above for non-hovered buttons.
+    // HOVER mode: non-toggle buttons are only visually active when finger is inside
+    // (unless gesture/LP is active — see concept: button without primary transfers
+    // visual activation to gesture/LP firing).
     if (e->type == ELEM_BUTTON && e->activation_mode == ACTIVATION_HOVER
-        && !e->cached_has_toggle && !point_in_element(x, y, e)) {
+        && !e->cached_has_toggle && !point_in_element(x, y, e)
+        && !e->gesture_swipe_triggered && !e->gesture_long_press_triggered
+        && !e->gesture_toggled && !e->lp_toggled) {
         e->visual_active = false;
     }
 }
@@ -277,21 +284,27 @@ void suppress_element_gestures(TouchElement* e, TouchActionResult* restrict resu
     e->gesture_suppressed = true;
 }
 
-void release_element_bindings(TouchElement* e, TouchActionResult* restrict result) {
+void release_element_bindings(TouchElement* e, TouchActionResult* restrict result, bool release_gestures) {
     if (!e->cached_has_any_binding && !e->gesture_swipe_triggered && !e->gesture_long_press_triggered)
         return;
     if (e->bindings[0].type != BINDING_NONE && !(e->primary_sticky_mask & 1)
         && !((e->bindings[0].toggle || e->cached_has_toggle) && e->selected))
         release_binding(result, &e->bindings[0]);
-    if (__builtin_expect(e->gesture_swipe_triggered, 0) && !e->gesture_toggled)
-        release_bindings_list(result, e->element_gesture, e->element_gesture_count);
-    if (__builtin_expect(e->gesture_long_press_triggered, 0) && !e->lp_toggled)
-        release_bindings_list(result, e->element_long_press, e->element_long_press_count);
-    e->long_press_arm = false;
-    e->gesture_long_press_triggered = false;
-    e->gesture_swipe_triggered = false;
-    e->gesture_timer_armed = false;
-    e->visual_long_press_active = false;
+    if (release_gestures) {
+        if (__builtin_expect(e->gesture_swipe_triggered, 0) && !e->gesture_toggled)
+            release_bindings_list(result, e->element_gesture, e->element_gesture_count);
+        if (__builtin_expect(e->gesture_long_press_triggered, 0) && !e->lp_toggled)
+            release_bindings_list(result, e->element_long_press, e->element_long_press_count);
+        e->long_press_arm = false;
+        e->gesture_long_press_triggered = false;
+        e->gesture_swipe_triggered = false;
+        e->gesture_timer_armed = false;
+        e->visual_long_press_active = false;
+    } else {
+        e->long_press_arm = false;
+        e->gesture_timer_armed = false;
+        e->visual_long_press_active = false;
+    }
     e->current_ptr_id = -1;
     e->engaged = false;
     if (!element_is_toggle_active(e))
@@ -393,6 +406,7 @@ void element_reset_runtime(TouchElement* e) {
     e->gesture_timer_armed = false;
     e->auto_repeat_primary_pressed = false;
     e->auto_repeat_last_time = 0;
+    e->toggle_debounce_last_time = 0;
     e->stick_value_x = 0.0f;
     e->stick_value_y = 0.0f;
     e->trackpad_vel_x = 0.0f;
