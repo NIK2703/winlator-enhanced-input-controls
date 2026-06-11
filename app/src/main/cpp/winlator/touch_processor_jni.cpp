@@ -102,7 +102,6 @@ static jint nativeSyncVisualState(JNIEnv* env, jclass clazz, jfloatArray positio
     env->ReleaseFloatArrayElements(positions, pos, 0);
     env->ReleaseIntArrayElements(states, st, 0);
     if (scroll) env->ReleaseFloatArrayElements(scrollOffsets, scroll, 0);
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "nativeSyncVisualState: count=%d active=%d", n, active_count);
     return (jint)n;
 }
 
@@ -389,6 +388,34 @@ void touch_processor_set_view_offset(float offset_x, float offset_y) {
     g_state.cfg.view_offset_y = offset_y;
 }
 
+static inline void apply_modifier_mask(JNIEnv* env, jobject config,
+    jfieldID fid, GestureBindingSlot* slot, int modifier_value) {
+    int mask = env->GetIntField(config, fid);
+    for (int j = 0; j < slot->count; j++)
+        if (mask & (1 << j))
+            slot->arr[j].modifiers = modifier_value;
+}
+
+static inline void apply_toggle_mask(JNIEnv* env, jobject config,
+    jfieldID fid, GestureBindingSlot* slot) {
+    int mask = env->GetIntField(config, fid);
+    for (int j = 0; j < slot->count; j++)
+        if (mask & (1 << j))
+            slot->arr[j].toggle = true;
+}
+
+static inline void apply_auto_repeat_mask(JNIEnv* env, jobject config,
+    jfieldID fid, GestureBindingSlot* slot, jfieldID interval_fid) {
+    int mask = env->GetIntField(config, fid);
+    int interval = env->GetIntField(config, interval_fid);
+    if (interval <= 0) interval = 100;
+    for (int j = 0; j < slot->count; j++) {
+        if (mask & (1 << j))
+            slot->arr[j].auto_repeat = true;
+        slot->arr[j].auto_repeat_interval_ms = interval;
+    }
+}
+
 static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorConfig* c) {
     c->touch_mode = (TouchMode)env->GetIntField(config, g_config.touchMode);
     c->input_mode = (InputMode)env->GetIntField(config, g_config.inputMode);
@@ -465,12 +492,8 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
         { g_config.stSingleTapDrag2nd, &c->tp[GESTURE_SINGLE_DRAG_2ND] },
         { g_config.stDoubleTapDrag2nd, &c->tp[GESTURE_DOUBLE_DRAG_2ND] },
     };
-    for (int i = 0; i < (int)(sizeof(sticky_slots)/sizeof(sticky_slots[0])); i++) {
-        int mask = env->GetIntField(config, sticky_slots[i].fid);
-        for (int j = 0; j < sticky_slots[i].slot->count; j++)
-            if (mask & (1 << j))
-                sticky_slots[i].slot->arr[j].modifiers = 1;
-    }
+    for (int i = 0; i < (int)(sizeof(sticky_slots)/sizeof(sticky_slots[0])); i++)
+        apply_modifier_mask(env, config, sticky_slots[i].fid, sticky_slots[i].slot, 1);
 
     struct ToggleSlotPair { jfieldID fid; GestureBindingSlot* slot; };
     ToggleSlotPair toggle_slots[] = {
@@ -495,12 +518,8 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
         { g_config.tgSingleTapDrag2nd, &c->tp[GESTURE_SINGLE_DRAG_2ND] },
         { g_config.tgDoubleTapDrag2nd, &c->tp[GESTURE_DOUBLE_DRAG_2ND] },
     };
-    for (int i = 0; i < (int)(sizeof(toggle_slots)/sizeof(toggle_slots[0])); i++) {
-        int mask = env->GetIntField(config, toggle_slots[i].fid);
-        for (int j = 0; j < toggle_slots[i].slot->count; j++)
-            if (mask & (1 << j))
-                toggle_slots[i].slot->arr[j].toggle = true;
-    }
+    for (int i = 0; i < (int)(sizeof(toggle_slots)/sizeof(toggle_slots[0])); i++)
+        apply_toggle_mask(env, config, toggle_slots[i].fid, toggle_slots[i].slot);
 
     // Phase 4: auto-repeat bitmasks + intervals (per-binding, like toggle)
     struct AutoRepeatSlotPair { jfieldID fid; GestureBindingSlot* slot; jfieldID interval_fid; };
@@ -526,16 +545,8 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
         { g_config.arSingleTapDrag2nd, &c->tp[GESTURE_SINGLE_DRAG_2ND], g_config.arSingleTapDrag2ndIntervalMs },
         { g_config.arDoubleTapDrag2nd, &c->tp[GESTURE_DOUBLE_DRAG_2ND], g_config.arDoubleTapDrag2ndIntervalMs },
     };
-    for (int i = 0; i < (int)(sizeof(ar_slots)/sizeof(ar_slots[0])); i++) {
-        int mask = env->GetIntField(config, ar_slots[i].fid);
-        int interval = env->GetIntField(config, ar_slots[i].interval_fid);
-        if (interval <= 0) interval = 100;
-        for (int j = 0; j < ar_slots[i].slot->count; j++) {
-            if (mask & (1 << j))
-                ar_slots[i].slot->arr[j].auto_repeat = true;
-            ar_slots[i].slot->arr[j].auto_repeat_interval_ms = interval;
-        }
-    }
+    for (int i = 0; i < (int)(sizeof(ar_slots)/sizeof(ar_slots[0])); i++)
+        apply_auto_repeat_mask(env, config, ar_slots[i].fid, ar_slots[i].slot, ar_slots[i].interval_fid);
 
     c->color_primary = (uint32_t)env->GetIntField(config, g_config.colorPrimary);
     c->color_secondary = (uint32_t)env->GetIntField(config, g_config.colorSecondary);
@@ -752,40 +763,43 @@ static void element_geometry_flush(void) {
     g_geom_count = n;
 }
 
+static void cache_element_field_ids(JNIEnv* env) {
+    if (g_elem.elemClass) return;
+    jclass ec = env->FindClass("com/winlator/cmod/inputcontrols/NativeTouchProcessor$NativeElement");
+    g_elem.elemClass = (jclass)env->NewGlobalRef(ec);
+    g_elem.type = env->GetFieldID(ec, "type", "I");
+    g_elem.shape = env->GetFieldID(ec, "shape", "I");
+    g_elem.x = env->GetFieldID(ec, "x", "I");
+    g_elem.y = env->GetFieldID(ec, "y", "I");
+    g_elem.w = env->GetFieldID(ec, "w", "F");
+    g_elem.h = env->GetFieldID(ec, "h", "F");
+    g_elem.scale = env->GetFieldID(ec, "scale", "F");
+    g_elem.passthroughTouch = env->GetFieldID(ec, "passthroughTouch", "Z");
+    g_elem.activationMode = env->GetFieldID(ec, "activationMode", "I");
+    g_elem.elementLongPress = env->GetFieldID(ec, "elementLongPress", "[I");
+    g_elem.elementGesture = env->GetFieldID(ec, "elementGesture", "[I");
+    g_elem.bindingTypes = env->GetFieldID(ec, "bindingTypes", "[I");
+    g_elem.bindingSticky = env->GetFieldID(ec, "bindingSticky", "[I");
+    g_elem.bindingToggle = env->GetFieldID(ec, "bindingToggle", "[I");
+    g_elem.bindingAutoRepeat = env->GetFieldID(ec, "bindingAutoRepeat", "[I");
+    g_elem.bindingAutoRepeatIntervalMs = env->GetFieldID(ec, "bindingAutoRepeatIntervalMs", "[I");
+    g_elem.longPressToggleBitmask = env->GetFieldID(ec, "longPressToggleBitmask", "I");
+    g_elem.gestureToggleBitmask = env->GetFieldID(ec, "gestureToggleBitmask", "I");
+    g_elem.rangeOrdinal = env->GetFieldID(ec, "rangeOrdinal", "I");
+    g_elem.rangeMax = env->GetFieldID(ec, "rangeMax", "I");
+    g_elem.bindingCount = env->GetFieldID(ec, "bindingCount", "I");
+    g_elem.orientation = env->GetFieldID(ec, "orientation", "I");
+    g_elem.buttonLongPressHaptic = env->GetFieldID(ec, "buttonLongPressHaptic", "I");
+    g_elem.buttonGestureHaptic = env->GetFieldID(ec, "buttonGestureHaptic", "I");
+    g_elem.cornerRadius = env->GetFieldID(ec, "cornerRadius", "F");
+    g_elem.opacity = env->GetFieldID(ec, "opacity", "F");
+    env->DeleteLocalRef(ec);
+}
+
 static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) {
     if (elements == NULL) return;
 
-    if (!g_elem.elemClass) {
-        jclass ec = env->FindClass("com/winlator/cmod/inputcontrols/NativeTouchProcessor$NativeElement");
-        g_elem.elemClass = (jclass)env->NewGlobalRef(ec);
-        g_elem.type = env->GetFieldID(ec, "type", "I");
-        g_elem.shape = env->GetFieldID(ec, "shape", "I");
-        g_elem.x = env->GetFieldID(ec, "x", "I");
-        g_elem.y = env->GetFieldID(ec, "y", "I");
-        g_elem.w = env->GetFieldID(ec, "w", "F");
-        g_elem.h = env->GetFieldID(ec, "h", "F");
-        g_elem.scale = env->GetFieldID(ec, "scale", "F");
-        g_elem.passthroughTouch = env->GetFieldID(ec, "passthroughTouch", "Z");
-        g_elem.activationMode = env->GetFieldID(ec, "activationMode", "I");
-        g_elem.elementLongPress = env->GetFieldID(ec, "elementLongPress", "[I");
-        g_elem.elementGesture = env->GetFieldID(ec, "elementGesture", "[I");
-        g_elem.bindingTypes = env->GetFieldID(ec, "bindingTypes", "[I");
-        g_elem.bindingSticky = env->GetFieldID(ec, "bindingSticky", "[I");
-        g_elem.bindingToggle = env->GetFieldID(ec, "bindingToggle", "[I");
-        g_elem.bindingAutoRepeat = env->GetFieldID(ec, "bindingAutoRepeat", "[I");
-        g_elem.bindingAutoRepeatIntervalMs = env->GetFieldID(ec, "bindingAutoRepeatIntervalMs", "[I");
-        g_elem.longPressToggleBitmask = env->GetFieldID(ec, "longPressToggleBitmask", "I");
-        g_elem.gestureToggleBitmask = env->GetFieldID(ec, "gestureToggleBitmask", "I");
-        g_elem.rangeOrdinal = env->GetFieldID(ec, "rangeOrdinal", "I");
-        g_elem.rangeMax = env->GetFieldID(ec, "rangeMax", "I");
-        g_elem.bindingCount = env->GetFieldID(ec, "bindingCount", "I");
-        g_elem.orientation = env->GetFieldID(ec, "orientation", "I");
-        g_elem.buttonLongPressHaptic = env->GetFieldID(ec, "buttonLongPressHaptic", "I");
-        g_elem.buttonGestureHaptic = env->GetFieldID(ec, "buttonGestureHaptic", "I");
-        g_elem.cornerRadius = env->GetFieldID(ec, "cornerRadius", "F");
-        g_elem.opacity = env->GetFieldID(ec, "opacity", "F");
-        env->DeleteLocalRef(ec);
-    }
+    cache_element_field_ids(env);
 
     jsize len = env->GetArrayLength(elements);
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "nativeSetElements: array_len=%d", (int)len);
@@ -906,7 +920,6 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
         for (int p = 0; p < MAX_PETALS; p++) elems[i].petal_active[p] = false;
 
         env->DeleteLocalRef(je);
-        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "  elem[%d] type=%d x=%d y=%d scale=%.2f", i, (int)elems[i].type, elems[i].x, elems[i].y, elems[i].scale);
     }
 
     touch_processor_set_elements(elems, len);
@@ -927,35 +940,33 @@ static void nativeSetSimTouchScreen(JNIEnv* env, jclass clazz, jboolean enabled)
     touch_processor_set_sim_touch_screen(enabled == JNI_TRUE);
 }
 
+static void dispatch_and_flush(JNIEnv* env, const TouchActionResult* r, const char* event_name) {
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "event=%s trigger_flush", event_name);
+    visual_state_flush();
+    dispatch_actions_batch(env, r);
+}
+
 static void nativeOnFingerDown(JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y,
                                 jlong timeMs) {
     TouchActionResult r = touch_processor_on_finger_down(ptrId, x, y, (uint64_t)timeMs);
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "event=%s trigger_flush", "down");
-    visual_state_flush();
-    dispatch_actions_batch(env, &r);
+    dispatch_and_flush(env, &r, "down");
 }
 
 static void nativeOnFingerMove(JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y,
                                 jlong timeMs) {
     TouchActionResult r = touch_processor_on_finger_move(ptrId, x, y, (uint64_t)timeMs);
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "event=%s trigger_flush", "move");
-    visual_state_flush();
-    dispatch_actions_batch(env, &r);
+    dispatch_and_flush(env, &r, "move");
 }
 
 static void nativeOnFingerUp(JNIEnv* env, jclass clazz, jint ptrId, jfloat x, jfloat y,
                               jlong timeMs) {
     TouchActionResult r = touch_processor_on_finger_up(ptrId, x, y, (uint64_t)timeMs);
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "event=%s trigger_flush", "up");
-    visual_state_flush();
-    dispatch_actions_batch(env, &r);
+    dispatch_and_flush(env, &r, "up");
 }
 
 static void nativeTick(JNIEnv* env, jclass clazz, jlong timeMs) {
     TouchActionResult r = touch_processor_tick((uint64_t)timeMs);
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "event=%s trigger_flush", "tick");
-    visual_state_flush();
-    dispatch_actions_batch(env, &r);
+    dispatch_and_flush(env, &r, "tick");
 }
 
 static void nativeReset(JNIEnv* env, jclass clazz) {

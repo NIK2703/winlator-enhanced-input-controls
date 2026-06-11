@@ -31,6 +31,31 @@
 #include <poll.h>
 #include <linux/input.h>
 
+// ioctl type/number constants (from linux/input.h EVIO*)
+#define IOCTL_EVIOCGVERSION   0x4501
+#define IOCTL_EVIOCGID        0x4502
+#define IOCTL_EVIOCGNAME_0x6  0x4506
+#define IOCTL_EVIOCGPROP      0x4509
+#define IOCTL_EVIOCGKEY       0x4518
+#define IOCTL_EVIOCGBIT_EV    0x4520
+#define IOCTL_EVIOCGBIT_KEY   0x4521
+#define IOCTL_EVIOCGBIT_REL   0x4522
+#define IOCTL_EVIOCGBIT_ABS   0x4523
+#define IOCTL_EVIOCGBIT_FF    0x4535
+#define IOCTL_EVIOCSFF        0x4580
+#define IOCTL_EVIOCRMFF       0x4581
+#define IOCTL_EVIOCGEFFECTS   0x4584
+#define IOCTL_EVIOCGABS_MIN   0x4540
+#define IOCTL_EVIOCGABS_MAX   0x4551
+#define IOCTL_EVIOCGRAB       0x4590
+#define IOCTL_JSIOCGNAME      0x6A13
+
+#define DLSYM_OR_FALLBACK(var, name, fallback_expr) \
+    do { \
+        if (!(var)) *(void **)&(var) = dlsym(RTLD_NEXT, (name)); \
+        if (!(var)) return (fallback_expr); \
+    } while(0)
+
 #define EXPORT __attribute__((visibility("default"))) extern "C"
 
 std::unordered_map<int, const char *> controller_map;
@@ -184,6 +209,27 @@ int get_event_number(const char *event) {
     return atoi(p);
 }
 
+struct PathRedirect {
+    char* fake_path;
+    const char* resolved;
+    bool is_from_input;
+};
+
+static PathRedirect redirect_path(const char* pathname) {
+    PathRedirect r = {nullptr, pathname, false};
+    if (!pathname) return r;
+    if (strstr(pathname, "/dev/input/event")) {
+        r.fake_path = from_real_to_fake_path(pathname);
+        if (r.fake_path) {
+            r.resolved = r.fake_path;
+            r.is_from_input = true;
+        }
+    } else if (!strcmp(pathname, "/dev/input")) {
+        r.resolved = hook_dir;
+    }
+    return r;
+}
+
 EXPORT int open(const char *pathname, int flags, ...) {
     if (!g_hooks_ready) {
         va_list va; va_start(va, flags);
@@ -195,49 +241,28 @@ EXPORT int open(const char *pathname, int flags, ...) {
     mode_t mode;
     int fd;
     bool hasMode;
-    bool isFromInput;
-    char *fake_path = nullptr;
 
     va_start(va, flags);
 
     hasMode = flags & O_CREAT;
-    isFromInput = false;
     
     if (hasMode) {
         mode = va_arg(va, mode_t);
     }
     
-    va_end(va);
+	va_end(va);
 
-	if (!my_open)
-    	*(void **)&my_open = dlsym(RTLD_NEXT, "open");
-	if (!my_open) {
-        va_list va2;
-        va_start(va2, flags);
-        mode_t m = flags & O_CREAT ? va_arg(va2, mode_t) : 0;
-        va_end(va2);
-        return syscall(SYS_openat, AT_FDCWD, pathname, flags, m);
-    }
+	DLSYM_OR_FALLBACK(my_open, "open", syscall(SYS_openat, AT_FDCWD, pathname, flags, hasMode ? mode : 0));
 
-	if (pathname) {
-		if (strstr(pathname, "/dev/input/event")) {
-		    fake_path = from_real_to_fake_path(pathname);
-		    if (fake_path) {
-		        pathname = fake_path;
-		        isFromInput = true;
-		    }
-		}
-		else if (!strcmp(pathname, "/dev/input")) {
-			pathname = hook_dir;
-		}
-	}
-	    
+	PathRedirect pr = redirect_path(pathname);
+	pathname = pr.resolved;
+    
 	if (hasMode)
 	    fd = my_open(pathname, flags, mode);
 	else
 	    fd = my_open(pathname, flags);
 
-	if (isFromInput) {
+	if (pr.is_from_input) {
 		Logger::log("Adding controller, fd %d event %s\n", fd, get_event(pathname));
 		{
 		    std::lock_guard<std::mutex> lock(controller_map_mutex);
@@ -245,7 +270,7 @@ EXPORT int open(const char *pathname, int flags, ...) {
 		}
     }
 	    
-	free(fake_path);
+	free(pr.fake_path);
 	return fd;
 }
 
@@ -260,12 +285,9 @@ EXPORT int openat(int dirfd, const char *pathname, int flags, ...) {
     mode_t mode;
     int fd;
     bool hasMode;
-    bool isFromInput;
-    char *fake_path = nullptr;
     
     va_start(va, flags);
 
-    isFromInput = false;
     hasMode = flags & O_CREAT;
     
     if (hasMode) {
@@ -274,35 +296,17 @@ EXPORT int openat(int dirfd, const char *pathname, int flags, ...) {
     
     va_end(va);
 
-    if (!my_openat)
-    	*(void **)&my_openat = dlsym(RTLD_NEXT, "openat");
-    if (!my_openat) {
-        va_list va2;
-        va_start(va2, flags);
-        mode_t m = flags & O_CREAT ? va_arg(va2, mode_t) : 0;
-        va_end(va2);
-        return syscall(SYS_openat, dirfd, pathname, flags, m);
-    }
+    DLSYM_OR_FALLBACK(my_openat, "openat", syscall(SYS_openat, dirfd, pathname, flags, hasMode ? mode : 0));
     
-    if (pathname) {
-        if (strstr(pathname, "/dev/input/event")) {
-            fake_path = from_real_to_fake_path(pathname);
-            if (fake_path) {
-                pathname = fake_path;
-                isFromInput = true;
-            }
-        }
-        else if (!strcmp(pathname, "/dev/input")) {                                    
-            pathname = hook_dir;             
-        }
-    }
+    PathRedirect pr = redirect_path(pathname);
+    pathname = pr.resolved;
     
     if (hasMode)
         fd = my_openat(dirfd, pathname, flags, mode);
     else
         fd = my_openat(dirfd, pathname, flags);
 
-    if (isFromInput) {
+    if (pr.is_from_input) {
         Logger::log("Adding controller, fd %d event %s\n", fd, get_event(pathname));
         {
             std::lock_guard<std::mutex> lock(controller_map_mutex);
@@ -310,7 +314,7 @@ EXPORT int openat(int dirfd, const char *pathname, int flags, ...) {
         }
     }
 
-    free(fake_path);
+    free(pr.fake_path);
     return fd;
 }
 
@@ -318,27 +322,17 @@ EXPORT int stat(const char *pathname, struct stat *statbuf) {
     if (!g_hooks_ready)
         return syscall(SYS_newfstatat, AT_FDCWD, pathname, statbuf, 0);
 	lazy_init();
-	if (!my_stat)
-		*(void **)&my_stat = dlsym(RTLD_NEXT, "stat");
-	if (!my_stat)
-        return syscall(SYS_newfstatat, AT_FDCWD, pathname, statbuf, 0);
+	DLSYM_OR_FALLBACK(my_stat, "stat", syscall(SYS_newfstatat, AT_FDCWD, pathname, statbuf, 0));
 
-     char *fake_path = nullptr;
      const char *event = nullptr;
      int event_number = -1;
 
-	if (pathname) {
-		if (strstr(pathname, "/dev/input/event")) {
-		    fake_path = from_real_to_fake_path(pathname);
-		    if (fake_path) {
-		        pathname = fake_path;
-		        event = get_event(pathname);
-		        event_number = get_event_number(event);
-		    }
-		}
-		else if (!strcmp(pathname, "/dev/input")) {                                    
-		    pathname = hook_dir;             
-		}
+	PathRedirect pr = redirect_path(pathname);
+	pathname = pr.resolved;
+
+	if (pr.is_from_input) {
+	    event = get_event(pathname);
+	    event_number = get_event_number(event);
 	}
 
 	int ret = my_stat(pathname, statbuf);
@@ -347,17 +341,14 @@ EXPORT int stat(const char *pathname, struct stat *statbuf) {
 		statbuf->st_rdev = makedev(1, event_number);
 	}
 
-	free(fake_path);
+	free(pr.fake_path);
 	return ret;
 }
 
 EXPORT int fstat(int fd, struct stat *buf) {
     if (!g_hooks_ready)
         return syscall(SYS_newfstatat, fd, "", buf, AT_EMPTY_PATH);
-	if (!my_fstat)
-    	*(void **)&my_fstat = dlsym(RTLD_NEXT, "fstat");
-    if (!my_fstat)
-        return syscall(SYS_newfstatat, fd, "", buf, AT_EMPTY_PATH);
+	DLSYM_OR_FALLBACK(my_fstat, "fstat", syscall(SYS_newfstatat, fd, "", buf, AT_EMPTY_PATH));
 
     int ret = my_fstat(fd, buf);
 
@@ -375,10 +366,7 @@ EXPORT int fstat(int fd, struct stat *buf) {
 EXPORT int scandir(const char *dirp, struct dirent ***namelist, int(*filter)(const struct dirent *), int(*compar)(const struct dirent **, const struct dirent **)) {
     if (!g_hooks_ready) { errno = ENOSYS; return -1; }
 	lazy_init();
-	if (!my_scandir)
-		*(void **)&my_scandir = dlsym(RTLD_NEXT, "scandir");
-	if (!my_scandir)
-        return -1;
+	DLSYM_OR_FALLBACK(my_scandir, "scandir", -1);
 	
 	if (dirp) {
 	    if (!strcmp(dirp, "/dev/input")) {
@@ -393,26 +381,13 @@ EXPORT int inotify_add_watch(int fd, const char *pathname, uint32_t mask) {
     if (!g_hooks_ready)
         return syscall(SYS_inotify_add_watch, fd, pathname, mask);
 	lazy_init();
-	if (!my_inotify_add_watch)
-		*(void **)&my_inotify_add_watch = dlsym(RTLD_NEXT, "inotify_add_watch");
-    if (!my_inotify_add_watch)
-        return syscall(SYS_inotify_add_watch, fd, pathname, mask);
+	DLSYM_OR_FALLBACK(my_inotify_add_watch, "inotify_add_watch", syscall(SYS_inotify_add_watch, fd, pathname, mask));
 
-    char *fake_path = nullptr;
-    if (pathname) {
-        if (strstr(pathname, "/dev/input/event")) {
-            fake_path = from_real_to_fake_path(pathname);
-            if (fake_path) {
-                pathname = fake_path;
-            }
-        }
-        else if (!strcmp(pathname, "/dev/input")) {
-            pathname = hook_dir;
-    	}
-    }
+    PathRedirect pr = redirect_path(pathname);
+    pathname = pr.resolved;
 
     int ret = my_inotify_add_watch(fd, pathname, mask);
-    free(fake_path);
+    free(pr.fake_path);
     return ret;
 }
 
@@ -436,16 +411,13 @@ EXPORT int ioctl(int fd, int op, ...) {
         event_number = get_event_number(event);
     }
 
-	int type = (op >> 8 & 0xFF);
-	int number = (op >> 0 & 0xFF);
-
-    if (type == 0x45 && number == 0x1) {
+    if (op == IOCTL_EVIOCGVERSION) {
         Logger::log("Hooking ioctl EVIOCGVERSION for event %s\n", event);
         int version = 65536;
         memcpy(argp, (void *)&version, sizeof(int));
         return 0;
     }
-    else if (type == 0x45 && number == 0x2) {
+    else if (op == IOCTL_EVIOCGID) {
         Logger::log("Hooking ioctl EVIOCGID for event %s\n", event);
         struct input_id id;
         memset(&id, 0, sizeof(id));
@@ -456,7 +428,7 @@ EXPORT int ioctl(int fd, int op, ...) {
         memcpy(argp, (void *)&id, sizeof(id));
         return 0;
     }
-    else if (type == 0x45 && number == 0x6) {
+    else if (op == IOCTL_EVIOCGNAME_0x6) {
     	Logger::log("Hooking ioctl EVIOCGNAME for event %s\n", event);
     	char *name;
     	
@@ -466,18 +438,18 @@ EXPORT int ioctl(int fd, int op, ...) {
     	free(name);
     	return 0;
     }
-    else if (type == 0x45 && number == 0x9) {
+    else if (op == IOCTL_EVIOCGPROP) {
         Logger::log("Hooking ioctl EVIOCGPROP for event %s\n", event);
         memset(argp, 0, sizeof(int));
         return 0;
     }
-    else if (type == 0x45 && number == 0x18) {
+    else if (op == IOCTL_EVIOCGKEY) {
     	Logger::log("Hooking ioctl EVIOCGKEY(len) for event %s\n", event);
     	char bitmask[KEY_MAX / 8] = {0};
         memcpy(argp, (void *)&bitmask, sizeof(bitmask));
         return 0;
     }
-    else if (type == 0x45 && number == 0x20) {
+    else if (op == IOCTL_EVIOCGBIT_EV) {
     	Logger::log("Hooking ioctl EVIOCGBIT(0, len) for event %s\n", event);
         char bitmask[EV_MAX / 8] = {0};
         bitmask[EV_SYN / 8] |= (1 << (EV_SYN % 8));
@@ -486,7 +458,7 @@ EXPORT int ioctl(int fd, int op, ...) {
     	memcpy(argp, (void *)&bitmask, sizeof(bitmask));
     	return 0;	
     }
-    else if (type == 0x45 && number == 0x21) {
+    else if (op == IOCTL_EVIOCGBIT_KEY) {
         Logger::log("Hooking ioctl EVIOCGBIT(EV_KEY, len) for event %s\n", event);
         char bitmask[KEY_MAX / 8] = {0};
         for (int i = 0x130; i <= 0x13e; i++) {
@@ -508,13 +480,13 @@ EXPORT int ioctl(int fd, int op, ...) {
         memcpy(argp, (void *)&bitmask, sizeof(bitmask));
         return 0;
     }
-    else if (type == 0x45 && number == 0x22) {
+    else if (op == IOCTL_EVIOCGBIT_REL) {
     	Logger::log("Hooking ioctl EVIOCGBIT(EV_REL, len) for event %s\n", event);
     	char bitmask[REL_MAX / 8] = {0};
     	memcpy(argp, (void *)&bitmask, sizeof(bitmask));
     	return 0;
     }
-    else if (type == 0x45 && number == 0x23) {
+    else if (op == IOCTL_EVIOCGBIT_ABS) {
     	Logger::log("Hooking ioctl EVIOCGBIT(EV_ABS, len) for event %s\n", event);
     	char bitmask[ABS_MAX / 8] = {0};
     	bitmask[ABS_X / 8] |= (1 << (ABS_X % 8));
@@ -528,7 +500,7 @@ EXPORT int ioctl(int fd, int op, ...) {
     	memcpy(argp, (void *)&bitmask, sizeof(bitmask));
     	return 0;
     }
-    else if (type == 0x45 && number == 0x35) {
+    else if (op == IOCTL_EVIOCGBIT_FF) {
         Logger::log("Hooking ioctl EVIOCGBIT(EV_FF, len) for event %s\n", event);
         char bitmask[FF_MAX / 8] = {0};
         bitmask[FF_RUMBLE / 8] |= (1 << (FF_RUMBLE % 8));
@@ -536,7 +508,7 @@ EXPORT int ioctl(int fd, int op, ...) {
         memcpy(argp, (void *)&bitmask, sizeof(bitmask));
         return 0;
     }
-    else if (type == 0x45 && number == 0x80) {
+    else if (op == IOCTL_EVIOCSFF) {
         struct ff_effect *effect = (struct ff_effect *)argp;
         if (effect->id == -1) {
             effect->id = next_ff_id++;
@@ -544,18 +516,19 @@ EXPORT int ioctl(int fd, int op, ...) {
         ff_effects[effect->id] = *effect;
         return 0;
     }
-    else if (type == 0x45 && number == 0x81) {
+    else if (op == IOCTL_EVIOCRMFF) {
         int id = (intptr_t)argp;
         ff_effects.erase(id);
         return 0;
     }
-    else if (type == 0x45 && number == 0x84) {
+    else if (op == IOCTL_EVIOCGEFFECTS) {
         int max_effects = 16;
         memcpy(argp, &max_effects, sizeof(int));
         return 0;
     }
-    else if (type == 0x45 && number >= 0x40 && number <= 0x51) {
+    else if (op >= IOCTL_EVIOCGABS_MIN && op <= IOCTL_EVIOCGABS_MAX) {
     	Logger::log("Hooking ioctl EVIOCGABS(ABS) for event %s\n", event);
+    	int number = op & 0xFF;
     	struct input_absinfo abs_info;
     	memset(&abs_info, 0, sizeof(abs_info));
     	if (number >= 0x40 && number <= 0x41) {
@@ -587,12 +560,12 @@ EXPORT int ioctl(int fd, int op, ...) {
     	memcpy(argp, (void *)&abs_info, sizeof(abs_info));
     	return 0;
     }
-    else if (type == 0x45 && number == 0x90) {
+    else if (op == IOCTL_EVIOCGRAB) {
     	Logger::log("Hooking ioctl EVIOCGRAB for event %s\n", event);
     	/* Always pretend this succeeds */
     	return 0;
     }
-    else if (type == 0x6A && number == 0x13) {
+    else if (op == IOCTL_JSIOCGNAME) {
     	Logger::log("Hooking ioctl JSIOCGNAME(len) for event %s\n", event);
     	char *name;
         asprintf(&name, "Generic HID Gamepad %d", event_number);
@@ -601,6 +574,8 @@ EXPORT int ioctl(int fd, int op, ...) {
     	return 0;
     }
     else {
+    	int type = (op >> 8 & 0xFF);
+    	int number = (op >> 0 & 0xFF);
     	Logger::log("Unhandled evdev ioctl, type %d number %d\n", type, number);
     	return syscall(SYS_ioctl, fd, op, argp);
     }
@@ -610,16 +585,16 @@ static std::set<int> closed_fds;
 
 EXPORT int close(int fd) {
     if (!g_hooks_ready) return syscall(SYS_close, fd);
-	if (!my_close)
-		*(void **)&my_close = dlsym(RTLD_NEXT, "close");
-	if (!my_close)
-        return syscall(SYS_close, fd);
+	DLSYM_OR_FALLBACK(my_close, "close", syscall(SYS_close, fd));
 
 	{
 	    std::lock_guard<std::mutex> lock(controller_map_mutex);
 	    if (closed_fds.count(fd)) {
 	        return 0;
 	    }
+	    // closed_fds is bounded by process lifetime: the OS recycles fd numbers,
+	    // and each fd is inserted at most once. The set cannot grow beyond the
+	    // maximum fd value the kernel assigns to this process.
 	    closed_fds.insert(fd);
 	    auto controller = controller_map.find(fd);
 	    if (controller != controller_map.end()) {
@@ -702,10 +677,7 @@ static void check_ff_event(const struct input_event *ev, uint16_t slot) {
 
 EXPORT ssize_t write(int fd, const void *buf, size_t count) {
   if (!g_hooks_ready) return syscall(SYS_write, fd, buf, count);
-  if (!my_write)
-    *(void **)&my_write = dlsym(RTLD_NEXT, "write");
-  if (!my_write)
-    return syscall(SYS_write, fd, buf, count);
+  DLSYM_OR_FALLBACK(my_write, "write", syscall(SYS_write, fd, buf, count));
 
   const char *event = nullptr;
   {
@@ -732,16 +704,22 @@ EXPORT ssize_t write(int fd, const void *buf, size_t count) {
     	          return (ssize_t)count;
     	      }
     	      // Multi-event: filter out FF events by writing only non-FF events
-    	      struct input_event filtered[num_events];
+    	      struct input_event stack_filtered[32];
+    	      struct input_event* filtered = (num_events <= 32) ? stack_filtered :
+    	          (struct input_event*)malloc(num_events * sizeof(struct input_event));
+    	      if (!filtered) return (ssize_t)count;
     	      size_t filtered_count = 0;
     	      for (size_t i = 0; i < num_events; i++) {
     	          if (ev[i].type != EV_FF) {
     	              filtered[filtered_count++] = ev[i];
     	          }
     	      }
-    	      if (filtered_count == 0)
+    	      if (filtered_count == 0) {
+    	          if (filtered != stack_filtered) free(filtered);
     	          return (ssize_t)count;
+    	      }
     	      ssize_t written = my_write(fd, filtered, filtered_count * sizeof(struct input_event));
+    	      if (filtered != stack_filtered) free(filtered);
     	      if (written >= 0)
     	          return (ssize_t)count;
     	      return written;
@@ -753,10 +731,7 @@ EXPORT ssize_t write(int fd, const void *buf, size_t count) {
 
 EXPORT ssize_t writev(int fd, const struct iovec *iov, int iovcnt) {
   if (!g_hooks_ready) return syscall(SYS_writev, fd, iov, iovcnt);
-  if (!real_writev)
-    *(void **)&real_writev = dlsym(RTLD_NEXT, "writev");
-  if (!real_writev)
-    return syscall(SYS_writev, fd, iov, iovcnt);
+  DLSYM_OR_FALLBACK(real_writev, "writev", syscall(SYS_writev, fd, iov, iovcnt));
   const char *event = nullptr;
   {
       std::lock_guard<std::mutex> lock(controller_map_mutex);

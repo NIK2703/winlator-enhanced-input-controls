@@ -23,11 +23,18 @@
 #define MAX_TAP_TRAVEL 10
 #define RANGE_TAP_TIMEOUT_MS 200
 #define TAP_MAX_TIME_MS 200
+#define GESTURE_SECOND_MASK (GESTURE_MASK(GESTURE_SINGLE_2ND) | GESTURE_MASK(GESTURE_DOUBLE_2ND) | GESTURE_MASK(GESTURE_SINGLE_DRAG_2ND) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND))
 #define MOUSE_WHEEL_DELTA 120
 
 // Scheduled actions (non-blocking replacement for delay_ms)
 #define MAX_SCHEDULED_ACTIONS 32
 #define MAX_HELD_ACTIONS 16
+#define GRID_COLS 8
+#define GRID_ROWS 8
+#define DPAD_RADIUS_MULTIPLIER  7.0f
+#define STICK_RADIUS_MULTIPLIER 6.0f
+#define RANGE_HEIGHT_MULTIPLIER 2.0f
+#define MAX_BINDINGS_PER_ELEMENT 4
 
 typedef struct {
     uint64_t scheduled_time_ms;
@@ -74,8 +81,6 @@ typedef struct {
     int free_finger_hint;
 
     // === HIT-TESTING: spatial grid + element layout (every touch DOWN) ===
-    #define GRID_COLS 8
-    #define GRID_ROWS 8
     float grid_cell_w;
     float grid_cell_h;
     float grid_min_x;
@@ -241,6 +246,19 @@ static inline bool current_mode_has_gesture(GestureType t) {
 }
 
 // Copy main-finger bindings from mode bindings (zeroes second-finger slots).
+static inline void copy_main_finger_bindings(FingerBindings* fb, const GestureModeBindings* mb) {
+    fb->single_tap = mb->single_tap;            fb->single_tap_count = mb->single_tap_count;
+    fb->long_press = mb->long_press;            fb->long_press_count = mb->long_press_count;
+    fb->double_tap = mb->double_tap;            fb->double_tap_count = mb->double_tap_count;
+    fb->single_tap_drag = mb->single_tap_drag;  fb->single_tap_drag_count = mb->single_tap_drag_count;
+    fb->long_press_drag = mb->long_press_drag;  fb->long_press_drag_count = mb->long_press_drag_count;
+    fb->double_tap_drag = mb->double_tap_drag;  fb->double_tap_drag_count = mb->double_tap_drag_count;
+    fb->single_tap_2nd = NULL;  fb->single_tap_2nd_count = 0;
+    fb->double_tap_2nd = NULL;  fb->double_tap_2nd_count = 0;
+    fb->single_tap_drag_2nd = NULL; fb->single_tap_drag_2nd_count = 0;
+    fb->double_tap_drag_2nd = NULL; fb->double_tap_drag_2nd_count = 0;
+}
+// Legacy macro, prefer inline function above
 #define COPY_FROM_MODE_BINDINGS(fb_, mb_) { \
     (fb_)->single_tap = (mb_).single_tap;            (fb_)->single_tap_count = (mb_).single_tap_count; \
     (fb_)->long_press = (mb_).long_press;            (fb_)->long_press_count = (mb_).long_press_count; \
@@ -291,6 +309,19 @@ static inline bool gesture_processing_needed(void) {
 }
 
 // Copy second-finger bindings from mode bindings (2nd variants map to primary slots).
+static inline void copy_second_finger_bindings(FingerBindings* fb, const GestureModeBindings* mb) {
+    fb->single_tap = mb->single_2nd;          fb->single_tap_count = mb->single_2nd_count;
+    fb->long_press = NULL;                     fb->long_press_count = 0;
+    fb->double_tap = mb->double_2nd;          fb->double_tap_count = mb->double_2nd_count;
+    fb->single_tap_drag = mb->single_drag_2nd; fb->single_tap_drag_count = mb->single_drag_2nd_count;
+    fb->long_press_drag = NULL;                fb->long_press_drag_count = 0;
+    fb->double_tap_drag = mb->double_drag_2nd; fb->double_tap_drag_count = mb->double_drag_2nd_count;
+    fb->single_tap_2nd = NULL; fb->single_tap_2nd_count = 0;
+    fb->double_tap_2nd = NULL; fb->double_tap_2nd_count = 0;
+    fb->single_tap_drag_2nd = NULL; fb->single_tap_drag_2nd_count = 0;
+    fb->double_tap_drag_2nd = NULL; fb->double_tap_drag_2nd_count = 0;
+}
+// Legacy macro, prefer inline function above
 #define COPY_FROM_MODE_BINDINGS_2ND(fb_, mb_) { \
     (fb_)->single_tap = (mb_).single_2nd;          (fb_)->single_tap_count = (mb_).single_2nd_count; \
     (fb_)->long_press = NULL;                      (fb_)->long_press_count = 0; \
@@ -311,7 +342,7 @@ static inline void setup_main_finger_bindings(FingerBindings* fb) {
         mb.single_tap_drag = NULL; mb.single_tap_drag_count = 0;
         mb.single_drag_2nd = NULL; mb.single_drag_2nd_count = 0;
     }
-    COPY_FROM_MODE_BINDINGS(fb, mb);
+    copy_main_finger_bindings(fb, &mb);
 }
 
 // Set up second-finger bindings: 2nd variants map to primary FingerBindings slots.
@@ -324,7 +355,7 @@ static inline void setup_second_finger_bindings(TouchFinger* f) {
         return;
     }
     const GestureModeBindings* mb = get_mode_bindings();
-    COPY_FROM_MODE_BINDINGS_2ND(fb, *mb);
+    copy_second_finger_bindings(fb, mb);
     if (g_state.cfg.is_tp) {
         fb->single_tap_drag = NULL; fb->single_tap_drag_count = 0;
     }
@@ -336,16 +367,16 @@ static inline void setup_second_finger_bindings(TouchFinger* f) {
 static inline void element_compute_snapped_hwhh(TouchElement* e, float snap) {
     float hs = snap;
     switch (e->type) {
-        case ELEM_DPAD: e->hw = hs * 7.0f * e->scale; e->hh = hs * 7.0f * e->scale; break;
+        case ELEM_DPAD: e->hw = hs * DPAD_RADIUS_MULTIPLIER * e->scale; e->hh = hs * DPAD_RADIUS_MULTIPLIER * e->scale; break;
         case ELEM_STICK:
-        case ELEM_TRACKPAD: e->hw = hs * 6.0f * e->scale; e->hh = hs * 6.0f * e->scale; break;
+        case ELEM_TRACKPAD: e->hw = hs * STICK_RADIUS_MULTIPLIER * e->scale; e->hh = hs * STICK_RADIUS_MULTIPLIER * e->scale; break;
         case ELEM_BUTTON:
             if (e->shape == SHAPE_CIRCLE) { e->hw = hs * 3.0f * e->scale; e->hh = hs * 3.0f * e->scale; }
             else { e->hw = e->w * hs * 0.5f * e->scale; e->hh = e->h * hs * 0.5f * e->scale; }
             break;
         case ELEM_RANGE_BUTTON:
             e->hw = hs * ((e->range_binding_count * 4) / 2) * e->scale;
-            e->hh = hs * 2.0f * e->scale;
+            e->hh = hs * RANGE_HEIGHT_MULTIPLIER * e->scale;
             if (e->range_orientation == 1) { float _t = e->hw; e->hw = e->hh; e->hh = _t; }
             break;
         default: e->hw = e->w * hs * 0.5f * e->scale; e->hh = e->h * hs * 0.5f * e->scale; break;
@@ -448,7 +479,7 @@ static inline void enter_sdtw(TouchFinger* f, uint64_t time_ms) {
     sdtw_ctx->dt_waiting = true;
     sdtw_ctx->dt_wait_start_time = time_ms;
     copy_bindings_bounded(f->bindings.double_tap, f->bindings.double_tap_count,
-        sdtw_ctx->pending_double, &sdtw_ctx->pending_double_count, FALLBACK_MAX);
+        sdtw_ctx->pending_double.items, &sdtw_ctx->pending_double.count, FALLBACK_MAX);
 }
 
 static inline bool finger_has_gesture(const TouchFinger* f) {
@@ -461,16 +492,22 @@ static inline bool finger_has_gesture(const TouchFinger* f) {
 }
 
 static inline bool element_has_toggle(const TouchElement* e) {
-    return e->bindings[0].toggle || e->bindings[1].toggle || e->bindings[2].toggle || e->bindings[3].toggle;
+    for (int i = 0; i < MAX_BINDINGS_PER_ELEMENT; i++)
+        if (e->bindings[i].toggle) return true;
+    return false;
 }
 
 static inline bool element_has_auto_repeat(const TouchElement* e) {
-    return e->bindings[0].auto_repeat || e->bindings[1].auto_repeat || e->bindings[2].auto_repeat || e->bindings[3].auto_repeat;
+    for (int i = 0; i < MAX_BINDINGS_PER_ELEMENT; i++)
+        if (e->bindings[i].auto_repeat) return true;
+    return false;
 }
 
 // Cached fields accessed directly via f->cached_* — no wrapper overhead needed
 
 #define BINDING_GAMEPAD_COUNT 24
+#define GAMEPAD_RIGHT_STICK_BASE 16
+#define GAMEPAD_RIGHT_STICK_COUNT 4
 
 static inline bool is_keyboard_binding(const TouchBinding* b) {
     return b->type >= BINDING_KEYBOARD_FIRST && b->type <= BINDING_KEYBOARD_LAST;
@@ -480,7 +517,7 @@ static inline bool is_gamepad_binding(const TouchBinding* b) {
 }
 static inline bool is_right_stick_binding(const TouchElement* e) {
     int bt = e->bindings[0].type - BINDING_GAMEPAD_BASE;
-    return bt >= 16 && bt <= 19;
+    return bt >= GAMEPAD_RIGHT_STICK_BASE && bt < GAMEPAD_RIGHT_STICK_BASE + GAMEPAD_RIGHT_STICK_COUNT;
 }
 
 // Element shared helpers
