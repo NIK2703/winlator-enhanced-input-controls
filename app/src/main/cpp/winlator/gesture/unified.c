@@ -140,7 +140,7 @@ const GesturePairSlot* select_s_slot(const TouchFinger* f) {
 // MOVE slot selection — handles all 5 gesture types
 // ============================================================
 static inline bool has_actual_dt_state(const GestureFingerCtx* ctx) {
-    return ctx->deferred_double_count > 0
+    return ctx->deferred_double.count > 0
         || ctx->post_double_tap_drag;
 }
 
@@ -151,7 +151,7 @@ const GesturePairSlot* select_slot_for_move(
         return f->is_second_finger ? NULL : SLOT_L();
     if (f->is_second_finger)
         return has_actual_dt_state(ctx) ? SLOT_D2() : SLOT_S2();
-    if (ctx->post_double_tap_drag || ctx->deferred_double_count > 0)
+    if (ctx->post_double_tap_drag || ctx->deferred_double.count > 0)
         return SLOT_D();
     return SLOT_S();
 }

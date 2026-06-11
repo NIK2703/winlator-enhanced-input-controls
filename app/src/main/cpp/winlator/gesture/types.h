@@ -5,33 +5,9 @@
 
 // ---- Constants ----
 #define FALLBACK_MAX 8
+#define GESTURE_SLOT_COUNT 5
 #define TP_EARLY_EXIT_MS 200
 #define INVALID_PTR_ID (-1)
-
-// GestureBindingSet — precomputed boolean flags (mirrors Java GestureHandler.BindingSet)
-typedef struct {
-    bool has_active_single_tap;
-    bool has_active_double_tap;
-    bool has_active_long_press;
-    bool has_active_single_tap_drag;
-    bool has_active_long_press_drag;
-    bool has_active_double_tap_drag;
-    bool has_long_press_timer;
-
-} GestureBindingSet;
-
-// Build a GestureBindingSet from a FingerBindings struct (mirrors Java buildBindingSet())
-static inline GestureBindingSet gesture_build_binding_set(const FingerBindings* fb) {
-    GestureBindingSet s;
-    s.has_active_single_tap = fb->single_tap_count > 0;
-    s.has_active_double_tap = fb->double_tap_count > 0;
-    s.has_active_long_press = fb->long_press_count > 0;
-    s.has_active_single_tap_drag = fb->single_tap_drag_count > 0;
-    s.has_active_long_press_drag = fb->long_press_drag_count > 0;
-    s.has_active_double_tap_drag = fb->double_tap_drag_count > 0;
-    s.has_long_press_timer = s.has_active_long_press || s.has_active_long_press_drag;
-    return s;
-}
 
 // ---- Unified gesture pair branching ----
 
@@ -88,7 +64,6 @@ static inline GesturePairPlan gesture_decide_branch(GestureBranchParams bp) {
             p.hold_delay_ms = bp.hold_delay_ms;
         } else {
             // S-only, no competition, no hold: execute immediately (caller will hold)
-            // execute immediately
         }
         return p;
     }
@@ -106,7 +81,7 @@ bool gesture_is_within_tap_distance(float x, float y);
 void gesture_cancel_double_tap_wait(TouchActionResult* restrict result);
 void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger* f);
 
-// Unified tap execution helpers (shared across base.c, entry.c, handler.c)
+// Unified tap execution helpers (shared across base.c, handler.c)
 void execute_tap_on_finger_down(TouchFinger* f, TouchActionResult* restrict result,
     uint64_t time_ms, GesturePairPlan plan, bool force_hold,
     const TouchBinding* x, int x_cnt);
@@ -128,6 +103,14 @@ void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
     const TouchBinding* deferred_double, int deferred_double_count);
 
 // ============================================================
+// BindingSlot — reusable container for a fixed-capacity binding array
+// ============================================================
+typedef struct {
+    TouchBinding items[FALLBACK_MAX];
+    int count;
+} BindingSlot;
+
+// ============================================================
 // Unified per-finger gesture context
 // Replaces all per-finger global arrays (main vs second finger)
 // ============================================================
@@ -140,17 +123,10 @@ typedef struct {
     bool dt_waiting;
     uint64_t dt_wait_start_time;
 
-    TouchBinding fallback[FALLBACK_MAX];
-    int fallback_count;
-
-    TouchBinding pending_double[FALLBACK_MAX];
-    int pending_double_count;
-
-    TouchBinding deferred_double[FALLBACK_MAX];
-    int deferred_double_count;
-
-    TouchBinding pending_long_press[FALLBACK_MAX];
-    int pending_long_press_count;
+    BindingSlot fallback;
+    BindingSlot pending_double;
+    BindingSlot deferred_double;
+    BindingSlot pending_long_press;
 
     bool is_second_finger;
 } GestureFingerCtx;
@@ -170,8 +146,8 @@ typedef enum {
 // Gesture pair slot — encodes ALL differences between gesture
 // pairs (S/Sd, D/Dd, L/Ld, S2/Sd2, D2/Dd2) as data.
 // ============================================================
-// All boolean flags eliminated — use direct checks on GestureType fields
-// and is_second_finger instead.
+// Boolean flags eliminated — uses direct checks on GestureType fields;
+// is_second_finger tracks main vs second finger.
 typedef struct {
     GestureType bindings_non_drag;
     GestureType bindings_drag;
@@ -207,7 +183,7 @@ GesturePairPlan resolve_gesture_pair(
     const GesturePairSlot* slot);
 
 // Global gesture slot table (defined in unified.c)
-extern const GesturePairSlot GESTURE_SLOTS[5];
+extern const GesturePairSlot GESTURE_SLOTS[GESTURE_SLOT_COUNT];
 
 // ---- Named slot accessors ----
 #define SLOT_S()   (&GESTURE_SLOTS[0])   // S/Sd  (main single tap)

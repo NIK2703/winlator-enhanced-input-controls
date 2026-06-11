@@ -381,14 +381,14 @@ void release_element_bindings(TouchElement* e, TouchActionResult* restrict resul
 }
 
 void touch_finger_cache_bs(TouchFinger* f) {
-    GestureBindingSet bs = gesture_build_binding_set(&f->bindings);
-    f->cached_has_active_single_tap = bs.has_active_single_tap;
-    f->cached_has_active_double_tap = bs.has_active_double_tap;
-    f->cached_has_active_long_press = bs.has_active_long_press;
-    f->cached_has_active_single_tap_drag = bs.has_active_single_tap_drag;
-    f->cached_has_active_long_press_drag = bs.has_active_long_press_drag;
-    f->cached_has_active_double_tap_drag = bs.has_active_double_tap_drag;
-    f->cached_has_long_press_timer = bs.has_long_press_timer;
+    const FingerBindings* b = &f->bindings;
+    f->cached_has_active_single_tap = b->single_tap_count > 0;
+    f->cached_has_active_double_tap = b->double_tap_count > 0;
+    f->cached_has_active_long_press = b->long_press_count > 0;
+    f->cached_has_active_single_tap_drag = b->single_tap_drag_count > 0;
+    f->cached_has_active_long_press_drag = b->long_press_drag_count > 0;
+    f->cached_has_active_double_tap_drag = b->double_tap_drag_count > 0;
+    f->cached_has_long_press_timer = b->long_press_count > 0 || b->long_press_drag_count > 0;
 }
 
 void build_spatial_grid(void) {

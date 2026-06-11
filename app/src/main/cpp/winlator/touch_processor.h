@@ -227,7 +227,7 @@ typedef struct {
     float sub_pixel_x, sub_pixel_y;
     float travel_x, travel_y;
     bool active;
-    // Cached GestureBindingSet fields (recomputed after bindings change, avoids rebuilding per call)
+    // Cached binding flags (recomputed after bindings change, avoids rebuilding per call)
     bool cached_has_active_single_tap;
     bool cached_has_active_double_tap;
     bool cached_has_active_long_press;
