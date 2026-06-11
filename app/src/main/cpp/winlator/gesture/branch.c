@@ -852,17 +852,7 @@ static void up_handle_tp_early_exit(TouchFinger* f, GestureFingerCtx* ctx,
     }
 }
 
-// =========================================================================
-// DISPATCHER (public entry point)
-// =========================================================================
-void gesture_branch(TouchFinger* f, GestureFingerCtx* ctx,
-                    TouchActionResult* restrict result, uint64_t time_ms,
-                    GestureProcessEvent event,
-                    float dx, float dy)
-{
-    if (event >= GESTURE_EVENT_COUNT) return;
-    handlers[event](f, ctx, result, time_ms, dx, dy);
-}
+
 
 // =========================================================================
 // GESTURE_EVENT_DOWN
