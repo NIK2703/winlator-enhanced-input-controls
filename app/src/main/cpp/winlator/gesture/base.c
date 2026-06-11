@@ -86,7 +86,7 @@ void on_drag_start(TouchFinger* f, TouchActionResult* restrict result) {
     f->single_tap_hold_delay_ms = 0;
     // Execute pending second-finger D2 before clearing, so D2 isn't silently
     // lost when the second finger transitions to DRAGGING (two-finger DTD).
-    if (g_state.pending_second_double_count > 0) {
+    if (result && g_state.pending_second_double_count > 0) {
         execute_actions(result, g_state.pending_second_double, g_state.pending_second_double_count);
     }
     gesture_clear_second_finger_state();
