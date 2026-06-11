@@ -260,7 +260,7 @@ static CachedElementFieldIDs g_elem;
 static jobject g_dispatch_obj = NULL;
 static jmethodID g_dispatchAllActions;
 static jintArray g_dispatch_packed = NULL;
-#define DISPATCH_MAX_ACTIONS 32
+#define DISPATCH_MAX_ACTIONS 64
 
 
 

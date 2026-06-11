@@ -14,7 +14,7 @@ void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger
 
     if (g_state.gesture_pending_deferred_double_count > 0 && g_state.gesture_pending_double_count == 0) {
         copy_bindings_bounded(g_state.gesture_pending_deferred_double, g_state.gesture_pending_deferred_double_count,
-            g_state.gesture_pending_double, &g_state.gesture_pending_double_count, 8);
+            g_state.gesture_pending_double, &g_state.gesture_pending_double_count, FALLBACK_MAX);
     }
     g_state.gesture_pending_deferred_double_count = 0;
 
@@ -30,7 +30,7 @@ void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger
         confirm_double_tap(result, d_plan,
             g_state.gesture_pending_double, g_state.gesture_pending_double_count,
             g_state.gesture_pending_deferred_double,
-            &g_state.gesture_pending_deferred_double_count, 8,
+            &g_state.gesture_pending_deferred_double_count, FALLBACK_MAX,
             &g_state.gesture_post_double_tap_drag);
 
         g_state.gesture_pending_double_count = 0;
@@ -46,7 +46,7 @@ void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger
     if (g_state.gesture_pending_deferred_double_count > 0) {
         copy_bindings_bounded(g_state.gesture_pending_deferred_double,
             g_state.gesture_pending_deferred_double_count,
-            dt_ctx->deferred_double, &dt_ctx->deferred_double_count, 8);
+            dt_ctx->deferred_double, &dt_ctx->deferred_double_count, FALLBACK_MAX);
     }
     dt_ctx->post_double_tap_drag = g_state.gesture_post_double_tap_drag;
 }
@@ -61,9 +61,24 @@ bool resolve_drag_binding(
     const TouchBinding** out_binding,
     int* out_count)
 {
-    if (xd_count > 0) { *out_binding = xd; *out_count = xd_count; return true; }
-    if (press_on_drag && x_count > 0) { *out_binding = x; *out_count = x_count; return true; }
-    if (use_fallback && fb_count > 0) { *out_binding = fb; *out_count = fb_count; return true; }
+    if (xd_count > 0) {
+        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
+            "RESOLVE_DRAG: tier1_xd xd_cnt=%d type0=%d", xd_count, xd->type);
+        *out_binding = xd; *out_count = xd_count; return true;
+    }
+    if (press_on_drag && x_count > 0) {
+        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
+            "RESOLVE_DRAG: tier2_press_on_drag x_cnt=%d type0=%d", x_count, x->type);
+        *out_binding = x; *out_count = x_count; return true;
+    }
+    if (use_fallback && fb_count > 0) {
+        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
+            "RESOLVE_DRAG: tier3_fallback fb_cnt=%d type0=%d", fb_count, fb->type);
+        *out_binding = fb; *out_count = fb_count; return true;
+    }
+    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
+        "RESOLVE_DRAG: NONE xd_cnt=%d press=%d x_cnt=%d use_fb=%d fb_cnt=%d",
+        xd_count, press_on_drag, x_count, use_fallback, fb_count);
     return false;
 }
 
@@ -168,7 +183,7 @@ void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
     gesture_clear_deferred_tap();
     if (deferred_single && deferred_single_count > 0) {
         copy_bindings_bounded(deferred_single, deferred_single_count,
-            g_state.gesture_deferred_tap, &g_state.gesture_deferred_tap_count, 8);
+            g_state.gesture_deferred_tap, &g_state.gesture_deferred_tap_count, FALLBACK_MAX);
     }
     if (deferred_double && deferred_double_count > 0) {
         for (int _i = 0; _i < deferred_double_count && _i < 8; _i++) {
@@ -186,9 +201,9 @@ void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
     dt_ctx->dt_wait_start_time = time_ms;
     if (deferred_double && deferred_double_count > 0) {
         copy_bindings_bounded(deferred_double, deferred_double_count,
-            dt_ctx->pending_double, &dt_ctx->pending_double_count, 8);
+            dt_ctx->pending_double, &dt_ctx->pending_double_count, FALLBACK_MAX);
         copy_bindings_bounded(deferred_double, deferred_double_count,
-            dt_ctx->deferred_double, &dt_ctx->deferred_double_count, 8);
+            dt_ctx->deferred_double, &dt_ctx->deferred_double_count, FALLBACK_MAX);
     }
     f->cached_has_long_press_timer = false;
     f->state = GESTURE_STATE_DOUBLE_TAP_WAITING;

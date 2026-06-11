@@ -3,6 +3,8 @@ package com.winlator.cmod.core;
 import android.os.Process;
 
 
+import android.util.Log;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -63,9 +65,83 @@ public abstract class ProcessHelper {
     public static void resumeAllWineProcesses() {
         synchronized (stoppedPids) {
             for (int pid : stoppedPids) {
-                resumeProcess(pid);
+                if (isProcessAlive(pid)) {
+                    resumeProcess(pid);
+                }
             }
             stoppedPids.clear();
+
+            // Handle orphaned stopped wine processes (PPID=1, state=T)
+            // These can exist when box64 parent was killed while children were stopped
+            for (String process : listRunningWineProcesses()) {
+                int pid = Integer.parseInt(process);
+                if (isProcessStopped(pid)) {
+                    int ppid = getParentPid(pid);
+                    if (ppid <= 1) {
+                        Log.w("ProcessHelper", "Killing orphaned stopped wine process: pid=" + pid);
+                        killProcess(pid);
+                    } else {
+                        Log.w("ProcessHelper", "Resuming orphaned stopped wine process: pid=" + pid);
+                        resumeProcess(pid);
+                    }
+                }
+            }
+        }
+    }
+
+    public static boolean isProcessAlive(int pid) {
+        return new File("/proc/" + pid).exists();
+    }
+
+    public static boolean isProcessAliveByName(int pid, String namePrefix) {
+        try {
+            BufferedReader br = new BufferedReader(new InputStreamReader(
+                new FileInputStream("/proc/" + pid + "/stat")));
+            String data = br.readLine();
+            br.close();
+            int commStart = data.indexOf('(');
+            int commEnd = data.lastIndexOf(')');
+            if (commStart < 0 || commEnd <= commStart) return false;
+            String comm = data.substring(commStart + 1, commEnd);
+            return comm.contains(namePrefix);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static boolean isProcessStopped(int pid) {
+        try {
+            BufferedReader br = new BufferedReader(new InputStreamReader(
+                new FileInputStream("/proc/" + pid + "/stat")));
+            String data = br.readLine();
+            br.close();
+            int commStart = data.indexOf('(');
+            int commEnd = data.lastIndexOf(')');
+            if (commStart < 0 || commEnd <= commStart) return false;
+            // After ") " comes the state character (field 3)
+            String afterComm = data.substring(commEnd + 2);
+            char state = afterComm.charAt(0);
+            return state == 'T' || state == 't';
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static int getParentPid(int pid) {
+        try {
+            BufferedReader br = new BufferedReader(new InputStreamReader(
+                new FileInputStream("/proc/" + pid + "/stat")));
+            String data = br.readLine();
+            br.close();
+            int commStart = data.indexOf('(');
+            int commEnd = data.lastIndexOf(')');
+            if (commStart < 0 || commEnd <= commStart) return -1;
+            // After ") " comes state (char), then space, then ppid (int)
+            String afterComm = data.substring(commEnd + 2);
+            String[] fields = afterComm.split("\\s+");
+            return Integer.parseInt(fields[1]); // field index 1 = ppid
+        } catch (Exception e) {
+            return -1;
         }
     }
 

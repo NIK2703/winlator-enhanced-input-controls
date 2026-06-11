@@ -196,6 +196,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             pid = -1;
         }
         if (currentPid != -1) {
+            ProcessHelper.resumeAllWineProcesses();
             ProcessHelper.killProcess(currentPid);
         }
     }

@@ -273,9 +273,18 @@ public class FakeInputWriter {
             try {
                 channel.write(buffer);
             } catch (IOException e) {
-
+                // Write failed — invalidate prev state so next write retries everything
+                resetPrevState();
+                close();
             }
         }
+    }
+
+    private void resetPrevState() {
+        for (int i = 0; i < prevButtonStates.length; i++) prevButtonStates[i] = false;
+        prevThumbLX = prevThumbLY = prevThumbRX = prevThumbRY = 0;
+        prevTriggerL = prevTriggerR = 0;
+        prevHatX = prevHatY = 0;
     }
 
     public boolean isOpen() {

@@ -224,6 +224,7 @@ typedef struct {
     uint64_t down_time_ms;
     uint64_t last_move_time_ms;
     float last_x, last_y;
+    float sub_pixel_x, sub_pixel_y;
     float travel_x, travel_y;
     bool active;
     // Cached GestureBindingSet fields (recomputed after bindings change, avoids rebuilding per call)

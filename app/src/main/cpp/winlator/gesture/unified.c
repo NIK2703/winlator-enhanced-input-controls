@@ -2,6 +2,8 @@
 #include "types.h"
 #include "branch.h"
 
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture", __VA_ARGS__)
+
 // ============================================================
 // Per-finger gesture context
 // ============================================================
@@ -17,26 +19,22 @@ GestureFingerCtx g_ctx[MAX_FINGERS];
 // ============================================================
 const GesturePairSlot GESTURE_SLOTS[5] = {
     // Slot 0: S/Sd  (main finger single tap)
-    //  bind_non_drag     bind_drag              tp_non   tp_drag     comp_dt              comp_lp             comp_dt_drag             is2 comp_dt comp_lp
-    { GESTURE_SINGLE_TAP, GESTURE_SINGLE_TAP_DRAG,  0,       0,         GESTURE_DOUBLE_TAP,  GESTURE_LONG_PRESS, GESTURE_DOUBLE_TAP_DRAG, false, true,  true,
-    //  down_save_fb  agg_tp_delta  hold_check  resolve_fb  press_always  gate_tp_nodrag  down_hold  tick_s  tick_dt_fb
-        false,        false,        false,      false,      false,        true,           false,     false,  false },
-
+    { GESTURE_SINGLE_TAP, GESTURE_SINGLE_TAP_DRAG,  0,  0,
+      GESTURE_DOUBLE_TAP, GESTURE_LONG_PRESS, false },
     // Slot 1: D/Dd  (main finger double tap)
-    { GESTURE_DOUBLE_TAP, GESTURE_DOUBLE_TAP_DRAG,  0,       0,         0,                   0,                     0,                        false, false, false,
-        false, false, false, false, false, true,  false, false, false },
-
+    { GESTURE_DOUBLE_TAP, GESTURE_DOUBLE_TAP_DRAG,  0,  0,
+      0, 0, false },
     // Slot 2: L/Ld  (main finger long press)
-    { GESTURE_LONG_PRESS, GESTURE_LONG_PRESS_DRAG,  0,       0,         GESTURE_DOUBLE_TAP,  0,                     GESTURE_DOUBLE_TAP_DRAG,  false, true,  false,
-        false, false, false, false, false, true,  false, false, false },
-
+    { GESTURE_LONG_PRESS, GESTURE_LONG_PRESS_DRAG,  0,  0,
+      GESTURE_DOUBLE_TAP, 0, false },
     // Slot 3: S2/Sd2 (second finger single tap)
-    { GESTURE_SINGLE_2ND, GESTURE_SINGLE_DRAG_2ND,  GESTURE_SINGLE_2ND, GESTURE_SINGLE_DRAG_2ND, GESTURE_DOUBLE_2ND, 0, GESTURE_DOUBLE_DRAG_2ND, true,  true,  false,
-        true,  true,  true,  true,  true,  false, true,  true,  true },
-
+    { GESTURE_SINGLE_2ND, GESTURE_SINGLE_DRAG_2ND,
+      GESTURE_SINGLE_2ND, GESTURE_SINGLE_DRAG_2ND,
+      GESTURE_DOUBLE_2ND, 0, true },
     // Slot 4: D2/Dd2 (second finger double tap)
-    { GESTURE_DOUBLE_2ND, GESTURE_DOUBLE_DRAG_2ND,  GESTURE_DOUBLE_2ND, GESTURE_DOUBLE_DRAG_2ND, 0,                  0,                     0,                        true,  false, false,
-        true,  true,  true,  true,  true,  false, false, false, true  },
+    { GESTURE_DOUBLE_2ND, GESTURE_DOUBLE_DRAG_2ND,
+      GESTURE_DOUBLE_2ND, GESTURE_DOUBLE_DRAG_2ND,
+      0, 0, true },
 };
 
 // ============================================================
@@ -98,9 +96,9 @@ GesturePairPlan resolve_gesture_pair(
     const TouchFinger* f,
     const GesturePairSlot* slot)
 {
-    bool cd = slot->has_comp_dt
+    bool cd = slot->comp_dt != 0
         && (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag);
-    bool cl = slot->has_comp_lp
+    bool cl = slot->comp_lp != 0
         && f->cached_has_long_press_timer;
 
     bool hx =
@@ -122,6 +120,92 @@ GesturePairPlan resolve_gesture_pair(
 
     return gesture_decide_branch(gesture_branch_params(hx, hxd, cd, cl,
         g_state.cfg.is_ts, slot->is_second_finger, hd));
+}
+
+// ============================================================
+// DT slot selection — returns D/Dd for main, D2/Dd2 for second
+// ============================================================
+const GesturePairSlot* select_dt_slot(const TouchFinger* f) {
+    return f->is_second_finger ? SLOT_D2() : SLOT_D();
+}
+
+// ============================================================
+// S/Sd or S2/Sd2 slot selection
+// ============================================================
+const GesturePairSlot* select_s_slot(const TouchFinger* f) {
+    return f->is_second_finger ? SLOT_S2() : SLOT_S();
+}
+
+// ============================================================
+// MOVE slot selection — handles all 5 gesture types
+// ============================================================
+static inline bool has_actual_dt_state(const GestureFingerCtx* ctx) {
+    return ctx->deferred_double_count > 0
+        || ctx->post_double_tap_drag;
+}
+
+const GesturePairSlot* select_slot_for_move(
+    const TouchFinger* f, const GestureFingerCtx* ctx)
+{
+    if (f->state == GESTURE_STATE_LONG_PRESSING)
+        return f->is_second_finger ? NULL : SLOT_L();
+    if (f->is_second_finger)
+        return has_actual_dt_state(ctx) ? SLOT_D2() : SLOT_S2();
+    if (ctx->post_double_tap_drag || ctx->deferred_double_count > 0)
+        return SLOT_D();
+    return SLOT_S();
+}
+
+// ============================================================
+// UP slot selection
+// ============================================================
+const GesturePairSlot* select_slot_for_up(
+    const TouchFinger* f, const GestureFingerCtx* ctx)
+{
+    if (f->state == GESTURE_STATE_LONG_PRESSING)
+        return SLOT_L();
+    if (f->is_second_finger)
+        return has_actual_dt_state(ctx) ? SLOT_D2() : SLOT_S2();
+    return SLOT_S();
+}
+
+// ============================================================
+// Second-finger cleanup — consolidates duplicate code from UP
+// ============================================================
+void cleanup_second_finger(TouchFinger* f, GestureFingerCtx* ctx,
+                           TouchActionResult* restrict result) {
+    // Execute pending D2 from SDTW confirm before releasing state
+    if (g_state.pending_second_double_count > 0
+        && !g_state.gesture_is_action_held) {
+        LOGD("CLEANUP ptr=%d PENDING_D2 cnt=%d",
+            f->ptr_id, g_state.pending_second_double_count);
+        execute_actions(result, g_state.pending_second_double,
+            g_state.pending_second_double_count);
+    }
+    g_state.pending_second_double_count = 0;
+
+    // SDTW was just entered — clear gesture_second_active so the NEXT second
+    // finger DOWN can be recognized (otherwise it hits branch.c:46 as "3rd+ finger").
+    // Preserve second_double_tap_waiting for the SDTW confirm check.
+    if (ctx->dt_waiting) {
+        LOGD("CLEANUP ptr=%d SDTW_JUST_ENTERED preserve dt_waiting", f->ptr_id);
+        release_held_actions(result);
+        add_action(result, ACT_POINTER_BUTTON_RELEASE, 0, 0, 0);
+        add_action(result, ACT_POINTER_BUTTON_RELEASE, 2, 0, 0);
+        g_state.gesture_second_active = false;
+        f->state = GESTURE_STATE_DOUBLE_TAP_WAITING;
+        return;
+    }
+
+    g_state.second_double_tap_waiting = false;
+    if (!(ctx->post_double_tap_drag && g_state.gesture_is_action_held)) {
+        release_held_actions(result);
+        add_action(result, ACT_POINTER_BUTTON_RELEASE, 0, 0, 0);
+        add_action(result, ACT_POINTER_BUTTON_RELEASE, 2, 0, 0);
+    }
+    gesture_clear_second_finger_globals();
+    f->state = GESTURE_STATE_IDLE;
+    deactivate_finger(f);
 }
 
 // ============================================================

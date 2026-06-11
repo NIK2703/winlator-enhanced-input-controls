@@ -3,6 +3,10 @@
 
 #include "../touch_processor.h"
 
+// ---- Constants ----
+#define FALLBACK_MAX 8
+#define TP_EARLY_EXIT_MS 200
+
 // GestureBindingSet — precomputed boolean flags (mirrors Java GestureHandler.BindingSet)
 typedef struct {
     bool has_active_single_tap;
@@ -127,7 +131,6 @@ void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
 // Replaces all per-finger global arrays (main vs second finger)
 // ============================================================
 typedef struct {
-    int  hold_delay_ms;
     uint64_t hold_timer;
     bool single_tap_deferred;
     uint64_t single_tap_deferred_time;
@@ -135,8 +138,6 @@ typedef struct {
     bool dt_consumed;
     bool dt_waiting;
     uint64_t dt_wait_start_time;
-    float last_tap_up_x, last_tap_up_y;
-    bool deferred_second_finger_tap;
 
     TouchBinding fallback[8];
     int fallback_count;
@@ -150,8 +151,6 @@ typedef struct {
     TouchBinding pending_long_press[8];
     int pending_long_press_count;
 
-    int original_ptr_id;
-    bool double_tap_original_id_set;
     bool is_second_finger;
 } GestureFingerCtx;
 
@@ -169,6 +168,8 @@ typedef enum {
 // Gesture pair slot — encodes ALL differences between gesture
 // pairs (S/Sd, D/Dd, L/Ld, S2/Sd2, D2/Dd2) as data.
 // ============================================================
+// All boolean flags eliminated — use direct checks on GestureType fields
+// and is_second_finger instead.
 typedef struct {
     GestureType bindings_non_drag;
     GestureType bindings_drag;
@@ -176,21 +177,7 @@ typedef struct {
     GestureType tp_drag;
     GestureType comp_dt;
     GestureType comp_lp;
-    GestureType comp_dt_drag;  // Drag variant of comp_dt (for held-action TP check)
     bool is_second_finger;
-    bool has_comp_dt;
-    bool has_comp_lp;
-
-    // Unified behavioral flags — ELIMINATE is_second_finger branches
-    bool down_save_fallback;     // DOWN: save non-drag as fallback
-    bool move_agg_tp_delta;      // MOVE: aggregate TP main-finger delta
-    bool move_hold_check;        // MOVE: check held-action w/ SD+Dd before drag
-    bool move_resolve_fb;        // MOVE: use ctx->fallback in drag resolution
-    bool move_press_always;      // MOVE: press_on_drag unconditional
-    bool move_gate_tp_nodrag;    // MOVE: TP gate when no drag bindings
-    bool down_hold_always;       // DOWN: always hold non-drag (bypass plan, second finger S2)
-    bool tick_s_execute;         // TICK: S hold -> execute_actions (not hold)
-    bool tick_dt_uses_fb;        // TICK: DT timeout uses fallback
 } GesturePairSlot;
 
 // Per-finger context array (defined in unified.c)
@@ -219,5 +206,22 @@ GesturePairPlan resolve_gesture_pair(
 
 // Global gesture slot table (defined in unified.c)
 extern const GesturePairSlot GESTURE_SLOTS[5];
+
+// ---- Named slot accessors ----
+#define SLOT_S()   (&GESTURE_SLOTS[0])   // S/Sd  (main single tap)
+#define SLOT_D()   (&GESTURE_SLOTS[1])   // D/Dd  (main double tap)
+#define SLOT_L()   (&GESTURE_SLOTS[2])   // L/Ld  (main long press)
+#define SLOT_S2()  (&GESTURE_SLOTS[3])   // S2/Sd2 (second single tap)
+#define SLOT_D2()  (&GESTURE_SLOTS[4])   // D2/Dd2 (second double tap)
+
+// ---- Slot selection helpers (defined in unified.c) ----
+const GesturePairSlot* select_dt_slot(const TouchFinger* f);
+const GesturePairSlot* select_s_slot(const TouchFinger* f);
+const GesturePairSlot* select_slot_for_move(const TouchFinger* f, const GestureFingerCtx* ctx);
+const GesturePairSlot* select_slot_for_up(const TouchFinger* f, const GestureFingerCtx* ctx);
+
+// ---- Second-finger cleanup (defined in unified.c) ----
+void cleanup_second_finger(TouchFinger* f, GestureFingerCtx* ctx,
+                           TouchActionResult* restrict result);
 
 #endif // TOUCH_PROCESSOR_GESTURE_TYPES_H

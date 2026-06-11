@@ -618,6 +618,7 @@ public class WinHandler {
         Log.d("Winlator_WinH", "sendGamepadState");
         final ControlsProfile profile = activity.getInputControlsView().getProfile();
         if (profile == null) {
+            Log.w("Winlator_WinH", "sendGamepadState: profile=null, releasing slot");
             releaseSlot(OSC_DEVICE_ID);
             return;
         }
@@ -630,8 +631,11 @@ public class WinHandler {
             int slot = assignSlot(OSC_DEVICE_ID);
             if (slot >= 0 && writers[slot] != null) {
                 writers[slot].writeGamepadState(gamepadState);
+            } else {
+                Log.w("Winlator_WinH", "sendGamepadState: slot="+slot+" writers["+(slot >= 0 ? slot : "N/A")+"]="+(slot >= 0 ? writers[slot] : "N/A"));
             }
         } else {
+            Log.w("Winlator_WinH", "sendGamepadState: useVirtualGamepad=false (isVirtualGamepad="+profile.isVirtualGamepad()+" showTouchscreenControls="+activity.getInputControlsView().isShowTouchscreenControls()+"), releasing slot");
             releaseSlot(OSC_DEVICE_ID);
         }
 

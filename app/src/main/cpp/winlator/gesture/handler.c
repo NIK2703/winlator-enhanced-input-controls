@@ -799,9 +799,13 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                 if (ady > accel_threshold)
                     dy = ady * accel_factor * (dy > 0 ? 1.0f : -1.0f);
             }
-            if (dx != 0 || dy != 0) {
-                int id = lrintf(dx);
-                int jd = lrintf(dy);
+            dx += f->sub_pixel_x;
+            dy += f->sub_pixel_y;
+            int id = lrintf(dx);
+            int jd = lrintf(dy);
+            f->sub_pixel_x = dx - id;
+            f->sub_pixel_y = dy - jd;
+            if (id != 0 || jd != 0) {
                 if (g_state.cfg.input_mode == INPUT_RELATIVE)
                     add_action(result, ACT_MOUSE_EVENT, 0, id, jd);
                 else
@@ -848,6 +852,12 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
     }
     if (had_tracked || had_element) {
         // Element fingers must NEVER enter gesture states...
+        // Reset gesture_main_ptr_id if it was pointing to this element finger,
+        // so subsequent gesture fingers aren't misclassified as "second" fingers.
+        if (g_state.gesture_main_ptr_id == pid) {
+            g_state.gesture_main_ptr_id = -1;
+            gesture_clear_second_finger_globals();
+        }
         g_state.main_ptr_id = -1;
         deactivate_finger(f);
         return;

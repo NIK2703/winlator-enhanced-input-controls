@@ -251,6 +251,7 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     f->x = x; f->y = y;
     f->down_x = x; f->down_y = y;
     f->last_x = x; f->last_y = y;
+    f->sub_pixel_x = 0; f->sub_pixel_y = 0;
     f->down_time_ms = time_ms;
     f->travel_x = 0; f->travel_y = 0;
     f->is_tap = true;
@@ -273,9 +274,8 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
 
     if (gesture_processing_needed())
         handle_gesture_down(f, x, y, time_ms, &result);
-    if (result.count == 0) {
-        TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "on_finger_down ptr=%d 0 actions", ptr_id);
-    }
+    TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "on_finger_down ptr=%d actions=%d active=%d",
+        ptr_id, result.count, g_state.active_finger_count);
     return result;
 }
 
@@ -651,6 +651,10 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
     if (__builtin_expect(tick_us > 16000, 0)) {
         TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick: SLOW %lluus (>16ms budget) actions=%d",
             (unsigned long long)tick_us, result.count);
+    }
+    if (result.count > 0) {
+        TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "tick DONE: actions=%d active=%d",
+            result.count, g_state.active_finger_count);
     }
     return result;
 }

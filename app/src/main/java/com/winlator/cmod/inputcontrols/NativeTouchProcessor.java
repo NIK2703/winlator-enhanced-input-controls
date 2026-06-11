@@ -194,7 +194,7 @@ public class NativeTouchProcessor {
 
     private XServer xServer;
     private InputControlsView inputControlsView;
-    private boolean running;
+    private volatile boolean running;
     private static final String TAG = "NativeTouchProc";
     private Handler handler;
     private InputMode inputMode;
@@ -205,6 +205,18 @@ public class NativeTouchProcessor {
     private int mouseMoveHold;
     private Runnable mouseMoveRunnable;
     private Runnable mouseMoveTask;
+
+    // Diagnostic: ring buffer of last 200 events for crash analysis
+    private static final int EVENT_RING_SIZE = 200;
+    private final String[] eventRing = new String[EVENT_RING_SIZE];
+    private int eventRingHead = 0;
+    private long lastDispatchTime = 0;
+    private int dispatchCount = 0;
+    private int dispatchErrorCount = 0;
+    private long lastFingerDownTime = 0;
+    private int fingerDownCount = 0;
+    private long lastTickTime = 0;
+    private int tickCount = 0;
     {
         mouseMoveTask = () -> {
             if (xServer == null) return;
@@ -232,6 +244,43 @@ public class NativeTouchProcessor {
             loaded = false;
         }
         Log.w("Winlator_Controls", "NativeTouchProcessor: library loaded=" + loaded);
+    }
+
+    // === DIAGNOSTIC METHODS ===
+
+    private void recordEvent(String event) {
+        eventRing[eventRingHead] = System.currentTimeMillis() + " " + event;
+        eventRingHead = (eventRingHead + 1) % EVENT_RING_SIZE;
+    }
+
+    /** Call periodically (from tick) to dump full diagnostic state */
+    public void dumpDiagnostics() {
+        long now = System.currentTimeMillis();
+        Log.w("Winlator_Diag", "=== DIAGNOSTIC DUMP t=" + now + " ===");
+        Log.w("Winlator_Diag", "loaded=" + loaded + " running=" + running);
+        Log.w("Winlator_Diag", "xServer=" + xServer + " winHandler=" + (xServer != null ? xServer.getWinHandler() : "null"));
+        Log.w("Winlator_Diag", "dispatchPacked=" + (dispatchPacked != null ? "len=" + dispatchPacked.length : "NULL"));
+        Log.w("Winlator_Diag", "fingerDownCount=" + fingerDownCount + " lastFingerDown=" + (now - lastFingerDownTime) + "ms ago");
+        Log.w("Winlator_Diag", "tickCount=" + tickCount + " lastTick=" + (now - lastTickTime) + "ms ago");
+        Log.w("Winlator_Diag", "dispatchCount=" + dispatchCount + " dispatchErrors=" + dispatchErrorCount);
+        Log.w("Winlator_Diag", "lastDispatch=" + (now - lastDispatchTime) + "ms ago");
+
+        // Dump inputControlsView state
+        if (inputControlsView != null) {
+            Log.w("Winlator_Diag", "icv: showTouchscreen=" + inputControlsView.isShowTouchscreenControls()
+                + " profile=" + inputControlsView.getProfile());
+        }
+
+        // Dump last 50 events from ring buffer
+        Log.w("Winlator_Diag", "--- last events (ring buffer) ---");
+        int start = (eventRingHead - 50 + EVENT_RING_SIZE) % EVENT_RING_SIZE;
+        for (int i = 0; i < 50; i++) {
+            int idx = (start + i) % EVENT_RING_SIZE;
+            if (eventRing[idx] != null) {
+                Log.w("Winlator_Diag", "  [" + i + "] " + eventRing[idx]);
+            }
+        }
+        Log.w("Winlator_Diag", "=== END DIAGNOSTIC ===");
     }
 
     public boolean isLoaded() { return loaded; }
@@ -283,7 +332,7 @@ public class NativeTouchProcessor {
         }
         Log.w("Winlator_Controls", "init: called with config touchMode=" + config.touchMode + " inputMode=" + config.inputMode + " screen=" + config.screenW + "x" + config.screenH);
         nativeInit(config);
-        dispatchPacked = new int[128]; // max 32 actions × 4 ints
+        dispatchPacked = new int[256]; // max 64 actions × 4 ints
         nativeSetDispatchPacked(dispatchPacked);
         nativeRegisterDispatcher(this);
         visualBuffer = nativeGetVisualBuffer();
@@ -639,22 +688,34 @@ public class NativeTouchProcessor {
     }
 
     public void onFingerDown(int ptrId, float x, float y, long eventTime) {
-        if (!loaded || !running) return;
+        if (!loaded || !running) {
+            Log.w("Winlator_Touch", "onFingerDown DROPPED: loaded="+loaded+" running="+running+" ptrId="+ptrId);
+            return;
+        }
         nativeOnFingerDown(ptrId, x, y, eventTime);
     }
 
     public void onFingerMove(int ptrId, float x, float y, long eventTime) {
-        if (!loaded || !running) return;
+        if (!loaded || !running) {
+            Log.w("Winlator_Touch", "onFingerMove DROPPED: loaded="+loaded+" running="+running+" ptrId="+ptrId);
+            return;
+        }
         nativeOnFingerMove(ptrId, x, y, eventTime);
     }
 
     public void onFingerUp(int ptrId, float x, float y, long eventTime) {
-        if (!loaded || !running) return;
+        if (!loaded || !running) {
+            Log.w("Winlator_Touch", "onFingerUp DROPPED: loaded="+loaded+" running="+running+" ptrId="+ptrId);
+            return;
+        }
         nativeOnFingerUp(ptrId, x, y, eventTime);
     }
 
     public void tick(long eventTime) {
-        if (!loaded || !running) return;
+        if (!loaded || !running) {
+            Log.w("Winlator_Touch", "tick DROPPED: loaded="+loaded+" running="+running);
+            return;
+        }
         nativeTick(eventTime);
     }
 
@@ -684,28 +745,31 @@ public class NativeTouchProcessor {
 
     public void start() {
         running = true;
+        Log.w("Winlator_Touch", "start: running=true");
     }
     public void stop() {
         running = false;
+        Log.w("Winlator_Touch", "stop: running=false");
     }
 
     public void injectPointerMove(int x, int y) {
-        xServer.injectPointerMove(x, y);
+        if (xServer != null) xServer.injectPointerMove(x, y);
     }
 
     public void injectPointerMoveDelta(int dx, int dy) {
-        xServer.injectPointerMoveDelta(dx, dy);
+        if (xServer != null) xServer.injectPointerMoveDelta(dx, dy);
     }
 
     public void injectPointerButtonPress(int button) {
-        xServer.injectPointerButtonPress(POINTER_BUTTONS[button]);
+        if (xServer != null) xServer.injectPointerButtonPress(POINTER_BUTTONS[button]);
     }
 
     public void injectPointerButtonRelease(int button) {
-        xServer.injectPointerButtonRelease(POINTER_BUTTONS[button]);
+        if (xServer != null) xServer.injectPointerButtonRelease(POINTER_BUTTONS[button]);
     }
 
     public void injectKeyPress(int keycode, boolean isDown) {
+        if (xServer == null) return;
         if (keycode >= 0 && keycode < KEYCODES_BY_ID.length) {
             XKeycode kc = KEYCODES_BY_ID[keycode];
             if (kc != null) {
@@ -716,6 +780,7 @@ public class NativeTouchProcessor {
     }
 
     public void injectKeyRelease(int keycode, boolean isDown) {
+        if (xServer == null) return;
         if (keycode >= 0 && keycode < KEYCODES_BY_ID.length) {
             XKeycode kc = KEYCODES_BY_ID[keycode];
             if (kc != null) {
@@ -725,11 +790,13 @@ public class NativeTouchProcessor {
     }
 
     public void mouseEvent(int flags, int dx, int dy) {
-        xServer.getWinHandler().mouseEvent(flags, dx, dy, 0);
+        if (xServer != null && xServer.getWinHandler() != null) {
+            xServer.getWinHandler().mouseEvent(flags, dx, dy, 0);
+        }
     }
 
     public void scrollEvent(int amount) {
-        if (amount != 0) xServer.injectScroll(amount);
+        if (xServer != null && amount != 0) xServer.injectScroll(amount);
     }
 
     public void hapticEvent(int effect) {
@@ -762,48 +829,56 @@ public class NativeTouchProcessor {
 
     public void gamepadState(int btn, boolean isDown) {
         Log.d("Winlator_StickBinding", "NTP.gamepadState btn="+btn+" isDown="+isDown);
-        if (xServer.getWinHandler() != null) {
+        if (xServer != null && xServer.getWinHandler() != null) {
             xServer.getWinHandler().sendGamepadState(btn, isDown);
+        } else {
+            Log.w("Winlator_StickBinding", "NTP.gamepadState DROPPED: xServer="+xServer+" winHandler="+(xServer != null ? xServer.getWinHandler() : "null"));
         }
     }
 
     public void gamepadAxis(int isLeft, int axisX, int axisY) {
         Log.d("Winlator_StickBinding", "NTP.gamepadAxis isLeft="+isLeft+" axisX="+axisX+" axisY="+axisY);
-        if (xServer.getWinHandler() != null) {
+        if (xServer != null && xServer.getWinHandler() != null) {
             xServer.getWinHandler().sendGamepadAxis(isLeft != 0, axisX, axisY);
+        } else {
+            Log.w("Winlator_StickBinding", "NTP.gamepadAxis DROPPED: xServer="+xServer+" winHandler="+(xServer != null ? xServer.getWinHandler() : "null"));
         }
     }
 
     public void dispatchAllActions(int count) {
         int[] buf = dispatchPacked;
         if (buf == null) return;
-        for (int i = 0; i < count; i++) {
-            int base = i * 4;
-            int type = buf[base];
-            int a0 = buf[base + 1];
-            int a1 = buf[base + 2];
-            int a2 = buf[base + 3];
-            if (type == 13 || type == 14) {
-                Log.d("Winlator_StickBinding", "NTP.dispatchAllActions type="+type+" a0="+a0+" a1="+a1+" a2="+a2);
+        try {
+            for (int i = 0; i < count; i++) {
+                int base = i * 4;
+                int type = buf[base];
+                int a0 = buf[base + 1];
+                int a1 = buf[base + 2];
+                int a2 = buf[base + 3];
+                if (type == 13 || type == 14) {
+                    Log.d("Winlator_StickBinding", "NTP.dispatchAllActions type="+type+" a0="+a0+" a1="+a1+" a2="+a2);
+                }
+                switch (type) {
+                    case 0: break; // ACT_NONE
+                    case 1: injectPointerMove(a0, a1); break;
+                    case 2: injectPointerMoveDelta(a0, a1); break;
+                    case 3: injectPointerButtonPress(a0); break;
+                    case 4: injectPointerButtonRelease(a0); break;
+                    case 5: injectKeyPress(a0, a1 != 0); break;
+                    case 6: injectKeyRelease(a0, a1 != 0); break;
+                    case 7: mouseEvent(a0, a1, a2); break;
+                    case 8: scrollEvent(a0); break;
+                    case 9: hapticEvent(a0); break;
+                    case 10: setCursorSpeed(a0); break;
+                    case 11: startMouseMove(a0, a1, a2); break;
+                    case 12: stopMouseMove(); break;
+                    case 13: gamepadState(a0, a1 != 0); break;
+                    case 14: break; // ACT_GAMEPAD_RELEASE - handled natively
+                    case 15: gamepadAxis(a0, a1, a2); break;
+                }
             }
-            switch (type) {
-                case 0: break; // ACT_NONE
-                case 1: injectPointerMove(a0, a1); break;
-                case 2: injectPointerMoveDelta(a0, a1); break;
-                case 3: injectPointerButtonPress(a0); break;
-                case 4: injectPointerButtonRelease(a0); break;
-                case 5: injectKeyPress(a0, a1 != 0); break;
-                case 6: injectKeyRelease(a0, a1 != 0); break;
-                case 7: mouseEvent(a0, a1, a2); break;
-                case 8: scrollEvent(a0); break;
-                case 9: hapticEvent(a0); break;
-                case 10: setCursorSpeed(a0); break;
-                case 11: startMouseMove(a0, a1, a2); break;
-                case 12: stopMouseMove(); break;
-                case 13: gamepadState(a0, a1 != 0); break;
-                case 14: break; // ACT_GAMEPAD_RELEASE - handled natively
-                case 15: gamepadAxis(a0, a1, a2); break;
-            }
+        } catch (Exception e) {
+            Log.e("Winlator_Controls", "dispatchAllActions: exception at count="+count, e);
         }
     }
 }

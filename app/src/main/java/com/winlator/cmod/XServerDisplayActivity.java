@@ -692,9 +692,9 @@ if (enableLogs) {
     @Override
     public void onResume() {
         super.onResume();
+        Log.w("Winlator_Diag", "onResume: nativeTouchProcessor=" + nativeTouchProcessor + " nativeTickRunnable=" + nativeTickRunnable);
         if (environment != null) {
             xServerView.onResume();
-            environment.onResume();
             xServerView.queueEvent(() -> xServerView.getRenderer().updateScene());
         }
         if (hudDataSource != null && frameRating != null && frameRating.isSavedVisible()) {
@@ -718,9 +718,9 @@ if (enableLogs) {
     @Override
     public void onPause() {
         super.onPause();
+        Log.w("Winlator_Diag", "onPause: nativeTouchProcessor=" + nativeTouchProcessor + " nativeTickRunnable=" + nativeTickRunnable);
         if (!isInPictureInPictureMode()) {
             if (environment != null) {
-                environment.onPause();
                 xServerView.onPause();
             }
         }
@@ -737,12 +737,10 @@ if (enableLogs) {
         }
     }
     public void onWineKeepaliveTimeout() {
-        Log.w(TAG, "Wine keepalive timeout - wine may be hung, attempting recovery");
-        if (winHandler != null) {
-            if (environment != null) environment.onPause();
-            try { Thread.sleep(500); } catch (InterruptedException ignored) {}
-            if (environment != null) environment.onResume();
-        }
+        Log.w(TAG, "Wine keepalive timeout - attempting full recovery");
+        ProcessHelper.pauseAllWineProcesses();
+        try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+        ProcessHelper.resumeAllWineProcesses();
     }
 
     private void exit() {
@@ -805,6 +803,7 @@ if (enableLogs) {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
+        Log.w("Winlator_Diag", "onWindowFocusChanged: hasFocus=" + hasFocus + " nativeTouchProcessor=" + nativeTouchProcessor);
         if (hasFocus) {
             if (cursorLock) touchpadView.requestPointerCapture();
         } else {
@@ -1767,7 +1766,11 @@ private void applySidebarSettings() {
             if (nativeTickRunnable == null) {
                 nativeTickRunnable = () -> {
                     if (nativeTouchProcessor != null) {
-                        inputControlsView.tick(SystemClock.uptimeMillis());
+                        try {
+                            inputControlsView.tick(SystemClock.uptimeMillis());
+                        } catch (Exception e) {
+                            Log.e("Winlator_Controls", "tick: exception in tick loop", e);
+                        }
                         if (handler != null) {
                             handler.postDelayed(nativeTickRunnable, tickIntervalMs);
                         }
@@ -1836,6 +1839,7 @@ private void applySidebarSettings() {
     }
 
     private void hideInputControls() {
+        Log.w("Winlator_Diag", "hideInputControls: nativeTouchProcessor=" + nativeTouchProcessor);
         inputControlsView.setShowTouchscreenControls(true);
         inputControlsView.setVisibility(View.GONE);
         inputControlsView.setProfile(null);

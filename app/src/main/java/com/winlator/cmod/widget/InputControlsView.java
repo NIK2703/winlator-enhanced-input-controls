@@ -616,10 +616,20 @@ public class InputControlsView extends View {
     }
 
     public void tick(long timeMs) {
-        Log.w("Winlator_Controls", "tick: start timeMs=" + timeMs);
+        Log.w("Winlator_Controls", "tick: start timeMs=" + timeMs + " nativeTP=" + nativeTouchProcessor);
         if (nativeTouchProcessor != null) {
-            nativeTouchProcessor.tick(timeMs);
-            syncVisualStates();
+            try {
+                nativeTouchProcessor.tick(timeMs);
+            } catch (Exception e) {
+                Log.e("Winlator_Controls", "tick: exception in nativeTick", e);
+            }
+            try {
+                syncVisualStates();
+            } catch (Exception e) {
+                Log.e("Winlator_Controls", "tick: exception in syncVisualStates", e);
+            }
+        } else {
+            Log.w("Winlator_Controls", "tick: nativeTouchProcessor is NULL!");
         }
         if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
             int w = getWidth();
@@ -791,7 +801,7 @@ public class InputControlsView extends View {
         {
             int actionIndex = event.getActionIndex();
             int pointerId = event.getPointerId(actionIndex);
-            Log.w("Winlator_Controls", "onTouchEvent: action=" + event.getActionMasked() + " pointerId=" + pointerId + " x=" + event.getX(actionIndex) + " y=" + event.getY(actionIndex));
+            Log.w("Winlator_Controls", "onTouchEvent: action=" + event.getActionMasked() + " pointerId=" + pointerId + " x=" + event.getX(actionIndex) + " y=" + event.getY(actionIndex) + " nativeTP=" + nativeTouchProcessor + " editMode=" + editMode);
         }
 
         // Route through native processor
@@ -799,57 +809,62 @@ public class InputControlsView extends View {
             int action = event.getActionMasked();
             int actionIndex = event.getActionIndex();
             int pointerId = event.getPointerId(actionIndex);
-            switch (action) {
-                case MotionEvent.ACTION_DOWN:
-                case MotionEvent.ACTION_POINTER_DOWN: {
-                    float x = event.getX(actionIndex);
-                    float y = event.getY(actionIndex);
-                    nativeTouchProcessor.onFingerDown(pointerId, x, y, event.getEventTime());
-                    syncVisualStates();
-                    if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
-                        elementOverlayRenderer.scheduleRender();
+            try {
+                switch (action) {
+                    case MotionEvent.ACTION_DOWN:
+                    case MotionEvent.ACTION_POINTER_DOWN: {
+                        float x = event.getX(actionIndex);
+                        float y = event.getY(actionIndex);
+                        nativeTouchProcessor.onFingerDown(pointerId, x, y, event.getEventTime());
+                        syncVisualStates();
+                        if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
+                            elementOverlayRenderer.scheduleRender();
+                        }
+                        return true;
                     }
-                    return true;
-                }
-                case MotionEvent.ACTION_MOVE: {
-                    int historySize = event.getHistorySize();
-                    for (int h = 0; h < historySize; h++) {
+                    case MotionEvent.ACTION_MOVE: {
+                        int historySize = event.getHistorySize();
+                        for (int h = 0; h < historySize; h++) {
+                            for (int i = 0; i < event.getPointerCount(); i++) {
+                                int pid = event.getPointerId(i);
+                                nativeTouchProcessor.onFingerMove(pid, event.getHistoricalX(i, h), event.getHistoricalY(i, h), event.getHistoricalEventTime(h));
+                            }
+                        }
                         for (int i = 0; i < event.getPointerCount(); i++) {
                             int pid = event.getPointerId(i);
-                            nativeTouchProcessor.onFingerMove(pid, event.getHistoricalX(i, h), event.getHistoricalY(i, h), event.getHistoricalEventTime(h));
+                            nativeTouchProcessor.onFingerMove(pid, event.getX(i), event.getY(i), event.getEventTime());
                         }
+                        syncVisualStates();
+                        if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
+                            elementOverlayRenderer.scheduleRender();
+                        }
+                        return true;
                     }
-                    for (int i = 0; i < event.getPointerCount(); i++) {
-                        int pid = event.getPointerId(i);
-                        nativeTouchProcessor.onFingerMove(pid, event.getX(i), event.getY(i), event.getEventTime());
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_POINTER_UP: {
+                        float x = event.getX(actionIndex);
+                        float y = event.getY(actionIndex);
+                        nativeTouchProcessor.onFingerUp(pointerId, x, y, event.getEventTime());
+                        syncVisualStates();
+                        if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
+                            elementOverlayRenderer.scheduleRender();
+                        }
+                        return true;
                     }
-                    syncVisualStates();
-                    if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
-                        elementOverlayRenderer.scheduleRender();
+                    case MotionEvent.ACTION_CANCEL: {
+                        nativeTouchProcessor.reset();
+                        invalidate();
+                        if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
+                            elementOverlayRenderer.scheduleRender();
+                        }
+                        return true;
                     }
-                    return true;
                 }
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_POINTER_UP: {
-                    float x = event.getX(actionIndex);
-                    float y = event.getY(actionIndex);
-                    nativeTouchProcessor.onFingerUp(pointerId, x, y, event.getEventTime());
-                    syncVisualStates();
-                    if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
-                        elementOverlayRenderer.scheduleRender();
-                    }
-                    return true;
-                }
-                case MotionEvent.ACTION_CANCEL: {
-                    nativeTouchProcessor.reset();
-                    invalidate();
-                    if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
-                        elementOverlayRenderer.scheduleRender();
-                    }
-                    return true;
-                }
+                return true;
+            } catch (Exception e) {
+                Log.e("Winlator_Controls", "onTouchEvent: exception in native processing", e);
+                return true;
             }
-            return true;
         }
 
         if (editMode && readyToDraw) {

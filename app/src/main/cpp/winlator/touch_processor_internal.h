@@ -68,6 +68,8 @@ typedef struct {
     bool gesture_is_down_event;
     float gesture_second_main_ref_x;
     float gesture_second_main_ref_y;
+    float second_sdtw_ref_x;
+    float second_sdtw_ref_y;
     bool passthrough_active;
     int free_finger_hint;
 
@@ -440,6 +442,8 @@ static inline void copy_bindings_bounded(const TouchBinding* src, int src_count,
 static inline void enter_sdtw(TouchFinger* f, uint64_t time_ms) {
     g_state.second_double_tap_waiting = true;
     g_state.second_tap_fallback_time = time_ms;
+    g_state.second_sdtw_ref_x = f->tap_up_x;
+    g_state.second_sdtw_ref_y = f->tap_up_y;
     GestureFingerCtx* sdtw_ctx = &g_ctx[(int)(f - g_state.fingers)];
     sdtw_ctx->dt_waiting = true;
     sdtw_ctx->dt_wait_start_time = time_ms;
@@ -666,6 +670,13 @@ static inline void start_drag_with_binding(TouchFinger* f,
         same_as_held = bindings_equal(drag_binding, drag_count,
                         g_state.gesture_held_actions, g_state.gesture_held_count);
     }
+    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
+        "START_DRAG_WITH_BIND ptr=%d held=%d held_cnt=%d same=%d "
+        "drag_cnt=%d drag_type=%d drag_type0=%d",
+        f->ptr_id, g_state.gesture_is_action_held, g_state.gesture_held_count,
+        same_as_held, drag_count,
+        drag_binding ? drag_binding->type : -1,
+        drag_count > 0 ? drag_binding->type : -1);
     if (!same_as_held) {
         TouchBinding saved_ar[MAX_HELD_ACTIONS];
         int saved_ar_count = 0;
