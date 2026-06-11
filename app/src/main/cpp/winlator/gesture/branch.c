@@ -41,15 +41,19 @@ static inline void reset_single_tap_hold_timer(TouchFinger* f) {
     f->single_tap_hold_timer = 0;
 }
 
+static inline void reset_common_gesture_state(void) {
+    g_state.gesture_post_double_tap_drag = false;
+}
+
 static inline void reset_main_gesture_state(void) {
     g_state.gesture_double_tap_waiting = false;
-    g_state.gesture_post_double_tap_drag = false;
+    reset_common_gesture_state();
     g_state.gesture_main_ptr_id = INVALID_PTR_ID;
 }
 
 static inline void reset_second_gesture_state(void) {
     g_state.gesture_second_active = false;
-    g_state.gesture_post_double_tap_drag = false;
+    reset_common_gesture_state();
     g_state.second_double_tap_waiting = false;
     g_state.pending_second_double_count = 0;
     g_state.second_tap_fallback_count = 0;
@@ -58,10 +62,6 @@ static inline void reset_second_gesture_state(void) {
 static inline void reset_dt_gesture_state(void) {
     g_state.gesture_double_tap_waiting = false;
     gesture_clear_deferred_tap();
-}
-
-static inline void cleanup_sdtw_timeout(void) {
-    reset_second_gesture_state();
 }
 
 // =========================================================================
@@ -164,7 +164,8 @@ static inline TapPathResult mark_dt_consumed_idle(TouchFinger* f, GestureFingerC
 // Path 1: deferred D from DT confirm
 static TapPathResult tap_path_deferred_double(
     TouchFinger* f, GestureFingerCtx* ctx,
-    TouchActionResult* restrict result)
+    TouchActionResult* restrict result, uint64_t time_ms __attribute__((unused)),
+    const TapPathParams* params __attribute__((unused)))
 {
     if (ctx->deferred_double.count > 0) {
         if (!g_state.gesture_is_action_held)
@@ -178,7 +179,10 @@ static TapPathResult tap_path_deferred_double(
 
 // Path 2: post-DT drag cleanup
 static TapPathResult tap_path_post_dt_drag(
-    TouchFinger* f, GestureFingerCtx* ctx)
+    TouchFinger* f, GestureFingerCtx* ctx,
+    TouchActionResult* restrict result __attribute__((unused)),
+    uint64_t time_ms __attribute__((unused)),
+    const TapPathParams* params __attribute__((unused)))
 {
     if (ctx->post_double_tap_drag)
         return mark_dt_consumed_idle(f, ctx);
@@ -188,13 +192,13 @@ static TapPathResult tap_path_post_dt_drag(
 // Path 3: DT consumed (3+ tap) — fire S binding
 static TapPathResult tap_path_dt_consumed(
     TouchFinger* f, GestureFingerCtx* ctx,
-    TouchActionResult* restrict result,
-    const TouchBinding* non_drag, int non_drag_count)
+    TouchActionResult* restrict result, uint64_t time_ms __attribute__((unused)),
+    const TapPathParams* params)
 {
     if (ctx->dt_consumed) {
         ctx->dt_consumed = false;
         g_state.gesture_double_tap_consumed = false;
-        execute_if_not_held(result, non_drag, non_drag_count);
+        execute_if_not_held(result, params->non_drag, params->non_drag_count);
         f->state = GESTURE_STATE_IDLE;
         return TAP_PATH_HANDLED;
     }
@@ -244,13 +248,13 @@ static TapPathResult execute_tap_path(
 {
     TapPathResult r;
 
-    r = tap_path_deferred_double(f, ctx, result);
+    r = tap_path_deferred_double(f, ctx, result, time_ms, params);
     if (r != TAP_PATH_SINGLE) return r;
 
-    r = tap_path_post_dt_drag(f, ctx);
+    r = tap_path_post_dt_drag(f, ctx, result, time_ms, params);
     if (r != TAP_PATH_SINGLE) return r;
 
-    r = tap_path_dt_consumed(f, ctx, result, params->non_drag, params->non_drag_count);
+    r = tap_path_dt_consumed(f, ctx, result, time_ms, params);
     if (r != TAP_PATH_SINGLE) return r;
 
     return tap_path_normal(f, ctx, result, time_ms, params);
@@ -356,7 +360,7 @@ static void tick_dt_timeout(TouchFinger* f, GestureFingerCtx* ctx,
         if (ctx->fallback.count > 0)
             execute_actions(result, ctx->fallback.items, ctx->fallback.count);
         ctx->fallback.count = 0;
-        cleanup_sdtw_timeout();
+        reset_second_gesture_state();
         TouchFinger* main_finger = find_finger(g_state.gesture_main_ptr_id);
         if (main_finger && finger_can_go_idle(main_finger))
             main_finger->state = GESTURE_STATE_IDLE;
@@ -1066,6 +1070,8 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
         case GESTURE_STATE_DOUBLE_TAP_WAITING:
             up_handle_dt_waiting(f, ctx, result, slot,
                 resolved.non_drag, resolved.non_drag_count);
+            break;
+        case GESTURE_STATE_IDLE:
             break;
         default:
             up_handle_default(f, ctx, result);

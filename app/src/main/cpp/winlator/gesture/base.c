@@ -23,23 +23,22 @@ static bool validate_dt_confirm(void) {
 static void copy_deferred_double_to_all(const TouchBinding* src, int src_count, GestureFingerCtx* dt_context);
 
 static void sync_dt_ctx(TouchFinger* f) {
-    GestureFingerCtx* dt_context = &g_ctx[finger_index(f)];
+    int idx = finger_index(f);
+    if (idx < 0) return;
+    GestureFingerCtx* dt_context = &g_ctx[idx];
     dt_context->dt_waiting = false;
     dt_context->pending_double.count = 0;
     dt_context->deferred_double.count = 0;
-    if (g_state.gesture_pending_deferred_double_count > 0) {
-        copy_bindings_bounded(g_state.gesture_pending_deferred_double,
-            g_state.gesture_pending_deferred_double_count,
-            dt_context->deferred_double.items, &dt_context->deferred_double.count, FALLBACK_MAX);
-    }
     dt_context->post_double_tap_drag = g_state.gesture_post_double_tap_drag;
 }
 
 void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger* f) {
     if (!validate_dt_confirm()) return;
 
+    int idx = finger_index(f);
+    if (idx < 0) return;
     copy_deferred_double_to_all(g_state.gesture_pending_deferred_double,
-        g_state.gesture_pending_deferred_double_count, &g_ctx[finger_index(f)]);
+        g_state.gesture_pending_deferred_double_count, &g_ctx[idx]);
 
     bool has_dt = g_state.gesture_pending_double_count > 0;
     bool has_dt_drag = f->bindings.double_tap_drag_count > 0;
@@ -129,7 +128,8 @@ void gesture_cancel_double_tap_wait(TouchActionResult* restrict result) {
     TouchFinger* main_finger = find_finger(g_state.gesture_main_ptr_id);
     if (main_finger) {
         main_finger->state = GESTURE_STATE_IDLE;
-        g_ctx[finger_index(main_finger)].dt_waiting = false;
+        int idx = finger_index(main_finger);
+        if (idx >= 0) g_ctx[idx].dt_waiting = false;
     }
 }
 
@@ -213,7 +213,9 @@ void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
         copy_bindings_bounded(deferred_single, deferred_single_count,
             g_state.gesture_deferred_tap, &g_state.gesture_deferred_tap_count, FALLBACK_MAX);
     }
-    GestureFingerCtx* dt_context = &g_ctx[finger_index(f)];
+    int idx = finger_index(f);
+    if (idx < 0) return;
+    GestureFingerCtx* dt_context = &g_ctx[idx];
     if (deferred_double && deferred_double_count > 0) {
         copy_deferred_double_to_all(deferred_double, deferred_double_count, dt_context);
     }
@@ -228,7 +230,19 @@ void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
 }
 
 // Confirm double-tap: execute D now or defer to finger-up.
-// Returns true if D was executed now, false if deferred.
+//
+// Returns:
+//   true  — was_executed_now: D actions were fired via execute_actions_hold.
+//   false — deferred: D actions were NOT fired; caller must execute them on finger-up.
+//
+// out_post_dtd:
+//   Set to true when post-double-tap-drag is enabled after this confirm.
+//   When was_executed_now=true  → true means drag is available for the held D.
+//   When was_executed_now=false → always true (deferred path always enables drag).
+//
+// dst/dst_count/dst_max:
+//   D bindings are always copied here regardless of the branch, so that
+//   check_start_drag can skip redundant Sd and PATH 1 fires on finger-up.
 bool confirm_double_tap(TouchActionResult* restrict result,
     GesturePairPlan d_plan,
     const TouchBinding* src, int src_count,

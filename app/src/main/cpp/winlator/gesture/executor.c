@@ -7,6 +7,7 @@ static void release_non_modifiers_first(TouchActionResult* restrict result, cons
 #define MOD_KEYCODE_CTRL  0x25
 #define MOD_KEYCODE_SHIFT 0x32
 #define MOD_KEYCODE_ALT   0x40
+#define MOVE_DIRECTION_COUNT 4
 
 bool is_modifier_binding(const TouchBinding* b) {
     if (is_keyboard_binding(b)) {
@@ -28,6 +29,10 @@ static inline bool is_mouse_button_binding(const TouchBinding* b) {
 
 static inline int gamepad_button_index(const TouchBinding* b) {
     return b->type - BINDING_GAMEPAD_BASE;
+}
+
+static inline uint64_t calc_press_delay(int binding_delay, int non_mod_count) {
+    return (binding_delay > 0 && non_mod_count > 0) ? (uint64_t)non_mod_count * binding_delay : 0;
 }
 
 static int schedule_action(TouchBinding binding, int action_type, uint64_t delay_from_now_ms) {
@@ -183,7 +188,7 @@ static bool execute_hold_actions(TouchActionResult* restrict result, const Touch
     bool hold = force_hold || (b->modifiers != 0);
     if (!hold && !b->auto_repeat) return false;
 
-    uint64_t press_delay = (binding_delay > 0 && non_mod_count > 0) ? (uint64_t)non_mod_count * binding_delay : 0;
+    uint64_t press_delay = calc_press_delay(binding_delay, non_mod_count);
     if (binding_delay > 0 && press_delay > 0) {
         schedule_action(*b, action_type_for_binding(b), press_delay);
     } else {
@@ -197,7 +202,7 @@ static bool execute_hold_actions(TouchActionResult* restrict result, const Touch
 
 static void execute_tap_actions(TouchActionResult* restrict result, const TouchBinding* b,
                                 int non_mod_count, int binding_delay) {
-    uint64_t press_delay = (binding_delay > 0 && non_mod_count > 0) ? (uint64_t)non_mod_count * binding_delay : 0;
+    uint64_t press_delay = calc_press_delay(binding_delay, non_mod_count);
     uint64_t release_delay = press_delay + binding_delay;
     if (is_gamepad_binding(b)) {
         int btn_idx = gamepad_button_index(b);
@@ -271,8 +276,9 @@ static void execute_actions_impl(TouchActionResult* restrict result, const Touch
     }
 
     // Release modifier keyboard bindings last in reverse order
-    if (binding_delay > 0 && non_mod_count > 0) {
-        uint64_t mod_release_delay = (uint64_t)non_mod_count * binding_delay + binding_delay;
+    uint64_t press_delay = calc_press_delay(binding_delay, non_mod_count);
+    if (press_delay > 0) {
+        uint64_t mod_release_delay = press_delay + binding_delay;
         for (int i = count - 1; i >= 0; i--) {
             const TouchBinding* b = &actions[i];
             if (b->type == BINDING_NONE) continue;
@@ -306,51 +312,49 @@ static int pointer_button_idx(const TouchBinding* b) {
         case BINDING_MOUSE_MIDDLE: return 1;
         case BINDING_MOUSE_BUTTON4: return 3;
         case BINDING_MOUSE_BUTTON5: return 4;
-        default: return 0;
+        default: return 0; /* MOUSE_LEFT fallback */
+    }
+}
+
+static void dispatch_binding_action(TouchActionResult* restrict result, const TouchBinding* b, bool is_press) {
+    if (b->type == BINDING_NONE) return;
+    if (is_gamepad_binding(b)) {
+        int btn_idx = gamepad_button_index(b);
+        add_action(result, ACT_GAMEPAD_STATE, btn_idx, is_press ? 1 : 0, 0);
+    } else if (is_keyboard_binding(b)) {
+        add_action(result, is_press ? ACT_KEY_PRESS : ACT_KEY_RELEASE, b->keycode, is_press ? 1 : 0, 0);
+    } else if (is_mouse_button_binding(b)) {
+        int btn = pointer_button_idx(b);
+        add_action(result, is_press ? ACT_POINTER_BUTTON_PRESS : ACT_POINTER_BUTTON_RELEASE, btn, 0, 0);
+    } else if (b->type == BINDING_MOUSE_SCROLL_UP) {
+        if (is_press) add_action(result, ACT_SCROLL, -1, 0, 0);
+    } else if (b->type == BINDING_MOUSE_SCROLL_DOWN) {
+        if (is_press) add_action(result, ACT_SCROLL, 1, 0, 0);
+    } else if (is_mouse_move_binding(b)) {
+        if (!is_press) {
+            add_action(result, ACT_STOP_MOUSE_MOVE, 0, 0, 0);
+        }
     }
 }
 
 void release_binding(TouchActionResult* restrict result, const TouchBinding* b) {
-    if (b->type == BINDING_NONE) return;
-    if (is_gamepad_binding(b)) {
-        add_action(result, ACT_GAMEPAD_STATE, gamepad_button_index(b), 0, 0);
-    } else if (is_keyboard_binding(b)) {
-        add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0);
-    } else if (is_mouse_button_binding(b)) {
-        add_action(result, ACT_POINTER_BUTTON_RELEASE, pointer_button_idx(b), 0, 0);
-    } else if (b->type == BINDING_MOUSE_SCROLL_UP || b->type == BINDING_MOUSE_SCROLL_DOWN) {
-        /* scroll: no-op on release */
-    } else if (is_mouse_move_binding(b)) {
-        add_action(result, ACT_STOP_MOUSE_MOVE, 0, 0, 0);
-    }
+    dispatch_binding_action(result, b, false);
 }
 
 void press_binding(TouchActionResult* restrict result, const TouchBinding* b, bool hold) {
     if (b->type == BINDING_NONE) return;
-    if (is_gamepad_binding(b)) {
-        int btn_idx = gamepad_button_index(b);
-        add_action(result, ACT_GAMEPAD_STATE, btn_idx, 1, 0);
-        if (!hold) { add_action(result, ACT_GAMEPAD_STATE, btn_idx, 0, 0); }
-    } else if (is_keyboard_binding(b)) {
-        add_action(result, ACT_KEY_PRESS, b->keycode, 1, 0);
-        if (!hold) { add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0); }
-    } else if (is_mouse_button_binding(b)) {
-        int btn = pointer_button_idx(b);
-        add_action(result, ACT_POINTER_BUTTON_PRESS, btn, 0, 0);
-        if (!hold) { add_action(result, ACT_POINTER_BUTTON_RELEASE, btn, 0, 0); }
-    } else if (b->type == BINDING_MOUSE_SCROLL_UP) {
-        add_action(result, ACT_SCROLL, -1, 0, 0);
-    } else if (b->type == BINDING_MOUSE_SCROLL_DOWN) {
-        add_action(result, ACT_SCROLL, 1, 0, 0);
-    } else if (is_mouse_move_binding(b)) {
+    if (is_mouse_move_binding(b)) {
         static const int move_dx[] = { -1, 1, 0, 0 };
         static const int move_dy[] = { 0, 0, -1, 1 };
         int idx = b->type - BINDING_MOUSE_MOVE_LEFT;
-        if (idx >= 0 && idx < 4) {
+        if (idx >= 0 && idx < MOVE_DIRECTION_COUNT) {
             add_action(result, ACT_START_MOUSE_MOVE, move_dx[idx], move_dy[idx], hold ? 1 : 0);
             if (!hold) { add_action(result, ACT_STOP_MOUSE_MOVE, 0, 0, 0); }
         }
+        return;
     }
+    dispatch_binding_action(result, b, true);
+    if (!hold) { dispatch_binding_action(result, b, false); }
 }
 
 static void compact_scheduled_actions(int old_count) {
