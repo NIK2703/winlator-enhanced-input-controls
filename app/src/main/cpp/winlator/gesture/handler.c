@@ -72,7 +72,7 @@ static inline void cleanup_second_finger_up(TouchActionResult* restrict result) 
         main->pending_resume_action_count = 0;
         main->state = GESTURE_STATE_DRAGGING;
     }
-    g_state.gesture_second_ptr_id = -1;
+    g_state.gesture_second_ptr_id = INVALID_PTR_ID;
 }
 
 static inline void schedule_pending_release(uint64_t* time_field, int* ptr_field, int* id_field, int ptr_id, uint64_t time_ms) {
@@ -221,7 +221,7 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
     if (g_state.gesture_main_ptr_id >= 0) {
         main_finger = find_finger(g_state.gesture_main_ptr_id);
         if (!main_finger || !main_finger->active) {
-            g_state.gesture_main_ptr_id = -1;
+            g_state.gesture_main_ptr_id = INVALID_PTR_ID;
             g_state.gesture_second_active = false;
         }
     }
@@ -528,7 +528,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                             if (toggle_btn->current_ptr_id >= 0) {
                                 int16_t eidx = (int16_t)(toggle_btn - g_state.elements);
                                 finger_remove_engaged(f, eidx);
-                                toggle_btn->current_ptr_id = -1;
+                                toggle_btn->current_ptr_id = INVALID_PTR_ID;
                                 toggle_btn->engaged = false;
                             }
                             handle_element_down(toggle_btn, f->ptr_id, x, y, time_ms, result);
@@ -591,7 +591,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
                             release_bindings_list(result, curr->element_gesture, curr->element_gesture_count);
                         if (hgl && !hlt)
                             release_bindings_list(result, curr->element_long_press, curr->element_long_press_count);
-                        curr->current_ptr_id = -1;
+                        curr->current_ptr_id = INVALID_PTR_ID;
                         curr->engaged = false;
                         handle_element_down(curr, f->ptr_id, x, y, time_ms, result);
                         if (hgt)
@@ -834,7 +834,7 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
     }
     // activation_mode_up for HOVER already clears hovered_element_per_ptr,
     // for TRACK does not. Gesture handler always clears unconditionally.
-    g_state.hovered_element_per_ptr[pi] = -1;
+    g_state.hovered_element_per_ptr[pi] = INVALID_PTR_ID;
 
     const int pid = f->ptr_id;
     bool had_element = false;
@@ -855,10 +855,10 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
         // Reset gesture_main_ptr_id if it was pointing to this element finger,
         // so subsequent gesture fingers aren't misclassified as "second" fingers.
         if (g_state.gesture_main_ptr_id == pid) {
-            g_state.gesture_main_ptr_id = -1;
+            g_state.gesture_main_ptr_id = INVALID_PTR_ID;
             gesture_clear_second_finger_globals();
         }
-        g_state.main_ptr_id = -1;
+        g_state.main_ptr_id = INVALID_PTR_ID;
         deactivate_finger(f);
         return;
     }
@@ -868,7 +868,7 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
         && !__builtin_expect(g_state.gesture_post_double_tap_drag, 0)
         && !__builtin_expect(g_state.second_double_tap_waiting, 0)) {
         deactivate_finger(f);
-        g_state.main_ptr_id = -1;
+        g_state.main_ptr_id = INVALID_PTR_ID;
         return;
     }
 
@@ -889,7 +889,7 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
                 f->pending_resume_action_count = 0;
                 f->double_tap_original_id_set = false;
                 f->state = GESTURE_STATE_IDLE;
-                g_state.gesture_main_ptr_id = -1;
+                g_state.gesture_main_ptr_id = INVALID_PTR_ID;
                 g_state.gesture_second_active = false;
             } else {
                 f->double_tap_original_id_set = false;
@@ -925,5 +925,5 @@ void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, Touch
         schedule_pending_release(&g_state.pending_right_release_time, &g_state.pending_right_release_ptr_id, &g_state.finger_pointer_right, f->ptr_id, time_ms);
     }
 
-    g_state.main_ptr_id = -1;
+    g_state.main_ptr_id = INVALID_PTR_ID;
 }

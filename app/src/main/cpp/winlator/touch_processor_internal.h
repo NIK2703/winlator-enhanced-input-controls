@@ -116,13 +116,13 @@ typedef struct {
     int finger_pointer_right;
 
     // === COLD: deferred actions, held actions, scheduled actions ===
-    TouchBinding gesture_deferred_tap[8];
+    TouchBinding gesture_deferred_tap[FALLBACK_MAX];
     int gesture_deferred_tap_count;
-    TouchBinding gesture_pending_double[8];
+    TouchBinding gesture_pending_double[FALLBACK_MAX];
     int gesture_pending_double_count;
-    TouchBinding gesture_pending_deferred_double[8];
+    TouchBinding gesture_pending_deferred_double[FALLBACK_MAX];
     int gesture_pending_deferred_double_count;
-    TouchBinding gesture_pending_deferred_long_press[8];
+    TouchBinding gesture_pending_deferred_long_press[FALLBACK_MAX];
     int gesture_pending_deferred_long_press_count;
     TouchBinding gesture_held_actions[16];
     int gesture_held_count;
@@ -131,10 +131,10 @@ typedef struct {
     int gesture_toggled_count;
     uint64_t gesture_auto_repeat_last_time[16];
     uint64_t gesture_auto_repeat_last_time_held[16];
-    TouchBinding second_tap_fallback[8];
+    TouchBinding second_tap_fallback[FALLBACK_MAX];
     int second_tap_fallback_count;
     uint64_t second_tap_fallback_time;
-    TouchBinding pending_second_double[8];
+    TouchBinding pending_second_double[FALLBACK_MAX];
     int pending_second_double_count;
 
     // Delayed release + sim
@@ -409,13 +409,13 @@ static inline void tap_up_cleanup(TouchFinger* f, TouchActionResult* restrict re
     if (!g_state.gesture_second_active || !g_state.gesture_is_action_held
         || g_state.cfg.is_tp)
         release_held_actions(result);
-    g_state.gesture_main_ptr_id = -1;
+    g_state.gesture_main_ptr_id = INVALID_PTR_ID;
     deactivate_finger(f);
 }
 
 static inline void gesture_clear_second_finger_globals(void) {
     g_state.gesture_second_active = false;
-    g_state.gesture_second_ptr_id = -1;
+    g_state.gesture_second_ptr_id = INVALID_PTR_ID;
     g_state.gesture_deferred_second_finger_tap = false;
     g_state.gesture_post_double_tap_drag = false;
     g_state.gesture_second_main_ref_x = 0;
@@ -448,7 +448,7 @@ static inline void enter_sdtw(TouchFinger* f, uint64_t time_ms) {
     sdtw_ctx->dt_waiting = true;
     sdtw_ctx->dt_wait_start_time = time_ms;
     copy_bindings_bounded(f->bindings.double_tap, f->bindings.double_tap_count,
-        sdtw_ctx->pending_double, &sdtw_ctx->pending_double_count, 8);
+        sdtw_ctx->pending_double, &sdtw_ctx->pending_double_count, FALLBACK_MAX);
 }
 
 static inline bool finger_has_gesture(const TouchFinger* f) {
@@ -588,8 +588,8 @@ TrackedButtons* get_tracked_buttons(int ptr_id);
 
 static inline void reset_tracked_slot(TrackedButtons* tb, int pid_slot) {
     tb->count = 0;
-    tb->ptr_id = -1;
-    g_state.hovered_element_per_ptr[pid_slot] = -1;
+    tb->ptr_id = INVALID_PTR_ID;
+    g_state.hovered_element_per_ptr[pid_slot] = INVALID_PTR_ID;
 }
 
 static inline bool gesture_remove_toggled_action(int type, int keycode) {

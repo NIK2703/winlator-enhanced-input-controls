@@ -6,6 +6,7 @@
 // ---- Constants ----
 #define FALLBACK_MAX 8
 #define TP_EARLY_EXIT_MS 200
+#define INVALID_PTR_ID (-1)
 
 // GestureBindingSet — precomputed boolean flags (mirrors Java GestureHandler.BindingSet)
 typedef struct {
@@ -139,16 +140,16 @@ typedef struct {
     bool dt_waiting;
     uint64_t dt_wait_start_time;
 
-    TouchBinding fallback[8];
+    TouchBinding fallback[FALLBACK_MAX];
     int fallback_count;
 
-    TouchBinding pending_double[8];
+    TouchBinding pending_double[FALLBACK_MAX];
     int pending_double_count;
 
-    TouchBinding deferred_double[8];
+    TouchBinding deferred_double[FALLBACK_MAX];
     int deferred_double_count;
 
-    TouchBinding pending_long_press[8];
+    TouchBinding pending_long_press[FALLBACK_MAX];
     int pending_long_press_count;
 
     bool is_second_finger;
@@ -161,7 +162,8 @@ typedef enum {
     GESTURE_EVENT_DOWN,
     GESTURE_EVENT_MOVE,
     GESTURE_EVENT_UP,
-    GESTURE_EVENT_TICK
+    GESTURE_EVENT_TICK,
+    GESTURE_EVENT_COUNT
 } GestureProcessEvent;
 
 // ============================================================
