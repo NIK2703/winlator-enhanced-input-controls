@@ -17,25 +17,25 @@ GestureFingerCtx g_ctx[MAX_FINGERS];
 // ============================================================
 const GesturePairSlot GESTURE_SLOTS[5] = {
     // Slot 0: S/Sd  (main finger single tap)
-    //  bind_non_drag     bind_drag              tp_non   tp_drag     comp_dt              comp_lp         is2 comp_dt comp_lp
-    { GESTURE_SINGLE_TAP, GESTURE_SINGLE_TAP_DRAG,  0,       0,         GESTURE_DOUBLE_TAP,  GESTURE_LONG_PRESS,     false, true,  true,
+    //  bind_non_drag     bind_drag              tp_non   tp_drag     comp_dt              comp_lp             comp_dt_drag             is2 comp_dt comp_lp
+    { GESTURE_SINGLE_TAP, GESTURE_SINGLE_TAP_DRAG,  0,       0,         GESTURE_DOUBLE_TAP,  GESTURE_LONG_PRESS, GESTURE_DOUBLE_TAP_DRAG, false, true,  true,
     //  down_save_fb  agg_tp_delta  hold_check  resolve_fb  press_always  gate_tp_nodrag  down_hold  tick_s  tick_dt_fb
         false,        false,        false,      false,      false,        true,           false,     false,  false },
 
     // Slot 1: D/Dd  (main finger double tap)
-    { GESTURE_DOUBLE_TAP, GESTURE_DOUBLE_TAP_DRAG,  0,       0,         0,                   0,                      false, false, false,
+    { GESTURE_DOUBLE_TAP, GESTURE_DOUBLE_TAP_DRAG,  0,       0,         0,                   0,                     0,                        false, false, false,
         false, false, false, false, false, true,  false, false, false },
 
     // Slot 2: L/Ld  (main finger long press)
-    { GESTURE_LONG_PRESS, GESTURE_LONG_PRESS_DRAG,  0,       0,         GESTURE_DOUBLE_TAP,  0,                      false, true,  false,
+    { GESTURE_LONG_PRESS, GESTURE_LONG_PRESS_DRAG,  0,       0,         GESTURE_DOUBLE_TAP,  0,                     GESTURE_DOUBLE_TAP_DRAG,  false, true,  false,
         false, false, false, false, false, true,  false, false, false },
 
     // Slot 3: S2/Sd2 (second finger single tap)
-    { GESTURE_SINGLE_2ND, GESTURE_SINGLE_DRAG_2ND,  GESTURE_SINGLE_2ND, GESTURE_SINGLE_DRAG_2ND, GESTURE_DOUBLE_2ND, 0,  true,  true,  false,
+    { GESTURE_SINGLE_2ND, GESTURE_SINGLE_DRAG_2ND,  GESTURE_SINGLE_2ND, GESTURE_SINGLE_DRAG_2ND, GESTURE_DOUBLE_2ND, 0, GESTURE_DOUBLE_DRAG_2ND, true,  true,  false,
         true,  true,  true,  true,  true,  false, true,  true,  true },
 
     // Slot 4: D2/Dd2 (second finger double tap)
-    { GESTURE_DOUBLE_2ND, GESTURE_DOUBLE_DRAG_2ND,  GESTURE_DOUBLE_2ND, GESTURE_DOUBLE_DRAG_2ND, 0,                   0,  true,  false, false,
+    { GESTURE_DOUBLE_2ND, GESTURE_DOUBLE_DRAG_2ND,  GESTURE_DOUBLE_2ND, GESTURE_DOUBLE_DRAG_2ND, 0,                  0,                     0,                        true,  false, false,
         true,  true,  true,  true,  true,  false, false, false, true  },
 };
 

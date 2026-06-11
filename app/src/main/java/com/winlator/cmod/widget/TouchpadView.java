@@ -17,12 +17,14 @@ import android.widget.FrameLayout;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
+import com.winlator.cmod.inputcontrols.InputDispatcher;
 import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.inputcontrols.NativeTouchProcessor;
+import com.winlator.cmod.inputcontrols.TouchTimeoutManager;
+import com.winlator.cmod.math.CoordinateTransform;
 import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.renderer.ViewTransformation;
 import com.winlator.cmod.winhandler.MouseEventFlags;
-import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XServer;
 
@@ -40,15 +42,15 @@ public class TouchpadView extends View {
     private boolean pointerButtonLeftEnabled = true;
     private boolean pointerButtonRightEnabled = true;
 
-    private Handler timeoutHandler;
-    private Runnable hideControlsRunnable;
+    private InputDispatcher inputDispatcher;
+    private TouchTimeoutManager touchTimeoutManager;
 
     @SuppressLint("ResourceType")
     public TouchpadView(Context context, XServer xServer, Handler timeoutHandler, Runnable hideControlsRunnable) {
         super(context);
         this.xServer = xServer;
-        this.timeoutHandler = timeoutHandler;
-        this.hideControlsRunnable = hideControlsRunnable;
+        this.inputDispatcher = new InputDispatcher(xServer);
+        this.touchTimeoutManager = new TouchTimeoutManager(timeoutHandler, hideControlsRunnable);
 
         setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setBackground(createTransparentBg());
@@ -80,30 +82,11 @@ public class TouchpadView extends View {
         ViewTransformation viewTransformation = new ViewTransformation();
         viewTransformation.update(outerWidth, outerHeight, innerWidth, innerHeight);
 
-        float invAspect = 1.0f / viewTransformation.aspect;
-        if (!xServer.getRenderer().isFullscreen()) {
-            XForm.makeTranslation(xform, -viewTransformation.viewOffsetX, -viewTransformation.viewOffsetY);
-            XForm.scale(xform, invAspect, invAspect);
-        } else
-            XForm.makeScale(xform, (float) innerWidth / outerWidth, (float) innerHeight / outerHeight);
-
-        if (nativeTouchProcessor != null) {
-            float scaleX, scaleY;
-            float offsetX, offsetY;
-            if (!xServer.getRenderer().isFullscreen()) {
-                scaleX = invAspect;
-                scaleY = invAspect;
-                offsetX = viewTransformation.viewOffsetX;
-                offsetY = viewTransformation.viewOffsetY;
-            } else {
-                scaleX = (float) innerWidth / outerWidth;
-                scaleY = (float) innerHeight / outerHeight;
-                offsetX = 0;
-                offsetY = 0;
-            }
-            nativeTouchProcessor.setXformScale(scaleX, scaleY);
-            nativeTouchProcessor.setViewOffset(offsetX, offsetY);
-        }
+        CoordinateTransform ct = new CoordinateTransform();
+        ct.compute(outerWidth, outerHeight, innerWidth, innerHeight,
+            xServer.getRenderer() != null && xServer.getRenderer().isFullscreen());
+        ct.applyToXform(xform);
+        ct.applyToNativeProcessor(nativeTouchProcessor);
     }
 
     public void updateVisibleRelativeCursor(int x, int y) {
@@ -117,7 +100,11 @@ public class TouchpadView extends View {
     }
 
     public InputMode getCurrentInputMode() {
-        return currentProfile != null ? currentProfile.getInputMode() : InputMode.ABSOLUTE;
+        return inputDispatcher.getInputMode();
+    }
+
+    public InputDispatcher getInputDispatcher() {
+        return inputDispatcher;
     }
 
     @Override
@@ -166,10 +153,7 @@ public class TouchpadView extends View {
     }
 
     private void resetTouchscreenTimeout() {
-        if (timeoutHandler != null && hideControlsRunnable != null) {
-            timeoutHandler.removeCallbacks(hideControlsRunnable);
-            timeoutHandler.postDelayed(hideControlsRunnable, 5000);
-        }
+        touchTimeoutManager.reset();
     }
 
     private boolean handleStylusHoverEvent(MotionEvent event) {
@@ -243,76 +227,46 @@ public class TouchpadView extends View {
         if (event.isFromSource(InputDevice.SOURCE_MOUSE)) {
             int actionButton = event.getActionButton();
             switch (event.getAction()) {
-                case MotionEvent.ACTION_BUTTON_PRESS:
-                    if (actionButton == MotionEvent.BUTTON_PRIMARY) {
-                        if (getCurrentInputMode() == InputMode.RELATIVE)
-                            xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTDOWN, 0, 0, 0);
-                        else
-                            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
-                    } else if (actionButton == MotionEvent.BUTTON_SECONDARY) {
-                        if (getCurrentInputMode() == InputMode.RELATIVE)
-                            xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTDOWN, 0, 0, 0);
-                        else
-                            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
-                    } else if (actionButton == MotionEvent.BUTTON_TERTIARY) {
-                        if (getCurrentInputMode() == InputMode.RELATIVE)
-                            xServer.getWinHandler().mouseEvent(MouseEventFlags.MIDDLEDOWN, 0, 0, 0);
-                        else
-                            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_MIDDLE);
-                    }
+                case MotionEvent.ACTION_BUTTON_PRESS: {
+                    Pointer.Button btn = toPointerButton(actionButton);
+                    if (btn != null) inputDispatcher.dispatchPointerButton(btn, true);
                     handled = true;
                     break;
-                case MotionEvent.ACTION_BUTTON_RELEASE:
-                    if (actionButton == MotionEvent.BUTTON_PRIMARY) {
-                        if (getCurrentInputMode() == InputMode.RELATIVE)
-                            xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTUP, 0, 0, 0);
-                        else
-                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
-                    } else if (actionButton == MotionEvent.BUTTON_SECONDARY) {
-                        if (getCurrentInputMode() == InputMode.RELATIVE)
-                            xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTUP, 0, 0, 0);
-                        else
-                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
-                    } else if (actionButton == MotionEvent.BUTTON_TERTIARY) {
-                        if (getCurrentInputMode() == InputMode.RELATIVE)
-                            xServer.getWinHandler().mouseEvent(MouseEventFlags.MIDDLEUP, 0, 0, 0);
-                        else
-                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_MIDDLE);
-                    }
+                }
+                case MotionEvent.ACTION_BUTTON_RELEASE: {
+                    Pointer.Button btn = toPointerButton(actionButton);
+                    if (btn != null) inputDispatcher.dispatchPointerButton(btn, false);
                     handled = true;
                     break;
+                }
                 case MotionEvent.ACTION_MOVE:
-                case MotionEvent.ACTION_HOVER_MOVE:
+                case MotionEvent.ACTION_HOVER_MOVE: {
                     float[] transformedPoint = XForm.transformPoint(xform, event.getX(), event.getY());
-                    if (getCurrentInputMode() == InputMode.RELATIVE) {
-                        xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, (int)transformedPoint[0], (int)transformedPoint[1], 0);
+                    if (inputDispatcher.getInputMode() == InputMode.RELATIVE) {
+                        inputDispatcher.dispatchMouseEvent(MouseEventFlags.MOVE, (int)transformedPoint[0], (int)transformedPoint[1]);
                         updateVisibleRelativeCursor((int) transformedPoint[0], (int) transformedPoint[1]);
-                    } else
-                        xServer.injectPointerMove((int)transformedPoint[0], (int)transformedPoint[1]);
-                    handled = true;
-                    break;
-                case MotionEvent.ACTION_SCROLL:
-                    float scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
-                    if (scrollY <= -1.0f) {
-                        if (getCurrentInputMode() == InputMode.RELATIVE)
-                            xServer.getWinHandler().mouseEvent(MouseEventFlags.WHEEL, 0, 0, (int)scrollY);
-                        else {
-                            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
-                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
-                        }
-                    } else if (scrollY >= 1.0f) {
-                        if (getCurrentInputMode() == InputMode.RELATIVE)
-                            xServer.getWinHandler().mouseEvent(MouseEventFlags.WHEEL, 0, 0, (int)scrollY);
-                        else {
-                            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
-                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
-                        }
+                    } else {
+                        inputDispatcher.dispatchPointerMove((int)transformedPoint[0], (int)transformedPoint[1]);
                     }
                     handled = true;
                     break;
+                }
+                case MotionEvent.ACTION_SCROLL: {
+                    float scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+                    inputDispatcher.dispatchScroll(scrollY);
+                    handled = true;
+                    break;
+                }
             }
         }
         return handled;
+    }
+
+    private static Pointer.Button toPointerButton(int actionButton) {
+        if (actionButton == MotionEvent.BUTTON_PRIMARY) return Pointer.Button.BUTTON_LEFT;
+        if (actionButton == MotionEvent.BUTTON_SECONDARY) return Pointer.Button.BUTTON_RIGHT;
+        if (actionButton == MotionEvent.BUTTON_TERTIARY) return Pointer.Button.BUTTON_MIDDLE;
+        return null;
     }
 
     private StateListDrawable createTransparentBg() {
@@ -338,6 +292,9 @@ public class TouchpadView extends View {
 
     public void setProfile(ControlsProfile profile) {
         this.currentProfile = profile;
+        if (profile != null) {
+            inputDispatcher.setInputMode(profile.getInputMode());
+        }
     }
 
     public void clearProfile() {

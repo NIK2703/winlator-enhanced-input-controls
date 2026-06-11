@@ -369,22 +369,9 @@ public class NativeTouchProcessor {
         return nativeHoveredIndex(ptrId);
     }
 
-    private static final int GESTURE_SINGLE_TAP = ControlsProfile.GESTURE_SINGLE_TAP;
-    private static final int GESTURE_LONG_PRESS = ControlsProfile.GESTURE_LONG_PRESS;
-    private static final int GESTURE_DOUBLE_TAP = ControlsProfile.GESTURE_DOUBLE_TAP;
-    private static final int GESTURE_SINGLE_TAP_DRAG = ControlsProfile.GESTURE_SINGLE_TAP_DRAG;
-    private static final int GESTURE_LONG_PRESS_DRAG = ControlsProfile.GESTURE_LONG_PRESS_DRAG;
-    private static final int GESTURE_DOUBLE_TAP_DRAG = ControlsProfile.GESTURE_DOUBLE_TAP_DRAG;
-    private static final int GESTURE_SINGLE_2ND = ControlsProfile.GESTURE_SINGLE_2ND;
-    private static final int GESTURE_DOUBLE_2ND = ControlsProfile.GESTURE_DOUBLE_2ND;
-    private static final int GESTURE_SINGLE_DRAG_2ND = ControlsProfile.GESTURE_SINGLE_DRAG_2ND;
-    private static final int GESTURE_DOUBLE_DRAG_2ND = ControlsProfile.GESTURE_DOUBLE_DRAG_2ND;
-
-    private static final int GESTURE_COUNT = ControlsProfile.GESTURE_COUNT;
-
     private static BindPackage[] collectGestureActions(ControlsProfile profile) {
-        BindPackage[] actions = new BindPackage[GESTURE_COUNT];
-        for (int i = 0; i < GESTURE_COUNT; i++) {
+        BindPackage[] actions = new BindPackage[GestureType.COUNT];
+        for (int i = 0; i < GestureType.COUNT; i++) {
             actions[i] = profile.getGestureAction(i);
         }
         return actions;
@@ -453,14 +440,14 @@ public class NativeTouchProcessor {
         c.cursorAccelerationFactor = 1.25f;
 
         BindPackage[] gestureActions = collectGestureActions(profile);
-        int[][] ts = new int[GESTURE_COUNT][];
-        int[][] tp = new int[GESTURE_COUNT][];
-        int[] st = new int[GESTURE_COUNT];
-        int[] tg = new int[GESTURE_COUNT];
-        int[] ar = new int[GESTURE_COUNT];
-        int[] arInterval = new int[GESTURE_COUNT];
+        int[][] ts = new int[GestureType.COUNT][];
+        int[][] tp = new int[GestureType.COUNT][];
+        int[] st = new int[GestureType.COUNT];
+        int[] tg = new int[GestureType.COUNT];
+        int[] ar = new int[GestureType.COUNT];
+        int[] arInterval = new int[GestureType.COUNT];
 
-        for (int i = 0; i < GESTURE_COUNT; i++) {
+        for (int i = 0; i < GestureType.COUNT; i++) {
             BindPackage bp = gestureActions[i];
             int[] encoded = bp.encode();
             ts[i] = encoded;

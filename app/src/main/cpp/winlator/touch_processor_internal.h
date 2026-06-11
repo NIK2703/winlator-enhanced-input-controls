@@ -284,7 +284,8 @@ static inline bool gesture_processing_needed(void) {
     return __builtin_expect(g_state.cfg.caps_mode_mask != 0, 1)
         || g_state.gesture_double_tap_waiting
         || g_state.gesture_post_double_tap_drag
-        || g_state.second_double_tap_waiting;
+        || g_state.second_double_tap_waiting
+        || g_state.element_count > 0;
 }
 
 // Copy second-finger bindings from mode bindings (2nd variants map to primary slots).

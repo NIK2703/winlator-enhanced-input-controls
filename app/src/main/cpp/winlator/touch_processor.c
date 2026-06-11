@@ -1,5 +1,6 @@
 #include "touch_processor_internal.h"
 #include "touch_processor_activation.h"
+#include "gesture/types.h"
 
 // spatial grid rebuild (defined in element/shared.c)
 void init_bezier_lut(void);
@@ -254,7 +255,7 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     f->travel_x = 0; f->travel_y = 0;
     f->is_tap = true;
 
-    // Copy all 12 FingerBindings lists from config
+    // Copy all 12 FingerBindings lists from config (only when generation changes)
     FingerBindings* fb = &f->bindings;
     uint32_t bindings_gen = g_state.cfg.bindings_generation;
     if (__builtin_expect(f->bindings_generation != bindings_gen, 0)) {
@@ -262,11 +263,13 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
             f->bindings_generation, bindings_gen);
         setup_main_finger_bindings(fb);
         f->bindings_generation = bindings_gen;
-        touch_finger_cache_bs(f);
         TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "bindings result: S=%d L=%d D=%d Sd=%d Ld=%d Dd=%d",
             fb->single_tap_count, fb->long_press_count, fb->double_tap_count,
             fb->single_tap_drag_count, fb->long_press_drag_count, fb->double_tap_drag_count);
     }
+    // Always refresh cached flags — they may have been cleared between DOWNs
+    // (e.g. by enter_double_tap_waiting, LP timer paths).
+    touch_finger_cache_bs(f);
 
     if (gesture_processing_needed())
         handle_gesture_down(f, x, y, time_ms, &result);
@@ -312,6 +315,10 @@ TouchActionResult touch_processor_on_finger_up(int ptr_id, float x, float y, uin
     }
     if (__builtin_expect(f->single_tap_deferred, 0)) {
         return result; // gesture_tick will handle cleanup via deferred tap
+    }
+    // Keep finger alive for gesture_tick to process DT_TIMEOUT
+    if (__builtin_expect(f->state == GESTURE_STATE_DOUBLE_TAP_WAITING, 0)) {
+        return result; // gesture_tick will fire DT_TIMEOUT and deactivate
     }
     deactivate_finger(f);
     g_state.free_finger_hint = (int)(f - g_state.fingers);
@@ -564,7 +571,7 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
                     toggle_alternate_bindings(e, &e->lp_toggled, e->cached_lp_has_toggle,
                         e->element_long_press, e->element_long_press_count,
                         e->bindings[0].type != BINDING_NONE, &result);
-                    if (e->button_long_press_haptic > 0)
+                    if (e->button_long_press_haptic > 0 && e->element_long_press_count > 0)
                         add_action(&result, ACT_HAPTIC, e->button_long_press_haptic, 0, 0);
                 }
             }
@@ -666,6 +673,7 @@ void touch_processor_reset(void) {
         saved_cfg.caps_has_gesture_bindings, saved_cfg.caps_has_double_tap, saved_cfg.caps_has_drag_bindings);
 
     memset(&g_state, 0, sizeof(g_state));
+    memset(g_ctx, 0, sizeof(g_ctx));
 
     // Restore config (NOT zeroed — needed for touch processing after reset)
     g_state.cfg = saved_cfg;

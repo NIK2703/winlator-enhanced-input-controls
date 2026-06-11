@@ -34,12 +34,14 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.BindPackage;
+import com.winlator.cmod.inputcontrols.InputDispatcher;
 import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.NativeTouchProcessor;
 import com.winlator.cmod.inputcontrols.ExternalControllerBinding;
 import com.winlator.cmod.inputcontrols.GamepadState;
+import com.winlator.cmod.inputcontrols.TouchTimeoutManager;
 import com.winlator.cmod.math.Mathf;
 
 import java.nio.ByteBuffer;
@@ -88,8 +90,8 @@ public class InputControlsView extends View {
     private final PointF mouseMoveOffset = new PointF();
     private boolean showTouchscreenControls = true;
     private boolean cachesPreBuilt = false;
-    private Handler timeoutHandler;
-    private Runnable hideControlsRunnable;
+    private InputDispatcher inputDispatcher;
+    private TouchTimeoutManager touchTimeoutManager;
 
     private SharedPreferences preferences;
     private boolean cachedRenderingEnabled;
@@ -114,6 +116,9 @@ public class InputControlsView extends View {
 
     public void setInputMode(InputMode mode) {
         this.inputMode = mode;
+        if (inputDispatcher != null) {
+            inputDispatcher.setInputMode(mode);
+        }
     }
 
     public boolean isFocusedOnStick() {
@@ -141,8 +146,7 @@ public class InputControlsView extends View {
     @SuppressLint("ResourceType")
     public InputControlsView(Context context, Handler timeoutHandler, Runnable hideControlsRunnable) {
         super(context);
-        this.timeoutHandler = timeoutHandler;
-        this.hideControlsRunnable = hideControlsRunnable;
+        this.touchTimeoutManager = new TouchTimeoutManager(timeoutHandler, hideControlsRunnable);
         setClickable(true);
         setFocusable(true);
         setFocusableInTouchMode(true);
@@ -654,6 +658,7 @@ public class InputControlsView extends View {
 
     public void setXServer(XServer xServer) {
         this.xServer = xServer;
+        this.inputDispatcher = new InputDispatcher(xServer);
     }
 
     public int getMaxWidth() {
@@ -683,16 +688,15 @@ public class InputControlsView extends View {
                 synchronized (InputControlsView.this) {
                     offset = new PointF(mouseMoveOffset.x, mouseMoveOffset.y);
                 }
-                if (offset.x != 0 || offset.y != 0) {
-                    if (inputMode == InputMode.RELATIVE) {
-                        WinHandler wh = xServer != null ? xServer.getWinHandler() : null;
-                        if (wh != null)
-                            wh.mouseEvent(MouseEventFlags.MOVE, (int) (offset.x * cursorSpeed * 10), (int) (offset.y * cursorSpeed * 10), 0);
-                    } else if (xServer != null)
-                        xServer.injectPointerMoveDelta(
+                if ((offset.x != 0 || offset.y != 0) && inputDispatcher != null) {
+                    if (inputDispatcher.getInputMode() == InputMode.RELATIVE) {
+                        inputDispatcher.dispatchMouseEvent(MouseEventFlags.MOVE,
+                            (int) (offset.x * cursorSpeed * 10), (int) (offset.y * cursorSpeed * 10));
+                    } else {
+                        inputDispatcher.dispatchPointerMoveDelta(
                             (int) (offset.x * cursorSpeed * 10),
-                            (int) (offset.y * cursorSpeed * 10)
-                    );
+                            (int) (offset.y * cursorSpeed * 10));
+                    }
                 }
             }
         }, 0, 1000 / 60);
@@ -890,10 +894,8 @@ public class InputControlsView extends View {
     }
 
     private void resetTouchscreenTimeout() {
-
-        if (timeoutHandler != null && hideControlsRunnable != null) {
-            timeoutHandler.removeCallbacks(hideControlsRunnable);
-            timeoutHandler.postDelayed(hideControlsRunnable, 5000);
+        if (touchTimeoutManager != null) {
+            touchTimeoutManager.reset();
         }
     }
 
@@ -1017,27 +1019,15 @@ public class InputControlsView extends View {
             }
             else {
                 Pointer.Button pointerButton = binding.getPointerButton();
-                if (isActionDown) {
-                    if (pointerButton != null) {
-                        if (inputMode == InputMode.RELATIVE) {
-                            int wheelDelta = pointerButton == Pointer.Button.BUTTON_SCROLL_UP ? MOUSE_WHEEL_DELTA : (pointerButton == Pointer.Button.BUTTON_SCROLL_DOWN ? -MOUSE_WHEEL_DELTA : 0);
-                            winHandler.mouseEvent(MouseEventFlags.getFlagFor(pointerButton, true), 0, 0, wheelDelta);
-                        } else {
-                            xServer.injectPointerButtonPress(pointerButton);
-                        }
+                if (pointerButton != null) {
+                    int wheelDelta = (pointerButton == Pointer.Button.BUTTON_SCROLL_UP) ? MOUSE_WHEEL_DELTA
+                        : (pointerButton == Pointer.Button.BUTTON_SCROLL_DOWN) ? -MOUSE_WHEEL_DELTA : 0;
+                    if (inputDispatcher != null) {
+                        inputDispatcher.dispatchPointerButton(pointerButton, isActionDown, wheelDelta);
                     }
-                    else xServer.injectKeyPress(binding.keycode);
                 }
-                else {
-                    if (pointerButton != null) {
-                        if (inputMode == InputMode.RELATIVE) {
-                            winHandler.mouseEvent(MouseEventFlags.getFlagFor(pointerButton, false), 0, 0, 0);
-                        } else {
-                            xServer.injectPointerButtonRelease(pointerButton);
-                        }
-                    }
-                    else xServer.injectKeyRelease(binding.keycode);
-                }
+                else if (isActionDown) xServer.injectKeyPress(binding.keycode);
+                else xServer.injectKeyRelease(binding.keycode);
             }
         }
     }

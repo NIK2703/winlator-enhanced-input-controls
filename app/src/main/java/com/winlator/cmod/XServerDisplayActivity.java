@@ -81,10 +81,13 @@ import com.winlator.cmod.core.WineThemeManager;
 import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
+import com.winlator.cmod.inputcontrols.InputDispatcher;
 import com.winlator.cmod.inputcontrols.NativeTouchProcessor;
 import com.winlator.cmod.inputcontrols.TouchActivationMode;
 import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
+import com.winlator.cmod.inputcontrols.TouchTimeoutManager;
+import com.winlator.cmod.math.CoordinateTransform;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.midi.MidiHandler;
@@ -152,24 +155,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         activity.xServer.screenInfo.width,
                         activity.xServer.screenInfo.height,
                         activity.globalCursorSpeed);
-                // Preserve xform scale/view offset across config update
-                int outerW = com.winlator.cmod.core.AppUtils.getScreenWidth();
-                int outerH = com.winlator.cmod.core.AppUtils.getScreenHeight();
-                int innerW = activity.xServer.screenInfo.width;
-                int innerH = activity.xServer.screenInfo.height;
-                boolean fullscreen = activity.xServer.getRenderer() != null && activity.xServer.getRenderer().isFullscreen();
-                if (!fullscreen) {
-                    float aspect = Math.min((float)outerW / innerW, (float)outerH / innerH);
-                    updatedConfig.xformScaleX = 1.0f / aspect;
-                    updatedConfig.xformScaleY = 1.0f / aspect;
-                    updatedConfig.viewOffsetX = (outerW - innerW * aspect) / 2.0f;
-                    updatedConfig.viewOffsetY = (outerH - innerH * aspect) / 2.0f;
-                } else {
-                    updatedConfig.xformScaleX = (float)innerW / outerW;
-                    updatedConfig.xformScaleY = (float)innerH / outerH;
-                    updatedConfig.viewOffsetX = 0;
-                    updatedConfig.viewOffsetY = 0;
-                }
+                CoordinateTransform ct = new CoordinateTransform();
+                ct.compute(
+                    com.winlator.cmod.core.AppUtils.getScreenWidth(),
+                    com.winlator.cmod.core.AppUtils.getScreenHeight(),
+                    activity.xServer.screenInfo.width,
+                    activity.xServer.screenInfo.height,
+                    activity.xServer.getRenderer() != null && activity.xServer.getRenderer().isFullscreen());
+                ct.applyToNativeConfig(updatedConfig);
                 activity.nativeTouchProcessor.updateConfig(updatedConfig);
             }
         }
@@ -213,6 +206,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private int frameRatingWindowId = -1;
     private boolean cursorLock;
     private final float[] xform = XForm.getInstance();
+    private InputDispatcher inputDispatcher;
+    private TouchTimeoutManager touchTimeoutManager;
     private ContentsManager contentsManager;
     private MidiHandler midiHandler;
     private String midiSoundFont = "";
@@ -351,6 +346,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 inputControlsView.setVisibility(View.GONE);
             }
         };
+        touchTimeoutManager = new TouchTimeoutManager(timeoutHandler, hideControlsRunnable);
 
         contentsManager = new ContentsManager(this);
         contentsManager.syncContents();
@@ -515,6 +511,7 @@ if (enableLogs) {
         inputControlsManager = new InputControlsManager(this);
         xServer = new XServer(new ScreenInfo(screenSize));
         xServer.setWinHandler(winHandler);
+        inputDispatcher = new InputDispatcher(xServer);
 
         boolean[] winStarted = {false};
 
@@ -635,57 +632,51 @@ if (enableLogs) {
     private void handleCapturedPointer(MotionEvent event) {
         int actionButton = event.getActionButton();
         switch (event.getAction()) {
-            case MotionEvent.ACTION_BUTTON_PRESS:
-                if (actionButton == MotionEvent.BUTTON_PRIMARY) {
-                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTDOWN, 0, 0, 0);
-                    else xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
-                } else if (actionButton == MotionEvent.BUTTON_SECONDARY) {
-                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTDOWN, 0, 0, 0);
-                    else xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
-                } else if (actionButton == MotionEvent.BUTTON_TERTIARY) {
-                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.MIDDLEDOWN, 0, 0, 0);
-                    else xServer.injectPointerButtonPress(Pointer.Button.BUTTON_MIDDLE); 
-                }
+            case MotionEvent.ACTION_BUTTON_PRESS: {
+                Pointer.Button btn = toPointerButton(actionButton);
+                if (btn != null) inputDispatcher.dispatchPointerButton(btn, true);
                 break;
-            case MotionEvent.ACTION_BUTTON_RELEASE:
-                if (actionButton == MotionEvent.BUTTON_PRIMARY) {
-                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTUP, 0, 0, 0);
-                    else xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
-                } else if (actionButton == MotionEvent.BUTTON_SECONDARY) {
-                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTUP, 0, 0, 0);
-                    else xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
-                } else if (actionButton == MotionEvent.BUTTON_TERTIARY) {
-                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.MIDDLEUP, 0, 0, 0);
-                    else xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_MIDDLE); 
-                }
+            }
+            case MotionEvent.ACTION_BUTTON_RELEASE: {
+                Pointer.Button btn = toPointerButton(actionButton);
+                if (btn != null) inputDispatcher.dispatchPointerButton(btn, false);
                 break;
+            }
             case MotionEvent.ACTION_MOVE:
-            case MotionEvent.ACTION_HOVER_MOVE:
+            case MotionEvent.ACTION_HOVER_MOVE: {
                 float[] transformedPoint = XForm.transformPoint(xform, event.getX(), event.getY());
-                if (xServer.getInputMode() == InputMode.RELATIVE) {
-                    xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, (int)transformedPoint[0], (int)transformedPoint[1], 0);
+                if (inputDispatcher.getInputMode() == InputMode.RELATIVE) {
+                    inputDispatcher.dispatchMouseEvent(MouseEventFlags.MOVE, (int)transformedPoint[0], (int)transformedPoint[1]);
                     if (xServer.getRenderer() != null) {
                         xServer.getRenderer().updateVisualCursorPosition((int) transformedPoint[0], (int) transformedPoint[1]);
                     }
-                } else xServer.injectPointerMoveDelta((int)transformedPoint[0], (int)transformedPoint[1]);
+                } else {
+                    inputDispatcher.dispatchPointerMoveDelta((int)transformedPoint[0], (int)transformedPoint[1]);
+                }
                 break;
-            case MotionEvent.ACTION_SCROLL:
+            }
+            case MotionEvent.ACTION_SCROLL: {
                 float scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
-                if (scrollY <= -1.0f) {
-                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.WHEEL, 0, 0, (int)scrollY * 270);
-                    else {
-                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
-                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
-                    }
-                } else if (scrollY >= 1.0f) {
-                    if (xServer.getInputMode() == InputMode.RELATIVE) xServer.getWinHandler().mouseEvent(MouseEventFlags.WHEEL, 0, 0,(int)scrollY * 270);
-                    else {
-                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
-                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
+                int scaled = (int) scrollY * 270;
+                if (scrollY <= -1.0f || scrollY >= 1.0f) {
+                    if (inputDispatcher.getInputMode() == InputMode.RELATIVE) {
+                        inputDispatcher.dispatchMouseEvent(MouseEventFlags.WHEEL, 0, 0, scaled);
+                    } else {
+                        Pointer.Button dir = scrollY <= -1.0f ? Pointer.Button.BUTTON_SCROLL_DOWN : Pointer.Button.BUTTON_SCROLL_UP;
+                        inputDispatcher.dispatchPointerButton(dir, true);
+                        inputDispatcher.dispatchPointerButton(dir, false);
                     }
                 }
                 break;
+            }
         }
+    }
+
+    private static Pointer.Button toPointerButton(int actionButton) {
+        if (actionButton == MotionEvent.BUTTON_PRIMARY) return Pointer.Button.BUTTON_LEFT;
+        if (actionButton == MotionEvent.BUTTON_SECONDARY) return Pointer.Button.BUTTON_RIGHT;
+        if (actionButton == MotionEvent.BUTTON_TERTIARY) return Pointer.Button.BUTTON_MIDDLE;
+        return null;
     }
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
@@ -741,8 +732,8 @@ if (enableLogs) {
         }
 
         // Remove pending hide timeout so controls don't disappear while in background
-        if (timeoutHandler != null && hideControlsRunnable != null) {
-            timeoutHandler.removeCallbacks(hideControlsRunnable);
+        if (touchTimeoutManager != null) {
+            touchTimeoutManager.cancel();
         }
     }
     public void onWineKeepaliveTimeout() {
@@ -1082,6 +1073,7 @@ if (enableLogs) {
         rootView.addView(magnifierView);
         
         inputControlsView = new InputControlsView(this, timeoutHandler, hideControlsRunnable);
+        touchTimeoutManager.setTargetView(inputControlsView);
         inputControlsView.setOverlayOpacity(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY));
         inputControlsView.setTouchpadView(touchpadView);
         touchpadView.setInputControlsView(inputControlsView);
@@ -1720,24 +1712,20 @@ private void applySidebarSettings() {
         boolean isTimeoutEnabled = preferences.getBoolean("touchscreen_timeout_enabled", false);
 
         if (isTimeoutEnabled) {
-            inputControlsView.setVisibility(View.VISIBLE);
-
+            touchTimeoutManager.setVisibility(true);
             touchpadView.setOnTouchListener((v, event) -> {
                 int action = event.getAction();
                 if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE) {
-                    inputControlsView.setVisibility(View.VISIBLE);
-                    timeoutHandler.removeCallbacks(hideControlsRunnable);
-                    timeoutHandler.postDelayed(hideControlsRunnable, 5000); 
+                    touchTimeoutManager.setVisibility(true);
+                    touchTimeoutManager.reset();
                 }
-                return false; 
+                return false;
             });
-
-            timeoutHandler.removeCallbacks(hideControlsRunnable);
-            timeoutHandler.postDelayed(hideControlsRunnable, 5000); 
+            touchTimeoutManager.reset();
         } else {
-            inputControlsView.setVisibility(View.VISIBLE); 
-            timeoutHandler.removeCallbacks(hideControlsRunnable); 
-            touchpadView.setOnTouchListener(null); 
+            touchTimeoutManager.setVisibility(true);
+            touchTimeoutManager.cancel();
+            touchpadView.setOnTouchListener(null);
         }
     }
     private void showInputControls(ControlsProfile profile) {
@@ -1758,6 +1746,7 @@ private void applySidebarSettings() {
         inputControlsView.setInputMode(profile.getInputMode());
         xServer.setInputMode(profile.getInputMode());
         xServer.getInputDeviceManager().setInputMode(profile.getInputMode());
+        inputDispatcher.setInputMode(profile.getInputMode());
 
         // Initialize native touch processor
         if (nativeTouchProcessor != null) {
@@ -1765,25 +1754,11 @@ private void applySidebarSettings() {
             NativeTouchProcessor.NativeConfig nativeConfig =
                 NativeTouchProcessor.buildNativeConfig(profile, xServer.screenInfo.width, xServer.screenInfo.height, globalCursorSpeed);
             // Set xform scale so trackpad deltas map view-pixels to Wine-screen-pixels
-            {
-                int outerW = AppUtils.getScreenWidth();
-                int outerH = AppUtils.getScreenHeight();
-                int innerW = xServer.screenInfo.width;
-                int innerH = xServer.screenInfo.height;
-                boolean fullscreen = xServer.getRenderer() != null && xServer.getRenderer().isFullscreen();
-                if (!fullscreen) {
-                    float aspect = Math.min((float)outerW / innerW, (float)outerH / innerH);
-                    nativeConfig.xformScaleX = 1.0f / aspect;
-                    nativeConfig.xformScaleY = 1.0f / aspect;
-                    nativeConfig.viewOffsetX = (outerW - innerW * aspect) / 2.0f;
-                    nativeConfig.viewOffsetY = (outerH - innerH * aspect) / 2.0f;
-                } else {
-                    nativeConfig.xformScaleX = (float)innerW / outerW;
-                    nativeConfig.xformScaleY = (float)innerH / outerH;
-                    nativeConfig.viewOffsetX = 0;
-                    nativeConfig.viewOffsetY = 0;
-                }
-            }
+            CoordinateTransform ct = new CoordinateTransform();
+            ct.compute(AppUtils.getScreenWidth(), AppUtils.getScreenHeight(),
+                xServer.screenInfo.width, xServer.screenInfo.height,
+                xServer.getRenderer() != null && xServer.getRenderer().isFullscreen());
+            ct.applyToNativeConfig(nativeConfig);
             nativeTouchProcessor.init(nativeConfig);
             Log.w("Winlator_Controls", "showInputControls: native touch processor init");
 
@@ -1886,6 +1861,7 @@ private void applySidebarSettings() {
         inputControlsView.setInputMode(InputMode.ABSOLUTE);
         xServer.setInputMode(InputMode.ABSOLUTE);
         xServer.getInputDeviceManager().setInputMode(InputMode.ABSOLUTE);
+        inputDispatcher.setInputMode(InputMode.ABSOLUTE);
 
         inputControlsView.invalidate();
         winHandler.sendGamepadState();

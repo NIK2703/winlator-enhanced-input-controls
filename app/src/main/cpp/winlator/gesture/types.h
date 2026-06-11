@@ -176,6 +176,7 @@ typedef struct {
     GestureType tp_drag;
     GestureType comp_dt;
     GestureType comp_lp;
+    GestureType comp_dt_drag;  // Drag variant of comp_dt (for held-action TP check)
     bool is_second_finger;
     bool has_comp_dt;
     bool has_comp_lp;
@@ -215,5 +216,8 @@ void resolve_binding_slot(
 GesturePairPlan resolve_gesture_pair(
     const TouchFinger* f,
     const GesturePairSlot* slot);
+
+// Global gesture slot table (defined in unified.c)
+extern const GesturePairSlot GESTURE_SLOTS[5];
 
 #endif // TOUCH_PROCESSOR_GESTURE_TYPES_H

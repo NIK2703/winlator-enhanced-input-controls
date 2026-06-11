@@ -62,17 +62,17 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
 
     // Gesture type indices (mirrors C GestureType enum)
-    public static final int GESTURE_SINGLE_TAP = 0;
-    public static final int GESTURE_LONG_PRESS = 1;
-    public static final int GESTURE_DOUBLE_TAP = 2;
-    public static final int GESTURE_SINGLE_TAP_DRAG = 3;
-    public static final int GESTURE_LONG_PRESS_DRAG = 4;
-    public static final int GESTURE_DOUBLE_TAP_DRAG = 5;
-    public static final int GESTURE_SINGLE_2ND = 6;
-    public static final int GESTURE_DOUBLE_2ND = 7;
-    public static final int GESTURE_SINGLE_DRAG_2ND = 8;
-    public static final int GESTURE_DOUBLE_DRAG_2ND = 9;
-    public static final int GESTURE_COUNT = 10;
+    public static final int GESTURE_SINGLE_TAP = GestureType.SINGLE_TAP.id;
+    public static final int GESTURE_LONG_PRESS = GestureType.LONG_PRESS.id;
+    public static final int GESTURE_DOUBLE_TAP = GestureType.DOUBLE_TAP.id;
+    public static final int GESTURE_SINGLE_TAP_DRAG = GestureType.SINGLE_TAP_DRAG.id;
+    public static final int GESTURE_LONG_PRESS_DRAG = GestureType.LONG_PRESS_DRAG.id;
+    public static final int GESTURE_DOUBLE_TAP_DRAG = GestureType.DOUBLE_TAP_DRAG.id;
+    public static final int GESTURE_SINGLE_2ND = GestureType.SINGLE_2ND.id;
+    public static final int GESTURE_DOUBLE_2ND = GestureType.DOUBLE_2ND.id;
+    public static final int GESTURE_SINGLE_DRAG_2ND = GestureType.SINGLE_DRAG_2ND.id;
+    public static final int GESTURE_DOUBLE_DRAG_2ND = GestureType.DOUBLE_DRAG_2ND.id;
+    public static final int GESTURE_COUNT = GestureType.COUNT;
 
     // === Unified gesture bindings (primary storage) ===
     private BindPackage gestureSingleTapAction = BindPackage.fromSingle(Binding.MOUSE_LEFT_BUTTON);
@@ -426,35 +426,31 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
     public BindPackage getGestureAction(int gestureIndex) {
         ensureGestureSettingsLoaded();
-        switch (gestureIndex) {
-            case GESTURE_SINGLE_TAP: return gestureSingleTapAction;
-            case GESTURE_LONG_PRESS: return gestureLongPressAction;
-            case GESTURE_DOUBLE_TAP: return gestureDoubleTapAction;
-            case GESTURE_SINGLE_TAP_DRAG: return gestureSingleTapDragAction;
-            case GESTURE_LONG_PRESS_DRAG: return gestureLongPressDragAction;
-            case GESTURE_DOUBLE_TAP_DRAG: return gestureDoubleTapDragAction;
-            case GESTURE_SINGLE_2ND: return gestureSingleTap2ndFingerAction;
-            case GESTURE_DOUBLE_2ND: return gestureDoubleTap2ndFingerAction;
-            case GESTURE_SINGLE_DRAG_2ND: return gestureSingleTap2ndFingerDragAction;
-            case GESTURE_DOUBLE_DRAG_2ND: return gestureDoubleTap2ndFingerDragAction;
-            default: return new BindPackage();
-        }
+        if (gestureIndex == GESTURE_SINGLE_TAP) return gestureSingleTapAction;
+        if (gestureIndex == GESTURE_LONG_PRESS) return gestureLongPressAction;
+        if (gestureIndex == GESTURE_DOUBLE_TAP) return gestureDoubleTapAction;
+        if (gestureIndex == GESTURE_SINGLE_TAP_DRAG) return gestureSingleTapDragAction;
+        if (gestureIndex == GESTURE_LONG_PRESS_DRAG) return gestureLongPressDragAction;
+        if (gestureIndex == GESTURE_DOUBLE_TAP_DRAG) return gestureDoubleTapDragAction;
+        if (gestureIndex == GESTURE_SINGLE_2ND) return gestureSingleTap2ndFingerAction;
+        if (gestureIndex == GESTURE_DOUBLE_2ND) return gestureDoubleTap2ndFingerAction;
+        if (gestureIndex == GESTURE_SINGLE_DRAG_2ND) return gestureSingleTap2ndFingerDragAction;
+        if (gestureIndex == GESTURE_DOUBLE_DRAG_2ND) return gestureDoubleTap2ndFingerDragAction;
+        return new BindPackage();
     }
 
     public void setGestureAction(int gestureIndex, BindPackage bp) {
         BindPackage pkg = new BindPackage(bp);
-        switch (gestureIndex) {
-            case GESTURE_SINGLE_TAP: gestureSingleTapAction = pkg; break;
-            case GESTURE_LONG_PRESS: gestureLongPressAction = pkg; break;
-            case GESTURE_DOUBLE_TAP: gestureDoubleTapAction = pkg; break;
-            case GESTURE_SINGLE_TAP_DRAG: gestureSingleTapDragAction = pkg; break;
-            case GESTURE_LONG_PRESS_DRAG: gestureLongPressDragAction = pkg; break;
-            case GESTURE_DOUBLE_TAP_DRAG: gestureDoubleTapDragAction = pkg; break;
-            case GESTURE_SINGLE_2ND: gestureSingleTap2ndFingerAction = pkg; break;
-            case GESTURE_DOUBLE_2ND: gestureDoubleTap2ndFingerAction = pkg; break;
-            case GESTURE_SINGLE_DRAG_2ND: gestureSingleTap2ndFingerDragAction = pkg; break;
-            case GESTURE_DOUBLE_DRAG_2ND: gestureDoubleTap2ndFingerDragAction = pkg; break;
-        }
+        if (gestureIndex == GESTURE_SINGLE_TAP) gestureSingleTapAction = pkg;
+        else if (gestureIndex == GESTURE_LONG_PRESS) gestureLongPressAction = pkg;
+        else if (gestureIndex == GESTURE_DOUBLE_TAP) gestureDoubleTapAction = pkg;
+        else if (gestureIndex == GESTURE_SINGLE_TAP_DRAG) gestureSingleTapDragAction = pkg;
+        else if (gestureIndex == GESTURE_LONG_PRESS_DRAG) gestureLongPressDragAction = pkg;
+        else if (gestureIndex == GESTURE_DOUBLE_TAP_DRAG) gestureDoubleTapDragAction = pkg;
+        else if (gestureIndex == GESTURE_SINGLE_2ND) gestureSingleTap2ndFingerAction = pkg;
+        else if (gestureIndex == GESTURE_DOUBLE_2ND) gestureDoubleTap2ndFingerAction = pkg;
+        else if (gestureIndex == GESTURE_SINGLE_DRAG_2ND) gestureSingleTap2ndFingerDragAction = pkg;
+        else if (gestureIndex == GESTURE_DOUBLE_DRAG_2ND) gestureDoubleTap2ndFingerDragAction = pkg;
     }
 
     private void ensureGestureSettingsLoaded() {
