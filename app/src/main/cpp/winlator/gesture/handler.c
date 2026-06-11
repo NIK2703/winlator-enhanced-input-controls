@@ -3,6 +3,12 @@
 #include "branch.h"
 
 #define DELAYED_RELEASE_MS 30
+#define GRID_NEIGHBOR_OFFSET 1
+#define CURSOR_SENSITIVITY_DIVISOR 100.0f
+
+static inline int pointer_index(const TouchFinger* f) {
+    return (int)((uint32_t)f->ptr_id % MAX_FINGERS);
+}
 
 static inline void gesture_repress_saved_bindings(TouchElement* element, bool had_gest_swipe, bool had_gest_lp, TouchActionResult* restrict result);
 
@@ -133,6 +139,15 @@ static inline TouchFinger* find_other_dt_finger(TouchFinger* finger) {
     return NULL;
 }
 
+static inline void setup_second_finger_state(void) {
+    TouchFinger* second_finger = find_finger(g_state.gesture_second_ptr_id);
+    if (second_finger) {
+        second_finger->is_second_finger = true;
+        setup_second_finger_bindings(second_finger);
+    }
+    g_state.gesture_second_active = true;
+}
+
 static inline void handle_ts_main_finger_down(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, bool was_second_deferred) {
     if (check_confirm_dt_waiting(finger, result, NULL, false)) {
         g_state.gesture_main_ptr_id = finger->ptr_id;
@@ -148,25 +163,13 @@ static inline void handle_ts_main_finger_down(TouchFinger* finger, float x, floa
             }
         }
 
-        if (was_second_deferred && g_state.gesture_second_ptr_id >= 0) {
-            TouchFinger* second_finger = find_finger(g_state.gesture_second_ptr_id);
-            if (second_finger) {
-                second_finger->is_second_finger = true;
-                setup_second_finger_bindings(second_finger);
-            }
-            g_state.gesture_second_active = true;
-        }
+        if (was_second_deferred && g_state.gesture_second_ptr_id >= 0)
+            setup_second_finger_state();
         return;
     }
 
-    if (!g_state.gesture_double_tap_waiting && was_second_deferred && g_state.gesture_second_ptr_id >= 0) {
-        TouchFinger* second_finger = find_finger(g_state.gesture_second_ptr_id);
-        if (second_finger) {
-            second_finger->is_second_finger = true;
-            setup_second_finger_bindings(second_finger);
-        }
-        g_state.gesture_second_active = true;
-    }
+    if (!g_state.gesture_double_tap_waiting && was_second_deferred && g_state.gesture_second_ptr_id >= 0)
+        setup_second_finger_state();
 
     finger->original_ptr_id = finger->ptr_id;
     finger->double_tap_original_id_set = true;
@@ -201,14 +204,14 @@ static inline void handle_ts_second_finger_down(TouchFinger* finger, uint64_t ti
 }
 
 static inline void handle_sim_touch_down(TouchFinger* finger, float x, float y, uint64_t time_ms) {
-    int nf = active_finger_count();
-    if (nf == 1) {
+    int finger_count = active_finger_count();
+    if (finger_count == 1) {
         g_state.sim_continue_click = true;
         g_state.sim_click_press_time = time_ms + CLICK_DELAY_MS;
         g_state.sim_click_ptr_id = finger->ptr_id;
         g_state.last_touch_x = (int)x;
         g_state.last_touch_y = (int)y;
-    } else if (nf == 2) {
+    } else if (finger_count == 2) {
         TouchFinger* first = NULL;
         for (int i = 0; i < MAX_FINGERS; i++) {
             if (g_state.fingers[i].active && g_state.fingers[i].ptr_id != finger->ptr_id) {
@@ -249,8 +252,8 @@ static inline void process_element_hit(TouchElement* element, TouchFinger* finge
     if (has_passthrough && element->passthrough_touch)
         g_state.passthrough_active = true;
 
-    ActivationMode am = element->activation_mode;
-    if (am == ACTIVATION_LOCK) {
+    ActivationMode activation_mode = element->activation_mode;
+    if (activation_mode == ACTIVATION_LOCK) {
         if (!*found_lock) {
             handle_element_down(element, finger->ptr_id, x, y, time_ms, result);
             *found_lock = true;
@@ -273,10 +276,10 @@ static inline void hit_test_elements_down(TouchFinger* finger, float x, float y,
         int cx = (int)((x - g_state.grid_min_x) * g_state.grid_inv_cell_w);
         int cy = (int)((y - g_state.grid_min_y) * g_state.grid_inv_cell_h);
         if (cx >= 0 && cx < GRID_COLS && cy >= 0 && cy < GRID_ROWS) {
-            int start_cx = cx - 1 < 0 ? 0 : cx - 1;
-            int end_cx = cx + 1 >= GRID_COLS ? GRID_COLS - 1 : cx + 1;
-            int start_cy = cy - 1 < 0 ? 0 : cy - 1;
-            int end_cy = cy + 1 >= GRID_ROWS ? GRID_ROWS - 1 : cy + 1;
+            int start_cx = cx - GRID_NEIGHBOR_OFFSET < 0 ? 0 : cx - GRID_NEIGHBOR_OFFSET;
+            int end_cx = cx + GRID_NEIGHBOR_OFFSET >= GRID_COLS ? GRID_COLS - 1 : cx + GRID_NEIGHBOR_OFFSET;
+            int start_cy = cy - GRID_NEIGHBOR_OFFSET < 0 ? 0 : cy - GRID_NEIGHBOR_OFFSET;
+            int end_cy = cy + GRID_NEIGHBOR_OFFSET >= GRID_ROWS ? GRID_ROWS - 1 : cy + GRID_NEIGHBOR_OFFSET;
             for (int r = start_cy; r <= end_cy; r++) {
                 for (int c = start_cx; c <= end_cx; c++) {
                     int cell_idx = r * GRID_COLS + c;
@@ -348,7 +351,7 @@ void handle_gesture_down(TouchFinger* finger, float x, float y, uint64_t time_ms
                 }
             }
             if (btn->activation_mode == ACTIVATION_HOVER)
-                g_state.hovered_element_per_ptr[(uint32_t)finger->ptr_id % MAX_FINGERS] = element_index(btn);
+                g_state.hovered_element_per_ptr[pointer_index(finger)] = element_index(btn);
             if (!btn->passthrough_touch) handled = true;
         } else {
             handle_element_down(btn, finger->ptr_id, x, y, time_ms, result);
@@ -474,8 +477,7 @@ static inline bool save_hover_state(TouchFinger* finger, HoverRestoreState* out_
     out_state->gest_timer = false;
     *out_saved_hovered_idx = -1;
     if (!g_state.cfg.caps_has_track_hover_buttons) return false;
-    int pointer_index = (uint32_t)finger->ptr_id % MAX_FINGERS;
-    *out_saved_hovered_idx = g_state.hovered_element_per_ptr[pointer_index];
+    *out_saved_hovered_idx = g_state.hovered_element_per_ptr[pointer_index(finger)];
     TrackedButtons* tracked = get_tracked_buttons(finger->ptr_id);
     if (tracked->count > 0) {
         int first_idx = tracked->element_indices[0];
@@ -493,14 +495,13 @@ static inline bool save_hover_state(TouchFinger* finger, HoverRestoreState* out_
     return out_state->has_gesture;
 }
 
-static inline void handle_toggle_slide_over(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, TouchElement** ht_elem, bool* ht_elem_valid) {
-    if (!*ht_elem_valid) { *ht_elem = hit_test_element(x, y); *ht_elem_valid = true; }
-    TouchElement* toggle_btn = *ht_elem;
+static inline void handle_toggle_slide_over(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, TouchElement** hit_element, bool* hit_element_valid) {
+    if (!*hit_element_valid) { *hit_element = hit_test_element(x, y); *hit_element_valid = true; }
+    TouchElement* toggle_btn = *hit_element;
     if (toggle_btn && toggle_btn->type == ELEM_BUTTON && toggle_btn->cached_has_toggle) {
         ActivationMode mode = g_state.activation_mode;
         if (mode == ACTIVATION_TRACK || mode == ACTIVATION_HOVER) {
-            int pointer_index = (uint32_t)finger->ptr_id % MAX_FINGERS;
-            TrackedButtons* tracked = &g_state.tracked[pointer_index];
+            TrackedButtons* tracked = &g_state.tracked[pointer_index(finger)];
             bool already_tracked = is_tracked(tracked, element_index(toggle_btn));
             if (!already_tracked && !toggle_btn->gesture_timer_armed) {
                 if (toggle_btn->cached_has_auto_repeat) {
@@ -533,12 +534,12 @@ static inline void handle_toggle_slide_over(TouchFinger* finger, float x, float 
 }
 
 static inline void handle_track_hover_move(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, HoverRestoreState* hover_state, int saved_hovered_idx, bool* had_element_move) {
-    int pointer_index = (uint32_t)finger->ptr_id % MAX_FINGERS;
+    int ptr_idx = pointer_index(finger);
     TrackedButtons* tracked = get_tracked_buttons(finger->ptr_id);
     ActivationMode mode = g_state.activation_mode;
 
     if (mode == ACTIVATION_HOVER) {
-        int prev_idx = g_state.hovered_element_per_ptr[pointer_index];
+        int prev_idx = g_state.hovered_element_per_ptr[ptr_idx];
         ActivationModeParams hover_params = ACTIVATION_MODE_HOVER;
         hover_params.skip_reentry_down = true;
         int curr_idx = activation_mode_move_buttons(finger->ptr_id, x, y, time_ms, result, &hover_params);
@@ -576,7 +577,7 @@ static inline void handle_track_hover_move(TouchFinger* finger, float x, float y
             hover_state->gest_timer = false;
         }
 
-        gesture_restore_first_button_state(finger, pointer_index, saved_hovered_idx,
+        gesture_restore_first_button_state(finger, ptr_idx, saved_hovered_idx,
             hover_state, tracked, result);
 
         if (curr_idx >= 0 && tracked->count > 0 && curr_idx == tracked->element_indices[0]
@@ -587,7 +588,7 @@ static inline void handle_track_hover_move(TouchFinger* finger, float x, float y
     } else if (tracked->count > 0) {
         activation_mode_move_buttons(finger->ptr_id, x, y, time_ms, result, &ACTIVATION_MODE_TRACK);
 
-        gesture_restore_first_button_state(finger, pointer_index, saved_hovered_idx,
+        gesture_restore_first_button_state(finger, ptr_idx, saved_hovered_idx,
             hover_state, tracked, result);
     }
 }
@@ -606,7 +607,7 @@ static inline void handle_cursor_move(TouchFinger* finger, float x, float y, uin
         float dy = y - finger->last_y;
         float sx = g_state.cfg.xform_scale_x;
         float sy = g_state.cfg.xform_scale_y;
-        float sens = g_state.cfg.cursor_speed / 100.0f;
+        float sens = g_state.cfg.cursor_speed / CURSOR_SENSITIVITY_DIVISOR;
         float accel_factor = g_state.cfg.cursor_acceleration_factor;
         float accel_threshold = (float)g_state.cfg.cursor_acceleration_threshold;
         dx *= sx;
@@ -732,14 +733,72 @@ static inline bool handle_engaged_element_move(TouchFinger* finger, float x, flo
 
 static inline bool check_passthrough_engagement(TouchFinger* finger) {
     if (g_state.cfg.caps_has_passthrough_elements) {
-        uint8_t _cnt = finger->engaged_elem_count;
-        for (uint8_t _i = 0; _i < _cnt; _i++) {
-            if (g_state.elements[finger->engaged_elem_indices[_i]].passthrough_touch) {
+        uint8_t count = finger->engaged_elem_count;
+        for (uint8_t i = 0; i < count; i++) {
+            if (g_state.elements[finger->engaged_elem_indices[i]].passthrough_touch) {
                 return true;
             }
         }
     }
     return false;
+}
+
+// ============================================================
+// handle_gesture_move — element interaction phase
+// ============================================================
+static inline bool handle_move_button_interactions(
+    TouchFinger* finger, float x, float y, uint64_t time_ms,
+    TouchActionResult* restrict result,
+    bool has_track_hover, bool has_element_toggle,
+    HoverRestoreState* hover_state, int saved_hovered_idx,
+    TouchElement** hit_element, bool* hit_element_valid)
+{
+    bool had_element_move = handle_engaged_element_move(finger, x, y, time_ms, result);
+    if (had_element_move) return true;
+
+    bool is_gesture_zone_finger = finger->state > GESTURE_STATE_IDLE;
+    bool has_passthrough_engagement = check_passthrough_engagement(finger);
+    bool skip_element_activation = is_gesture_zone_finger || has_passthrough_engagement;
+
+    if (has_element_toggle && !skip_element_activation)
+        handle_toggle_slide_over(finger, x, y, time_ms, result, hit_element, hit_element_valid);
+
+    if (has_track_hover && !skip_element_activation)
+        handle_track_hover_move(finger, x, y, time_ms, result, hover_state, saved_hovered_idx, &had_element_move);
+
+    if (had_element_move) return true;
+
+    if (has_track_hover) {
+        TrackedButtons* tracked = &g_state.tracked[pointer_index(finger)];
+        if (tracked->count > 0) {
+            int first_idx = tracked->element_indices[0];
+            if (first_idx >= 0 && first_idx < g_state.element_count) {
+                TouchElement* first = &g_state.elements[first_idx];
+                if (first->type == ELEM_BUTTON && !first->passthrough_touch)
+                    return true;
+            }
+        }
+    }
+
+    if (!*hit_element_valid) { *hit_element = hit_test_element(x, y); *hit_element_valid = true; }
+    TouchElement* elem = *hit_element;
+    if (elem && elem->current_ptr_id == finger->ptr_id && !elem->passthrough_touch) {
+        handle_element_move(elem, x, y, time_ms, result);
+        return true;
+    }
+
+    return false;
+}
+
+// ============================================================
+// handle_gesture_move — gesture + cursor phase
+// ============================================================
+static inline void handle_move_gesture_and_cursor(
+    TouchFinger* finger, float x, float y, uint64_t time_ms,
+    TouchActionResult* restrict result, bool is_ts, bool is_tp)
+{
+    handle_gesture_move_processing(finger, x, y, time_ms, result, is_ts, is_tp);
+    handle_cursor_move(finger, x, y, time_ms, result);
 }
 
 // ============================================================
@@ -756,8 +815,8 @@ void handle_gesture_move(TouchFinger* finger, float x, float y, uint64_t time_ms
     const bool has_track_hover = g_state.cfg.caps_has_track_hover_buttons;
     const bool has_element_toggle = g_state.cfg.caps_has_element_toggle;
 
-    TouchElement* ht_elem = NULL;
-    bool ht_elem_valid = false;
+    TouchElement* hit_element = NULL;
+    bool hit_element_valid = false;
 
     if (fabsf(finger->x - finger->down_x) > g_state.cfg.drag_threshold_px || fabsf(finger->y - finger->down_y) > g_state.cfg.drag_threshold_px)
         finger->cached_has_moved_beyond_threshold = true;
@@ -767,56 +826,16 @@ void handle_gesture_move(TouchFinger* finger, float x, float y, uint64_t time_ms
     if (has_track_hover)
         save_hover_state(finger, &hover_state, &saved_hovered_idx);
 
-    bool had_element_move = handle_engaged_element_move(finger, x, y, time_ms, result);
-
-    if (had_element_move) {
+    if (handle_move_button_interactions(finger, x, y, time_ms, result,
+            has_track_hover, has_element_toggle, &hover_state, saved_hovered_idx,
+            &hit_element, &hit_element_valid))
+    {
         finger->last_x = x;
         finger->last_y = y;
         return;
     }
 
-    bool is_gesture_zone_finger = finger->state > GESTURE_STATE_IDLE;
-    bool has_passthrough_engagement = check_passthrough_engagement(finger);
-    bool skip_element_activation = is_gesture_zone_finger || has_passthrough_engagement;
-
-    if (has_element_toggle && !skip_element_activation) {
-        handle_toggle_slide_over(finger, x, y, time_ms, result, &ht_elem, &ht_elem_valid);
-    }
-
-    if (has_track_hover && !skip_element_activation) {
-        handle_track_hover_move(finger, x, y, time_ms, result, &hover_state, saved_hovered_idx, &had_element_move);
-    }
-
-    if (had_element_move) {
-        finger->last_x = x;
-        finger->last_y = y;
-        return;
-    }
-
-    if (has_track_hover) {
-        TrackedButtons* tracked = &g_state.tracked[(uint32_t)finger->ptr_id % MAX_FINGERS];
-        if (tracked->count > 0) {
-            int first_idx = tracked->element_indices[0];
-            if (first_idx >= 0 && first_idx < g_state.element_count) {
-                TouchElement* first = &g_state.elements[first_idx];
-                if (first->type == ELEM_BUTTON && !first->passthrough_touch)
-                    return;
-            }
-        }
-    }
-
-    if (!ht_elem_valid) { ht_elem = hit_test_element(x, y); ht_elem_valid = true; }
-    TouchElement* elem = ht_elem;
-    if (elem && elem->current_ptr_id == finger->ptr_id && !elem->passthrough_touch) {
-        handle_element_move(elem, x, y, time_ms, result);
-        finger->last_x = x;
-        finger->last_y = y;
-        return;
-    }
-
-    handle_gesture_move_processing(finger, x, y, time_ms, result, is_ts, is_tp);
-
-    handle_cursor_move(finger, x, y, time_ms, result);
+    handle_move_gesture_and_cursor(finger, x, y, time_ms, result, is_ts, is_tp);
 
     finger->last_x = x; finger->last_y = y;
 }
@@ -898,8 +917,8 @@ static inline void handle_tp_up(TouchFinger* finger, uint64_t time_ms, TouchActi
 __attribute__((hot))
 void handle_gesture_up(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_gesture_up ptr=%d", finger->ptr_id);
-    int pointer_index = (uint32_t)finger->ptr_id % MAX_FINGERS;
-    TrackedButtons* tracked = &g_state.tracked[pointer_index];
+    int ptr_idx = pointer_index(finger);
+    TrackedButtons* tracked = &g_state.tracked[ptr_idx];
     bool had_tracked = false;
     if (g_state.cfg.caps_has_track_hover_buttons && tracked->ptr_id == finger->ptr_id && tracked->count > 0) {
         had_tracked = activation_mode_up(finger->ptr_id, x, y, time_ms, result,
@@ -907,16 +926,16 @@ void handle_gesture_up(TouchFinger* finger, float x, float y, uint64_t time_ms, 
                 ? &ACTIVATION_MODE_TRACK
                 : &ACTIVATION_MODE_HOVER);
     }
-    g_state.hovered_element_per_ptr[pointer_index] = INVALID_PTR_ID;
+    g_state.hovered_element_per_ptr[ptr_idx] = INVALID_PTR_ID;
 
-    const int pid = finger->ptr_id;
+    const int ptr_id = finger->ptr_id;
     bool had_element = false;
-    TouchFinger* finger_up = find_finger(pid);
+    TouchFinger* finger_up = find_finger(ptr_id);
     if (finger_up != NULL) {
-        uint8_t cnt = finger_up->engaged_elem_count;
-        for (uint8_t i = 0; i < cnt; i++) {
+        uint8_t count = finger_up->engaged_elem_count;
+        for (uint8_t i = 0; i < count; i++) {
             TouchElement* element = &g_state.elements[finger_up->engaged_elem_indices[i]];
-            if (element->current_ptr_id == pid) {
+            if (element->current_ptr_id == ptr_id) {
                 handle_element_up(element, x, y, time_ms, result);
                 had_element = true;
             }
@@ -924,7 +943,7 @@ void handle_gesture_up(TouchFinger* finger, float x, float y, uint64_t time_ms, 
         finger_up->engaged_elem_count = 0;
     }
     if (had_tracked || had_element) {
-        if (g_state.gesture_main_ptr_id == pid) {
+        if (g_state.gesture_main_ptr_id == ptr_id) {
             g_state.gesture_main_ptr_id = INVALID_PTR_ID;
             gesture_clear_second_finger_globals();
         }
