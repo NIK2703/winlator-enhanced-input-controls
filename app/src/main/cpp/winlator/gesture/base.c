@@ -2,7 +2,9 @@
 #include "branch.h"
 
 static inline int finger_index(const TouchFinger* f) {
-    return (int)(f - g_state.fingers);
+    int idx = (int)(f - g_state.fingers);
+    if (idx < 0 || idx >= MAX_FINGERS) return -1;
+    return idx;
 }
 
 static bool validate_dt_confirm(void) {
@@ -18,13 +20,7 @@ static bool validate_dt_confirm(void) {
     return true;
 }
 
-static void copy_deferred_double(void) {
-    if (g_state.gesture_pending_deferred_double_count > 0 && g_state.gesture_pending_double_count == 0) {
-        copy_bindings_bounded(g_state.gesture_pending_deferred_double, g_state.gesture_pending_deferred_double_count,
-            g_state.gesture_pending_double, &g_state.gesture_pending_double_count, FALLBACK_MAX);
-    }
-    g_state.gesture_pending_deferred_double_count = 0;
-}
+static void copy_deferred_double_to_all(const TouchBinding* src, int src_count, GestureFingerCtx* dt_context);
 
 static void sync_dt_ctx(TouchFinger* f) {
     GestureFingerCtx* dt_context = &g_ctx[finger_index(f)];
@@ -42,7 +38,8 @@ static void sync_dt_ctx(TouchFinger* f) {
 void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger* f) {
     if (!validate_dt_confirm()) return;
 
-    copy_deferred_double();
+    copy_deferred_double_to_all(g_state.gesture_pending_deferred_double,
+        g_state.gesture_pending_deferred_double_count, &g_ctx[finger_index(f)]);
 
     bool has_dt = g_state.gesture_pending_double_count > 0;
     bool has_dt_drag = f->bindings.double_tap_drag_count > 0;
@@ -136,6 +133,23 @@ void gesture_cancel_double_tap_wait(TouchActionResult* restrict result) {
     }
 }
 
+static void gesture_handle_sdtw_timeout(uint64_t time_ms, TouchActionResult* restrict result) {
+    uint32_t sdtw_mask = GESTURE_MASK(GESTURE_DOUBLE_2ND) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND);
+    if ((g_state.cfg.caps_mode_mask & sdtw_mask) && g_state.second_double_tap_waiting
+        && time_ms - g_state.second_tap_fallback_time >= (uint64_t)g_state.cfg.double_tap_timeout_ms)
+    {
+        int fallback_count = g_state.second_tap_fallback_count;
+        gesture_clear_second_finger_state();
+        if (fallback_count > 0) {
+            execute_actions(result, g_state.second_tap_fallback, fallback_count);
+            g_state.second_tap_fallback_count = 0;
+        }
+        TouchFinger* main_finger = find_finger(g_state.gesture_main_ptr_id);
+        if (main_finger && main_finger->state != GESTURE_STATE_DRAGGING)
+            main_finger->state = GESTURE_STATE_IDLE;
+    }
+}
+
 void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
     // caps gate: must run before the gesture-bindings early return so that
     // stale DT/SDTW flags are cleaned up even when switching to a no-gesture mode.
@@ -155,21 +169,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
         gesture_branch(f, &g_ctx[i], result, time_ms, GESTURE_EVENT_TICK, 0 /*x*/, 0 /*y*/);
     }
 
-    // ---- SDTW timeout (top-level, survives finger deactivation) ----
-    uint32_t sdtw_mask = GESTURE_MASK(GESTURE_DOUBLE_2ND) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND);
-    if ((g_state.cfg.caps_mode_mask & sdtw_mask) && g_state.second_double_tap_waiting
-        && time_ms - g_state.second_tap_fallback_time >= (uint64_t)g_state.cfg.double_tap_timeout_ms)
-    {
-        int fallback_count = g_state.second_tap_fallback_count;
-        gesture_clear_second_finger_state();
-        if (fallback_count > 0) {
-            execute_actions(result, g_state.second_tap_fallback, fallback_count);
-            g_state.second_tap_fallback_count = 0;
-        }
-        TouchFinger* main_finger = find_finger(g_state.gesture_main_ptr_id);
-        if (main_finger && main_finger->state != GESTURE_STATE_DRAGGING)
-            main_finger->state = GESTURE_STATE_IDLE;
-    }
+    gesture_handle_sdtw_timeout(time_ms, result);
 }
 
 

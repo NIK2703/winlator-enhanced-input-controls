@@ -16,6 +16,12 @@ bool is_modifier_binding(const TouchBinding* b) {
     return false;
 }
 
+static inline int action_type_for_binding(const TouchBinding* b) {
+    return is_keyboard_binding(b) ? ACT_KEY_PRESS :
+           is_mouse_button_binding(b) ? ACT_POINTER_BUTTON_PRESS :
+           ACT_GAMEPAD_STATE;
+}
+
 static inline bool is_mouse_button_binding(const TouchBinding* b) {
     return b->type >= BINDING_MOUSE_LEFT && b->type <= BINDING_MOUSE_BUTTON5;
 }
@@ -80,6 +86,8 @@ void add_action(TouchActionResult* restrict r, ActionType type, int param0, int 
             r->actions[r->count].mouse_move.hold = 0;
             break;
         case ACT_GAMEPAD_STATE:
+            /* Gamepad state uses .key union member: keycode holds button index, is_down holds pressed state.
+               The backend maps this to the appropriate gamepad event. */
             r->actions[r->count].key.keycode = param0;
             r->actions[r->count].key.is_down = param1;
             break;
@@ -157,10 +165,7 @@ static bool execute_toggle_actions(TouchActionResult* restrict result, const Tou
                 g_state.scheduled_actions[si].active = false;
                 g_state.scheduled_actions[si].needs_toggle_record = false;
             } else {
-                int act = is_keyboard_binding(b) ? ACT_KEY_PRESS :
-                          is_mouse_button_binding(b) ? ACT_POINTER_BUTTON_PRESS :
-                          ACT_GAMEPAD_STATE;
-                int sched_idx = schedule_action(*b, act, (uint64_t)non_mod_count * binding_delay);
+                int sched_idx = schedule_action(*b, action_type_for_binding(b), (uint64_t)non_mod_count * binding_delay);
                 if (sched_idx >= 0)
                     g_state.scheduled_actions[sched_idx].needs_toggle_record = true;
             }
@@ -180,10 +185,7 @@ static bool execute_hold_actions(TouchActionResult* restrict result, const Touch
 
     uint64_t press_delay = (binding_delay > 0 && non_mod_count > 0) ? (uint64_t)non_mod_count * binding_delay : 0;
     if (binding_delay > 0 && press_delay > 0) {
-        int act = is_keyboard_binding(b) ? ACT_KEY_PRESS :
-                  is_mouse_button_binding(b) ? ACT_POINTER_BUTTON_PRESS :
-                  ACT_GAMEPAD_STATE;
-        schedule_action(*b, act, press_delay);
+        schedule_action(*b, action_type_for_binding(b), press_delay);
     } else {
         press_binding(result, b, true);
     }
@@ -317,6 +319,7 @@ void release_binding(TouchActionResult* restrict result, const TouchBinding* b) 
     } else if (is_mouse_button_binding(b)) {
         add_action(result, ACT_POINTER_BUTTON_RELEASE, pointer_button_idx(b), 0, 0);
     } else if (b->type == BINDING_MOUSE_SCROLL_UP || b->type == BINDING_MOUSE_SCROLL_DOWN) {
+        /* scroll: no-op on release */
     } else if (is_mouse_move_binding(b)) {
         add_action(result, ACT_STOP_MOUSE_MOVE, 0, 0, 0);
     }
@@ -379,22 +382,14 @@ void process_scheduled_actions(TouchActionResult* restrict result, uint64_t time
             sa->active = false;
             switch (sa->action_type) {
                 case ACT_KEY_PRESS:
-                    add_action(result, ACT_KEY_PRESS, sa->binding.keycode, 1, 0);
+                case ACT_POINTER_BUTTON_PRESS:
+                case ACT_GAMEPAD_STATE:
+                    press_binding(result, &sa->binding, true);
                     break;
                 case ACT_KEY_RELEASE:
-                    add_action(result, ACT_KEY_RELEASE, sa->binding.keycode, 0, 0);
-                    break;
-                case ACT_POINTER_BUTTON_PRESS:
-                    add_action(result, ACT_POINTER_BUTTON_PRESS, pointer_button_idx(&sa->binding), 0, 0);
-                    break;
                 case ACT_POINTER_BUTTON_RELEASE:
-                    add_action(result, ACT_POINTER_BUTTON_RELEASE, pointer_button_idx(&sa->binding), 0, 0);
-                    break;
-                case ACT_GAMEPAD_STATE:
-                    add_action(result, ACT_GAMEPAD_STATE, gamepad_button_index(&sa->binding), 1, 0);
-                    break;
                 case ACT_GAMEPAD_RELEASE:
-                    add_action(result, ACT_GAMEPAD_STATE, gamepad_button_index(&sa->binding), 0, 0);
+                    release_binding(result, &sa->binding);
                     break;
             }
             if (sa->needs_toggle_record) {

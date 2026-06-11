@@ -188,11 +188,35 @@ extern const GesturePairSlot GESTURE_SLOTS[GESTURE_SLOT_COUNT];
 // ---- Slot selection helpers (defined in unified.c) ----
 const GesturePairSlot* select_dt_slot(const TouchFinger* f);
 const GesturePairSlot* select_s_slot(const TouchFinger* f);
-const GesturePairSlot* select_slot_for_move(const TouchFinger* f, const GestureFingerCtx* ctx);
-const GesturePairSlot* select_slot_for_up(const TouchFinger* f, const GestureFingerCtx* ctx);
+const GesturePairSlot* select_slot_common(const TouchFinger* f, const GestureFingerCtx* ctx, bool is_up_event);
 
 // ---- Second-finger cleanup (defined in unified.c) ----
 void cleanup_second_finger(TouchFinger* f, GestureFingerCtx* ctx,
                            TouchActionResult* restrict result);
+
+// ---- Branch-local types (moved from branch.c) ----
+
+typedef enum {
+    TAP_PATH_HANDLED,
+    TAP_PATH_ENTER_DT,
+    TAP_PATH_SINGLE,
+} TapPathResult;
+
+typedef struct {
+    const TouchBinding* non_drag;
+    int non_drag_count;
+    const TouchBinding* fallback;
+    int fallback_count;
+    bool is_second_finger;
+} TapPathParams;
+
+typedef struct {
+    const TouchBinding* non_drag;
+    int non_drag_count;
+    const TouchBinding* drag;
+    int drag_count;
+} DragResolveParams;
+
+typedef enum { ROLE_MAIN, ROLE_SECOND, ROLE_IGNORED } DownRole;
 
 #endif // TOUCH_PROCESSOR_GESTURE_TYPES_H
