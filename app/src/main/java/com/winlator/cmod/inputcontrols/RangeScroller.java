@@ -89,7 +89,7 @@ public class RangeScroller {
         ControlElement.Range range = element.getRange();
         int from = (int)Math.floor((scrollOffset / getElementSize()) % range.max);
         if (from < 0) from = range.max + from;
-        int to = from + element.getBindingCount();
+        int to = from + element.getBindingCount() + 1;
         rangeIndexFrom = (byte)from;
         rangeIndexTo = (byte)to;
     }

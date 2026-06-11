@@ -54,7 +54,7 @@ public class FakeInputWriter {
     private boolean isOpen = false;
     private volatile boolean destroyed = false;
 
-    private final boolean[] prevButtonStates = new boolean[12];
+    private final boolean[] prevButtonStates = new boolean[BUTTON_MAP.length];
     private int prevThumbLX, prevThumbLY, prevThumbRX, prevThumbRY;
     private int prevTriggerL, prevTriggerR;
     private int prevHatX, prevHatY;
@@ -81,6 +81,7 @@ public class FakeInputWriter {
             raf = new RandomAccessFile(eventFile, "rw");
             raf.seek(raf.length());
             channel = raf.getChannel();
+            resetPrevState();
             isOpen = true;
             return true;
         } catch (IOException | SecurityException e) {
@@ -185,7 +186,7 @@ public class FakeInputWriter {
     }
 
     private void writeEvent(short type, short code, int value) {
-        if (buffer.remaining() < 16) return;
+        if (buffer.remaining() < EVENT_SIZE) return;
         long timeMs = System.currentTimeMillis();
         buffer.putLong(timeMs / 1000);
         buffer.putLong((timeMs % 1000) * 1000);

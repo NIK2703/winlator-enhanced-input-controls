@@ -653,11 +653,11 @@ public class WinHandler {
             ExternalController profileController = profile.getController(controller.getDeviceId());
             if (profileController != null && profileController.getControllerBindingCount() > 0) {
                 Log.d("Winlator_StickBinding", "sendGamepadState USING REMAPPED state bindingsCount="+profileController.getControllerBindingCount()+
-                        " remapped(thumbLX="+controller.remappedState.thumbLX+" thumbLY="+controller.remappedState.thumbLY+
-                        " thumbRX="+controller.remappedState.thumbRX+" thumbRY="+controller.remappedState.thumbRY+")");
+                        " remapped(thumbLX="+profileController.remappedState.thumbLX+" thumbLY="+profileController.remappedState.thumbLY+
+                        " thumbRX="+profileController.remappedState.thumbRX+" thumbRY="+profileController.remappedState.thumbRY+")");
                 int slot = assignSlot(controller.getDeviceId());
                 if (slot >= 0 && writers[slot] != null) {
-                    writers[slot].writeGamepadState(controller.remappedState);
+                    writers[slot].writeGamepadState(profileController.remappedState);
                 }
                 return;
             }

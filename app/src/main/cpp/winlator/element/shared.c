@@ -363,8 +363,9 @@ void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     // 1. Element-specific up handlers (element_button_up etc.) already release
     //    primary bindings internally — calling release_element_bindings would double-release.
     // 2. This path must always release non-toggle gestures (release_non_toggle_gestures)
-    //    without clearing gesture state flags, whereas release_element_bindings with
-    //    release_gestures=true would also clear the flags (gesture_swipe_triggered etc.).
+    //    and then clear gesture state flags, whereas release_element_bindings with
+    //    release_gestures=true would also clear the flags (gesture_swipe_triggered etc.)
+    //    but also release toggle gestures — which this path must NOT do.
     // 3. release_element_bindings has its own early-return for no-binding elements,
     //    but this path must still clean up engaged state and visual state regardless.
     // Toggle buttons that still have any active toggle keep their visual activation
@@ -376,6 +377,9 @@ void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     // leaving gesture bindings pressed forever and breaking future gesture
     // detection on subsequent finger-downs.
     release_non_toggle_gestures(e, result);
+    e->gesture_timer_armed = false;
+    e->gesture_swipe_triggered = false;
+    e->gesture_long_press_triggered = false;
     if (release_ptr_id >= 0) {
         TouchFinger* f = find_finger(release_ptr_id);
         if (__builtin_expect(f != NULL, 1))

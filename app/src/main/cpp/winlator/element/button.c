@@ -397,7 +397,11 @@ static void handle_button_up_activation_mode(TouchElement* e, bool has_primary, 
                 }
                 if (toggle_debounce_check(e, time_ms)) return;
                 e->selected = !e->selected;
-                release_and_deselect(e, has_primary, result);
+                if (e->selected) {
+                    suppress_element_gestures(e, result);
+                } else {
+                    release_and_deselect(e, has_primary, result);
+                }
             }
             // HOVER mode: no-op — toggle managed on DOWN/MOVE entry
         } else if (e->activation_mode != ACTIVATION_HOVER) {

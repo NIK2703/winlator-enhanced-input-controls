@@ -31,24 +31,19 @@
 #include <poll.h>
 #include <linux/input.h>
 
-// ioctl type/number constants (from linux/input.h EVIO*)
-#define IOCTL_EVIOCGVERSION   0x4501
-#define IOCTL_EVIOCGID        0x4502
-#define IOCTL_EVIOCGNAME_0x6  0x4506
-#define IOCTL_EVIOCGPROP      0x4509
-#define IOCTL_EVIOCGKEY       0x4518
-#define IOCTL_EVIOCGBIT_EV    0x4520
-#define IOCTL_EVIOCGBIT_KEY   0x4521
-#define IOCTL_EVIOCGBIT_REL   0x4522
-#define IOCTL_EVIOCGBIT_ABS   0x4523
-#define IOCTL_EVIOCGBIT_FF    0x4535
-#define IOCTL_EVIOCSFF        0x4580
-#define IOCTL_EVIOCRMFF       0x4581
-#define IOCTL_EVIOCGEFFECTS   0x4584
-#define IOCTL_EVIOCGABS_MIN   0x4540
-#define IOCTL_EVIOCGABS_MAX   0x4551
-#define IOCTL_EVIOCGRAB       0x4590
-#define IOCTL_JSIOCGNAME      0x6A13
+// Extract direction, type, number from ioctl code
+// Direction: bits 30-31 (_IOC_NONE=0, _IOC_WRITE=1, _IOC_READ=2)
+// Size: bits 16-29
+// Type: bits 8-15
+// Number: bits 0-7
+#define IOCTL_DIR(op)    (((op) >> 30) & 3)
+#define IOCTL_TYPE(op)   (((op) >> 8) & 0xFF)
+#define IOCTL_NR(op)     ((op) & 0xFF)
+#define IOCTL_SIZE(op)   (((op) >> 16) & 0x3FFF)
+#define IOCTL_READ       2
+#define IOCTL_WRITE      1
+#define IOCTL_EV_TYPE    'E'
+#define IOCTL_JS_TYPE    'j'
 
 #define DLSYM_OR_FALLBACK(var, name, fallback_expr) \
     do { \
@@ -65,6 +60,7 @@ static bool lazy_init_done = false;
 static const char *hook_dir = nullptr;
 static bool vibration_enabled = true;
 volatile sig_atomic_t stop_flag = 0;
+static std::set<int> closed_fds;
 
 // POD flag — zero in BSS at load time, set to 1 after all C++ statics
 // (controller_map, mutex, closed_fds, ff_effects) are constructed.
@@ -262,10 +258,11 @@ EXPORT int open(const char *pathname, int flags, ...) {
 	else
 	    fd = my_open(pathname, flags);
 
-	if (pr.is_from_input) {
+	if (pr.is_from_input && fd >= 0) {
 		Logger::log("Adding controller, fd %d event %s\n", fd, get_event(pathname));
 		{
 		    std::lock_guard<std::mutex> lock(controller_map_mutex);
+		    closed_fds.erase(fd);
 		    controller_map[fd] = strdup(get_event(pathname));
 		}
     }
@@ -306,10 +303,11 @@ EXPORT int openat(int dirfd, const char *pathname, int flags, ...) {
     else
         fd = my_openat(dirfd, pathname, flags);
 
-    if (pr.is_from_input) {
+    if (pr.is_from_input && fd >= 0) {
         Logger::log("Adding controller, fd %d event %s\n", fd, get_event(pathname));
         {
             std::lock_guard<std::mutex> lock(controller_map_mutex);
+            closed_fds.erase(fd);
             controller_map[fd] = strdup(get_event(pathname));
         }
     }
@@ -411,13 +409,48 @@ EXPORT int ioctl(int fd, int op, ...) {
         event_number = get_event_number(event);
     }
 
-    if (op == IOCTL_EVIOCGVERSION) {
+    int dir = IOCTL_DIR(op);
+    int type = IOCTL_TYPE(op);
+    int nr = IOCTL_NR(op);
+    int len = IOCTL_SIZE(op);
+
+    // Handle Linux joystick interface ioctls (type 'j')
+    if (type == IOCTL_JS_TYPE) {
+        if (nr == 0x13 && dir == IOCTL_READ) {
+            // JSIOCGNAME(len) — get joystick name
+            Logger::log("Hooking ioctl JSIOCGNAME(len=%d) for event %s\n", len, event);
+            char *name;
+            asprintf(&name, "Generic HID Gamepad %d", event_number);
+            int copy_len = len - 1;
+            if (copy_len < 0) copy_len = 0;
+            int name_len = strlen(name);
+            if (copy_len > name_len) copy_len = name_len;
+            memcpy((char *)argp, name, copy_len);
+            ((char *)argp)[copy_len] = '\0';
+            free(name);
+            return 0;
+        }
+        Logger::log("Unhandled joystick ioctl, nr=%d dir=%d\n", nr, dir);
+        return syscall(SYS_ioctl, fd, op, argp);
+    }
+
+    // Handle evdev ioctls (type 'E')
+    if (type != IOCTL_EV_TYPE) {
+        int type2 = (op >> 8 & 0xFF);
+        int number2 = (op >> 0 & 0xFF);
+        Logger::log("Unhandled ioctl, type=%c(0x%x) nr=%d\n", type2, type2, number2);
+        return syscall(SYS_ioctl, fd, op, argp);
+    }
+
+    // EVIOCGVERSION: _IOR('E', 0x01, int)
+    if (nr == 0x01 && dir == IOCTL_READ) {
         Logger::log("Hooking ioctl EVIOCGVERSION for event %s\n", event);
         int version = 65536;
         memcpy(argp, (void *)&version, sizeof(int));
         return 0;
     }
-    else if (op == IOCTL_EVIOCGID) {
+    // EVIOCGID: _IOR('E', 0x02, struct input_id)
+    else if (nr == 0x02 && dir == IOCTL_READ) {
         Logger::log("Hooking ioctl EVIOCGID for event %s\n", event);
         struct input_id id;
         memset(&id, 0, sizeof(id));
@@ -428,87 +461,113 @@ EXPORT int ioctl(int fd, int op, ...) {
         memcpy(argp, (void *)&id, sizeof(id));
         return 0;
     }
-    else if (op == IOCTL_EVIOCGNAME_0x6) {
-    	Logger::log("Hooking ioctl EVIOCGNAME for event %s\n", event);
-    	char *name;
-    	
-    	asprintf(&name, "Generic HID Gamepad %d", event_number);
-    	
-    	strcpy((char *)argp, name);
-    	free(name);
-    	return 0;
+    // EVIOCGNAME(len): _IOC(_IOC_READ, 'E', 0x06, len)
+    else if (nr == 0x06 && dir == IOCTL_READ) {
+        Logger::log("Hooking ioctl EVIOCGNAME(len=%d) for event %s\n", len, event);
+        char *name;
+        asprintf(&name, "Generic HID Gamepad %d", event_number);
+        int copy_len = len - 1;
+        if (copy_len < 0) copy_len = 0;
+        int name_len = strlen(name);
+        if (copy_len > name_len) copy_len = name_len;
+        memcpy((char *)argp, name, copy_len);
+        ((char *)argp)[copy_len] = '\0';
+        free(name);
+        return 0;
     }
-    else if (op == IOCTL_EVIOCGPROP) {
+    // EVIOCGPROP(len): _IOC(_IOC_READ, 'E', 0x09, len)
+    else if (nr == 0x09 && dir == IOCTL_READ) {
         Logger::log("Hooking ioctl EVIOCGPROP for event %s\n", event);
-        memset(argp, 0, sizeof(int));
+        memset(argp, 0, len);
         return 0;
     }
-    else if (op == IOCTL_EVIOCGKEY) {
-    	Logger::log("Hooking ioctl EVIOCGKEY(len) for event %s\n", event);
-    	char bitmask[KEY_MAX / 8] = {0};
-        memcpy(argp, (void *)&bitmask, sizeof(bitmask));
+    // EVIOCGKEY(len): _IOC(_IOC_READ, 'E', 0x18, len)
+    else if (nr == 0x18 && dir == IOCTL_READ) {
+        Logger::log("Hooking ioctl EVIOCGKEY(len=%d) for event %s\n", len, event);
+        char bitmask[(KEY_MAX + 7) / 8];
+        memset(bitmask, 0, sizeof(bitmask));
+        int copy_len = len;
+        if (copy_len > (int)sizeof(bitmask)) copy_len = sizeof(bitmask);
+        memcpy(argp, (void *)bitmask, copy_len);
         return 0;
     }
-    else if (op == IOCTL_EVIOCGBIT_EV) {
-    	Logger::log("Hooking ioctl EVIOCGBIT(0, len) for event %s\n", event);
-        char bitmask[EV_MAX / 8] = {0};
+    // EVIOCGBIT(ev_type, len): _IOC(_IOC_READ, 'E', 0x20 + ev_type, len)
+    // nr == 0x20 means ev_type=0 (EV_SYN), 0x21=EV_KEY, 0x22=EV_REL, 0x23=EV_ABS, 0x35=EV_FF
+    else if (nr == 0x20 && dir == IOCTL_READ) {
+        // EVIOCGBIT(0, len) — event type bitmask
+        Logger::log("Hooking ioctl EVIOCGBIT(EV_SYN, len=%d) for event %s\n", len, event);
+        char bitmask[(EV_MAX + 7) / 8];
+        memset(bitmask, 0, sizeof(bitmask));
         bitmask[EV_SYN / 8] |= (1 << (EV_SYN % 8));
         bitmask[EV_KEY / 8] |= (1 << (EV_KEY % 8));
         bitmask[EV_ABS / 8] |= (1 << (EV_ABS % 8));
-    	memcpy(argp, (void *)&bitmask, sizeof(bitmask));
-    	return 0;	
-    }
-    else if (op == IOCTL_EVIOCGBIT_KEY) {
-        Logger::log("Hooking ioctl EVIOCGBIT(EV_KEY, len) for event %s\n", event);
-        char bitmask[KEY_MAX / 8] = {0};
-        for (int i = 0x130; i <= 0x13e; i++) {
-            if (i == 0x130)
-                bitmask[BTN_A / 8] |= (1 << (BTN_A % 8));
-            else if (i == 0x131)
-                bitmask[BTN_B / 8] |= (1 << (BTN_B % 8));
-            else if (i == 0x132)
-                continue;
-            else if (i == 0x133)
-                bitmask[BTN_X / 8] |= (1 << (BTN_X % 8));
-            else if (i == 0x134)
-                bitmask[BTN_Y / 8] |= (1 << (BTN_Y % 8));
-            else if (i == 0x135)
-                continue;
-            else
-                bitmask[i / 8] |= (1 << (i % 8));
-        }
-        memcpy(argp, (void *)&bitmask, sizeof(bitmask));
+        int copy_len = len;
+        if (copy_len > (int)sizeof(bitmask)) copy_len = sizeof(bitmask);
+        memcpy(argp, (void *)bitmask, copy_len);
         return 0;
     }
-    else if (op == IOCTL_EVIOCGBIT_REL) {
-    	Logger::log("Hooking ioctl EVIOCGBIT(EV_REL, len) for event %s\n", event);
-    	char bitmask[REL_MAX / 8] = {0};
-    	memcpy(argp, (void *)&bitmask, sizeof(bitmask));
-    	return 0;
+    else if (nr == 0x21 && dir == IOCTL_READ) {
+        // EVIOCGBIT(EV_KEY, len) — key bitmask
+        Logger::log("Hooking ioctl EVIOCGBIT(EV_KEY, len=%d) for event %s\n", len, event);
+        char bitmask[(KEY_MAX + 7) / 8];
+        memset(bitmask, 0, sizeof(bitmask));
+        bitmask[BTN_A / 8] |= (1 << (BTN_A % 8));
+        bitmask[BTN_B / 8] |= (1 << (BTN_B % 8));
+        bitmask[BTN_X / 8] |= (1 << (BTN_X % 8));
+        bitmask[BTN_Y / 8] |= (1 << (BTN_Y % 8));
+        bitmask[BTN_TL / 8] |= (1 << (BTN_TL % 8));
+        bitmask[BTN_TR / 8] |= (1 << (BTN_TR % 8));
+        bitmask[BTN_SELECT / 8] |= (1 << (BTN_SELECT % 8));
+        bitmask[BTN_START / 8] |= (1 << (BTN_START % 8));
+        bitmask[BTN_THUMBL / 8] |= (1 << (BTN_THUMBL % 8));
+        bitmask[BTN_THUMBR / 8] |= (1 << (BTN_THUMBR % 8));
+        int copy_len = len;
+        if (copy_len > (int)sizeof(bitmask)) copy_len = sizeof(bitmask);
+        memcpy(argp, (void *)bitmask, copy_len);
+        return 0;
     }
-    else if (op == IOCTL_EVIOCGBIT_ABS) {
-    	Logger::log("Hooking ioctl EVIOCGBIT(EV_ABS, len) for event %s\n", event);
-    	char bitmask[ABS_MAX / 8] = {0};
-    	bitmask[ABS_X / 8] |= (1 << (ABS_X % 8));
-    	bitmask[ABS_Y / 8] |= (1 << (ABS_Y % 8));
-    	bitmask[ABS_RX / 8] |= (1 << (ABS_RX % 8));
-    	bitmask[ABS_RY / 8] |= (1 << (ABS_RY % 8));
-    	bitmask[ABS_GAS / 8] |= (1 << (ABS_GAS % 8));
-    	bitmask[ABS_BRAKE / 8] |= (1 << (ABS_BRAKE % 8));
-    	bitmask[ABS_HAT0X / 8] |= (1 << (ABS_HAT0X % 8));
-    	bitmask[ABS_HAT0Y / 8] |= (1 << (ABS_HAT0Y % 8));
-    	memcpy(argp, (void *)&bitmask, sizeof(bitmask));
-    	return 0;
+    else if (nr == 0x22 && dir == IOCTL_READ) {
+        // EVIOCGBIT(EV_REL, len) — relative axes (none for gamepad)
+        Logger::log("Hooking ioctl EVIOCGBIT(EV_REL, len=%d) for event %s\n", len, event);
+        char bitmask[(REL_MAX + 7) / 8];
+        memset(bitmask, 0, sizeof(bitmask));
+        int copy_len = len;
+        if (copy_len > (int)sizeof(bitmask)) copy_len = sizeof(bitmask);
+        memcpy(argp, (void *)bitmask, copy_len);
+        return 0;
     }
-    else if (op == IOCTL_EVIOCGBIT_FF) {
-        Logger::log("Hooking ioctl EVIOCGBIT(EV_FF, len) for event %s\n", event);
-        char bitmask[FF_MAX / 8] = {0};
+    else if (nr == 0x23 && dir == IOCTL_READ) {
+        // EVIOCGBIT(EV_ABS, len) — absolute axes bitmask
+        Logger::log("Hooking ioctl EVIOCGBIT(EV_ABS, len=%d) for event %s\n", len, event);
+        char bitmask[(ABS_MAX + 7) / 8];
+        memset(bitmask, 0, sizeof(bitmask));
+        bitmask[ABS_X / 8] |= (1 << (ABS_X % 8));
+        bitmask[ABS_Y / 8] |= (1 << (ABS_Y % 8));
+        bitmask[ABS_RX / 8] |= (1 << (ABS_RX % 8));
+        bitmask[ABS_RY / 8] |= (1 << (ABS_RY % 8));
+        bitmask[ABS_GAS / 8] |= (1 << (ABS_GAS % 8));
+        bitmask[ABS_BRAKE / 8] |= (1 << (ABS_BRAKE % 8));
+        bitmask[ABS_HAT0X / 8] |= (1 << (ABS_HAT0X % 8));
+        bitmask[ABS_HAT0Y / 8] |= (1 << (ABS_HAT0Y % 8));
+        int copy_len = len;
+        if (copy_len > (int)sizeof(bitmask)) copy_len = sizeof(bitmask);
+        memcpy(argp, (void *)bitmask, copy_len);
+        return 0;
+    }
+    else if (nr == 0x35 && dir == IOCTL_READ) {
+        // EVIOCGBIT(EV_FF, len) — force feedback bitmask
+        Logger::log("Hooking ioctl EVIOCGBIT(EV_FF, len=%d) for event %s\n", len, event);
+        char bitmask[(FF_MAX + 7) / 8];
+        memset(bitmask, 0, sizeof(bitmask));
         bitmask[FF_RUMBLE / 8] |= (1 << (FF_RUMBLE % 8));
         bitmask[FF_PERIODIC / 8] |= (1 << (FF_PERIODIC % 8));
-        memcpy(argp, (void *)&bitmask, sizeof(bitmask));
+        int copy_len = len;
+        if (copy_len > (int)sizeof(bitmask)) copy_len = sizeof(bitmask);
+        memcpy(argp, (void *)bitmask, copy_len);
         return 0;
     }
-    else if (op == IOCTL_EVIOCSFF) {
+    // EVIOCSFF: _IOW('E', 0x80, struct ff_effect)
+    else if (nr == 0x80 && dir == IOCTL_WRITE) {
         struct ff_effect *effect = (struct ff_effect *)argp;
         if (effect->id == -1) {
             effect->id = next_ff_id++;
@@ -516,72 +575,64 @@ EXPORT int ioctl(int fd, int op, ...) {
         ff_effects[effect->id] = *effect;
         return 0;
     }
-    else if (op == IOCTL_EVIOCRMFF) {
+    // EVIOCRMFF: _IOW('E', 0x81, int)
+    else if (nr == 0x81 && dir == IOCTL_WRITE) {
         int id = (intptr_t)argp;
         ff_effects.erase(id);
         return 0;
     }
-    else if (op == IOCTL_EVIOCGEFFECTS) {
+    // EVIOCGEFFECTS: _IOR('E', 0x84, int)
+    else if (nr == 0x84 && dir == IOCTL_READ) {
         int max_effects = 16;
         memcpy(argp, &max_effects, sizeof(int));
         return 0;
     }
-    else if (op >= IOCTL_EVIOCGABS_MIN && op <= IOCTL_EVIOCGABS_MAX) {
-    	Logger::log("Hooking ioctl EVIOCGABS(ABS) for event %s\n", event);
-    	int number = op & 0xFF;
-    	struct input_absinfo abs_info;
-    	memset(&abs_info, 0, sizeof(abs_info));
-    	if (number >= 0x40 && number <= 0x41) {
-    		abs_info.value = 0;
-    		abs_info.minimum = -32768;
-    		abs_info.maximum = 32767;
-    	}
-    	else if (number >= 0x43 && number <= 0x44) {
-    		abs_info.value = 0;
-    		abs_info.minimum = -32768;
-    		abs_info.maximum = 32767;
-    	}
-    	else if (number == 0x42) {
-    		abs_info.value = 0;
-    		abs_info.minimum = 0;
-    		abs_info.maximum = 255;
-    		// ABS_Z / ABS_THROTTLE for trigger axes
-    	}
-    	else if (number >= 0x49 && number <= 0x4A) {
-    		abs_info.value = 0;
-    		abs_info.minimum = 0;
-    		abs_info.maximum = 255;
-    	}
-    	else if (number >= 0x50 && number <= 0x51) {
-    		abs_info.value = 0;
-    		abs_info.minimum = -1;
-    		abs_info.maximum = 1;
-    	}
-    	memcpy(argp, (void *)&abs_info, sizeof(abs_info));
-    	return 0;
+    // EVIOCGABS(abs_code): _IOC(_IOC_READ, 'E', 0x40 + abs_code, sizeof(struct input_absinfo))
+    else if (nr >= 0x40 && nr <= 0x7F && dir == IOCTL_READ) {
+        int abs_code = nr - 0x40;
+        Logger::log("Hooking ioctl EVIOCGABS(0x%02x) for event %s\n", abs_code, event);
+        struct input_absinfo abs_info;
+        memset(&abs_info, 0, sizeof(abs_info));
+        switch (abs_code) {
+            case ABS_X:
+            case ABS_Y:
+            case ABS_RX:
+            case ABS_RY:
+                abs_info.minimum = -32768;
+                abs_info.maximum = 32767;
+                break;
+            case ABS_Z:
+                abs_info.minimum = 0;
+                abs_info.maximum = 255;
+                break;
+            case ABS_GAS:
+            case ABS_BRAKE:
+                abs_info.minimum = 0;
+                abs_info.maximum = 255;
+                break;
+            case ABS_HAT0X:
+            case ABS_HAT0Y:
+                abs_info.minimum = -1;
+                abs_info.maximum = 1;
+                break;
+            default:
+                // Unknown axis — return zeroed info
+                break;
+        }
+        memcpy(argp, (void *)&abs_info, sizeof(abs_info));
+        return 0;
     }
-    else if (op == IOCTL_EVIOCGRAB) {
-    	Logger::log("Hooking ioctl EVIOCGRAB for event %s\n", event);
-    	/* Always pretend this succeeds */
-    	return 0;
-    }
-    else if (op == IOCTL_JSIOCGNAME) {
-    	Logger::log("Hooking ioctl JSIOCGNAME(len) for event %s\n", event);
-    	char *name;
-        asprintf(&name, "Generic HID Gamepad %d", event_number);
-    	strcpy((char *)argp, name);
-    	free(name);
-    	return 0;
+    // EVIOCGRAB: _IOW('E', 0x90, int)
+    else if (nr == 0x90 && dir == IOCTL_WRITE) {
+        Logger::log("Hooking ioctl EVIOCGRAB for event %s\n", event);
+        /* Always pretend this succeeds */
+        return 0;
     }
     else {
-    	int type = (op >> 8 & 0xFF);
-    	int number = (op >> 0 & 0xFF);
-    	Logger::log("Unhandled evdev ioctl, type %d number %d\n", type, number);
-    	return syscall(SYS_ioctl, fd, op, argp);
+        Logger::log("Unhandled evdev ioctl, nr=0x%02x dir=%d len=%d\n", nr, dir, len);
+        return syscall(SYS_ioctl, fd, op, argp);
     }
 }
-
-static std::set<int> closed_fds;
 
 EXPORT int close(int fd) {
     if (!g_hooks_ready) return syscall(SYS_close, fd);
