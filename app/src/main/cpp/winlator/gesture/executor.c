@@ -38,45 +38,66 @@ static int schedule_action(TouchBinding binding, int action_type, uint64_t delay
 }
 
 void add_action(TouchActionResult* restrict r, ActionType type, int param0, int param1, int param2) {
-    if (__builtin_expect(r->count >= (int)(sizeof(r->actions) / sizeof(r->actions[0])), 0)) {
+    if (r->count >= (int)(sizeof(r->actions) / sizeof(r->actions[0]))) {
         __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "add_action: buffer overflow (type=%d)", type);
         return;
     }
     r->actions[r->count].type = type;
     switch (type) {
-        case ACT_POINTER_MOVE: r->actions[r->count].pointer_move.x = param0; r->actions[r->count].pointer_move.y = param1; break;
-        case ACT_POINTER_MOVE_DELTA: r->actions[r->count].pointer_delta.dx = param0; r->actions[r->count].pointer_delta.dy = param1; break;
-        case ACT_POINTER_BUTTON_PRESS: case ACT_POINTER_BUTTON_RELEASE: r->actions[r->count].pointer_button.button = param0; break;
-        case ACT_KEY_PRESS: case ACT_KEY_RELEASE: r->actions[r->count].key.keycode = param0; r->actions[r->count].key.is_down = param1; break;
-        case ACT_MOUSE_EVENT: r->actions[r->count].mouse_event.flags = param0; r->actions[r->count].mouse_event.dx = param1; r->actions[r->count].mouse_event.dy = param2; break;
-        case ACT_SCROLL: r->actions[r->count].scroll.amount = param0; break;
-        case ACT_START_MOUSE_MOVE: r->actions[r->count].mouse_move.dx = param0; r->actions[r->count].mouse_move.dy = param1; r->actions[r->count].mouse_move.hold = param2; break;
-        case ACT_STOP_MOUSE_MOVE: r->actions[r->count].mouse_move.dx = 0; r->actions[r->count].mouse_move.dy = 0; r->actions[r->count].mouse_move.hold = 0; break;
-        case ACT_GAMEPAD_STATE: r->actions[r->count].key.keycode = param0; r->actions[r->count].key.is_down = param1; break;
-        case ACT_GAMEPAD_AXIS: r->actions[r->count].gamepad_axis.is_left = param0; r->actions[r->count].gamepad_axis.axis_x = param1; r->actions[r->count].gamepad_axis.axis_y = param2; break;
-        case ACT_HAPTIC: r->actions[r->count].haptic.effect = param0; break;
-        case ACT_SET_CURSOR_SPEED: r->actions[r->count].cursor_speed.speed = param0; break;
-        default: break;
+        case ACT_POINTER_MOVE:
+            r->actions[r->count].pointer_move.x = param0;
+            r->actions[r->count].pointer_move.y = param1;
+            break;
+        case ACT_POINTER_MOVE_DELTA:
+            r->actions[r->count].pointer_delta.dx = param0;
+            r->actions[r->count].pointer_delta.dy = param1;
+            break;
+        case ACT_POINTER_BUTTON_PRESS:
+        case ACT_POINTER_BUTTON_RELEASE:
+            r->actions[r->count].pointer_button.button = param0;
+            break;
+        case ACT_KEY_PRESS:
+        case ACT_KEY_RELEASE:
+            r->actions[r->count].key.keycode = param0;
+            r->actions[r->count].key.is_down = param1;
+            break;
+        case ACT_MOUSE_EVENT:
+            r->actions[r->count].mouse_event.flags = param0;
+            r->actions[r->count].mouse_event.dx = param1;
+            r->actions[r->count].mouse_event.dy = param2;
+            break;
+        case ACT_SCROLL:
+            r->actions[r->count].scroll.amount = param0;
+            break;
+        case ACT_START_MOUSE_MOVE:
+            r->actions[r->count].mouse_move.dx = param0;
+            r->actions[r->count].mouse_move.dy = param1;
+            r->actions[r->count].mouse_move.hold = param2;
+            break;
+        case ACT_STOP_MOUSE_MOVE:
+            r->actions[r->count].mouse_move.dx = 0;
+            r->actions[r->count].mouse_move.dy = 0;
+            r->actions[r->count].mouse_move.hold = 0;
+            break;
+        case ACT_GAMEPAD_STATE:
+            r->actions[r->count].key.keycode = param0;
+            r->actions[r->count].key.is_down = param1;
+            break;
+        case ACT_GAMEPAD_AXIS:
+            r->actions[r->count].gamepad_axis.is_left = param0;
+            r->actions[r->count].gamepad_axis.axis_x = param1;
+            r->actions[r->count].gamepad_axis.axis_y = param2;
+            break;
+        case ACT_HAPTIC:
+            r->actions[r->count].haptic.effect = param0;
+            break;
+        case ACT_SET_CURSOR_SPEED:
+            r->actions[r->count].cursor_speed.speed = param0;
+            break;
+        default:
+            break;
     }
     r->count++;
-}
-
-static void press_binding_by_type(TouchActionResult* restrict result, const TouchBinding* b) {
-    if (is_keyboard_binding(b))
-        add_action(result, ACT_KEY_PRESS, b->keycode, 1, 0);
-    else if (is_mouse_button_binding(b))
-        add_action(result, ACT_POINTER_BUTTON_PRESS, pointer_button_idx(b), 0, 0);
-    else if (is_gamepad_binding(b))
-        add_action(result, ACT_GAMEPAD_STATE, gamepad_button_index(b), 1, 0);
-}
-
-static void release_binding_by_type(TouchActionResult* restrict result, const TouchBinding* b) {
-    if (is_keyboard_binding(b))
-        add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0);
-    else if (is_mouse_button_binding(b))
-        add_action(result, ACT_POINTER_BUTTON_RELEASE, pointer_button_idx(b), 0, 0);
-    else if (is_gamepad_binding(b))
-        add_action(result, ACT_GAMEPAD_STATE, gamepad_button_index(b), 0, 0);
 }
 
 void release_held_actions(TouchActionResult* restrict result) {
@@ -99,7 +120,7 @@ void release_non_modifiers_first(TouchActionResult* restrict result, const Touch
         if (actions[i].type != BINDING_NONE && !is_modifier_binding(&actions[i]))
             release_binding(result, &actions[i]);
     for (int i = count - 1; i >= 0; i--)
-        if (actions[i].type != BINDING_NONE && __builtin_expect(is_modifier_binding(&actions[i]), 0))
+        if (actions[i].type != BINDING_NONE && is_modifier_binding(&actions[i]))
             release_binding(result, &actions[i]);
 }
 
@@ -116,7 +137,7 @@ static bool execute_toggle_actions(TouchActionResult* restrict result, const Tou
         }
     }
     if (found) {
-        release_binding_by_type(result, b);
+        release_binding(result, b);
         gesture_remove_toggled_action(b->type, b->keycode);
     } else {
         if (binding_delay > 0 && non_mod_count > 0) {
@@ -132,7 +153,7 @@ static bool execute_toggle_actions(TouchActionResult* restrict result, const Tou
                 }
             }
             if (pending) {
-                release_binding_by_type(result, b);
+                release_binding(result, b);
                 g_state.scheduled_actions[si].active = false;
                 g_state.scheduled_actions[si].needs_toggle_record = false;
             } else {
@@ -144,7 +165,7 @@ static bool execute_toggle_actions(TouchActionResult* restrict result, const Tou
                     g_state.scheduled_actions[sched_idx].needs_toggle_record = true;
             }
         } else {
-            press_binding_by_type(result, b);
+            press_binding(result, b, true);
             if (g_state.gesture_toggled_count < MAX_HELD_ACTIONS)
                 g_state.gesture_toggled_actions[g_state.gesture_toggled_count++] = *b;
         }
@@ -164,7 +185,7 @@ static bool execute_hold_actions(TouchActionResult* restrict result, const Touch
                   ACT_GAMEPAD_STATE;
         schedule_action(*b, act, press_delay);
     } else {
-        press_binding_by_type(result, b);
+        press_binding(result, b, true);
     }
     if (g_state.gesture_held_count < MAX_HELD_ACTIONS)
         g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
@@ -214,8 +235,8 @@ static void execute_actions_impl(TouchActionResult* restrict result, const Touch
     // Press modifier keyboard bindings first
     for (int i = 0; i < count; i++) {
         const TouchBinding* b = &actions[i];
-        if (__builtin_expect(b->type == BINDING_NONE, 0)) continue;
-        if (__builtin_expect(is_modifier_binding(b), 0))
+        if (b->type == BINDING_NONE) continue;
+        if (is_modifier_binding(b))
             add_action(result, ACT_KEY_PRESS, b->keycode, 1, 0);
     }
 
@@ -224,8 +245,8 @@ static void execute_actions_impl(TouchActionResult* restrict result, const Touch
     int non_mod_count = 0;
     for (int i = 0; i < count; i++) {
         const TouchBinding* b = &actions[i];
-        if (__builtin_expect(b->type == BINDING_NONE, 0)) continue;
-        if (__builtin_expect(is_modifier_binding(b), 0)) continue;
+        if (b->type == BINDING_NONE) continue;
+        if (is_modifier_binding(b)) continue;
         if (b->type == BINDING_MOUSE_SCROLL_UP || b->type == BINDING_MOUSE_SCROLL_DOWN) continue;
         if (is_mouse_move_binding(b)) continue;
 
@@ -252,15 +273,15 @@ static void execute_actions_impl(TouchActionResult* restrict result, const Touch
         uint64_t mod_release_delay = (uint64_t)non_mod_count * binding_delay + binding_delay;
         for (int i = count - 1; i >= 0; i--) {
             const TouchBinding* b = &actions[i];
-            if (__builtin_expect(b->type == BINDING_NONE, 0)) continue;
-            if (__builtin_expect(is_modifier_binding(b), 0))
+            if (b->type == BINDING_NONE) continue;
+            if (is_modifier_binding(b))
                 schedule_action(*b, ACT_KEY_RELEASE, mod_release_delay);
         }
     } else {
         for (int i = count - 1; i >= 0; i--) {
             const TouchBinding* b = &actions[i];
-            if (__builtin_expect(b->type == BINDING_NONE, 0)) continue;
-            if (__builtin_expect(is_modifier_binding(b), 0))
+            if (b->type == BINDING_NONE) continue;
+            if (is_modifier_binding(b))
                 add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0);
         }
     }
@@ -329,6 +350,23 @@ void press_binding(TouchActionResult* restrict result, const TouchBinding* b, bo
     }
 }
 
+static void compact_scheduled_actions(int old_count) {
+    ScheduledAction* sched_actions = g_state.scheduled_actions;
+    int write_idx = 0;
+    for (int i = 0; i < g_state.scheduled_action_count; i++) {
+        if (sched_actions[i].active) {
+            if (write_idx != i)
+                sched_actions[write_idx] = sched_actions[i];
+            write_idx++;
+        }
+    }
+    g_state.scheduled_action_count = write_idx;
+    for (int i = write_idx; i < old_count; i++) {
+        sched_actions[i].active = false;
+        sched_actions[i].binding.type = BINDING_NONE;
+    }
+}
+
 void process_scheduled_actions(TouchActionResult* restrict result, uint64_t time_ms) {
     if (g_state.scheduled_action_count == 0) return;
     int old_count = g_state.scheduled_action_count;
@@ -366,17 +404,5 @@ void process_scheduled_actions(TouchActionResult* restrict result, uint64_t time
             }
         }
     }
-    int write_idx = 0;
-    for (int i = 0; i < g_state.scheduled_action_count; i++) {
-        if (sched_actions[i].active) {
-            if (write_idx != i)
-                sched_actions[write_idx] = sched_actions[i];
-            write_idx++;
-        }
-    }
-    g_state.scheduled_action_count = write_idx;
-    for (int i = write_idx; i < old_count; i++) {
-        sched_actions[i].active = false;
-        sched_actions[i].binding.type = BINDING_NONE;
-    }
+    compact_scheduled_actions(old_count);
 }

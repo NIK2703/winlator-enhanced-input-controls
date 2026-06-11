@@ -45,12 +45,12 @@ const GesturePairSlot GESTURE_SLOTS[5] = {
 const GesturePairSlot* select_gesture_slot(const TouchFinger* f) {
     if (f->cached_has_active_long_press || f->cached_has_active_long_press_drag) {
         if (f->is_second_finger) return NULL; // no L/Ld for second finger
-        return &GESTURE_SLOTS[2];
+        return SLOT_L();
     }
     if (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag) {
-        return f->is_second_finger ? &GESTURE_SLOTS[4] : &GESTURE_SLOTS[1];
+        return f->is_second_finger ? SLOT_D2() : SLOT_D();
     }
-    return f->is_second_finger ? &GESTURE_SLOTS[3] : &GESTURE_SLOTS[0];
+    return f->is_second_finger ? SLOT_S2() : SLOT_S();
 }
 
 // ============================================================
@@ -61,16 +61,34 @@ static void resolve_binding_for_type(
     const TouchBinding** out, int* out_count)
 {
     switch (type) {
-        case GESTURE_SINGLE_TAP:         *out = fb->single_tap;        *out_count = fb->single_tap_count;        break;
-        case GESTURE_DOUBLE_TAP:         *out = fb->double_tap;        *out_count = fb->double_tap_count;        break;
-        case GESTURE_LONG_PRESS:         *out = fb->long_press;        *out_count = fb->long_press_count;        break;
-        case GESTURE_SINGLE_2ND:         *out = fb->single_tap;        *out_count = fb->single_tap_count;        break;
-        case GESTURE_DOUBLE_2ND:         *out = fb->double_tap;        *out_count = fb->double_tap_count;        break;
-        case GESTURE_SINGLE_TAP_DRAG:    *out = fb->single_tap_drag;   *out_count = fb->single_tap_drag_count;   break;
-        case GESTURE_DOUBLE_TAP_DRAG:    *out = fb->double_tap_drag;   *out_count = fb->double_tap_drag_count;   break;
-        case GESTURE_LONG_PRESS_DRAG:    *out = fb->long_press_drag;   *out_count = fb->long_press_drag_count;   break;
-        case GESTURE_SINGLE_DRAG_2ND:    *out = fb->single_tap_drag;   *out_count = fb->single_tap_drag_count;   break;
-        case GESTURE_DOUBLE_DRAG_2ND:    *out = fb->double_tap_drag;   *out_count = fb->double_tap_drag_count;   break;
+        case GESTURE_SINGLE_TAP:
+        case GESTURE_SINGLE_2ND:
+            *out = fb->single_tap;
+            *out_count = fb->single_tap_count;
+            break;
+        case GESTURE_DOUBLE_TAP:
+        case GESTURE_DOUBLE_2ND:
+            *out = fb->double_tap;
+            *out_count = fb->double_tap_count;
+            break;
+        case GESTURE_LONG_PRESS:
+            *out = fb->long_press;
+            *out_count = fb->long_press_count;
+            break;
+        case GESTURE_SINGLE_TAP_DRAG:
+        case GESTURE_SINGLE_DRAG_2ND:
+            *out = fb->single_tap_drag;
+            *out_count = fb->single_tap_drag_count;
+            break;
+        case GESTURE_DOUBLE_TAP_DRAG:
+        case GESTURE_DOUBLE_DRAG_2ND:
+            *out = fb->double_tap_drag;
+            *out_count = fb->double_tap_drag_count;
+            break;
+        case GESTURE_LONG_PRESS_DRAG:
+            *out = fb->long_press_drag;
+            *out_count = fb->long_press_drag_count;
+            break;
         default: *out = NULL; *out_count = 0; break;
     }
 }
@@ -99,6 +117,27 @@ void resolve_binding_slot(
 // ============================================================
 // Unified pair plan resolution
 // ============================================================
+static bool gesture_type_has_cached(const TouchFinger* f, GestureType type) {
+    switch (type) {
+        case GESTURE_SINGLE_TAP:
+        case GESTURE_SINGLE_2ND:
+            return f->cached_has_active_single_tap;
+        case GESTURE_DOUBLE_TAP:
+        case GESTURE_DOUBLE_2ND:
+            return f->cached_has_active_double_tap;
+        case GESTURE_LONG_PRESS:
+            return f->cached_has_active_long_press;
+        case GESTURE_SINGLE_TAP_DRAG:
+        case GESTURE_SINGLE_DRAG_2ND:
+            return f->cached_has_active_single_tap_drag;
+        case GESTURE_DOUBLE_TAP_DRAG:
+        case GESTURE_DOUBLE_DRAG_2ND:
+            return f->cached_has_active_double_tap_drag;
+        default:
+            return false;
+    }
+}
+
 GesturePairPlan resolve_gesture_pair(
     const TouchFinger* f,
     const GesturePairSlot* slot)
@@ -108,22 +147,11 @@ GesturePairPlan resolve_gesture_pair(
     bool has_competing_lp = slot->comp_lp != 0
         && f->cached_has_long_press_timer;
 
-    bool has_non_drag =
-        slot->bindings_non_drag == GESTURE_SINGLE_TAP  ? f->cached_has_active_single_tap :
-        slot->bindings_non_drag == GESTURE_DOUBLE_TAP  ? f->cached_has_active_double_tap :
-        slot->bindings_non_drag == GESTURE_LONG_PRESS  ? f->cached_has_active_long_press :
-        slot->bindings_non_drag == GESTURE_SINGLE_2ND  ? f->cached_has_active_single_tap :
-        slot->bindings_non_drag == GESTURE_DOUBLE_2ND  ? f->cached_has_active_double_tap : false;
-
-    bool has_drag =
-        slot->bindings_drag == GESTURE_SINGLE_TAP_DRAG ? f->cached_has_active_single_tap_drag :
-        slot->bindings_drag == GESTURE_DOUBLE_TAP_DRAG ? f->cached_has_active_double_tap_drag :
-        slot->bindings_drag == GESTURE_LONG_PRESS_DRAG ? f->cached_has_active_long_press_drag :
-        slot->bindings_drag == GESTURE_SINGLE_DRAG_2ND ? f->cached_has_active_single_tap_drag :
-        slot->bindings_drag == GESTURE_DOUBLE_DRAG_2ND ? f->cached_has_active_double_tap_drag : false;
+    bool has_non_drag = gesture_type_has_cached(f, slot->bindings_non_drag);
+    bool has_drag = gesture_type_has_cached(f, slot->bindings_drag);
 
     // S slot gets hold_delay from config; others use 0
-    int hold_delay_ms = (slot == &GESTURE_SLOTS[0]) ? g_state.cfg.single_tap_delay_ms : 0;
+    int hold_delay_ms = (slot == SLOT_S()) ? g_state.cfg.single_tap_delay_ms : 0;
 
     return gesture_decide_branch(gesture_branch_params(has_non_drag, has_drag, has_competing_dt, has_competing_lp,
         g_state.cfg.is_ts, slot->is_second_finger, hold_delay_ms));

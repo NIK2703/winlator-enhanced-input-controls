@@ -62,7 +62,7 @@ void touch_processor_update_config(const TouchProcessorConfig* config) {
             setup_main_finger_bindings(fb);
         }
         f->bindings_generation = g_state.cfg.bindings_generation;
-        touch_finger_cache_bs(f);
+        touch_finger_cache_bindings_state(f);
     }
 }
 
@@ -270,7 +270,7 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     }
     // Always refresh cached flags — they may have been cleared between DOWNs
     // (e.g. by enter_double_tap_waiting, LP timer paths).
-    touch_finger_cache_bs(f);
+    touch_finger_cache_bindings_state(f);
 
     if (gesture_processing_needed())
         handle_gesture_down(f, x, y, time_ms, &result);
