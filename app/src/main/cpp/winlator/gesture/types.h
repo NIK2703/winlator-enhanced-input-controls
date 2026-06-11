@@ -164,13 +164,6 @@ extern GestureFingerCtx g_ctx[MAX_FINGERS];
 // Init per-finger context
 void g_ctx_init(GestureFingerCtx* ctx, bool is_second);
 
-// ---- Unified entry point (defined in unified.c) ----
-void gesture_process_finger(
-    TouchFinger* f, GestureFingerCtx* ctx,
-    TouchActionResult* result, uint64_t time_ms,
-    GestureProcessEvent event,
-    float x, float y);
-
 // ---- Unified slot / binding / plan helpers (defined in unified.c) ----
 const GesturePairSlot* select_gesture_slot(const TouchFinger* f);
 void resolve_binding_slot(

@@ -1,8 +1,10 @@
 #include "../touch_processor_internal.h"
 #include "types.h"
-#include "branch.h"
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture", __VA_ARGS__)
+
+#define MOUSE_BTN_LEFT   0
+#define MOUSE_BTN_MIDDLE 2
 
 // ============================================================
 // Per-finger gesture context
@@ -54,6 +56,25 @@ const GesturePairSlot* select_gesture_slot(const TouchFinger* f) {
 // ============================================================
 // Unified binding resolution
 // ============================================================
+static void resolve_binding_for_type(
+    GestureType type, const FingerBindings* fb,
+    const TouchBinding** out, int* out_count)
+{
+    switch (type) {
+        case GESTURE_SINGLE_TAP:         *out = fb->single_tap;        *out_count = fb->single_tap_count;        break;
+        case GESTURE_DOUBLE_TAP:         *out = fb->double_tap;        *out_count = fb->double_tap_count;        break;
+        case GESTURE_LONG_PRESS:         *out = fb->long_press;        *out_count = fb->long_press_count;        break;
+        case GESTURE_SINGLE_2ND:         *out = fb->single_tap;        *out_count = fb->single_tap_count;        break;
+        case GESTURE_DOUBLE_2ND:         *out = fb->double_tap;        *out_count = fb->double_tap_count;        break;
+        case GESTURE_SINGLE_TAP_DRAG:    *out = fb->single_tap_drag;   *out_count = fb->single_tap_drag_count;   break;
+        case GESTURE_DOUBLE_TAP_DRAG:    *out = fb->double_tap_drag;   *out_count = fb->double_tap_drag_count;   break;
+        case GESTURE_LONG_PRESS_DRAG:    *out = fb->long_press_drag;   *out_count = fb->long_press_drag_count;   break;
+        case GESTURE_SINGLE_DRAG_2ND:    *out = fb->single_tap_drag;   *out_count = fb->single_tap_drag_count;   break;
+        case GESTURE_DOUBLE_DRAG_2ND:    *out = fb->double_tap_drag;   *out_count = fb->double_tap_drag_count;   break;
+        default: *out = NULL; *out_count = 0; break;
+    }
+}
+
 void resolve_binding_slot(
     const TouchFinger* f,
     const GesturePairSlot* slot,
@@ -70,22 +91,8 @@ void resolve_binding_slot(
         // NOTE: setup_second_finger_bindings maps 2nd-variant bindings into
         // PRIMARY fields (single_tap ← S2, double_tap ← D2, etc.) and NULLs
         // the 2nd-variant fields. So S2/D2 slots resolve from PRIMARY fields.
-        switch (slot->bindings_non_drag) {
-            case GESTURE_SINGLE_TAP:    *non_drag = fb->single_tap;       *non_drag_count = fb->single_tap_count;       break;
-            case GESTURE_DOUBLE_TAP:    *non_drag = fb->double_tap;       *non_drag_count = fb->double_tap_count;       break;
-            case GESTURE_LONG_PRESS:    *non_drag = fb->long_press;       *non_drag_count = fb->long_press_count;       break;
-            case GESTURE_SINGLE_2ND:    *non_drag = fb->single_tap;       *non_drag_count = fb->single_tap_count;       break;
-            case GESTURE_DOUBLE_2ND:    *non_drag = fb->double_tap;       *non_drag_count = fb->double_tap_count;       break;
-            default: *non_drag = NULL; *non_drag_count = 0; break;
-        }
-        switch (slot->bindings_drag) {
-            case GESTURE_SINGLE_TAP_DRAG:  *drag = fb->single_tap_drag;   *drag_count = fb->single_tap_drag_count;   break;
-            case GESTURE_DOUBLE_TAP_DRAG:  *drag = fb->double_tap_drag;   *drag_count = fb->double_tap_drag_count;   break;
-            case GESTURE_LONG_PRESS_DRAG:  *drag = fb->long_press_drag;   *drag_count = fb->long_press_drag_count;   break;
-            case GESTURE_SINGLE_DRAG_2ND:  *drag = fb->single_tap_drag;   *drag_count = fb->single_tap_drag_count;   break;
-            case GESTURE_DOUBLE_DRAG_2ND:  *drag = fb->double_tap_drag;   *drag_count = fb->double_tap_drag_count;   break;
-            default: *drag = NULL; *drag_count = 0; break;
-        }
+        resolve_binding_for_type(slot->bindings_non_drag, fb, non_drag, non_drag_count);
+        resolve_binding_for_type(slot->bindings_drag, fb, drag, drag_count);
     }
 }
 
@@ -96,19 +103,19 @@ GesturePairPlan resolve_gesture_pair(
     const TouchFinger* f,
     const GesturePairSlot* slot)
 {
-    bool cd = slot->comp_dt != 0
+    bool has_competing_dt = slot->comp_dt != 0
         && (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag);
-    bool cl = slot->comp_lp != 0
+    bool has_competing_lp = slot->comp_lp != 0
         && f->cached_has_long_press_timer;
 
-    bool hx =
+    bool has_non_drag =
         slot->bindings_non_drag == GESTURE_SINGLE_TAP  ? f->cached_has_active_single_tap :
         slot->bindings_non_drag == GESTURE_DOUBLE_TAP  ? f->cached_has_active_double_tap :
         slot->bindings_non_drag == GESTURE_LONG_PRESS  ? f->cached_has_active_long_press :
         slot->bindings_non_drag == GESTURE_SINGLE_2ND  ? f->cached_has_active_single_tap :
         slot->bindings_non_drag == GESTURE_DOUBLE_2ND  ? f->cached_has_active_double_tap : false;
 
-    bool hxd =
+    bool has_drag =
         slot->bindings_drag == GESTURE_SINGLE_TAP_DRAG ? f->cached_has_active_single_tap_drag :
         slot->bindings_drag == GESTURE_DOUBLE_TAP_DRAG ? f->cached_has_active_double_tap_drag :
         slot->bindings_drag == GESTURE_LONG_PRESS_DRAG ? f->cached_has_active_long_press_drag :
@@ -116,10 +123,10 @@ GesturePairPlan resolve_gesture_pair(
         slot->bindings_drag == GESTURE_DOUBLE_DRAG_2ND ? f->cached_has_active_double_tap_drag : false;
 
     // S slot gets hold_delay from config; others use 0
-    int hd = (slot == &GESTURE_SLOTS[0]) ? g_state.cfg.single_tap_delay_ms : 0;
+    int hold_delay_ms = (slot == &GESTURE_SLOTS[0]) ? g_state.cfg.single_tap_delay_ms : 0;
 
-    return gesture_decide_branch(gesture_branch_params(hx, hxd, cd, cl,
-        g_state.cfg.is_ts, slot->is_second_finger, hd));
+    return gesture_decide_branch(gesture_branch_params(has_non_drag, has_drag, has_competing_dt, has_competing_lp,
+        g_state.cfg.is_ts, slot->is_second_finger, hold_delay_ms));
 }
 
 // ============================================================
@@ -137,36 +144,35 @@ const GesturePairSlot* select_s_slot(const TouchFinger* f) {
 }
 
 // ============================================================
-// MOVE slot selection — handles all 5 gesture types
+// MOVE/UP slot selection — unified for both event types
 // ============================================================
 static inline bool has_actual_dt_state(const GestureFingerCtx* ctx) {
     return ctx->deferred_double.count > 0
         || ctx->post_double_tap_drag;
 }
 
-const GesturePairSlot* select_slot_for_move(
-    const TouchFinger* f, const GestureFingerCtx* ctx)
+const GesturePairSlot* select_slot_common(
+    const TouchFinger* f, const GestureFingerCtx* ctx, bool is_up_event)
 {
     if (f->state == GESTURE_STATE_LONG_PRESSING)
         return f->is_second_finger ? NULL : SLOT_L();
     if (f->is_second_finger)
         return has_actual_dt_state(ctx) ? SLOT_D2() : SLOT_S2();
-    if (ctx->post_double_tap_drag || ctx->deferred_double.count > 0)
+    if (!is_up_event && (ctx->post_double_tap_drag || ctx->deferred_double.count > 0))
         return SLOT_D();
     return SLOT_S();
 }
 
-// ============================================================
-// UP slot selection
-// ============================================================
+const GesturePairSlot* select_slot_for_move(
+    const TouchFinger* f, const GestureFingerCtx* ctx)
+{
+    return select_slot_common(f, ctx, false);
+}
+
 const GesturePairSlot* select_slot_for_up(
     const TouchFinger* f, const GestureFingerCtx* ctx)
 {
-    if (f->state == GESTURE_STATE_LONG_PRESSING)
-        return SLOT_L();
-    if (f->is_second_finger)
-        return has_actual_dt_state(ctx) ? SLOT_D2() : SLOT_S2();
-    return SLOT_S();
+    return select_slot_common(f, ctx, true);
 }
 
 // ============================================================
@@ -190,8 +196,8 @@ void cleanup_second_finger(TouchFinger* f, GestureFingerCtx* ctx,
     if (ctx->dt_waiting) {
         LOGD("CLEANUP ptr=%d SDTW_JUST_ENTERED preserve dt_waiting", f->ptr_id);
         release_held_actions(result);
-        add_action(result, ACT_POINTER_BUTTON_RELEASE, 0, 0, 0);
-        add_action(result, ACT_POINTER_BUTTON_RELEASE, 2, 0, 0);
+        add_action(result, ACT_POINTER_BUTTON_RELEASE, MOUSE_BTN_LEFT, 0, 0);
+        add_action(result, ACT_POINTER_BUTTON_RELEASE, MOUSE_BTN_MIDDLE, 0, 0);
         g_state.gesture_second_active = false;
         f->state = GESTURE_STATE_DOUBLE_TAP_WAITING;
         return;
@@ -200,8 +206,8 @@ void cleanup_second_finger(TouchFinger* f, GestureFingerCtx* ctx,
     g_state.second_double_tap_waiting = false;
     if (!(ctx->post_double_tap_drag && g_state.gesture_is_action_held)) {
         release_held_actions(result);
-        add_action(result, ACT_POINTER_BUTTON_RELEASE, 0, 0, 0);
-        add_action(result, ACT_POINTER_BUTTON_RELEASE, 2, 0, 0);
+        add_action(result, ACT_POINTER_BUTTON_RELEASE, MOUSE_BTN_LEFT, 0, 0);
+        add_action(result, ACT_POINTER_BUTTON_RELEASE, MOUSE_BTN_MIDDLE, 0, 0);
     }
     gesture_clear_second_finger_globals();
     f->state = GESTURE_STATE_IDLE;
@@ -216,22 +222,4 @@ void g_ctx_init(GestureFingerCtx* ctx, bool is_second) {
     ctx->is_second_finger = is_second;
 }
 
-// ============================================================
-// ---- Unified event handlers (static, per-event-type) ----
-// ============================================================
 
-// ============================================================
-// gesture_process_finger — THE unified entry point
-// ============================================================
-void gesture_process_finger(
-    TouchFinger* f, GestureFingerCtx* ctx,
-    TouchActionResult* result, uint64_t time_ms,
-    GestureProcessEvent event,
-    float x, float y)
-{
-    // Delegate to gesture_branch.
-    // For MOVE: x,y are the caller-provided delta (dx, dy)
-    // For DOWN/UP: x,y are finger position (unused)
-    // For TICK: x,y are 0 (unused)
-    gesture_branch(f, ctx, result, time_ms, event, x, y);
-}

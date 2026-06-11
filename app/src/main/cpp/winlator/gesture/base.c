@@ -1,25 +1,48 @@
 #include "../touch_processor_internal.h"
+#include "branch.h"
 
 static inline int finger_index(const TouchFinger* f) {
     return (int)(f - g_state.fingers);
 }
 
-void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger* f) {
+static bool validate_dt_confirm(void) {
     if (!g_state.gesture_double_tap_waiting) {
         __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "DT_CONFIRM: skipped - not waiting");
-        return;
+        return false;
     }
     __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "DT_CONFIRM: pending_dbl=%d pending_deferred_dbl=%d",
         g_state.gesture_pending_double_count,
         g_state.gesture_pending_deferred_double_count);
     g_state.gesture_double_tap_waiting = false;
     g_state.gesture_deferred_tap_count = 0;
+    return true;
+}
 
+static void copy_deferred_double(void) {
     if (g_state.gesture_pending_deferred_double_count > 0 && g_state.gesture_pending_double_count == 0) {
         copy_bindings_bounded(g_state.gesture_pending_deferred_double, g_state.gesture_pending_deferred_double_count,
             g_state.gesture_pending_double, &g_state.gesture_pending_double_count, FALLBACK_MAX);
     }
     g_state.gesture_pending_deferred_double_count = 0;
+}
+
+static void sync_dt_ctx(TouchFinger* f) {
+    GestureFingerCtx* dt_ctx = &g_ctx[finger_index(f)];
+    dt_ctx->dt_waiting = false;
+    dt_ctx->pending_double.count = 0;
+    dt_ctx->deferred_double.count = 0;
+    if (g_state.gesture_pending_deferred_double_count > 0) {
+        copy_bindings_bounded(g_state.gesture_pending_deferred_double,
+            g_state.gesture_pending_deferred_double_count,
+            dt_ctx->deferred_double.items, &dt_ctx->deferred_double.count, FALLBACK_MAX);
+    }
+    dt_ctx->post_double_tap_drag = g_state.gesture_post_double_tap_drag;
+}
+
+void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger* f) {
+    if (!validate_dt_confirm()) return;
+
+    copy_deferred_double();
 
     bool has_dt = g_state.gesture_pending_double_count > 0;
     bool has_dt_drag = f->bindings.double_tap_drag_count > 0;
@@ -41,17 +64,7 @@ void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger
         g_state.gesture_post_double_tap_drag = has_dt_drag;
     }
 
-    // Sync per-finger ctx for unified DOWN/UP/TICK paths
-    GestureFingerCtx* dt_ctx = &g_ctx[(int)(f - g_state.fingers)];
-    dt_ctx->dt_waiting = false;
-    dt_ctx->pending_double.count = 0;
-    dt_ctx->deferred_double.count = 0;
-    if (g_state.gesture_pending_deferred_double_count > 0) {
-        copy_bindings_bounded(g_state.gesture_pending_deferred_double,
-            g_state.gesture_pending_deferred_double_count,
-            dt_ctx->deferred_double.items, &dt_ctx->deferred_double.count, FALLBACK_MAX);
-    }
-    dt_ctx->post_double_tap_drag = g_state.gesture_post_double_tap_drag;
+    sync_dt_ctx(f);
 }
 
 bool resolve_drag_binding(
@@ -123,7 +136,6 @@ void gesture_cancel_double_tap_wait(TouchActionResult* restrict result) {
     }
 }
 
-// ---- gesture_tick ----
 void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
     // caps gate: must run before the gesture-bindings early return so that
     // stale DT/SDTW flags are cleaned up even when switching to a no-gesture mode.
@@ -140,7 +152,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
         TouchFinger* f = &fingers[i];
         if (!f->active) continue;
         if (f->engaged_elem_count > 0) continue;
-        gesture_process_finger(f, &g_ctx[i], result, time_ms, GESTURE_EVENT_TICK, 0, 0);
+        gesture_branch(f, &g_ctx[i], result, time_ms, GESTURE_EVENT_TICK, 0 /*x*/, 0 /*y*/);
     }
 
     // ---- SDTW timeout (top-level, survives finger deactivation) ----
@@ -162,7 +174,6 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
     }
 }
 
-// ---- Unified tap execution helpers ----
 
 // Execute S on finger-down: start hold timer, defer to drag/up, or execute now.
 // Pass resolved bindings (x = non-drag, x_cnt) instead of hardcoded single_tap.
@@ -204,7 +215,7 @@ void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
     g_state.gesture_last_tap_up_x = f->tap_up_x;
     g_state.gesture_last_tap_up_y = f->tap_up_y;
     // Sync per-finger ctx for unified tick/down/up paths
-    GestureFingerCtx* dt_ctx = &g_ctx[(int)(f - g_state.fingers)];
+    GestureFingerCtx* dt_ctx = &g_ctx[finger_index(f)];
     dt_ctx->dt_waiting = true;
     dt_ctx->dt_wait_start_time = time_ms;
     if (deferred_double && deferred_double_count > 0) {
