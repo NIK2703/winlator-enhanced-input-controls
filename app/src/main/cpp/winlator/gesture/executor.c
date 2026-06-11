@@ -17,14 +17,14 @@ bool is_modifier_binding(const TouchBinding* b) {
     return false;
 }
 
+static inline bool is_mouse_button_binding(const TouchBinding* b) {
+    return b->type >= BINDING_MOUSE_LEFT && b->type <= BINDING_MOUSE_BUTTON5;
+}
+
 static inline int action_type_for_binding(const TouchBinding* b) {
     return is_keyboard_binding(b) ? ACT_KEY_PRESS :
            is_mouse_button_binding(b) ? ACT_POINTER_BUTTON_PRESS :
            ACT_GAMEPAD_STATE;
-}
-
-static inline bool is_mouse_button_binding(const TouchBinding* b) {
-    return b->type >= BINDING_MOUSE_LEFT && b->type <= BINDING_MOUSE_BUTTON5;
 }
 
 static inline int gamepad_button_index(const TouchBinding* b) {
