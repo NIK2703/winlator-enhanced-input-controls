@@ -90,7 +90,8 @@ Java_com_winlator_cmod_renderer_GPUImage_lockHardwareBuffer(JNIEnv *env, jclass 
     AHardwareBuffer_describe(ahb, &desc);
 
     if (!g_setStride) {
-        g_setStride = (*env)->GetMethodID(env, obj, "setStride", "(S)V");
+        jclass cls = (*env)->GetObjectClass(env, obj);
+        g_setStride = (*env)->GetMethodID(env, cls, "setStride", "(S)V");
         if (!g_setStride) return 0;
         if ((*env)->ExceptionCheck(env)) {
             (*env)->ExceptionClear(env);
