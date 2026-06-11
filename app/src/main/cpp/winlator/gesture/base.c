@@ -40,7 +40,7 @@ void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger
 }
 
 // ---- helpers ----
-static inline bool resolve_drag_binding(
+bool resolve_drag_binding(
     const TouchBinding* xd, int xd_count,
     const TouchBinding* x,  int x_count,
     const TouchBinding* fb, int fb_count,
@@ -111,8 +111,10 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
 // ---- Unified tap execution helpers ----
 
 // Execute S on finger-down: start hold timer, defer to drag/up, or execute now.
+// Pass resolved bindings (x = non-drag, x_cnt) instead of hardcoded single_tap.
 void execute_tap_on_finger_down(TouchFinger* f, TouchActionResult* restrict result,
-    uint64_t time_ms, GesturePairPlan plan, bool force_hold)
+    uint64_t time_ms, GesturePairPlan plan, bool force_hold,
+    const TouchBinding* x, int x_cnt)
 {
     if (plan.hold_delay_ms > 0) {
         f->single_tap_hold_delay_ms = plan.hold_delay_ms;
@@ -121,14 +123,14 @@ void execute_tap_on_finger_down(TouchFinger* f, TouchActionResult* restrict resu
         // deferred to check_start_drag / handle_tap_up
     } else {
         if (force_hold)
-            execute_actions_hold(result, f->bindings.single_tap, f->bindings.single_tap_count);
+            execute_actions_hold(result, x, x_cnt);
         else
-            execute_actions(result, f->bindings.single_tap, f->bindings.single_tap_count);
+            execute_actions(result, x, x_cnt);
     }
 }
 
 // Enter DT_WAITING state, optionally saving deferred bindings.
-static inline void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
+void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
     const TouchBinding* deferred_single, int deferred_single_count,
     const TouchBinding* deferred_double, int deferred_double_count)
 {

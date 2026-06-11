@@ -103,12 +103,24 @@ void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger
 
 // Unified tap execution helpers (shared across base.c, entry.c, handler.c)
 void execute_tap_on_finger_down(TouchFinger* f, TouchActionResult* restrict result,
-    uint64_t time_ms, GesturePairPlan plan, bool force_hold);
+    uint64_t time_ms, GesturePairPlan plan, bool force_hold,
+    const TouchBinding* x, int x_cnt);
 bool confirm_double_tap(TouchActionResult* restrict result,
     GesturePairPlan d_plan,
     const TouchBinding* src, int src_count,
     TouchBinding* dst, int* dst_count, int dst_max,
     bool* out_post_dtd);
+bool resolve_drag_binding(
+    const TouchBinding* xd, int xd_count,
+    const TouchBinding* x,  int x_count,
+    const TouchBinding* fb, int fb_count,
+    bool press_on_drag,
+    bool use_fallback,
+    const TouchBinding** out_binding,
+    int* out_count);
+void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
+    const TouchBinding* deferred_single, int deferred_single_count,
+    const TouchBinding* deferred_double, int deferred_double_count);
 
 // ============================================================
 // Unified per-finger gesture context
@@ -175,6 +187,7 @@ typedef struct {
     bool move_resolve_fb;        // MOVE: use ctx->fallback in drag resolution
     bool move_press_always;      // MOVE: press_on_drag unconditional
     bool move_gate_tp_nodrag;    // MOVE: TP gate when no drag bindings
+    bool down_hold_always;       // DOWN: always hold non-drag (bypass plan, second finger S2)
     bool tick_s_execute;         // TICK: S hold -> execute_actions (not hold)
     bool tick_dt_uses_fb;        // TICK: DT timeout uses fallback
 } GesturePairSlot;

@@ -326,6 +326,7 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 
         save_pending_resume_action(main_finger);
         release_held_actions(result);
+        setup_second_finger_bindings(f);
         gesture_process_finger(f, &g_ctx[(int)(f - g_state.fingers)], result, time_ms, GESTURE_EVENT_DOWN, f->x, f->y);
         return;
     }
@@ -365,6 +366,8 @@ void handle_gesture_down(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
         }
     }
 
+    if (is_second && !g_state.gesture_second_active)
+        setup_second_finger_bindings(f);
     gesture_process_finger(f, &g_ctx[(int)(f - g_state.fingers)], result, time_ms, GESTURE_EVENT_DOWN, f->x, f->y);
 }
 
