@@ -11,7 +11,9 @@
 // =========================================================================
 
 static inline int finger_index(const TouchFinger* f) {
-    return (int)(f - g_state.fingers);
+    int idx = (int)(f - g_state.fingers);
+    if (idx < 0 || idx >= MAX_FINGERS) return 0;
+    return idx;
 }
 
 static inline void reset_finger_ctx(GestureFingerCtx* ctx, bool is_second) {
@@ -100,10 +102,8 @@ static inline void execute_if_not_held(TouchActionResult* restrict result,
 static void cleanup_main_finger(TouchFinger* f, GestureFingerCtx* ctx) {
     LOGD("UP ptr=%d CLEANUP_MAIN", f->ptr_id);
     f->state = GESTURE_STATE_IDLE;
-    ctx->post_double_tap_drag = false;
-    ctx->pending_long_press_count = 0;
-    ctx->deferred_double_count = 0;
-    ctx->dt_consumed = false;
+    memset(ctx, 0, sizeof(*ctx));
+    ctx->is_second_finger = f->is_second_finger;
     gesture_clear_deferred_tap();
     g_state.gesture_pending_deferred_long_press_count = 0;
     g_state.gesture_double_tap_waiting = false;
@@ -131,12 +131,18 @@ static inline TapPathResult mark_dt_consumed_idle(TouchFinger* f, GestureFingerC
     return TAP_PATH_HANDLED;
 }
 
+typedef struct {
+    const TouchBinding* non_drag;
+    int non_drag_count;
+    const TouchBinding* fallback;
+    int fallback_count;
+    bool is_second_finger;
+} TapPathParams;
+
 static TapPathResult execute_tap_path(
     TouchFinger* f, GestureFingerCtx* ctx,
     TouchActionResult* restrict result, uint64_t time_ms,
-    const TouchBinding* x, int x_cnt,
-    const TouchBinding* x2, int x2_cnt,
-    bool is_second_finger)
+    const TapPathParams* params)
 {
     // Path 1: deferred D from DT confirm
     if (ctx->deferred_double_count > 0) {
@@ -155,25 +161,25 @@ static TapPathResult execute_tap_path(
     if (ctx->dt_consumed) {
         ctx->dt_consumed = false;
         g_state.gesture_double_tap_consumed = false;
-        execute_if_not_held(result, x, x_cnt);
+        execute_if_not_held(result, params->non_drag, params->non_drag_count);
         f->state = GESTURE_STATE_IDLE;
         return TAP_PATH_HANDLED;
     }
 
     // Path 4: Normal first tap-up
     if (f->cached_has_active_double_tap) {
-        if (is_second_finger)
+        if (params->is_second_finger)
             enter_sdtw(f, time_ms);
         else
             enter_double_tap_waiting(f, time_ms,
-                x, x_cnt,
+                params->non_drag, params->non_drag_count,
                 f->bindings.double_tap, f->bindings.double_tap_count);
         return TAP_PATH_ENTER_DT;
     }
 
     if (f->cached_has_active_double_tap_drag) {
-        execute_if_not_held(result, x, x_cnt);
-        if (is_second_finger)
+        execute_if_not_held(result, params->non_drag, params->non_drag_count);
+        if (params->is_second_finger)
             enter_sdtw(f, time_ms);
         else
             enter_double_tap_waiting(f, time_ms, NULL, 0, NULL, 0);
@@ -181,11 +187,11 @@ static TapPathResult execute_tap_path(
     }
 
     // Path 4 else: single tap
-    if (is_second_finger) {
-        if (x2_cnt > 0)
-            execute_actions(result, x2, x2_cnt);
+    if (params->is_second_finger) {
+        if (params->fallback_count > 0)
+            execute_actions(result, params->fallback, params->fallback_count);
     } else {
-        execute_if_not_held(result, x, x_cnt);
+        execute_if_not_held(result, params->non_drag, params->non_drag_count);
     }
     f->state = GESTURE_STATE_IDLE;
     return TAP_PATH_SINGLE;
@@ -324,9 +330,14 @@ static void tick_deferred_single_tap(TouchFinger* f, GestureFingerCtx* ctx,
     const GesturePairSlot* ds_slot = select_s_slot(f);
     ResolvedBindings rb = resolve_slot(f, ds_slot);
 
-    TapPathResult path = execute_tap_path(f, ctx, result, time_ms,
-        rb.non_drag, rb.non_drag_count, rb.non_drag, rb.non_drag_count,
-        ds_slot->is_second_finger);
+    const TapPathParams tap_params = {
+        .non_drag = rb.non_drag,
+        .non_drag_count = rb.non_drag_count,
+        .fallback = rb.non_drag,
+        .fallback_count = rb.non_drag_count,
+        .is_second_finger = ds_slot->is_second_finger,
+    };
+    TapPathResult path = execute_tap_path(f, ctx, result, time_ms, &tap_params);
 
     if (path == TAP_PATH_ENTER_DT) return;
 
@@ -486,7 +497,7 @@ static bool handle_dt_waiting_on_down(TouchFinger* f, GestureFingerCtx* ctx,
 // UP HELPERS
 // =========================================================================
 
-static void up_handle_tap_waiting(TouchFinger* f, GestureFingerCtx* ctx,
+static bool up_handle_tap_waiting(TouchFinger* f, GestureFingerCtx* ctx,
                                   TouchActionResult* restrict result, uint64_t time_ms,
                                   const GesturePairSlot* slot,
                                   const TouchBinding* x, int x_cnt) {
@@ -497,18 +508,24 @@ static void up_handle_tap_waiting(TouchFinger* f, GestureFingerCtx* ctx,
         LOGD("UP ptr=%d DEFER_SINGLE_TAP delay=%d", f->ptr_id, g_state.cfg.single_tap_delay_ms);
         f->single_tap_deferred = true;
         f->single_tap_deferred_time = time_ms + g_state.cfg.single_tap_delay_ms;
-        return;
+        return true;
     }
 
-    TapPathResult path = execute_tap_path(f, ctx, result, time_ms,
-        x, x_cnt, ctx->fallback, ctx->fallback_count, slot->is_second_finger);
+    const TapPathParams tap_params = {
+        .non_drag = x,
+        .non_drag_count = x_cnt,
+        .fallback = ctx->fallback,
+        .fallback_count = ctx->fallback_count,
+        .is_second_finger = slot->is_second_finger,
+    };
+    TapPathResult path = execute_tap_path(f, ctx, result, time_ms, &tap_params);
 
     if (path == TAP_PATH_HANDLED || path == TAP_PATH_ENTER_DT)
-        return;
+        return true;
 
     if (slot->is_second_finger) {
         cleanup_second_finger(f, ctx, result);
-        return;
+        return true;
     }
 
     if (!f->single_tap_deferred) {
@@ -516,6 +533,7 @@ static void up_handle_tap_waiting(TouchFinger* f, GestureFingerCtx* ctx,
             || g_state.cfg.is_tp)
             release_held_actions(result);
     }
+    return false;
 }
 
 static void up_handle_long_pressing(TouchFinger* f, GestureFingerCtx* ctx,
@@ -601,24 +619,30 @@ static void up_prelude_second_finger(TouchFinger* f,
 // MOVE HELPERS
 // =========================================================================
 
+typedef struct {
+    const TouchBinding* non_drag;
+    int non_drag_count;
+    const TouchBinding* drag;
+    int drag_count;
+} DragResolveParams;
+
 static bool move_resolve_drag(
     TouchFinger* f, GestureFingerCtx* ctx,
     const GesturePairSlot* slot,
-    const TouchBinding* x, int x_cnt,
-    const TouchBinding* xd, int xd_cnt,
+    const DragResolveParams* params,
     const TouchBinding** out_binding, int* out_count)
 {
     bool is_d_slot = (slot == SLOT_D() || slot == SLOT_D2());
 
     bool press;
     if (is_d_slot) {
-        press = x_cnt > 0 && f->cached_has_active_double_tap
+        press = params->non_drag_count > 0 && f->cached_has_active_double_tap
             && !f->cached_has_active_double_tap_drag;
     } else {
         bool has_competing = f->cached_has_active_double_tap
             || f->cached_has_active_double_tap_drag
             || f->cached_has_long_press_timer;
-        press = x_cnt > 0 && has_competing && !g_state.gesture_is_action_held;
+        press = params->non_drag_count > 0 && has_competing && !g_state.gesture_is_action_held;
     }
 
     const TouchBinding* fb = NULL; int fb_cnt = 0;
@@ -641,16 +665,17 @@ static bool move_resolve_drag(
     }
 
     const TouchBinding* drag_binding = NULL; int drag_count = 0;
-    bool drag_ok = resolve_drag_binding(xd, xd_cnt, x, x_cnt, fb, fb_cnt,
+    bool drag_ok = resolve_drag_binding(params->drag, params->drag_count,
+        params->non_drag, params->non_drag_count, fb, fb_cnt,
         is_d_slot ? press : (g_state.cfg.is_ts && press),
         slot == SLOT_D2(), &drag_binding, &drag_count);
 
-    if (!drag_ok && x_cnt > 0) {
-        drag_binding = x;
-        drag_count = x_cnt;
+    if (!drag_ok && params->non_drag_count > 0) {
+        drag_binding = params->non_drag;
+        drag_count = params->non_drag_count;
         drag_ok = true;
         LOGD("MOVE ptr=%d POST_TIER_FALLBACK x_cnt=%d -> use non-drag as drag",
-            f->ptr_id, x_cnt);
+            f->ptr_id, params->non_drag_count);
     }
 
     LOGD("MOVE ptr=%d DRAG_RESOLVE ok=%d slot_nd=%d drag_cnt=%d is_d2=%d",
@@ -872,8 +897,13 @@ static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
         return;
 
     const TouchBinding* drag_binding = NULL; int drag_count = 0;
-    if (!move_resolve_drag(f, ctx, slot, rb.non_drag, rb.non_drag_count,
-                           rb.drag, rb.drag_count, &drag_binding, &drag_count))
+    const DragResolveParams drag_params = {
+        .non_drag = rb.non_drag,
+        .non_drag_count = rb.non_drag_count,
+        .drag = rb.drag,
+        .drag_count = rb.drag_count,
+    };
+    if (!move_resolve_drag(f, ctx, slot, &drag_params, &drag_binding, &drag_count))
         return;
 
     if (slot->is_second_finger && g_state.gesture_is_action_held) {
@@ -921,8 +951,9 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
 
     switch (f->state) {
         case GESTURE_STATE_TAP_WAITING:
-            up_handle_tap_waiting(f, ctx, result, time_ms, slot,
-                rb.non_drag, rb.non_drag_count);
+            if (up_handle_tap_waiting(f, ctx, result, time_ms, slot,
+                rb.non_drag, rb.non_drag_count))
+                return;
             break;
         case GESTURE_STATE_LONG_PRESSING:
             up_handle_long_pressing(f, ctx, result);
