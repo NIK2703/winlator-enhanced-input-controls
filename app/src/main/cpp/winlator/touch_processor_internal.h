@@ -33,8 +33,10 @@
 #define GRID_ROWS 8
 #define DPAD_RADIUS_MULTIPLIER  7.0f
 #define STICK_RADIUS_MULTIPLIER 6.0f
+#define GAMEPAD_AXIS_MAX 32767
 #define RANGE_HEIGHT_MULTIPLIER 2.0f
 #define MAX_BINDINGS_PER_ELEMENT 4
+#define NEAR_ZERO_THRESHOLD 0.0001f
 
 typedef struct {
     uint64_t scheduled_time_ms;
@@ -191,7 +193,7 @@ static inline void mark_all_dirty(void) {
 }
 
 // Forward declarations
-void touch_finger_cache_bs(TouchFinger* f);
+void touch_finger_cache_bindings_state(TouchFinger* f);
 
 // --- Inline helpers ---
 
@@ -351,7 +353,7 @@ static inline void setup_second_finger_bindings(TouchFinger* f) {
     // If no second-finger bindings exist in current mode, skip setup entirely
     if (!(g_state.cfg.caps_mode_mask & g_state.cfg.caps_second_mask)) {
         memset(fb, 0, sizeof(*fb));
-        touch_finger_cache_bs(f);
+        touch_finger_cache_bindings_state(f);
         return;
     }
     const GestureModeBindings* mb = get_mode_bindings();
@@ -359,7 +361,7 @@ static inline void setup_second_finger_bindings(TouchFinger* f) {
     if (g_state.cfg.is_tp) {
         fb->single_tap_drag = NULL; fb->single_tap_drag_count = 0;
     }
-    touch_finger_cache_bs(f);
+    touch_finger_cache_bindings_state(f);
 }
 
 // --- Element size computation (dedup set_elements / set_snapping_size) ---
@@ -396,7 +398,7 @@ static inline void deactivate_finger(TouchFinger* f) {
 // --- Internal function declarations ---
 
 // Actions
-void add_action(TouchActionResult* restrict r, ActionType type, int a0, int a1, int a2);
+void add_action(TouchActionResult* restrict r, ActionType type, int param0, int param1, int param2);
 void release_held_actions(TouchActionResult* restrict result);
 bool is_modifier_binding(const TouchBinding* b);
 void execute_actions(TouchActionResult* restrict result, const TouchBinding* actions, int count);
@@ -523,15 +525,16 @@ static inline bool is_right_stick_binding(const TouchElement* e) {
 // Element shared helpers
 bool point_in_element(float px, float py, const TouchElement* e);
 TouchElement* hit_test_element(float x, float y);
-void touch_finger_cache_bs(TouchFinger* f);
-int detect_swipe_dir(float dx, float dy, float threshold);
+void touch_finger_cache_bindings_state(TouchFinger* f);
+typedef enum { SWIPE_UP=0, SWIPE_DOWN=1, SWIPE_LEFT=2, SWIPE_RIGHT=3, SWIPE_NONE=-1 } SwipeDirection;
+SwipeDirection detect_swipe_dir(float dx, float dy, float threshold);
 bool is_mouse_move_binding(const TouchBinding* b);
 float cubic_bezier_interpolate_trackpad(float x);
 void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, TouchActionResult* restrict result);
 void release_element_bindings(TouchElement* e, TouchActionResult* restrict result, bool release_gestures);
 void suppress_element_gestures(TouchElement* e, TouchActionResult* restrict result);
 void release_non_toggle_gestures(TouchElement* e, TouchActionResult* restrict result);
-void toggle_alternate_bindings(TouchElement* e, bool* toggled_flag, bool has_toggle_cache,
+void toggle_alternate_bindings(TouchElement* e, bool* toggled_flag, bool supports_toggle,
                                TouchBinding* bindings, int count, bool has_primary,
                                TouchActionResult* restrict result);
 

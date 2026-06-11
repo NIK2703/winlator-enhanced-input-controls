@@ -1,7 +1,11 @@
 #include <aaudio/AAudio.h>
 #include <jni.h>
+#include <android/log.h>
 
-#define WAIT_COMPLETION_TIMEOUT 100 * 1000000L
+#define LOG_TAG "ALSAClient"
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+#define WAIT_COMPLETION_TIMEOUT (100 * 1000000L)
 
 enum Format {U8, S16LE, S16BE, FLOATLE, FLOATBE};
 
@@ -13,7 +17,10 @@ static aaudio_format_t toAAudioFormat(int format) {
         case U8:
             return AAUDIO_FORMAT_UNSPECIFIED;
         case S16LE:
+            return AAUDIO_FORMAT_PCM_I16;
         case S16BE:
+            LOGE("S16BE format is not supported");
+            return AAUDIO_FORMAT_UNSPECIFIED;
         default:
             return AAUDIO_FORMAT_PCM_I16;
     }
@@ -25,7 +32,10 @@ static AAudioStream *aaudioCreate(int32_t format, int8_t channelCount, int32_t s
     AAudioStream *stream;
 
     result = AAudio_createStreamBuilder(&builder);
-    if (result != AAUDIO_OK) return NULL;
+    if (result != AAUDIO_OK) {
+        LOGE("AAudio_createStreamBuilder failed: %d", result);
+        return NULL;
+    }
 
     AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
     AAudioStreamBuilder_setFormat(builder, toAAudioFormat(format));
@@ -34,6 +44,7 @@ static AAudioStream *aaudioCreate(int32_t format, int8_t channelCount, int32_t s
 
     result = AAudioStreamBuilder_openStream(builder, &stream);
     if (result != AAUDIO_OK) {
+        LOGE("AAudioStreamBuilder_openStream failed: %d", result);
         AAudioStreamBuilder_delete(builder);
         return NULL;
     }
@@ -41,7 +52,11 @@ static AAudioStream *aaudioCreate(int32_t format, int8_t channelCount, int32_t s
     AAudioStream_setBufferSizeInFrames(stream, bufferSize);
 
     result = AAudioStreamBuilder_delete(builder);
-    if (result != AAUDIO_OK) return NULL;
+    if (result != AAUDIO_OK) {
+        LOGE("AAudioStreamBuilder_delete failed: %d", result);
+        AAudioStream_close(stream);
+        return NULL;
+    }
 
     return stream;
 }
@@ -82,7 +97,9 @@ Java_com_winlator_cmod_alsaserver_ALSAClient_write(JNIEnv *env, jobject obj, jlo
                                               jint numFrames) {
     AAudioStream *aaudioStream = (AAudioStream*)streamPtr;
     if (aaudioStream) {
-        return aaudioWrite(aaudioStream, (*env)->GetDirectBufferAddress(env, buffer), numFrames);
+        void* data = (*env)->GetDirectBufferAddress(env, buffer);
+        if (!data) return -1;
+        return aaudioWrite(aaudioStream, data, numFrames);
     }
     else return -1;
 }

@@ -4,6 +4,14 @@
 
 // spatial grid rebuild (defined in element/shared.c)
 void init_bezier_lut(void);
+#define DEFAULT_OPACITY 0.5f
+#define DEFAULT_CORNER_RADIUS 0.8f
+#define TICK_GAP_WARNING_MS 100
+#define DEFAULT_CURSOR_ACCEL_THRESHOLD 6
+#define DEFAULT_CURSOR_ACCEL_FACTOR 1.25f
+#define DEFAULT_AUTO_REPEAT_INTERVAL_MS 100
+#define HIGH_ACTION_COUNT_THRESHOLD 16
+#define TICK_BUDGET_US 16000
 TouchProcessorState g_state;
 
 void touch_processor_init(const TouchProcessorConfig* config) {
@@ -22,8 +30,8 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     g_state.free_finger_hint = 0;
     g_state.gesture_toggled_count = 0;
     for (int i = 0; i < MAX_FINGERS; i++) g_state.hovered_element_per_ptr[i] = -1;
-    if (g_state.cfg.cursor_acceleration_threshold <= 0) g_state.cfg.cursor_acceleration_threshold = 6;
-    if (g_state.cfg.cursor_acceleration_factor <= 0.0f) g_state.cfg.cursor_acceleration_factor = 1.25f;
+    if (g_state.cfg.cursor_acceleration_threshold <= 0) g_state.cfg.cursor_acceleration_threshold = DEFAULT_CURSOR_ACCEL_THRESHOLD;
+    if (g_state.cfg.cursor_acceleration_factor <= 0.0f) g_state.cfg.cursor_acceleration_factor = DEFAULT_CURSOR_ACCEL_FACTOR;
     if (g_state.cfg.xform_scale_x <= 0.0f) g_state.cfg.xform_scale_x = 1.0f;
     if (g_state.cfg.xform_scale_y <= 0.0f) g_state.cfg.xform_scale_y = 1.0f;
     g_state.cfg.bindings_generation = 1;
@@ -66,21 +74,124 @@ void touch_processor_update_config(const TouchProcessorConfig* config) {
     }
 }
 
+static void init_element_visuals(TouchElement* e) {
+    e->visual_x = (float)e->x;
+    e->visual_y = (float)e->y;
+    e->visual_active = false;
+    e->engaged = false;
+    e->current_ptr_id = -1;
+    int idx = (int)(e - g_state.elements);
+    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "set_elements[%d] type=%d visual=0 (init)", idx, e->type);
+    if (e->opacity <= 0.0f) e->opacity = DEFAULT_OPACITY;
+    if (e->corner_radius <= 0.0f) e->corner_radius = DEFAULT_CORNER_RADIUS;
+    if (e->color_primary == 0) e->color_primary = g_state.cfg.color_primary;
+    if (e->color_secondary == 0) e->color_secondary = g_state.cfg.color_secondary;
+    if (e->stroke_width <= 0.0f) e->stroke_width = g_state.cfg.stroke_width_default;
+    if (e->fill_alpha_inactive <= 0) e->fill_alpha_inactive = g_state.cfg.fill_alpha_inactive_default;
+}
+
+static void compute_element_caps(TouchElement* e, int index) {
+    if (e->activation_mode == ACTIVATION_TRACK || e->activation_mode == ACTIVATION_HOVER)
+        g_state.cfg.caps_has_track_hover_buttons = true;
+    e->cached_has_toggle = element_has_toggle(e);
+    if (e->cached_has_toggle)
+        g_state.cfg.caps_has_element_toggle = true;
+    if (e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE)
+        g_state.cfg.caps_has_any_element_long_press = true;
+    if (e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE)
+        g_state.cfg.caps_has_any_element_gesture = true;
+    e->cached_has_auto_repeat = element_has_auto_repeat(e);
+    if (e->cached_has_auto_repeat)
+        g_state.cfg.caps_has_auto_repeat_buttons = true;
+    TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "set_elem[%d] type=%d b0.type=%d b0.tog=%d b0.ar=%d caps_tog=%d caps_ar=%d",
+        index, e->type, e->bindings[0].type,
+        e->bindings[0].toggle, e->bindings[0].auto_repeat,
+        g_state.cfg.caps_has_element_toggle, g_state.cfg.caps_has_auto_repeat_buttons);
+    if (e->bindings[0].type == BINDING_MOUSE_LEFT)
+        g_state.cfg.caps_has_mouse_left_element = true;
+    if (e->passthrough_touch)
+        g_state.cfg.caps_has_passthrough_elements = true;
+}
+
+static void cache_element_flags(TouchElement* e) {
+    e->cached_has_long_press = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
+    e->cached_has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
+    e->cached_has_any_binding = e->bindings[0].type != BINDING_NONE
+                             || e->bindings[1].type != BINDING_NONE
+                             || e->bindings[2].type != BINDING_NONE
+                             || e->bindings[3].type != BINDING_NONE;
+    e->cached_auto_repeat_interval = DEFAULT_AUTO_REPEAT_INTERVAL_MS;
+    for (int k = 0; k < MAX_BINDINGS_PER_ELEMENT; k++) {
+        if ((e->bindings[k].toggle || e->bindings[k].auto_repeat) && e->bindings[k].auto_repeat_interval_ms > 0) {
+            e->cached_auto_repeat_interval = e->bindings[k].auto_repeat_interval_ms;
+            break;
+        }
+    }
+    e->cached_lp_has_toggle = false;
+    for (int k = 0; k < e->element_long_press_count; k++)
+        if (e->element_long_press[k].toggle) { e->cached_lp_has_toggle = true; break; }
+    e->cached_gesture_has_toggle = false;
+    for (int k = 0; k < e->element_gesture_count; k++)
+        if (e->element_gesture[k].toggle) { e->cached_gesture_has_toggle = true; break; }
+    e->cached_bind0_is_gamepad = is_gamepad_binding(&e->bindings[0]);
+    e->cached_bind0_is_right_stick = is_right_stick_binding(e);
+}
+
+static void compute_element_geometry(TouchElement* e) {
+    float hs_snap = g_state.snapping_size > 0.0f ? g_state.snapping_size : 1.0f;
+    element_compute_snapped_hwhh(e, hs_snap);
+    e->cached_left = e->x - e->hw;
+    e->cached_right = e->x + e->hw;
+    e->cached_top = e->y - e->hh;
+    e->cached_bottom = e->y + e->hh;
+    e->cached_hw_sq = e->hw * e->hw;
+    int idx = (int)(e - g_state.elements);
+    if (e->type == ELEM_BUTTON && g_state.button_count < MAX_ELEMENTS)
+        g_state.button_indices[g_state.button_count++] = idx;
+    else if (e->type == ELEM_RANGE_BUTTON && g_state.range_count < MAX_ELEMENTS)
+        g_state.range_indices[g_state.range_count++] = idx;
+    if (e->type == ELEM_RANGE_BUTTON) {
+        float hs = g_state.snapping_size > 0.0f ? g_state.snapping_size : 1.0f;
+        e->cached_range_cw = hs * (e->range_binding_count * 2) * e->scale;
+        e->cached_range_ch = hs * RANGE_HEIGHT_MULTIPLIER * e->scale;
+        if (e->range_orientation == 1) { float _t = e->cached_range_cw; e->cached_range_cw = e->cached_range_ch; e->cached_range_ch = _t; }
+        int rbc = e->range_binding_count > 0 ? e->range_binding_count : 1;
+        e->cached_range_element_size = (e->range_orientation == 0 ? e->cached_range_cw * 2.0f : e->cached_range_ch * 2.0f) / (float)rbc;
+    }
+}
+
+typedef struct {
+    bool selected[MAX_ELEMENTS];
+    bool gesture_toggled[MAX_ELEMENTS];
+    bool lp_toggled[MAX_ELEMENTS];
+} ToggleState;
+
+static void save_toggle_state(ToggleState* state, int count) {
+    for (int i = 0; i < count; i++) {
+        state->selected[i] = g_state.elements[i].selected;
+        state->gesture_toggled[i] = g_state.elements[i].gesture_toggled;
+        state->lp_toggled[i] = g_state.elements[i].lp_toggled;
+    }
+}
+
+static void restore_toggle_state(const ToggleState* state, int count) {
+    for (int i = 0; i < count; i++) {
+        g_state.elements[i].selected = state->selected[i];
+        g_state.elements[i].gesture_toggled = state->gesture_toggled[i];
+        g_state.elements[i].lp_toggled = state->lp_toggled[i];
+        if (element_is_toggle_active(&g_state.elements[i]))
+            g_state.elements[i].visual_active = true;
+    }
+}
+
 void touch_processor_set_elements(const TouchElement* elements, int count) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "touch_processor_set_elements: count=%d", count);
     int n = count < MAX_ELEMENTS ? count : MAX_ELEMENTS;
 
-    // Save toggle state across set_elements to preserve active toggles on config change
     int old_count = g_state.element_count;
-    bool saved_selected[MAX_ELEMENTS];
-    bool saved_gesture_toggled[MAX_ELEMENTS];
-    bool saved_lp_toggled[MAX_ELEMENTS];
     int save_n = old_count < n ? old_count : n;
-    for (int i = 0; i < save_n; i++) {
-        saved_selected[i] = g_state.elements[i].selected;
-        saved_gesture_toggled[i] = g_state.elements[i].gesture_toggled;
-        saved_lp_toggled[i] = g_state.elements[i].lp_toggled;
-    }
+    ToggleState saved_toggle;
+    save_toggle_state(&saved_toggle, save_n);
 
     memcpy(g_state.elements, elements, n * sizeof(TouchElement));
     g_state.element_count = n;
@@ -104,92 +215,13 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
 
     for (int i = 0; i < n; i++) {
         TouchElement* e = &g_state.elements[i];
-        e->visual_x = (float)e->x;
-        e->visual_y = (float)e->y;
-        e->visual_active = false;
-        e->engaged = false;
-        e->current_ptr_id = -1;
-
-        // Initialize render defaults from config
-        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "set_elements[%d] type=%d visual=0 (init)", i, e->type);
-        if (e->opacity <= 0.0f) e->opacity = 0.5f;
-        if (e->corner_radius <= 0.0f) e->corner_radius = 0.8f;
-        if (e->color_primary == 0) e->color_primary = g_state.cfg.color_primary;
-        if (e->color_secondary == 0) e->color_secondary = g_state.cfg.color_secondary;
-        if (e->stroke_width <= 0.0f) e->stroke_width = g_state.cfg.stroke_width_default;
-        if (e->fill_alpha_inactive <= 0) e->fill_alpha_inactive = g_state.cfg.fill_alpha_inactive_default;
-
-        if (e->activation_mode == ACTIVATION_TRACK || e->activation_mode == ACTIVATION_HOVER)
-            g_state.cfg.caps_has_track_hover_buttons = true;
-        e->cached_has_toggle = element_has_toggle(e);
-        if (e->cached_has_toggle)
-            g_state.cfg.caps_has_element_toggle = true;
-        if (e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE)
-            g_state.cfg.caps_has_any_element_long_press = true;
-        if (e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE)
-            g_state.cfg.caps_has_any_element_gesture = true;
-        e->cached_has_auto_repeat = element_has_auto_repeat(e);
-        if (e->cached_has_auto_repeat)
-            g_state.cfg.caps_has_auto_repeat_buttons = true;
-        TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "set_elem[%d] type=%d b0.type=%d b0.tog=%d b0.ar=%d caps_tog=%d caps_ar=%d",
-            i, e->type, e->bindings[0].type,
-            e->bindings[0].toggle, e->bindings[0].auto_repeat,
-            g_state.cfg.caps_has_element_toggle, g_state.cfg.caps_has_auto_repeat_buttons);
-        if (e->bindings[0].type == BINDING_MOUSE_LEFT)
-            g_state.cfg.caps_has_mouse_left_element = true;
-        if (e->passthrough_touch)
-            g_state.cfg.caps_has_passthrough_elements = true;
-        float hs_snap = g_state.snapping_size > 0.0f ? g_state.snapping_size : 1.0f;
-        element_compute_snapped_hwhh(e, hs_snap);
-        e->cached_has_long_press = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
-        e->cached_has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
-        e->cached_has_any_binding = e->bindings[0].type != BINDING_NONE
-                                 || e->bindings[1].type != BINDING_NONE
-                                 || e->bindings[2].type != BINDING_NONE
-                                 || e->bindings[3].type != BINDING_NONE;
-        e->cached_auto_repeat_interval = 100;
-        for (int k = 0; k < 4; k++) {
-            if ((e->bindings[k].toggle || e->bindings[k].auto_repeat) && e->bindings[k].auto_repeat_interval_ms > 0) {
-                e->cached_auto_repeat_interval = e->bindings[k].auto_repeat_interval_ms;
-                break;
-            }
-        }
-        e->cached_lp_has_toggle = false;
-        for (int k = 0; k < e->element_long_press_count; k++)
-            if (e->element_long_press[k].toggle) { e->cached_lp_has_toggle = true; break; }
-        e->cached_gesture_has_toggle = false;
-        for (int k = 0; k < e->element_gesture_count; k++)
-            if (e->element_gesture[k].toggle) { e->cached_gesture_has_toggle = true; break; }
-        e->cached_bind0_is_gamepad = is_gamepad_binding(&e->bindings[0]);
-        e->cached_bind0_is_right_stick = is_right_stick_binding(e);
-        e->cached_left = e->x - e->hw;
-        e->cached_right = e->x + e->hw;
-        e->cached_top = e->y - e->hh;
-        e->cached_bottom = e->y + e->hh;
-        e->cached_hw_sq = e->hw * e->hw;
-
-        if (e->type == ELEM_BUTTON && g_state.button_count < MAX_ELEMENTS)
-            g_state.button_indices[g_state.button_count++] = i;
-        else if (e->type == ELEM_RANGE_BUTTON && g_state.range_count < MAX_ELEMENTS)
-            g_state.range_indices[g_state.range_count++] = i;
-
-        if (e->type == ELEM_RANGE_BUTTON) {
-            float hs = g_state.snapping_size > 0.0f ? g_state.snapping_size : 1.0f;
-            e->cached_range_cw = hs * (e->range_binding_count * 2) * e->scale;
-            e->cached_range_ch = hs * 2.0f * e->scale;
-            if (e->range_orientation == 1) { float _t = e->cached_range_cw; e->cached_range_cw = e->cached_range_ch; e->cached_range_ch = _t; }
-            int rbc = e->range_binding_count > 0 ? e->range_binding_count : 1;
-            e->cached_range_element_size = (e->range_orientation == 0 ? e->cached_range_cw * 2.0f : e->cached_range_ch * 2.0f) / (float)rbc;
-        }
+        init_element_visuals(e);
+        compute_element_caps(e, i);
+        cache_element_flags(e);
+        compute_element_geometry(e);
     }
     // Restore toggle state for elements that existed before the update
-    for (int i = 0; i < save_n; i++) {
-        if (g_state.elements[i].cached_has_toggle) {
-            g_state.elements[i].selected = saved_selected[i];
-            g_state.elements[i].gesture_toggled = saved_gesture_toggled[i];
-            g_state.elements[i].lp_toggled = saved_lp_toggled[i];
-        }
-    }
+    restore_toggle_state(&saved_toggle, save_n);
     mark_all_dirty();
     build_spatial_grid();
 }
@@ -199,11 +231,7 @@ void touch_processor_set_snapping_size(float size) {
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
         element_compute_snapped_hwhh(e, size);
-        e->cached_left = e->x - e->hw;
-        e->cached_right = e->x + e->hw;
-        e->cached_top = e->y - e->hh;
-        e->cached_bottom = e->y + e->hh;
-        e->cached_hw_sq = e->hw * e->hw;
+        element_update_position_cache(e);
     }
     mark_all_dirty();
     build_spatial_grid();
@@ -233,11 +261,6 @@ TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, u
     TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "gesture_main_ptr_id=%d second_active=%d touch_mode=%d gen=%d",
         g_state.gesture_main_ptr_id, g_state.gesture_second_active,
         g_state.cfg.touch_mode, g_state.cfg.bindings_generation);
-    // Java does NOT release held actions on every finger-down — only in specific
-    // paths (second-finger TouchscreenGestureHandler path or TouchpadGestureHandler
-    // onFingerDown). Releasing here would cancel a long-press hold
-    // (e.g. mouse-right held) when a second finger touches for scrolling.
-    // release_held_actions(&result);
 
     TouchFinger* f = find_finger(ptr_id);
     if (!f) {
@@ -443,17 +466,167 @@ static inline void process_auto_repeat_burst(TouchActionResult* restrict result,
     }
 }
 
+static void process_non_toggle_press_release(TouchElement* e, bool inside, uint64_t time_ms, TouchActionResult* restrict result) {
+    if (!inside) {
+        if (e->auto_repeat_primary_pressed && e->bindings[0].type != BINDING_NONE) {
+            release_binding(result, &e->bindings[0]);
+            e->auto_repeat_primary_pressed = false;
+        }
+    } else {
+        int interval_ms = e->cached_auto_repeat_interval;
+        if (e->auto_repeat_last_time == 0 || time_ms - e->auto_repeat_last_time >= (uint64_t)interval_ms) {
+            e->auto_repeat_primary_pressed = !e->auto_repeat_primary_pressed;
+            if (e->bindings[0].type != BINDING_NONE) {
+                if (e->auto_repeat_primary_pressed)
+                    press_binding(result, &e->bindings[0], true);
+                else
+                    release_binding(result, &e->bindings[0]);
+            }
+            e->auto_repeat_last_time = time_ms;
+        }
+    }
+}
+
+static void process_button_auto_repeat(TouchElement* e, int finger_idx, uint64_t time_ms, TouchActionResult* restrict result) {
+    if (!(g_state.cfg.caps_has_auto_repeat_buttons || e->cached_has_auto_repeat)) return;
+    if (!(e->cached_has_auto_repeat && (e->cached_has_toggle ? element_is_toggle_active(e) : (e->current_ptr_id >= 0 && e->engaged)))) return;
+    if (e->cached_has_toggle && element_is_toggle_active(e)) {
+        int interval_ms = e->cached_auto_repeat_interval;
+        if (e->auto_repeat_last_time == 0 || time_ms - e->auto_repeat_last_time >= (uint64_t)interval_ms) {
+            TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick burst elem=%d sel=%d int=%dms t0=%llu now=%llu bcnt=%d",
+                (int)(e - g_state.elements), e->selected, interval_ms,
+                (unsigned long long)e->auto_repeat_last_time, (unsigned long long)time_ms,
+                (e->bindings[0].auto_repeat?1:0)+(e->bindings[1].auto_repeat?1:0)+(e->bindings[2].auto_repeat?1:0)+(e->bindings[3].auto_repeat?1:0));
+            for (int k = 0; k < 4; k++) {
+                TouchBinding* tb = &e->bindings[k];
+                if (tb->type == BINDING_NONE) continue;
+                if (!tb->auto_repeat) continue;
+                TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick burst[%d] type=%d key=%d ar=%d tog=%d",
+                    k, tb->type, tb->keycode, tb->auto_repeat, tb->toggle);
+                release_binding(result, tb);
+                press_binding(result, tb, true);
+            }
+            e->auto_repeat_last_time = time_ms;
+        } else {
+            TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "tick burst WAIT elem=%d elapsed=%llu need=%d",
+                (int)(e - g_state.elements),
+                (unsigned long long)(time_ms - e->auto_repeat_last_time), interval_ms);
+        }
+    } else {
+        bool inside = point_in_element(e->visual_x, e->visual_y, e);
+        process_non_toggle_press_release(e, inside, time_ms, result);
+    }
+}
+
+static void process_button_long_press(TouchElement* e, int finger_idx, uint64_t time_ms, TouchActionResult* restrict result) {
+    if (!g_state.cfg.caps_has_any_element_long_press) return;
+    TouchFinger* _lp_f = e->current_ptr_id >= 0 ? find_finger(e->current_ptr_id) : NULL;
+    if (__builtin_expect(e->current_ptr_id >= 0, 0) && e->long_press_arm && !e->gesture_long_press_triggered
+        && e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE
+        && !finger_gesture_active(e))
+    {
+        uint64_t elapsed = time_ms - e->down_time_ms;
+        TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "TICK LP elapsed=%llu delay=%d arm=%d",
+            (unsigned long long)elapsed, g_state.cfg.long_press_delay_ms, e->long_press_arm);
+        if (elapsed >= g_state.cfg.long_press_delay_ms) {
+            TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "tick[%d] type=%d visual=1 (long_press_fire elapsed=%llu)", (int)(e - g_state.elements), e->type, (unsigned long long)elapsed);
+            e->gesture_long_press_triggered = true;
+            if (_lp_f) _lp_f->gesture_activated_in_touch = true;
+            e->visual_active = true;
+            e->visual_long_press_active = true;
+            mark_element_dirty(e);
+            e->long_press_arm = false;
+            toggle_alternate_bindings(e, &e->lp_toggled, e->cached_lp_has_toggle,
+                e->element_long_press, e->element_long_press_count,
+                e->bindings[0].type != BINDING_NONE, result);
+            if (e->button_long_press_haptic > 0 && e->element_long_press_count > 0)
+                add_action(result, ACT_HAPTIC, e->button_long_press_haptic, 0, 0);
+        }
+    }
+}
+
+static void process_button_gesture_timer(TouchElement* e, int finger_idx, uint64_t time_ms, TouchActionResult* restrict result) {
+    if (!g_state.cfg.caps_has_any_element_gesture) return;
+    TouchFinger* _gt_f = e->current_ptr_id >= 0 ? find_finger(e->current_ptr_id) : NULL;
+    if (__builtin_expect(e->current_ptr_id >= 0, 0) && e->gesture_timer_armed && !e->gesture_swipe_triggered
+        && !e->gesture_long_press_triggered
+        && e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE
+        && !finger_gesture_active(e))
+    {
+        if (time_ms - e->down_time_ms >= GESTURE_TIMER_MS) {
+            TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "tick[%d] type=%d visual=1 (gesture_timer_fire elapsed=%llu)", (int)(e - g_state.elements), e->type, (unsigned long long)(time_ms - e->down_time_ms));
+            e->gesture_swipe_triggered = true;
+            if (_gt_f) _gt_f->gesture_activated_in_touch = true;
+            e->visual_active = true;
+            mark_element_dirty(e);
+            e->gesture_timer_armed = false;
+            toggle_alternate_bindings(e, &e->gesture_toggled, e->cached_gesture_has_toggle,
+                e->element_gesture, e->element_gesture_count,
+                e->bindings[0].type != BINDING_NONE, result);
+            if (e->button_gesture_haptic > 0)
+                add_action(result, ACT_HAPTIC, e->button_gesture_haptic, 0, 0);
+        }
+    }
+}
+
+static void tick_begin(struct timespec* ts) {
+    clock_gettime(CLOCK_MONOTONIC, ts);
+}
+
+static void tick_end(struct timespec* start, int action_count) {
+    struct timespec end;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    uint64_t elapsed = (end.tv_sec - start->tv_sec) * 1000000
+                     + (end.tv_nsec - start->tv_nsec) / 1000;
+    if (__builtin_expect(elapsed > TICK_BUDGET_US, 0)) {
+        TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick: SLOW %lluus (>16ms budget) actions=%d",
+            (unsigned long long)elapsed, action_count);
+    }
+    if (action_count > HIGH_ACTION_COUNT_THRESHOLD) {
+        TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick: HIGH ACTION COUNT=%d (possible stutter)", action_count);
+    }
+}
+
+static void process_range_button_tick(uint64_t time_ms, TouchActionResult* restrict result) {
+    for (int _ri = 0; _ri < g_state.range_count; _ri++) {
+        TouchElement* e = &g_state.elements[g_state.range_indices[_ri]];
+        int kc = range_keycode(e->range_ordinal, e->range_index);
+        int _ridx = (int)(e - g_state.elements);
+
+        if (__builtin_expect(e->current_ptr_id >= 0, 0) && !e->range_hold_pressed && !e->range_scrolling && e->range_has_binding) {
+            if (time_ms - e->down_time_ms >= RANGE_TAP_TIMEOUT_MS) {
+                TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Range", "tick[%d] hold_timeout elapsed=%llu kc=%d",
+                    _ridx, (unsigned long long)(time_ms - e->down_time_ms), kc);
+                if (kc > 0) {
+                    add_action(result, ACT_KEY_PRESS, kc, 1, 0);
+                    e->range_hold_pressed = true;
+                }
+            }
+        }
+
+        if (e->range_pending_tap_release && time_ms >= e->range_tap_release_time) {
+            TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Range", "tick[%d] tap_release kc=%d", _ridx, kc);
+            if (kc > 0)
+                add_action(result, ACT_KEY_RELEASE, kc, 0, 0);
+            e->range_pending_tap_release = false;
+            e->range_scrolling = false;
+            e->range_has_binding = false;
+            e->range_hold_pressed = false;
+        }
+    }
+}
+
 TouchActionResult touch_processor_tick(uint64_t time_ms) {
     TouchActionResult result; result.count = 0;
 
-    if (__builtin_expect(g_state.last_tick_time != 0 && time_ms - g_state.last_tick_time > 100, 0)) {
+    if (__builtin_expect(g_state.last_tick_time != 0 && time_ms - g_state.last_tick_time > TICK_GAP_WARNING_MS, 0)) {
         TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick GAP: %llums since last tick (possible freeze)",
             (unsigned long long)(time_ms - g_state.last_tick_time));
     }
     g_state.last_tick_time = time_ms;
 
     struct timespec tick_start;
-    clock_gettime(CLOCK_MONOTONIC, &tick_start);
+    tick_begin(&tick_start);
 
     TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "tick: time=%llu active=%d dt_wait=%d sdtw=%d caps_gesture=%d caps_dt=%d",
         (unsigned long long)time_ms, g_state.active_finger_count,
@@ -470,12 +643,8 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
     int button_count = g_state.button_count;
     TouchElement* elements = g_state.elements;
     int* button_indices = g_state.button_indices;
-    uint32_t lp_delay_ms = g_state.cfg.long_press_delay_ms;
-    bool has_auto_repeat_buttons = g_state.cfg.caps_has_auto_repeat_buttons;
     TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "tick: has_ar=%d btn_cnt=%d elem_cnt=%d",
-        has_auto_repeat_buttons, button_count, g_state.element_count);
-    bool has_any_element_long_press = g_state.cfg.caps_has_any_element_long_press;
-    bool has_any_element_gesture = g_state.cfg.caps_has_any_element_gesture;
+        g_state.cfg.caps_has_auto_repeat_buttons, button_count, g_state.element_count);
     for (int _bi = 0; _bi < button_count; _bi++) {
         TouchElement* e = &elements[button_indices[_bi]];
 
@@ -491,115 +660,9 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
             mark_element_dirty(e);
         }
 
-        // Defensive: also check per-element — global flag can be stale after
-        // touch_processor_reset saves/restores elements but caps_has_auto_repeat_buttons
-        // is a separate field that is restored correctly via saved_cfg.
-        if (has_auto_repeat_buttons || e->cached_has_auto_repeat) {
-        // Auto-repeat: burst all bindings (toggle) or alternate primary (non-toggle)
-        if (e->cached_has_auto_repeat && (e->cached_has_toggle ? element_is_toggle_active(e) : (e->current_ptr_id >= 0 && e->engaged))) {
-            if (e->cached_has_toggle && element_is_toggle_active(e)) {
-                // Burst mode: press+release all bindings at interval with binding delay
-                // Cannot use execute_actions() here — it skips toggle bindings when
-                // gesture_is_down_event is false (tick context).
-                int interval_ms = e->cached_auto_repeat_interval;
-                if (e->auto_repeat_last_time == 0 || time_ms - e->auto_repeat_last_time >= (uint64_t)interval_ms) {
-                    // Burst all toggle and non-toggle auto_repeat bindings at element level.
-                    // Non-toggle AR bindings are no longer added to gesture_held_actions
-                    // by the select path — they're owned entirely by the element layer.
-                    TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick burst elem=%d sel=%d int=%dms t0=%llu now=%llu bcnt=%d",
-                        (int)(e - g_state.elements), e->selected, interval_ms,
-                        (unsigned long long)e->auto_repeat_last_time, (unsigned long long)time_ms,
-                        (e->bindings[0].auto_repeat?1:0)+(e->bindings[1].auto_repeat?1:0)+(e->bindings[2].auto_repeat?1:0)+(e->bindings[3].auto_repeat?1:0));
-                    for (int k = 0; k < 4; k++) {
-                        TouchBinding* tb = &e->bindings[k];
-                        if (tb->type == BINDING_NONE) continue;
-                        if (!tb->auto_repeat) continue;
-                        TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick burst[%d] type=%d key=%d ar=%d tog=%d",
-                            k, tb->type, tb->keycode, tb->auto_repeat, tb->toggle);
-                        release_binding(&result, tb);
-                        press_binding(&result, tb, true);
-                    }
-                    e->auto_repeat_last_time = time_ms;
-                } else {
-                    TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "tick burst WAIT elem=%d elapsed=%llu need=%d",
-                        (int)(e - g_state.elements),
-                        (unsigned long long)(time_ms - e->auto_repeat_last_time), interval_ms);
-                }
-            } else {
-                // Non-toggle auto-repeat: alternate press/release of primary binding
-                bool inside = point_in_element(e->visual_x, e->visual_y, e);
-                if (!inside) {
-                    if (e->auto_repeat_primary_pressed && e->bindings[0].type != BINDING_NONE) {
-                        release_binding(&result, &e->bindings[0]);
-                        e->auto_repeat_primary_pressed = false;
-                    }
-                } else {
-                    int interval_ms = e->cached_auto_repeat_interval;
-                    if (e->auto_repeat_last_time == 0 || time_ms - e->auto_repeat_last_time >= (uint64_t)interval_ms) {
-                        e->auto_repeat_primary_pressed = !e->auto_repeat_primary_pressed;
-                        if (e->bindings[0].type != BINDING_NONE) {
-                            if (e->auto_repeat_primary_pressed)
-                                press_binding(&result, &e->bindings[0], true);
-                            else
-                                release_binding(&result, &e->bindings[0]);
-                        }
-                        e->auto_repeat_last_time = time_ms;
-                    }
-                }
-            }
-        }
-        }
-
-        // Element long-press timeout
-        if (has_any_element_long_press) {
-            TouchFinger* _lp_f = e->current_ptr_id >= 0 ? find_finger(e->current_ptr_id) : NULL;
-            if (__builtin_expect(e->current_ptr_id >= 0, 0) && e->long_press_arm && !e->gesture_long_press_triggered
-                && e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE
-                && !finger_gesture_active(e))
-            {
-                uint64_t elapsed = time_ms - e->down_time_ms;
-                TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "TICK LP elapsed=%llu delay=%d arm=%d",
-                    (unsigned long long)elapsed, g_state.cfg.long_press_delay_ms, e->long_press_arm);
-                if (elapsed >= g_state.cfg.long_press_delay_ms) {
-                    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "tick[%d] type=%d visual=1 (long_press_fire elapsed=%llu)", (int)(e - g_state.elements), e->type, (unsigned long long)elapsed);
-                    e->gesture_long_press_triggered = true;
-                    if (_lp_f) _lp_f->gesture_activated_in_touch = true;
-                    e->visual_active = true;
-                    e->visual_long_press_active = true;
-                    mark_element_dirty(e);
-                    e->long_press_arm = false;
-                    toggle_alternate_bindings(e, &e->lp_toggled, e->cached_lp_has_toggle,
-                        e->element_long_press, e->element_long_press_count,
-                        e->bindings[0].type != BINDING_NONE, &result);
-                    if (e->button_long_press_haptic > 0 && e->element_long_press_count > 0)
-                        add_action(&result, ACT_HAPTIC, e->button_long_press_haptic, 0, 0);
-                }
-            }
-        }
-
-        // Element gesture timer (50ms for gesture-only buttons)
-        if (g_state.cfg.caps_has_any_element_gesture) {
-            TouchFinger* _gt_f = e->current_ptr_id >= 0 ? find_finger(e->current_ptr_id) : NULL;
-            if (__builtin_expect(e->current_ptr_id >= 0, 0) && e->gesture_timer_armed && !e->gesture_swipe_triggered
-                && !e->gesture_long_press_triggered
-                && e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE
-                && !finger_gesture_active(e))
-            {
-                if (time_ms - e->down_time_ms >= GESTURE_TIMER_MS) {
-                    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "tick[%d] type=%d visual=1 (gesture_timer_fire elapsed=%llu)", (int)(e - g_state.elements), e->type, (unsigned long long)(time_ms - e->down_time_ms));
-                    e->gesture_swipe_triggered = true;
-                    if (_gt_f) _gt_f->gesture_activated_in_touch = true;
-                    e->visual_active = true;
-                    mark_element_dirty(e);
-                    e->gesture_timer_armed = false;
-                    toggle_alternate_bindings(e, &e->gesture_toggled, e->cached_gesture_has_toggle,
-                        e->element_gesture, e->element_gesture_count,
-                        e->bindings[0].type != BINDING_NONE, &result);
-                    if (e->button_gesture_haptic > 0)
-                        add_action(&result, ACT_HAPTIC, e->button_gesture_haptic, 0, 0);
-                }
-            }
-        }
+        process_button_auto_repeat(e, _bi, time_ms, &result);
+        process_button_long_press(e, _bi, time_ms, &result);
+        process_button_gesture_timer(e, _bi, time_ms, &result);
     }
 
     // Gesture auto-repeat: burst any binding with auto_repeat flag.
@@ -609,49 +672,12 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
         process_auto_repeat_burst(&result, g_state.gesture_held_actions, g_state.gesture_held_count, g_state.gesture_auto_repeat_last_time_held, time_ms);
 
     // Range button: hold timer + deferred release
-    for (int _ri = 0; _ri < g_state.range_count; _ri++) {
-        TouchElement* e = &g_state.elements[g_state.range_indices[_ri]];
-        int kc = range_keycode(e->range_ordinal, e->range_index);
-        int _ridx = (int)(e - g_state.elements);
-
-        // Range button hold timer
-        if (__builtin_expect(e->current_ptr_id >= 0, 0) && !e->range_hold_pressed && !e->range_scrolling && e->range_has_binding) {
-            if (time_ms - e->down_time_ms >= RANGE_TAP_TIMEOUT_MS) {
-                TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Range", "tick[%d] hold_timeout elapsed=%llu kc=%d",
-                    _ridx, (unsigned long long)(time_ms - e->down_time_ms), kc);
-                if (kc > 0) {
-                    add_action(&result, ACT_KEY_PRESS, kc, 1, 0);
-                    e->range_hold_pressed = true;
-                }
-            }
-        }
-
-        // Range button deferred tap release
-        if (e->range_pending_tap_release && time_ms >= e->range_tap_release_time) {
-            TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Range", "tick[%d] tap_release kc=%d", _ridx, kc);
-            if (kc > 0)
-                add_action(&result, ACT_KEY_RELEASE, kc, 0, 0);
-            e->range_pending_tap_release = false;
-            e->range_scrolling = false;
-            e->range_has_binding = false;
-            e->range_hold_pressed = false;
-        }
-    }
+    process_range_button_tick(time_ms, &result);
 
     process_delayed_actions(&result, time_ms);
 
-    if (result.count > 16) {
-        TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick: HIGH ACTION COUNT=%d (possible stutter)", result.count);
-    }
+    tick_end(&tick_start, result.count);
 
-    struct timespec tick_end;
-    clock_gettime(CLOCK_MONOTONIC, &tick_end);
-    uint64_t tick_us = (tick_end.tv_sec - tick_start.tv_sec) * 1000000
-                     + (tick_end.tv_nsec - tick_start.tv_nsec) / 1000;
-    if (__builtin_expect(tick_us > 16000, 0)) {
-        TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "tick: SLOW %lluus (>16ms budget) actions=%d",
-            (unsigned long long)tick_us, result.count);
-    }
     if (result.count > 0) {
         TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "tick DONE: actions=%d active=%d",
             result.count, g_state.active_finger_count);
@@ -719,27 +745,13 @@ void touch_processor_reset(void) {
     g_state.scroll_accum_y = 0;
     g_state.gesture_toggled_count = 0;
 
-    // Save toggle state across reset so activation_reset can preserve visual_active
-    bool saved_selected[MAX_ELEMENTS];
-    bool saved_gesture_toggled[MAX_ELEMENTS];
-    bool saved_lp_toggled[MAX_ELEMENTS];
-    for (int i = 0; i < g_state.element_count; i++) {
-        saved_selected[i] = g_state.elements[i].selected;
-        saved_gesture_toggled[i] = g_state.elements[i].gesture_toggled;
-        saved_lp_toggled[i] = g_state.elements[i].lp_toggled;
-    }
+    ToggleState saved_toggle;
+    save_toggle_state(&saved_toggle, g_state.element_count);
 
     for (int i = 0; i < g_state.element_count; i++)
         element_reset_runtime(&g_state.elements[i]);
 
-    // Restore toggle state
-    for (int i = 0; i < g_state.element_count; i++) {
-        g_state.elements[i].selected = saved_selected[i];
-        g_state.elements[i].gesture_toggled = saved_gesture_toggled[i];
-        g_state.elements[i].lp_toggled = saved_lp_toggled[i];
-        if (element_is_toggle_active(&g_state.elements[i]))
-            g_state.elements[i].visual_active = true;
-    }
+    restore_toggle_state(&saved_toggle, g_state.element_count);
 
     mark_all_dirty();
     build_spatial_grid();

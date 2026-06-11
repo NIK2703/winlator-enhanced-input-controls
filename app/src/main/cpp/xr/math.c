@@ -3,14 +3,17 @@
 #include <math.h>
 #include <string.h>
 
+#define XR_TIME_SCALE 1e9
+#define XR_TIME_INV_SCALE 1e-9
+
 double FromXrTime(const XrTime time)
 {
-    return (time * 1e-9);
+    return (time * XR_TIME_INV_SCALE);
 }
 
 XrTime ToXrTime(const double time_in_seconds)
 {
-    return (XrTime)(time_in_seconds * 1e9);
+    return (XrTime)(time_in_seconds * XR_TIME_SCALE);
 }
 
 float ToDegrees(float rad)
@@ -133,7 +136,7 @@ float XrVector3fDistance(const XrVector3f a, const XrVector3f b)
     diff.x = a.x - b.x;
     diff.y = a.y - b.y;
     diff.z = a.z - b.z;
-    return sqrt(XrVector3fLengthSquared(diff));
+    return sqrtf(XrVector3fLengthSquared(diff));
 }
 
 float XrVector3fLengthSquared(const XrVector3f v)
@@ -191,7 +194,12 @@ XrVector3f XrVector3fGetAnglesFromVectors(XrVector3f forward, XrVector3f right, 
 
 XrVector3f XrVector3fNormalized(const XrVector3f v)
 {
-    float rcpLen = 1.0f / sqrtf(XrVector3fLengthSquared(v));
+    float lengthSquared = XrVector3fLengthSquared(v);
+    if (lengthSquared < 1e-9f) {
+        XrVector3f zero = {0, 0, 0};
+        return zero;
+    }
+    float rcpLen = 1.0f / sqrtf(lengthSquared);
     return XrVector3fScalarMultiply(v, rcpLen);
 }
 
@@ -206,13 +214,10 @@ XrVector3f XrVector3fScalarMultiply(const XrVector3f v, float scale)
 
 XrVector4f XrVector4fMultiplyMatrix4f(const float* m, const XrVector4f* v)
 {
-    float M[4][4];
-    memcpy(&M, m, sizeof(float) * 16);
-
     XrVector4f out;
-    out.x = M[0][0] * v->x + M[0][1] * v->y + M[0][2] * v->z + M[0][3] * v->w;
-    out.y = M[1][0] * v->x + M[1][1] * v->y + M[1][2] * v->z + M[1][3] * v->w;
-    out.z = M[2][0] * v->x + M[2][1] * v->y + M[2][2] * v->z + M[2][3] * v->w;
-    out.w = M[3][0] * v->x + M[3][1] * v->y + M[3][2] * v->z + M[3][3] * v->w;
+    out.x = m[0*4+0] * v->x + m[0*4+1] * v->y + m[0*4+2] * v->z + m[0*4+3] * v->w;
+    out.y = m[1*4+0] * v->x + m[1*4+1] * v->y + m[1*4+2] * v->z + m[1*4+3] * v->w;
+    out.z = m[2*4+0] * v->x + m[2*4+1] * v->y + m[2*4+2] * v->z + m[2*4+3] * v->w;
+    out.w = m[3*4+0] * v->x + m[3*4+1] * v->y + m[3*4+2] * v->z + m[3*4+3] * v->w;
     return out;
 }

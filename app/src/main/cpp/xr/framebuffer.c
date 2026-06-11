@@ -7,10 +7,11 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 bool XrFramebufferCreate(struct XrFramebuffer *framebuffer, XrSession session, int width, int height)
 {
-    memset(framebuffer, 0, sizeof(framebuffer));
+    memset(framebuffer, 0, sizeof(*framebuffer));
 #if XR_USE_GRAPHICS_API_OPENGL_ES
     return XrFramebufferCreateGL(framebuffer, session, width, height);
 #else
@@ -43,6 +44,7 @@ void XrFramebufferAcquire(struct XrFramebuffer *framebuffer)
     {
         res = xrWaitSwapchainImage(framebuffer->Handle, &wait_info);
         i++;
+        usleep(1000);
         ALOGV("Retry xrWaitSwapchainImage %d times due XR_TIMEOUT_EXPIRED (duration %lf ms",
               i, wait_info.timeout * (1E-9));
     }

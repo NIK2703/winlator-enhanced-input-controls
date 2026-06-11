@@ -1,7 +1,10 @@
 #include "../touch_processor_internal.h"
 
+// EXACT DUPLICATION: stick.c:31-47 has identical normalize+clamp logic. Refactor into shared helper when touching both files.
 static void dpad_normalize(float dx, float dy, float radius, float* restrict out_nx, float* restrict out_ny) {
+    if (radius < NEAR_ZERO_THRESHOLD) { *out_nx = 0; *out_ny = 0; return; }
     float dist = sqrtf(dx*dx + dy*dy);
+    if (dist < NEAR_ZERO_THRESHOLD) { *out_nx = 0; *out_ny = 0; return; }
     if (dist > radius) {
         float inv_dist = 1.0f / dist;
         *out_nx = dx * inv_dist;
@@ -15,10 +18,11 @@ static void dpad_normalize(float dx, float dy, float radius, float* restrict out
 
 static void dpad_update(TouchElement* e, float x, float y, TouchActionResult* restrict result) {
     TouchProcessorState* s = &g_state;
-    float radius = s->snapping_size * 7.0f * e->scale;
+    float radius = s->snapping_size * DPAD_RADIUS_MULTIPLIER * e->scale;
+    if (radius < NEAR_ZERO_THRESHOLD) return;
     float dx = x - e->x;
     float dy = y - e->y;
-    if (fabsf(dx) < 0.0001f && fabsf(dy) < 0.0001f) return;
+    if (fabsf(dx) < NEAR_ZERO_THRESHOLD && fabsf(dy) < NEAR_ZERO_THRESHOLD) return;
     float nx, ny;
     dpad_normalize(dx, dy, radius, &nx, &ny);
     element_set_petals(e, nx, ny, DPAD_DEAD_ZONE, result);

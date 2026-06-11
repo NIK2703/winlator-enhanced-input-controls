@@ -1,9 +1,7 @@
 #include <jni.h>
 #include <string.h>
-#include <malloc.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <math.h>
 #include <android/bitmap.h>
 #include <android/log.h>
 #ifdef __ARM_NEON
@@ -12,12 +10,33 @@
 
 #define WHITE 0xffffff
 #define BLACK 0x000000
-#define printf(...) __android_log_print(ANDROID_LOG_DEBUG, "System.out", __VA_ARGS__);
+#define FILL_ROW_STACK_SIZE 4096
+#define BYTES_PER_PIXEL 4
 
 enum GCFunction {GCF_CLEAR, GCF_AND, GCF_AND_REVERSE, GCF_COPY, GCF_AND_INVERTED, GCF_NO_OP, GCF_XOR, GCF_OR, GCF_NOR, GCF_EQUIV, GCF_INVERT, GCF_OR_REVERSE, GCF_COPY_INVERTED, GCF_OR_INVERTED, GCF_NAND, GCF_SET};
 
-static int packColor(int8_t r, int8_t g, int8_t b) {
-    return ((r & 0xff00) << 8) | (g & 0xff00) | (b >> 8);
+static bool alloc_fill_row(uint8_t stack_row[FILL_ROW_STACK_SIZE * BYTES_PER_PIXEL], uint8_t** row_out, int width) {
+    if (width <= 0) return false;
+    *row_out = stack_row;
+    if (width > FILL_ROW_STACK_SIZE) {
+        *row_out = (uint8_t*)malloc((size_t)width * BYTES_PER_PIXEL);
+        if (!*row_out) return false;
+    }
+    return true;
+}
+
+static void free_fill_row(uint8_t* row, uint8_t stack_row[FILL_ROW_STACK_SIZE * BYTES_PER_PIXEL]) {
+    if (row != stack_row) free(row);
+}
+
+static void fill_row_with_color(uint8_t* row, int rowSize, uint32_t color32) {
+    uint32_t* row32 = (uint32_t*)row;
+    int rowPixels = rowSize / BYTES_PER_PIXEL;
+    for (int i = 0; i < rowPixels; i++) row32[i] = color32;
+}
+
+static inline uint32_t packColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+    return ((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8) | a;
 }
 
 static void unpackColor(int color, uint8_t *rgba) {
@@ -25,6 +44,20 @@ static void unpackColor(int color, uint8_t *rgba) {
     rgba[1] = (color >> 8) & 255;
     rgba[0] = color & 255;
     rgba[3] = 255;
+}
+
+static inline int unpack_pixel(const uint8_t *data, int offset) {
+    return (data[offset] << 16) | (data[offset + 1] << 8) | data[offset + 2];
+}
+
+static inline void pack_pixel(uint8_t *data, int offset, int color) {
+    data[offset] = (color >> 16) & 0xff;
+    data[offset + 1] = (color >> 8) & 0xff;
+    data[offset + 2] = color & 0xff;
+}
+
+static inline uint32_t pack_pixel32(const uint8_t *rgba) {
+    return ((uint32_t)rgba[3] << 24) | ((uint32_t)rgba[2] << 16) | ((uint32_t)rgba[1] << 8) | rgba[0];
 }
 
 static int8_t getBit(uint8_t *line, int x) {
@@ -83,9 +116,11 @@ Java_com_winlator_cmod_xserver_Drawable_drawBitmap(JNIEnv *env, jclass obj,
     int *dstDataAddr = (*env)->GetDirectBufferAddress(env, dstData);
 
     if (!srcDataAddr || !dstDataAddr) {
-        printf("Error: NULL buffer address in drawBitmap\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in drawBitmap");
         return;
     }
+
+    if (width <= 0 || height <= 0) return;
 
     int stride = getBitmapBytePad(width);
     for (int16_t y = 0, x; y < height; y++) {
@@ -106,7 +141,7 @@ Java_com_winlator_cmod_xserver_Drawable_copyArea(JNIEnv *env, jclass obj, jshort
     uint8_t *dstDataAddr = (*env)->GetDirectBufferAddress(env, dstData);
 
     if (!srcDataAddr || !dstDataAddr) {
-        printf("Error: NULL buffer address in copyArea\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in copyArea");
         return;
     }
 
@@ -114,10 +149,14 @@ Java_com_winlator_cmod_xserver_Drawable_copyArea(JNIEnv *env, jclass obj, jshort
     jlong dstLength = (*env)->GetDirectBufferCapacity(env, dstData);
 
     if (srcX != 0 || srcY != 0 || dstX != 0 || dstY != 0 || srcLength != dstLength) {
-        int copyAmount = width * 4;
+        if (width <= 0 || height <= 0) return;
+        jlong maxSrcOff = ((jlong)(srcX + width - 1) + (jlong)(srcY + height - 1) * srcStride) * BYTES_PER_PIXEL;
+        jlong maxDstOff = ((jlong)(dstX + width - 1) + (jlong)(dstY + height - 1) * dstStride) * BYTES_PER_PIXEL;
+        if (maxSrcOff >= srcLength || maxDstOff >= dstLength) return;
+        int copyAmount = width * BYTES_PER_PIXEL;
         for (int16_t y = 0; y < height; y++) {
-            memcpy(dstDataAddr + (dstX + (y + dstY) * dstStride) * 4,
-                   srcDataAddr + (srcX + (y + srcY) * srcStride) * 4, copyAmount);
+            memcpy(dstDataAddr + (dstX + (y + dstY) * dstStride) * BYTES_PER_PIXEL,
+                   srcDataAddr + (srcX + (y + srcY) * srcStride) * BYTES_PER_PIXEL, copyAmount);
         }
     } else {
         memcpy(dstDataAddr, srcDataAddr, dstLength);
@@ -134,22 +173,29 @@ Java_com_winlator_cmod_xserver_Drawable_copyAreaOp(JNIEnv *env, jclass obj, jsho
     uint8_t *dstDataAddr = (*env)->GetDirectBufferAddress(env, dstData);
 
     if (!srcDataAddr || !dstDataAddr) {
-        printf("Error: NULL buffer address in copyAreaOp\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in copyAreaOp");
+        return;
+    }
+
+    jlong srcLength = (*env)->GetDirectBufferCapacity(env, srcData);
+    jlong dstLength = (*env)->GetDirectBufferCapacity(env, dstData);
+    jlong maxSrcOffset = (jlong)(srcX + width - 1 + (jlong)(srcY + height - 1) * srcStride) * BYTES_PER_PIXEL + (BYTES_PER_PIXEL - 1);
+    jlong maxDstOffset = (jlong)(dstX + width - 1 + (jlong)(dstY + height - 1) * dstStride) * BYTES_PER_PIXEL + (BYTES_PER_PIXEL - 1);
+    if (maxSrcOffset >= srcLength || maxDstOffset >= dstLength) {
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Buffer overflow in copyAreaOp");
         return;
     }
 
     for (int16_t y = 0; y < height; y++) {
         for (int16_t x = 0; x < width; x++) {
-            int i = (x + srcX + (y + srcY) * srcStride) * 4;
-            int j = (x + dstX + (y + dstY) * dstStride) * 4;
-            int srcColor = (srcDataAddr[i] << 16) | (srcDataAddr[i+1] << 8) | srcDataAddr[i+2];
-            int dstColor = (dstDataAddr[j] << 16) | (dstDataAddr[j+1] << 8) | dstDataAddr[j+2];
+            int i = (x + srcX + (y + srcY) * srcStride) * BYTES_PER_PIXEL;
+            int j = (x + dstX + (y + dstY) * dstStride) * BYTES_PER_PIXEL;
+            int srcColor = unpack_pixel(srcDataAddr, i);
+            int dstColor = unpack_pixel(dstDataAddr, j);
 
             dstColor = setPixelOp(srcColor, dstColor, gcFunction);
 
-            dstDataAddr[j] = (dstColor >> 16) & 0xff;
-            dstDataAddr[j+1] = (dstColor >> 8) & 0xff;
-            dstDataAddr[j+2] = dstColor & 0xff;
+            pack_pixel(dstDataAddr, j, dstColor);
         }
     }
 }
@@ -161,35 +207,35 @@ Java_com_winlator_cmod_xserver_Drawable_fillRect(JNIEnv *env, jclass obj, jshort
     uint8_t *dataAddr = (*env)->GetDirectBufferAddress(env, data);
 
     if (!dataAddr) {
-        printf("Error: NULL buffer address in fillRect\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in fillRect");
+        return;
+    }
+
+    jlong bufLength = (*env)->GetDirectBufferCapacity(env, data);
+    jlong maxOffset = (jlong)(x + width - 1 + (jlong)(y + height - 1) * stride) * BYTES_PER_PIXEL + (BYTES_PER_PIXEL - 1);
+    if (maxOffset >= bufLength) {
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Buffer overflow in fillRect");
         return;
     }
 
     uint8_t rgba[4];
     unpackColor(color, rgba);
 
-    int rowSize = width * 4;
-    uint8_t stackRow[4096 * 4];
-    uint8_t *row = stackRow;
-    bool heapRow = false;
-    if (width > 4096) {
-        row = malloc(rowSize);
-        if (!row) {
-            printf("Error: Failed to allocate memory for row\n");
-            return;
-        }
-        heapRow = true;
+    uint8_t stackRow[FILL_ROW_STACK_SIZE * BYTES_PER_PIXEL];
+    uint8_t *row;
+    if (!alloc_fill_row(stackRow, &row, width)) {
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to allocate memory for row");
+        return;
     }
 
-    uint32_t color32 = ((uint32_t)rgba[3] << 24) | ((uint32_t)rgba[2] << 16) | ((uint32_t)rgba[1] << 8) | rgba[0];
-    uint32_t *row32 = (uint32_t *)row;
-    int rowPixels = rowSize / 4;
-    for (int i = 0; i < rowPixels; i++) row32[i] = color32;
+    int rowSize = width * BYTES_PER_PIXEL;
+    uint32_t color32 = pack_pixel32(rgba);
+    fill_row_with_color(row, rowSize, color32);
     for (int16_t i = 0; i < height; i++) {
-        memcpy(dataAddr + (x + (i + y) * stride) * 4, row, rowSize);
+        memcpy(dataAddr + (x + (i + y) * stride) * BYTES_PER_PIXEL, row, rowSize);
     }
 
-    if (heapRow) free(row);
+    free_fill_row(row, stackRow);
 }
 
 JNIEXPORT void JNICALL
@@ -199,7 +245,7 @@ Java_com_winlator_cmod_xserver_Drawable_drawLine(JNIEnv *env, jclass obj, jshort
     uint8_t *dataAddr = (*env)->GetDirectBufferAddress(env, data);
 
     if (!dataAddr) {
-        printf("Error: NULL buffer address in drawLine\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in drawLine");
         return;
     }
 
@@ -212,28 +258,43 @@ Java_com_winlator_cmod_xserver_Drawable_drawLine(JNIEnv *env, jclass obj, jshort
     uint8_t rgba[4];
     unpackColor(color, rgba);
 
-    int rowSize = lineWidth * 4;
-    uint8_t stackRow[4096 * 4];
-    uint8_t *row = stackRow;
-    bool heapRow = false;
-    if (lineWidth > 4096) {
-        row = malloc(rowSize);
-        if (!row) {
-            printf("Error: Failed to allocate memory for row\n");
-            return;
-        }
-        heapRow = true;
+    uint8_t stackRow[FILL_ROW_STACK_SIZE * BYTES_PER_PIXEL];
+    uint8_t *row;
+    if (!alloc_fill_row(stackRow, &row, lineWidth)) {
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to allocate memory for row");
+        return;
     }
 
-    uint32_t color32 = ((uint32_t)rgba[3] << 24) | ((uint32_t)rgba[2] << 16) | ((uint32_t)rgba[1] << 8) | rgba[0];
-    uint32_t *row32 = (uint32_t *)row;
-    int rowPixels = rowSize / 4;
-    for (int i = 0; i < rowPixels; i++) row32[i] = color32;
+    jlong bufLength = (*env)->GetDirectBufferCapacity(env, data);
+    if (stride == 0) {
+        free_fill_row(row, stackRow);
+        return;
+    }
+    int height = bufLength / ((jlong)stride * BYTES_PER_PIXEL);
+    if (x0 < 0 || x0 >= stride || y0 < 0 || y0 >= height) {
+        free_fill_row(row, stackRow);
+        return;
+    }
+    if (x1 < 0 || x1 >= stride || y1 < 0 || y1 >= height) {
+        free_fill_row(row, stackRow);
+        return;
+    }
+
+    int rowSize = lineWidth * BYTES_PER_PIXEL;
+    uint32_t color32 = pack_pixel32(rgba);
+    fill_row_with_color(row, rowSize, color32);
+
+    int max_x = (x0 > x1 ? x0 : x1) + lineWidth;
+    int max_y = (y0 > y1 ? y0 : y1) + lineWidth;
+    if (max_x > stride || max_y > height) {
+        free_fill_row(row, stackRow);
+        return;
+    }
 
     while (true) {
         if (abs(x1 - x0) >= abs(y1 - y0)) {
             for (int16_t i = 0; i < lineWidth; i++) {
-                memcpy(dataAddr + (x0 + (i + y0) * stride) * 4, row, rowSize);
+                memcpy(dataAddr + (x0 + (i + y0) * stride) * BYTES_PER_PIXEL, row, rowSize);
             }
         } else {
             for (int16_t i = 0; i < lineWidth; i++) {
@@ -253,7 +314,7 @@ Java_com_winlator_cmod_xserver_Drawable_drawLine(JNIEnv *env, jclass obj, jshort
         }
     }
 
-    if (heapRow) free(row);
+    free_fill_row(row, stackRow);
 }
 
 JNIEXPORT void JNICALL
@@ -268,16 +329,16 @@ Java_com_winlator_cmod_xserver_Drawable_drawAlphaMaskedBitmap(JNIEnv *env, jclas
     uint32_t *dstDataAddr = (*env)->GetDirectBufferAddress(env, dstData);
 
     if (!srcDataAddr || !maskDataAddr || !dstDataAddr) {
-        printf("Error: NULL buffer address in drawAlphaMaskedBitmap\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in drawAlphaMaskedBitmap");
         return;
     }
 
-    uint32_t foreColor = (uint32_t)packColor(foreRed, foreGreen, foreBlue) | 0xff000000u;
-    uint32_t backColor = (uint32_t)packColor(backRed, backGreen, backBlue) | 0xff000000u;
+    uint32_t foreColor = packColor(foreRed & 0xff, foreGreen & 0xff, foreBlue & 0xff, 0xff);
+    uint32_t backColor = packColor(backRed & 0xff, backGreen & 0xff, backBlue & 0xff, 0xff);
 
-    jlong dstLength = (*env)->GetDirectBufferCapacity(env, dstData) / 4;
-#ifdef __ARM_NEON
+    jlong dstLength = (*env)->GetDirectBufferCapacity(env, dstData) / BYTES_PER_PIXEL;
     const uint32_t whiteMask = (uint32_t)WHITE;
+#ifdef __ARM_NEON
     uint32x4_t vFore = vdupq_n_u32(foreColor);
     uint32x4_t vBack = vdupq_n_u32(backColor);
     uint32x4_t vWhite = vdupq_n_u32(whiteMask);
@@ -298,7 +359,6 @@ Java_com_winlator_cmod_xserver_Drawable_drawAlphaMaskedBitmap(JNIEnv *env, jclas
             : 0u;
     }
 #else
-    const uint32_t whiteMask = (uint32_t)WHITE;
     for (jlong i = 0; i < dstLength; i++) {
         dstDataAddr[i] = maskDataAddr[i] == whiteMask
             ? (srcDataAddr[i] == whiteMask ? foreColor : backColor)
@@ -313,7 +373,7 @@ Java_com_winlator_cmod_xserver_Drawable_fromBitmap(JNIEnv *env, jclass obj, jobj
     char *dataAddr = (*env)->GetDirectBufferAddress(env, data);
 
     if (!dataAddr) {
-        printf("Error: NULL buffer address in fromBitmap\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in fromBitmap");
         return;
     }
 
@@ -321,15 +381,20 @@ Java_com_winlator_cmod_xserver_Drawable_fromBitmap(JNIEnv *env, jclass obj, jobj
     uint8_t *pixels;
 
     if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) {
-        printf("Error: Failed to get bitmap info in fromBitmap\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to get bitmap info in fromBitmap");
         return;
     }
     if (AndroidBitmap_lockPixels(env, bitmap, (void**)&pixels) < 0) {
-        printf("Error: Failed to lock bitmap pixels in fromBitmap\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to lock bitmap pixels in fromBitmap");
         return;
     }
 
-    size_t size = (size_t)info.width * (size_t)info.height * 4;
+    size_t size = (size_t)info.width * (size_t)info.height * BYTES_PER_PIXEL;
+    jlong capacity = (*env)->GetDirectBufferCapacity(env, data);
+    if (capacity < (jlong)size) {
+        AndroidBitmap_unlockPixels(env, bitmap);
+        return;
+    }
     memcpy(dataAddr, pixels, size);
 
     AndroidBitmap_unlockPixels(env, bitmap);
@@ -342,7 +407,7 @@ Java_com_winlator_cmod_xserver_Pixmap_toBitmap(JNIEnv *env, jclass obj, jobject 
     char *maskDataAddr = maskData ? (*env)->GetDirectBufferAddress(env, maskData) : NULL;
 
     if (!colorDataAddr) {
-        printf("Error: NULL color data address in toBitmap\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL color data address in toBitmap");
         return;
     }
 
@@ -350,15 +415,29 @@ Java_com_winlator_cmod_xserver_Pixmap_toBitmap(JNIEnv *env, jclass obj, jobject 
     uint8_t *pixels;
 
     if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) {
-        printf("Error: Failed to get bitmap info in toBitmap\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to get bitmap info in toBitmap");
         return;
     }
     if (AndroidBitmap_lockPixels(env, bitmap, (void**)&pixels) < 0) {
-        printf("Error: Failed to lock bitmap pixels in toBitmap\n");
+        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to lock bitmap pixels in toBitmap");
         return;
     }
 
-    for (int i = 0, size = info.width * info.height * 4; i < size; i += 4) {
+    jlong size = (jlong)info.width * (jlong)info.height * BYTES_PER_PIXEL;
+    jlong colorCap = (*env)->GetDirectBufferCapacity(env, colorData);
+    if (colorCap < size) {
+        AndroidBitmap_unlockPixels(env, bitmap);
+        return;
+    }
+    if (maskData) {
+        jlong maskCap = (*env)->GetDirectBufferCapacity(env, maskData);
+        if (maskCap < size) {
+            AndroidBitmap_unlockPixels(env, bitmap);
+            return;
+        }
+    }
+
+    for (jlong i = 0; i < size; i += BYTES_PER_PIXEL) {
         pixels[i+2] = colorDataAddr[i+0];
         pixels[i+1] = colorDataAddr[i+1];
         pixels[i+0] = colorDataAddr[i+2];

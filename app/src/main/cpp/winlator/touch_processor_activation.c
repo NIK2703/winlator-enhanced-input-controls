@@ -81,43 +81,31 @@ int activation_hovered_for_ptr(int ptr_id) {
     return g_state.hovered_element_per_ptr[ptr_id];
 }
 
+static const ActivationModeParams* get_activation_params(void) {
+    switch (g_state.activation_mode) {
+        case ACTIVATION_LOCK:  return &ACTIVATION_MODE_LOCK;
+        case ACTIVATION_TRACK: return &ACTIVATION_MODE_TRACK;
+        case ACTIVATION_HOVER: return &ACTIVATION_MODE_HOVER;
+        default:               return &ACTIVATION_MODE_LOCK;
+    }
+}
+
 // ─── Legacy entry points — now thin wrappers over the unified API ────────────
 
 __attribute__((hot))
 bool activation_handle_down(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
-    const ActivationModeParams* params;
-    switch (g_state.activation_mode) {
-        case ACTIVATION_LOCK:  params = &ACTIVATION_MODE_LOCK;  break;
-        case ACTIVATION_TRACK: params = &ACTIVATION_MODE_TRACK; break;
-        case ACTIVATION_HOVER: params = &ACTIVATION_MODE_HOVER; break;
-        default:               params = &ACTIVATION_MODE_LOCK;  break;
-    }
-    return activation_mode_down(ptr_id, x, y, time_ms, result, params);
+    return activation_mode_down(ptr_id, x, y, time_ms, result, get_activation_params());
 }
 
 __attribute__((hot))
 void activation_handle_move(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
-    const ActivationModeParams* params;
-    switch (g_state.activation_mode) {
-        case ACTIVATION_LOCK:  params = &ACTIVATION_MODE_LOCK;  break;
-        case ACTIVATION_TRACK: params = &ACTIVATION_MODE_TRACK; break;
-        case ACTIVATION_HOVER: params = &ACTIVATION_MODE_HOVER; break;
-        default:               params = &ACTIVATION_MODE_LOCK;  break;
-    }
-
+    const ActivationModeParams* params = get_activation_params();
     activation_mode_move_nonbuttons(ptr_id, x, y, time_ms, result, params);
     activation_mode_move_buttons(ptr_id, x, y, time_ms, result, params);
 }
 
 bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
-    const ActivationModeParams* params;
-    switch (g_state.activation_mode) {
-        case ACTIVATION_LOCK:  params = &ACTIVATION_MODE_LOCK;  break;
-        case ACTIVATION_TRACK: params = &ACTIVATION_MODE_TRACK; break;
-        case ACTIVATION_HOVER: params = &ACTIVATION_MODE_HOVER; break;
-        default:               params = &ACTIVATION_MODE_LOCK;  break;
-    }
-    return activation_mode_up(ptr_id, x, y, time_ms, result, params);
+    return activation_mode_up(ptr_id, x, y, time_ms, result, get_activation_params());
 }
 
 void activation_reset(void) {
