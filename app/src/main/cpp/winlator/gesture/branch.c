@@ -520,9 +520,20 @@ static bool up_handle_tap_waiting(TouchFinger* f, GestureFingerCtx* ctx,
     };
     TapPathResult path = execute_tap_path(f, ctx, result, time_ms, &tap_params);
 
-    if (path == TAP_PATH_HANDLED || path == TAP_PATH_ENTER_DT)
-        return true;
+    // TAP_PATH_HANDLED: DT consumed paths 1-3. State set to IDLE by execute_tap_path.
+    // Old code: break → cleanup_main_finger. Return false to let handle_up do cleanup.
+    if (path == TAP_PATH_HANDLED)
+        return false;
 
+    // TAP_PATH_ENTER_DT: entered DT/SDTW waiting.
+    // Old code: second finger → cleanup_second_finger → return; main finger → return (no cleanup).
+    if (path == TAP_PATH_ENTER_DT) {
+        if (slot->is_second_finger)
+            cleanup_second_finger(f, ctx, result);
+        return true;
+    }
+
+    // TAP_PATH_SINGLE: single tap executed. State set to IDLE.
     if (slot->is_second_finger) {
         cleanup_second_finger(f, ctx, result);
         return true;
