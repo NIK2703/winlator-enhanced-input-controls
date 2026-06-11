@@ -88,34 +88,35 @@ static inline ResolvedBindings resolve_slot(const TouchFinger* f,
 // FORWARD DECLARATIONS
 // =========================================================================
 static void handle_down(TouchFinger* f, GestureFingerCtx* ctx,
-                        TouchActionResult* restrict result, uint64_t time_ms,
-                        float dx, float dy);
+                        TouchActionResult* restrict result, uint64_t time_ms);
 static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
                         TouchActionResult* restrict result, uint64_t time_ms,
                         float dx, float dy);
 static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
-                      TouchActionResult* restrict result, uint64_t time_ms,
-                      float dx, float dy);
+                      TouchActionResult* restrict result, uint64_t time_ms);
 static void handle_tick(TouchFinger* f, GestureFingerCtx* ctx,
-                        TouchActionResult* restrict result, uint64_t time_ms,
-                        float dx, float dy);
+                        TouchActionResult* restrict result, uint64_t time_ms);
 static void up_handle_tp_early_exit(TouchFinger* f, GestureFingerCtx* ctx,
                                     TouchActionResult* restrict result, uint64_t time_ms,
                                     const TouchBinding* non_drag, int non_drag_count);
 
 // =========================================================================
-// DISPATCH TABLE
+// DISPATCHER (public entry point)
 // =========================================================================
-typedef void (*GestureEventHandler)(TouchFinger* f, GestureFingerCtx* ctx,
-    TouchActionResult* restrict result, uint64_t time_ms,
-    float dx, float dy);
-
-static const GestureEventHandler handlers[GESTURE_EVENT_COUNT] = {
-    [GESTURE_EVENT_DOWN] = handle_down,
-    [GESTURE_EVENT_MOVE] = handle_move,
-    [GESTURE_EVENT_UP]   = handle_up,
-    [GESTURE_EVENT_TICK] = handle_tick,
-};
+void gesture_branch(TouchFinger* f, GestureFingerCtx* ctx,
+                    TouchActionResult* restrict result, uint64_t time_ms,
+                    GestureProcessEvent event,
+                    float dx, float dy)
+{
+    if (event >= GESTURE_EVENT_COUNT) return;
+    switch (event) {
+        case GESTURE_EVENT_DOWN: handle_down(f, ctx, result, time_ms); break;
+        case GESTURE_EVENT_MOVE: handle_move(f, ctx, result, time_ms, dx, dy); break;
+        case GESTURE_EVENT_UP:   handle_up(f, ctx, result, time_ms); break;
+        case GESTURE_EVENT_TICK: handle_tick(f, ctx, result, time_ms); break;
+        default: break;
+    }
+}
 
 // =========================================================================
 // SHARED HELPERS (static, used by multiple handlers)
@@ -164,8 +165,7 @@ static inline TapPathResult mark_dt_consumed_idle(TouchFinger* f, GestureFingerC
 // Path 1: deferred D from DT confirm
 static TapPathResult tap_path_deferred_double(
     TouchFinger* f, GestureFingerCtx* ctx,
-    TouchActionResult* restrict result, uint64_t time_ms __attribute__((unused)),
-    const TapPathParams* params __attribute__((unused)))
+    TouchActionResult* restrict result)
 {
     if (ctx->deferred_double.count > 0) {
         if (!g_state.gesture_is_action_held)
@@ -179,10 +179,7 @@ static TapPathResult tap_path_deferred_double(
 
 // Path 2: post-DT drag cleanup
 static TapPathResult tap_path_post_dt_drag(
-    TouchFinger* f, GestureFingerCtx* ctx,
-    TouchActionResult* restrict result __attribute__((unused)),
-    uint64_t time_ms __attribute__((unused)),
-    const TapPathParams* params __attribute__((unused)))
+    TouchFinger* f, GestureFingerCtx* ctx)
 {
     if (ctx->post_double_tap_drag)
         return mark_dt_consumed_idle(f, ctx);
@@ -192,7 +189,7 @@ static TapPathResult tap_path_post_dt_drag(
 // Path 3: DT consumed (3+ tap) — fire S binding
 static TapPathResult tap_path_dt_consumed(
     TouchFinger* f, GestureFingerCtx* ctx,
-    TouchActionResult* restrict result, uint64_t time_ms __attribute__((unused)),
+    TouchActionResult* restrict result,
     const TapPathParams* params)
 {
     if (ctx->dt_consumed) {
@@ -248,13 +245,13 @@ static TapPathResult execute_tap_path(
 {
     TapPathResult r;
 
-    r = tap_path_deferred_double(f, ctx, result, time_ms, params);
+    r = tap_path_deferred_double(f, ctx, result);
     if (r != TAP_PATH_SINGLE) return r;
 
-    r = tap_path_post_dt_drag(f, ctx, result, time_ms, params);
+    r = tap_path_post_dt_drag(f, ctx);
     if (r != TAP_PATH_SINGLE) return r;
 
-    r = tap_path_dt_consumed(f, ctx, result, time_ms, params);
+    r = tap_path_dt_consumed(f, ctx, result, params);
     if (r != TAP_PATH_SINGLE) return r;
 
     return tap_path_normal(f, ctx, result, time_ms, params);
@@ -271,7 +268,7 @@ static void tick_lp_timer(TouchFinger* f, GestureFingerCtx* ctx,
         || f->cached_has_moved_beyond_threshold
         || g_state.gesture_is_action_held
         || f->gesture_activated_in_touch
-        || time_ms - f->down_time_ms < (uint64_t)g_state.cfg.long_press_timeout_ms)
+        || time_ms - f->down_time_ms < (uint64_t)g_state.cfg.long_press_timeout_ms) /* int→u64: prevent sign extension */
         return;
 
     LOGD("TICK ptr=%d LP_TIMER_FIRE elapsed=%" PRIu64,
@@ -315,7 +312,7 @@ static void tick_s_hold_timer(TouchFinger* f, GestureFingerCtx* ctx,
     ResolvedBindings resolved = resolve_slot(f, slot);
 
     if (f->single_tap_hold_delay_ms <= 0
-        || time_ms - f->single_tap_hold_timer < (uint64_t)f->single_tap_hold_delay_ms
+        || time_ms - f->single_tap_hold_timer < (uint64_t)f->single_tap_hold_delay_ms /* int→u64: prevent sign extension */
         || g_state.gesture_is_action_held
         || f->cached_has_moved_beyond_threshold
         || resolved.non_drag_count == 0)
@@ -342,12 +339,23 @@ static void reset_dt_ctx(GestureFingerCtx* ctx) {
     ctx->deferred_double.count = 0;
 }
 
+static inline void execute_and_cleanup_deferred(
+    TouchActionResult* restrict result,
+    const TouchBinding* bindings, int count,
+    TouchFinger* f, GestureFingerCtx* ctx)
+{
+    (void)ctx;
+    if (count > 0)
+        execute_actions(result, bindings, count);
+    deactivate_finger(f);
+}
+
 static void tick_dt_timeout(TouchFinger* f, GestureFingerCtx* ctx,
                             TouchActionResult* restrict result, uint64_t time_ms,
                             const GesturePairSlot* slot)
 {
     if (!ctx->dt_waiting
-        || time_ms - ctx->dt_wait_start_time < (uint64_t)g_state.cfg.double_tap_timeout_ms)
+        || time_ms - ctx->dt_wait_start_time < (uint64_t)g_state.cfg.double_tap_timeout_ms) /* int→u64: prevent sign extension */
         return;
 
     LOGD("TICK ptr=%d DT_TIMEOUT uses_fb=%d fallback_cnt=%d deferred_cnt=%d",
@@ -357,24 +365,21 @@ static void tick_dt_timeout(TouchFinger* f, GestureFingerCtx* ctx,
 
     if (slot->is_second_finger) {
         LOGD("TICK ptr=%d DT_TIMEOUT_SDTW fallback_cnt=%d", f->ptr_id, ctx->fallback.count);
-        if (ctx->fallback.count > 0)
-            execute_actions(result, ctx->fallback.items, ctx->fallback.count);
+        execute_and_cleanup_deferred(result, ctx->fallback.items, ctx->fallback.count, f, ctx);
         ctx->fallback.count = 0;
         reset_second_gesture_state();
         TouchFinger* main_finger = find_finger(g_state.gesture_main_ptr_id);
         if (main_finger && finger_can_go_idle(main_finger))
             main_finger->state = GESTURE_STATE_IDLE;
-        deactivate_finger(f);
     } else {
         if (g_state.gesture_deferred_tap_count > 0) {
             LOGD("TICK ptr=%d DT_TIMEOUT_S_FALLBACK cnt=%d",
                 f->ptr_id, g_state.gesture_deferred_tap_count);
-            execute_actions(result, g_state.gesture_deferred_tap,
-                g_state.gesture_deferred_tap_count);
         }
+        execute_and_cleanup_deferred(result, g_state.gesture_deferred_tap,
+            g_state.gesture_deferred_tap_count, f, ctx);
         gesture_clear_deferred_tap();
         reset_main_gesture_state();
-        deactivate_finger(f);
     }
 }
 
@@ -406,7 +411,7 @@ static void tick_deferred_single_tap(TouchFinger* f, GestureFingerCtx* ctx,
     release_held_actions(result);
     f->state = GESTURE_STATE_IDLE;
     g_state.gesture_main_ptr_id = INVALID_PTR_ID;
-    deactivate_finger(f);
+    execute_and_cleanup_deferred(result, NULL, 0, f, ctx);
 }
 
 // =========================================================================
@@ -422,7 +427,7 @@ static bool down_handle_sdtw(TouchFinger* f, GestureFingerCtx* ctx,
         return false;
 
     bool sdtw_time_valid = (time_ms - g_state.second_tap_fallback_time)
-        < (uint64_t)g_state.cfg.double_tap_timeout_ms;
+        < (uint64_t)g_state.cfg.double_tap_timeout_ms; /* int→u64: prevent sign extension */
     float sdtw_dx = f->x - g_state.second_sdtw_ref_x;
     float sdtw_dy = f->y - g_state.second_sdtw_ref_y;
     float sdtw_dist = sqrtf(sdtw_dx * sdtw_dx + sdtw_dy * sdtw_dy);
@@ -732,10 +737,17 @@ static bool move_resolve_drag(
     resolve_fallback_bindings(slot, f, ctx, &fallback_bindings, &fallback_count);
 
     const TouchBinding* drag_binding = NULL; int drag_count = 0;
-    bool drag_ok = resolve_drag_binding(params->drag, params->drag_count,
-        params->non_drag, params->non_drag_count, fallback_bindings, fallback_count,
-        is_d_slot ? press : (g_state.cfg.is_ts && press),
-        slot == SLOT_D2(), &drag_binding, &drag_count);
+    const DragResolveContext resolve_ctx = {
+        .drag = params->drag,
+        .drag_count = params->drag_count,
+        .non_drag = params->non_drag,
+        .non_drag_count = params->non_drag_count,
+        .fallback = fallback_bindings,
+        .fallback_count = fallback_count,
+        .press_on_drag = is_d_slot ? press : (g_state.cfg.is_ts && press),
+        .is_d2_slot = slot == SLOT_D2(),
+    };
+    bool drag_ok = resolve_drag_binding(&resolve_ctx, &drag_binding, &drag_count);
 
     if (!drag_ok && params->non_drag_count > 0) {
         drag_binding = params->non_drag;
@@ -856,8 +868,7 @@ void gesture_branch(TouchFinger* f, GestureFingerCtx* ctx,
 // GESTURE_EVENT_DOWN
 // =========================================================================
 static void handle_down(TouchFinger* f, GestureFingerCtx* ctx,
-                        TouchActionResult* restrict result, uint64_t time_ms,
-                        float dx __attribute__((unused)), float dy __attribute__((unused)))
+                        TouchActionResult* restrict result, uint64_t time_ms)
 {
     g_state.gesture_is_down_event = true;
     LOGD("DOWN ptr=%d state=%d", f->ptr_id, f->state);
@@ -1034,8 +1045,7 @@ static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
 // GESTURE_EVENT_UP
 // =========================================================================
 static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
-                      TouchActionResult* restrict result, uint64_t time_ms,
-                      float dx __attribute__((unused)), float dy __attribute__((unused)))
+                      TouchActionResult* restrict result, uint64_t time_ms)
 {
     g_state.gesture_is_down_event = false;
     f->tap_up_x = f->x;
@@ -1090,8 +1100,7 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
 // GESTURE_EVENT_TICK
 // =========================================================================
 static void handle_tick(TouchFinger* f, GestureFingerCtx* ctx,
-                        TouchActionResult* restrict result, uint64_t time_ms,
-                        float dx __attribute__((unused)), float dy __attribute__((unused)))
+                        TouchActionResult* restrict result, uint64_t time_ms)
 {
     LOGD_MOVE("TICK ptr=%d state=%d lp_timer=%d held=%d moved=%d",
         f->ptr_id, f->state,

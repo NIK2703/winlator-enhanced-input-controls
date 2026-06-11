@@ -12,7 +12,7 @@ static bool validate_dt_confirm(void) {
         __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture", "DT_CONFIRM: skipped - not waiting");
         return false;
     }
-    __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "DT_CONFIRM: pending_dbl=%d pending_deferred_dbl=%d",
+    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture", "DT_CONFIRM: pending_dbl=%d pending_deferred_dbl=%d",
         g_state.gesture_pending_double_count,
         g_state.gesture_pending_deferred_double_count);
     g_state.gesture_double_tap_waiting = false;
@@ -32,7 +32,7 @@ static void sync_dt_ctx(TouchFinger* f) {
     dt_context->post_double_tap_drag = g_state.gesture_post_double_tap_drag;
 }
 
-void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger* f) {
+void double_tap_confirm_internal(TouchActionResult* result, TouchFinger* f) {
     if (!validate_dt_confirm()) return;
 
     int idx = finger_index(f);
@@ -44,9 +44,8 @@ void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger
     bool has_dt_drag = f->bindings.double_tap_drag_count > 0;
 
     if (has_dt) {
-        GesturePairPlan double_plan = gesture_decide_branch(gesture_branch_params(
-            true, has_dt_drag, false, false,
-            g_state.cfg.is_ts, false, 0
+        GesturePairPlan double_plan = gesture_decide_branch(gesture_branch_params_simple(
+            true, has_dt_drag, g_state.cfg.is_ts
         ));
 
         confirm_double_tap(result, double_plan,
@@ -64,42 +63,38 @@ void double_tap_confirm_internal(TouchActionResult* restrict result, TouchFinger
 }
 
 bool resolve_drag_binding(
-    const TouchBinding* xd, int xd_count,
-    const TouchBinding* x,  int x_count,
-    const TouchBinding* fb, int fb_count,
-    bool press_on_drag,
-    bool use_fallback,
+    const DragResolveContext* ctx,
     const TouchBinding** out_binding,
     int* out_count)
 {
-    if (xd_count > 0) {
+    if (ctx->drag_count > 0) {
         __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
-            "RESOLVE_DRAG: tier1_xd xd_cnt=%d type0=%d", xd_count, xd->type);
-        *out_binding = xd;
-        *out_count = xd_count;
+            "RESOLVE_DRAG: tier1_xd xd_cnt=%d type0=%d", ctx->drag_count, ctx->drag->type);
+        *out_binding = ctx->drag;
+        *out_count = ctx->drag_count;
         return true;
     }
-    if (press_on_drag && x_count > 0) {
+    if (ctx->press_on_drag && ctx->non_drag_count > 0) {
         __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
-            "RESOLVE_DRAG: tier2_press_on_drag x_cnt=%d type0=%d", x_count, x->type);
-        *out_binding = x;
-        *out_count = x_count;
+            "RESOLVE_DRAG: tier2_press_on_drag x_cnt=%d type0=%d", ctx->non_drag_count, ctx->non_drag->type);
+        *out_binding = ctx->non_drag;
+        *out_count = ctx->non_drag_count;
         return true;
     }
-    if (use_fallback && fb_count > 0) {
+    if (ctx->is_d2_slot && ctx->fallback_count > 0) {
         __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
-            "RESOLVE_DRAG: tier3_fallback fb_cnt=%d type0=%d", fb_count, fb->type);
-        *out_binding = fb;
-        *out_count = fb_count;
+            "RESOLVE_DRAG: tier3_fallback fb_cnt=%d type0=%d", ctx->fallback_count, ctx->fallback->type);
+        *out_binding = ctx->fallback;
+        *out_count = ctx->fallback_count;
         return true;
     }
     __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
         "RESOLVE_DRAG: NONE xd_cnt=%d press=%d x_cnt=%d use_fb=%d fb_cnt=%d",
-        xd_count, press_on_drag, x_count, use_fallback, fb_count);
+        ctx->drag_count, ctx->press_on_drag, ctx->non_drag_count, ctx->is_d2_slot, ctx->fallback_count);
     return false;
 }
 
-void on_drag_start(TouchFinger* f, TouchActionResult* restrict result) {
+void on_drag_start(TouchFinger* f, TouchActionResult* result) {
     f->single_tap_hold_delay_ms = 0;
     // Execute pending second-finger D2 before clearing, so D2 isn't silently
     // lost when the second finger transitions to DRAGGING (two-finger DTD).
@@ -117,7 +112,7 @@ bool gesture_is_within_tap_distance(float x, float y) {
         && fabsf(y - g_state.gesture_last_tap_up_y) <= g_state.cfg.double_tap_distance_px;
 }
 
-void gesture_cancel_double_tap_wait(TouchActionResult* restrict result) {
+void gesture_cancel_double_tap_wait(TouchActionResult* result) {
     if (!g_state.gesture_double_tap_waiting) return;
     g_state.gesture_double_tap_waiting = false;
     if (g_state.gesture_deferred_tap_count > 0) {
@@ -133,7 +128,7 @@ void gesture_cancel_double_tap_wait(TouchActionResult* restrict result) {
     }
 }
 
-static void gesture_handle_sdtw_timeout(uint64_t time_ms, TouchActionResult* restrict result) {
+static void gesture_handle_sdtw_timeout(uint64_t time_ms, TouchActionResult* result) {
     uint32_t sdtw_mask = GESTURE_MASK(GESTURE_DOUBLE_2ND) | GESTURE_MASK(GESTURE_DOUBLE_DRAG_2ND);
     if ((g_state.cfg.caps_mode_mask & sdtw_mask) && g_state.second_double_tap_waiting
         && time_ms - g_state.second_tap_fallback_time >= (uint64_t)g_state.cfg.double_tap_timeout_ms)
@@ -150,7 +145,7 @@ static void gesture_handle_sdtw_timeout(uint64_t time_ms, TouchActionResult* res
     }
 }
 
-void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
+void gesture_tick(uint64_t time_ms, TouchActionResult* result) {
     // caps gate: must run before the gesture-bindings early return so that
     // stale DT/SDTW flags are cleaned up even when switching to a no-gesture mode.
     if (!g_state.cfg.caps_has_double_tap) {
@@ -161,7 +156,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
 
     if (!g_state.cfg.caps_has_gesture_bindings) return;
 
-    TouchFinger* restrict fingers = g_state.fingers;
+    TouchFinger* fingers = g_state.fingers;
     for (int i = 0; i < MAX_FINGERS; i++) {
         TouchFinger* f = &fingers[i];
         if (!f->active) continue;
@@ -175,7 +170,7 @@ void gesture_tick(uint64_t time_ms, TouchActionResult* restrict result) {
 
 // Execute S on finger-down: start hold timer, defer to drag/up, or execute now.
 // Pass resolved bindings (x = non-drag, x_cnt) instead of hardcoded single_tap.
-void execute_tap_on_finger_down(TouchFinger* f, TouchActionResult* restrict result,
+void execute_tap_on_finger_down(TouchFinger* f, TouchActionResult* result,
     uint64_t time_ms, GesturePairPlan plan, bool force_hold,
     const TouchBinding* x, int x_cnt)
 {
@@ -243,21 +238,19 @@ void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
 // dst/dst_count/dst_max:
 //   D bindings are always copied here regardless of the branch, so that
 //   check_start_drag can skip redundant Sd and PATH 1 fires on finger-up.
-bool confirm_double_tap(TouchActionResult* restrict result,
+bool confirm_double_tap(TouchActionResult* result,
     GesturePairPlan d_plan,
     const TouchBinding* src, int src_count,
     TouchBinding* dst, int* dst_count, int dst_max,
     bool* out_post_dtd)
 {
+    copy_bindings_bounded(src, src_count, dst, dst_count, dst_max);
+
     if (d_plan.pulse_on_up) {
-        copy_bindings_bounded(src, src_count, dst, dst_count, dst_max);
         *out_post_dtd = true;
         return false; // deferred
     } else {
         execute_actions_hold(result, src, src_count);
-        // Still store D bindings in deferred so PATH 1 fires on finger-up
-        // (prevents re-entering DT waiting and allows check_start_drag to skip Sd).
-        copy_bindings_bounded(src, src_count, dst, dst_count, dst_max);
         *out_post_dtd = d_plan.drag_available;
         return true; // executed now
     }

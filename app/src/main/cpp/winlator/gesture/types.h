@@ -4,6 +4,12 @@
 #include "../touch_processor.h"
 
 // ---- Constants ----
+#ifndef MOUSE_BTN_LEFT
+#define MOUSE_BTN_LEFT   0
+#endif
+#ifndef MOUSE_BTN_MIDDLE
+#define MOUSE_BTN_MIDDLE 2
+#endif
 #define FALLBACK_MAX 8
 #define GESTURE_SLOT_COUNT 5
 #define TP_EARLY_EXIT_MS 200
@@ -44,6 +50,11 @@ static inline GestureBranchParams gesture_branch_params(
     p.hold_delay_ms = hold_delay_ms;
     return p;
 }
+
+// Shorthand for the common case: only has_x / has_xd / is_ts vary,
+// everything else is false/0.
+#define gesture_branch_params_simple(has_x, has_xd, is_ts) \
+    gesture_branch_params((has_x), (has_xd), false, false, (is_ts), false, 0)
 
 // Unified decision for ANY non-drag/drag gesture pair.
 // When competing gestures exist for a pair, the non-drag action is deferred:
@@ -90,12 +101,20 @@ bool confirm_double_tap(TouchActionResult* restrict result,
     const TouchBinding* src, int src_count,
     TouchBinding* dst, int* dst_count, int dst_max,
     bool* out_post_dtd);
+
+typedef struct {
+    const TouchBinding* drag;
+    int                 drag_count;
+    const TouchBinding* non_drag;
+    int                 non_drag_count;
+    const TouchBinding* fallback;
+    int                 fallback_count;
+    bool                press_on_drag;
+    bool                is_d2_slot;
+} DragResolveContext;
+
 bool resolve_drag_binding(
-    const TouchBinding* xd, int xd_count,
-    const TouchBinding* x,  int x_count,
-    const TouchBinding* fb, int fb_count,
-    bool press_on_drag,
-    bool use_fallback,
+    const DragResolveContext* ctx,
     const TouchBinding** out_binding,
     int* out_count);
 void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,

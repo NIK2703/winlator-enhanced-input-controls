@@ -10,7 +10,7 @@ static inline int pointer_index(const TouchFinger* f) {
     return (int)((uint32_t)f->ptr_id % MAX_FINGERS);
 }
 
-static inline void gesture_repress_saved_bindings(TouchElement* element, bool had_gest_swipe, bool had_gest_lp, TouchActionResult* restrict result);
+static void gesture_repress_saved_bindings(TouchElement* element, bool had_gest_swipe, bool had_gest_lp, TouchActionResult* restrict result);
 
 typedef struct {
     bool has_gesture;
@@ -29,7 +29,7 @@ typedef struct {
     bool gesture_timer_armed;
 } ElementGestureState;
 
-static inline ElementGestureState save_element_gesture_state(const TouchElement* element) {
+static ElementGestureState save_element_gesture_state(const TouchElement* element) {
     return (ElementGestureState){
         .gesture_swipe_triggered = element->gesture_swipe_triggered,
         .gesture_long_press_triggered = element->gesture_long_press_triggered,
@@ -40,7 +40,7 @@ static inline ElementGestureState save_element_gesture_state(const TouchElement*
     };
 }
 
-static inline void restore_element_gesture_state(TouchElement* element, const ElementGestureState* state) {
+static void restore_element_gesture_state(TouchElement* element, const ElementGestureState* state) {
     element->gesture_swipe_triggered = state->gesture_swipe_triggered;
     element->gesture_long_press_triggered = state->gesture_long_press_triggered;
     element->long_press_arm = state->long_press_arm;
@@ -53,7 +53,7 @@ static inline int element_index(const TouchElement* element) {
     return (int)(element - g_state.elements);
 }
 
-static inline void gesture_restore_first_button_state(TouchFinger* finger, int pointer_index, int saved_hovered_idx,
+static void gesture_restore_first_button_state(TouchFinger* finger, int pointer_index, int saved_hovered_idx,
     const HoverRestoreState* state,
     TrackedButtons* tracked, TouchActionResult* restrict result)
 {
@@ -64,7 +64,7 @@ static inline void gesture_restore_first_button_state(TouchFinger* finger, int p
     TouchElement* prev = &g_state.elements[saved_hovered_idx];
     if (prev != &g_state.elements[tracked->element_indices[0]]) return;
 #ifndef NDEBUG
-    __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "gesture_HOVER restore lp_arm=%d gest_lp=%d gest_timer=%d",
+    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Hover", "gesture_HOVER restore lp_arm=%d gest_lp=%d gest_timer=%d",
         state->lp_arm, state->gest_lp, state->gest_timer);
 #endif
     prev->long_press_arm = state->lp_arm;
@@ -80,7 +80,7 @@ static inline void gesture_restore_first_button_state(TouchFinger* finger, int p
 }
 
 __attribute__((hot))
-static inline bool check_confirm_dt_waiting(TouchFinger* restrict finger, TouchActionResult* restrict result,
+static bool check_confirm_dt_waiting(TouchFinger* restrict finger, TouchActionResult* restrict result,
     TouchFinger* restrict main_finger, bool use_main_bindings)
 {
     if (!g_state.gesture_double_tap_waiting) return false;
@@ -102,7 +102,7 @@ static inline bool check_confirm_dt_waiting(TouchFinger* restrict finger, TouchA
     return true;
 }
 
-static inline void save_pending_resume_action(TouchFinger* main_finger) {
+static void save_pending_resume_action(TouchFinger* main_finger) {
     if (!main_finger || !main_finger->active) return;
     main_finger->pending_resume_action_count = 0;
     if (g_state.gesture_is_action_held) {
@@ -112,7 +112,7 @@ static inline void save_pending_resume_action(TouchFinger* main_finger) {
     }
 }
 
-static inline void cleanup_second_finger_up(TouchActionResult* restrict result) {
+static void cleanup_second_finger_up(TouchActionResult* restrict result) {
     TouchFinger* main = find_finger(g_state.gesture_main_ptr_id);
     if (main && main->pending_resume_action_count > 0) {
         execute_actions_hold(result, main->pending_resume_action, main->pending_resume_action_count);
@@ -122,7 +122,7 @@ static inline void cleanup_second_finger_up(TouchActionResult* restrict result) 
     g_state.gesture_second_ptr_id = INVALID_PTR_ID;
 }
 
-static inline void schedule_pending_release(uint64_t* time_field, int* ptr_field, int* id_field, int ptr_id, uint64_t time_ms) {
+static void schedule_pending_release(uint64_t* time_field, int* ptr_field, int* id_field, int ptr_id, uint64_t time_ms) {
     if (*id_field == ptr_id) {
         *time_field = time_ms + DELAYED_RELEASE_MS;
         *ptr_field = ptr_id;
@@ -130,7 +130,7 @@ static inline void schedule_pending_release(uint64_t* time_field, int* ptr_field
     }
 }
 
-static inline TouchFinger* find_other_dt_finger(TouchFinger* finger) {
+static TouchFinger* find_other_dt_finger(TouchFinger* finger) {
     for (int i = 0; i < MAX_FINGERS; i++) {
         TouchFinger* other = &g_state.fingers[i];
         if (other->active && other->double_tap_original_id_set && other->ptr_id != finger->ptr_id)
@@ -139,7 +139,7 @@ static inline TouchFinger* find_other_dt_finger(TouchFinger* finger) {
     return NULL;
 }
 
-static inline void setup_second_finger_state(void) {
+static void setup_second_finger_state(void) {
     TouchFinger* second_finger = find_finger(g_state.gesture_second_ptr_id);
     if (second_finger) {
         second_finger->is_second_finger = true;
@@ -148,7 +148,7 @@ static inline void setup_second_finger_state(void) {
     g_state.gesture_second_active = true;
 }
 
-static inline void handle_ts_main_finger_down(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, bool was_second_deferred) {
+static void handle_ts_main_finger_down(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, bool was_second_deferred) {
     if (check_confirm_dt_waiting(finger, result, NULL, false)) {
         g_state.gesture_main_ptr_id = finger->ptr_id;
 
@@ -178,7 +178,7 @@ static inline void handle_ts_main_finger_down(TouchFinger* finger, float x, floa
     gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_DOWN, finger->x, finger->y);
 }
 
-static inline void handle_ts_second_finger_down(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result, TouchFinger* main_finger) {
+static void handle_ts_second_finger_down(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result, TouchFinger* main_finger) {
     if (g_state.gesture_second_active) {
         finger->state = GESTURE_STATE_IDLE;
         return;
@@ -203,7 +203,7 @@ static inline void handle_ts_second_finger_down(TouchFinger* finger, uint64_t ti
     gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_DOWN, finger->x, finger->y);
 }
 
-static inline void handle_sim_touch_down(TouchFinger* finger, float x, float y, uint64_t time_ms) {
+static void handle_sim_touch_down(TouchFinger* finger, float x, float y, uint64_t time_ms) {
     int finger_count = active_finger_count();
     if (finger_count == 1) {
         g_state.sim_continue_click = true;
@@ -227,7 +227,7 @@ static inline void handle_sim_touch_down(TouchFinger* finger, float x, float y, 
     }
 }
 
-static inline void handle_tp_finger_down(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, TouchFinger* main_finger, bool is_first, bool is_second) {
+static void handle_tp_finger_down(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, TouchFinger* main_finger, bool is_first, bool is_second) {
     if (is_first) {
         g_state.scrolling = false;
         g_state.scroll_accum_y = 0;
@@ -245,7 +245,7 @@ static inline void handle_tp_finger_down(TouchFinger* finger, float x, float y, 
     gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_DOWN, finger->x, finger->y);
 }
 
-static inline void process_element_hit(TouchElement* element, TouchFinger* finger,
+static void process_element_hit(TouchElement* element, TouchFinger* finger,
     float x, float y, uint64_t time_ms, TouchActionResult* restrict result,
     bool has_passthrough, bool* found_lock, bool* handled, TouchElement** btn)
 {
@@ -268,7 +268,7 @@ static inline void process_element_hit(TouchElement* element, TouchFinger* finge
     }
 }
 
-static inline void hit_test_elements_down(TouchFinger* finger, float x, float y, uint64_t time_ms,
+static void hit_test_elements_down(TouchFinger* finger, float x, float y, uint64_t time_ms,
     TouchActionResult* restrict result, bool has_passthrough,
     bool* found_lock, bool* handled, TouchElement** btn)
 {
@@ -307,25 +307,18 @@ static inline void hit_test_elements_down(TouchFinger* finger, float x, float y,
 }
 
 // ============================================================
-// handle_gesture_down
+// handle_gesture_down — element hit-test & delegation
 // ============================================================
-__attribute__((hot))
-void handle_gesture_down(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
-    finger->gesture_activated_in_touch = false;
-    g_state.main_ptr_id = finger->ptr_id;
-
-    g_state.passthrough_active = false;
-    bool found_lock = false;
-    bool handled = false;
-    TouchElement* elements = g_state.elements;
-    int element_count = g_state.element_count;
+static bool handle_gesture_down_element(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     const bool has_mouse_left = g_state.cfg.caps_has_mouse_left_element;
     const bool has_passthrough = g_state.cfg.caps_has_passthrough_elements;
-    TouchFinger* main_finger = NULL;
+    bool found_lock = false;
+    bool handled = false;
     TouchElement* btn = NULL;
+
     if (has_mouse_left && g_state.pointer_left_enabled) {
-        for (int i = 0; i < element_count; i++) {
-            if (elements[i].bindings[0].type == BINDING_MOUSE_LEFT) {
+        for (int i = 0; i < g_state.element_count; i++) {
+            if (g_state.elements[i].bindings[0].type == BINDING_MOUSE_LEFT) {
                 g_state.pointer_left_enabled = false;
                 break;
             }
@@ -333,7 +326,7 @@ void handle_gesture_down(TouchFinger* finger, float x, float y, uint64_t time_ms
     }
 
     hit_test_elements_down(finger, x, y, time_ms, result, has_passthrough, &found_lock, &handled, &btn);
-    if (found_lock) return;
+    if (found_lock) return true;
 
     // TRACK/HOVER BUTTON
     if (btn == NULL) btn = hit_test_element(x, y);
@@ -358,19 +351,40 @@ void handle_gesture_down(TouchFinger* finger, float x, float y, uint64_t time_ms
             if (!btn->passthrough_touch) handled = true;
         }
     }
-    if (handled) return;
 
-    if (g_state.passthrough_active) {
-        finger->state = GESTURE_STATE_IDLE;
-        if (g_state.gesture_main_ptr_id < 0) {
-            g_state.gesture_main_ptr_id = finger->ptr_id;
-            g_state.gesture_post_double_tap_drag = false;
-            g_state.gesture_double_tap_consumed = false;
-            g_state.gesture_second_active = false;
-        }
-        return;
+    return handled;
+}
+
+// ============================================================
+// handle_gesture_down — passthrough logic
+// ============================================================
+static void handle_gesture_down_passthrough(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+    (void)x; (void)y; (void)time_ms;
+    if (!g_state.passthrough_active) return;
+    finger->state = GESTURE_STATE_IDLE;
+    if (g_state.gesture_main_ptr_id < 0) {
+        g_state.gesture_main_ptr_id = finger->ptr_id;
+        g_state.gesture_post_double_tap_drag = false;
+        g_state.gesture_double_tap_consumed = false;
+        g_state.gesture_second_active = false;
     }
+}
 
+// ============================================================
+// handle_gesture_down
+// ============================================================
+__attribute__((hot))
+void handle_gesture_down(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+    finger->gesture_activated_in_touch = false;
+    g_state.main_ptr_id = finger->ptr_id;
+
+    if (handle_gesture_down_element(finger, x, y, time_ms, result))
+        return;
+
+    handle_gesture_down_passthrough(finger, x, y, time_ms, result);
+    if (g_state.passthrough_active) return;
+
+    TouchFinger* main_finger = NULL;
     if (g_state.gesture_main_ptr_id >= 0) {
         main_finger = find_finger(g_state.gesture_main_ptr_id);
         if (!main_finger || !main_finger->active) {
@@ -404,7 +418,7 @@ void handle_gesture_down(TouchFinger* finger, float x, float y, uint64_t time_ms
     handle_tp_finger_down(finger, x, y, time_ms, result, main_finger, is_first, is_second);
 }
 
-static inline void release_gesture_alternate_bindings(TouchElement* element,
+static void release_gesture_alternate_bindings(TouchElement* element,
     const ElementGestureState* saved, TouchActionResult* restrict result)
 {
     if (saved->gesture_swipe_triggered && !saved->gesture_toggled)
@@ -413,7 +427,7 @@ static inline void release_gesture_alternate_bindings(TouchElement* element,
         release_bindings_list(result, element->element_long_press, element->element_long_press_count);
 }
 
-static inline void press_gesture_alternate_bindings(TouchElement* element,
+static void press_gesture_alternate_bindings(TouchElement* element,
     const ElementGestureState* saved, TouchActionResult* restrict result)
 {
     if (saved->gesture_toggled)
@@ -429,7 +443,7 @@ static inline void press_gesture_alternate_bindings(TouchElement* element,
 // ============================================================
 // handle_toggle_entry — unified toggle entry logic for slide-over
 // ============================================================
-static inline void gesture_repress_saved_bindings(
+static void gesture_repress_saved_bindings(
     TouchElement* element,
     bool had_gest_swipe, bool had_gest_lp,
     TouchActionResult* restrict result)
@@ -441,7 +455,7 @@ static inline void gesture_repress_saved_bindings(
 }
 
 // ============================================================
-static inline void handle_toggle_entry(TouchElement* element, TouchActionResult* restrict result) {
+static void handle_toggle_entry(TouchElement* element, TouchActionResult* restrict result) {
     if (element_is_toggle_active(element)) {
         // Don't deselect via slide-over if a gesture/long-press toggle is still active
         if (element_has_gesture_toggle(element)) {
@@ -469,7 +483,7 @@ static inline void handle_toggle_entry(TouchElement* element, TouchActionResult*
     mark_element_dirty(element);
 }
 
-static inline bool save_hover_state(TouchFinger* finger, HoverRestoreState* out_state, int* out_saved_hovered_idx) {
+static bool save_hover_state(TouchFinger* finger, HoverRestoreState* out_state, int* out_saved_hovered_idx) {
     out_state->has_gesture = false;
     out_state->lp_arm = false;
     out_state->gest_swipe = false;
@@ -495,7 +509,7 @@ static inline bool save_hover_state(TouchFinger* finger, HoverRestoreState* out_
     return out_state->has_gesture;
 }
 
-static inline void handle_toggle_slide_over(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, TouchElement** hit_element, bool* hit_element_valid) {
+static void handle_toggle_slide_over(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, TouchElement** hit_element, bool* hit_element_valid) {
     if (!*hit_element_valid) { *hit_element = hit_test_element(x, y); *hit_element_valid = true; }
     TouchElement* toggle_btn = *hit_element;
     if (toggle_btn && toggle_btn->type == ELEM_BUTTON && toggle_btn->cached_has_toggle) {
@@ -520,7 +534,7 @@ static inline void handle_toggle_slide_over(TouchFinger* finger, float x, float 
 #ifndef NDEBUG
                     int tbi = element_index(toggle_btn);
                     if (!element_is_toggle_active(toggle_btn))
-                        __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "gesture_toggle[%d] SELECT", tbi);
+                        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Hover", "gesture_toggle[%d] SELECT", tbi);
 #endif
                     handle_toggle_entry(toggle_btn, result);
                 }
@@ -533,7 +547,7 @@ static inline void handle_toggle_slide_over(TouchFinger* finger, float x, float 
     }
 }
 
-static inline void handle_track_hover_move(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, HoverRestoreState* hover_state, int saved_hovered_idx, bool* had_element_move) {
+static void handle_track_hover_move(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, HoverRestoreState* hover_state, int saved_hovered_idx, bool* had_element_move) {
     int ptr_idx = pointer_index(finger);
     TrackedButtons* tracked = get_tracked_buttons(finger->ptr_id);
     ActivationMode mode = g_state.activation_mode;
@@ -593,7 +607,7 @@ static inline void handle_track_hover_move(TouchFinger* finger, float x, float y
     }
 }
 
-static inline void handle_cursor_move(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+static void handle_cursor_move(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     int active_count = active_finger_count();
     if (!g_state.cfg.is_tp || g_state.scrolling || active_count > 2) return;
     if (g_state.sim_touch_screen) {
@@ -637,7 +651,7 @@ static inline void handle_cursor_move(TouchFinger* finger, float x, float y, uin
     }
 }
 
-static inline void handle_main_finger_propagate_to_second(float x, float y, uint64_t time_ms,
+static void handle_main_finger_propagate_to_second(float x, float y, uint64_t time_ms,
     TouchActionResult* restrict result, bool is_ts, bool is_tp)
 {
     if (!g_state.gesture_second_active) return;
@@ -653,7 +667,7 @@ static inline void handle_main_finger_propagate_to_second(float x, float y, uint
     }
 }
 
-static inline void handle_second_finger_move(TouchFinger* finger, float x, float y, uint64_t time_ms,
+static void handle_second_finger_move(TouchFinger* finger, float x, float y, uint64_t time_ms,
     TouchActionResult* restrict result, bool is_ts, bool is_tp)
 {
     if (!g_state.gesture_second_active || finger->ptr_id != g_state.gesture_second_ptr_id)
@@ -675,7 +689,7 @@ static inline void handle_second_finger_move(TouchFinger* finger, float x, float
     }
 }
 
-static inline void handle_gesture_move_processing(TouchFinger* finger, float x, float y, uint64_t time_ms,
+static void handle_gesture_move_processing(TouchFinger* finger, float x, float y, uint64_t time_ms,
     TouchActionResult* restrict result, bool is_ts, bool is_tp)
 {
     if (finger->ptr_id == g_state.gesture_main_ptr_id) {
@@ -713,7 +727,7 @@ static inline void handle_gesture_move_processing(TouchFinger* finger, float x, 
     }
 }
 
-static inline bool handle_engaged_element_move(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+static bool handle_engaged_element_move(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     uint8_t cnt = finger->engaged_elem_count;
     bool skip_buttons = (g_state.activation_mode == ACTIVATION_TRACK || g_state.activation_mode == ACTIVATION_HOVER);
     bool had_element_move = false;
@@ -731,7 +745,7 @@ static inline bool handle_engaged_element_move(TouchFinger* finger, float x, flo
     return had_element_move;
 }
 
-static inline bool check_passthrough_engagement(TouchFinger* finger) {
+static bool check_passthrough_engagement(TouchFinger* finger) {
     if (g_state.cfg.caps_has_passthrough_elements) {
         uint8_t count = finger->engaged_elem_count;
         for (uint8_t i = 0; i < count; i++) {
@@ -746,7 +760,7 @@ static inline bool check_passthrough_engagement(TouchFinger* finger) {
 // ============================================================
 // handle_gesture_move — element interaction phase
 // ============================================================
-static inline bool handle_move_button_interactions(
+static bool handle_move_button_interactions(
     TouchFinger* finger, float x, float y, uint64_t time_ms,
     TouchActionResult* restrict result,
     bool has_track_hover, bool has_element_toggle,
@@ -793,7 +807,7 @@ static inline bool handle_move_button_interactions(
 // ============================================================
 // handle_gesture_move — gesture + cursor phase
 // ============================================================
-static inline void handle_move_gesture_and_cursor(
+static void handle_move_gesture_and_cursor(
     TouchFinger* finger, float x, float y, uint64_t time_ms,
     TouchActionResult* restrict result, bool is_ts, bool is_tp)
 {
@@ -807,7 +821,7 @@ static inline void handle_move_gesture_and_cursor(
 __attribute__((hot))
 void handle_gesture_move(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
 #ifndef NDEBUG
-    __android_log_print(ANDROID_LOG_WARN, "Winlator_Hover", "gesture_MOVE ptr=%d x=%.0f y=%.0f engaged_cnt=%d", finger->ptr_id, x, y, finger->active);
+    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Hover", "gesture_MOVE ptr=%d x=%.0f y=%.0f engaged_cnt=%d", finger->ptr_id, x, y, finger->active);
 #endif
 
     const bool is_ts = g_state.cfg.is_ts;
@@ -840,24 +854,28 @@ void handle_gesture_move(TouchFinger* finger, float x, float y, uint64_t time_ms
     finger->last_x = x; finger->last_y = y;
 }
 
-static inline void ts_up_main_finger(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result) {
+static void ts_up_main_finger(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result) {
     g_state.gesture_deferred_second_finger_tap = g_state.gesture_second_active;
     finger->pending_resume_action_count = 0;
     finger->double_tap_original_id_set = false;
     gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_UP, finger->x, finger->y);
 }
 
-static inline void ts_up_second_double_tap_waiting(TouchFinger* finger, TouchActionResult* restrict result) {
-    gesture_clear_second_finger_state();
+static void deactivate_finger_to_idle(TouchFinger* finger) {
+    finger->state = GESTURE_STATE_IDLE;
     deactivate_finger(finger);
 }
 
-static inline void ts_up_original_id_set(TouchFinger* finger, TouchActionResult* restrict result) {
+static void ts_up_second_double_tap_waiting(TouchFinger* finger, TouchActionResult* restrict result) {
+    gesture_clear_second_finger_state();
+    deactivate_finger_to_idle(finger);
+}
+
+static void ts_up_original_id_set(TouchFinger* finger, TouchActionResult* restrict result) {
     if (!g_state.gesture_second_active) {
         release_held_actions(result);
         finger->pending_resume_action_count = 0;
         finger->double_tap_original_id_set = false;
-        finger->state = GESTURE_STATE_IDLE;
         g_state.gesture_main_ptr_id = INVALID_PTR_ID;
         g_state.gesture_second_active = false;
     } else {
@@ -867,19 +885,20 @@ static inline void ts_up_original_id_set(TouchFinger* finger, TouchActionResult*
         g_state.gesture_post_double_tap_drag = false;
         release_held_actions(result);
     }
-    deactivate_finger(finger);
+    deactivate_finger_to_idle(finger);
 }
 
-static inline void ts_up_second_finger(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result) {
+static void ts_up_second_finger(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result) {
     gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_UP, finger->x, finger->y);
     cleanup_second_finger_up(result);
 }
 
 static inline void ts_up_idle_double_tap(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result) {
     gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_UP, finger->x, finger->y);
+    deactivate_finger_to_idle(finger);
 }
 
-static inline void handle_ts_up(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result) {
+static void handle_ts_up(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result) {
     if (finger->ptr_id == g_state.gesture_main_ptr_id) {
         ts_up_main_finger(finger, time_ms, result);
     } else if (g_state.second_double_tap_waiting) {
@@ -897,7 +916,7 @@ static inline void handle_ts_up(TouchFinger* finger, uint64_t time_ms, TouchActi
     }
 }
 
-static inline void handle_tp_up(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result) {
+static void handle_tp_up(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result) {
     if (finger->ptr_id == g_state.gesture_main_ptr_id) {
         finger->pending_resume_action_count = 0;
     }

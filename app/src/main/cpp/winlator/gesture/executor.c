@@ -48,6 +48,19 @@ static int schedule_action(TouchBinding binding, int action_type, uint64_t delay
     return idx;
 }
 
+static void release_modifiers_with_delay(TouchActionResult* restrict result, const TouchBinding* actions, int count, uint64_t mod_release_delay, bool use_schedule) {
+    for (int i = count - 1; i >= 0; i--) {
+        const TouchBinding* b = &actions[i];
+        if (b->type == BINDING_NONE) continue;
+        if (is_modifier_binding(b)) {
+            if (use_schedule)
+                schedule_action(*b, ACT_KEY_RELEASE, mod_release_delay);
+            else
+                add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0);
+        }
+    }
+}
+
 void add_action(TouchActionResult* restrict r, ActionType type, int param0, int param1, int param2) {
     if (r->count >= (int)(sizeof(r->actions) / sizeof(r->actions[0]))) {
         __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "add_action: buffer overflow (type=%d)", type);
@@ -55,48 +68,46 @@ void add_action(TouchActionResult* restrict r, ActionType type, int param0, int 
     }
     r->actions[r->count].type = type;
     switch (type) {
-        case ACT_POINTER_MOVE:
+        case ACT_POINTER_MOVE:          /* param0=x, param1=y */
             r->actions[r->count].pointer_move.x = param0;
             r->actions[r->count].pointer_move.y = param1;
             break;
-        case ACT_POINTER_MOVE_DELTA:
+        case ACT_POINTER_MOVE_DELTA:    /* param0=dx, param1=dy */
             r->actions[r->count].pointer_delta.dx = param0;
             r->actions[r->count].pointer_delta.dy = param1;
             break;
         case ACT_POINTER_BUTTON_PRESS:
-        case ACT_POINTER_BUTTON_RELEASE:
+        case ACT_POINTER_BUTTON_RELEASE: /* param0=button index */
             r->actions[r->count].pointer_button.button = param0;
             break;
         case ACT_KEY_PRESS:
-        case ACT_KEY_RELEASE:
+        case ACT_KEY_RELEASE:           /* param0=keycode, param1=is_down */
             r->actions[r->count].key.keycode = param0;
             r->actions[r->count].key.is_down = param1;
             break;
-        case ACT_MOUSE_EVENT:
+        case ACT_MOUSE_EVENT:           /* param0=flags, param1=dx, param2=dy */
             r->actions[r->count].mouse_event.flags = param0;
             r->actions[r->count].mouse_event.dx = param1;
             r->actions[r->count].mouse_event.dy = param2;
             break;
-        case ACT_SCROLL:
+        case ACT_SCROLL:                /* param0=amount (negative=up, positive=down) */
             r->actions[r->count].scroll.amount = param0;
             break;
-        case ACT_START_MOUSE_MOVE:
+        case ACT_START_MOUSE_MOVE:      /* param0=dx, param1=dy, param2=hold */
             r->actions[r->count].mouse_move.dx = param0;
             r->actions[r->count].mouse_move.dy = param1;
             r->actions[r->count].mouse_move.hold = param2;
             break;
-        case ACT_STOP_MOUSE_MOVE:
+        case ACT_STOP_MOUSE_MOVE:       /* no params */
             r->actions[r->count].mouse_move.dx = 0;
             r->actions[r->count].mouse_move.dy = 0;
             r->actions[r->count].mouse_move.hold = 0;
             break;
-        case ACT_GAMEPAD_STATE:
-            /* Gamepad state uses .key union member: keycode holds button index, is_down holds pressed state.
-               The backend maps this to the appropriate gamepad event. */
+        case ACT_GAMEPAD_STATE:          /* param0=button_index, param1=is_down */
             r->actions[r->count].key.keycode = param0;
             r->actions[r->count].key.is_down = param1;
             break;
-        case ACT_GAMEPAD_AXIS:
+        case ACT_GAMEPAD_AXIS:           /* param0=is_left, param1=axis_x, param2=axis_y */
             r->actions[r->count].gamepad_axis.is_left = param0;
             r->actions[r->count].gamepad_axis.axis_x = param1;
             r->actions[r->count].gamepad_axis.axis_y = param2;
@@ -128,7 +139,7 @@ void release_held_actions(TouchActionResult* restrict result) {
     memset(g_state.gesture_auto_repeat_last_time_held, 0, sizeof(g_state.gesture_auto_repeat_last_time_held));
 }
 
-void release_non_modifiers_first(TouchActionResult* restrict result, const TouchBinding* actions, int count) {
+static void release_non_modifiers_first(TouchActionResult* restrict result, const TouchBinding* actions, int count) {
     for (int i = count - 1; i >= 0; i--)
         if (actions[i].type != BINDING_NONE && !is_modifier_binding(&actions[i]))
             release_binding(result, &actions[i]);
@@ -277,22 +288,8 @@ static void execute_actions_impl(TouchActionResult* restrict result, const Touch
 
     // Release modifier keyboard bindings last in reverse order
     uint64_t press_delay = calc_press_delay(binding_delay, non_mod_count);
-    if (press_delay > 0) {
-        uint64_t mod_release_delay = press_delay + binding_delay;
-        for (int i = count - 1; i >= 0; i--) {
-            const TouchBinding* b = &actions[i];
-            if (b->type == BINDING_NONE) continue;
-            if (is_modifier_binding(b))
-                schedule_action(*b, ACT_KEY_RELEASE, mod_release_delay);
-        }
-    } else {
-        for (int i = count - 1; i >= 0; i--) {
-            const TouchBinding* b = &actions[i];
-            if (b->type == BINDING_NONE) continue;
-            if (is_modifier_binding(b))
-                add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0);
-        }
-    }
+    uint64_t mod_release_delay = press_delay > 0 ? press_delay + binding_delay : 0;
+    release_modifiers_with_delay(result, actions, count, mod_release_delay, press_delay > 0);
 }
 
 void execute_actions(TouchActionResult* restrict result, const TouchBinding* actions, int count) {
@@ -378,8 +375,8 @@ void process_scheduled_actions(TouchActionResult* restrict result, uint64_t time
     if (g_state.scheduled_action_count == 0) return;
     int old_count = g_state.scheduled_action_count;
     ScheduledAction* sched_actions = g_state.scheduled_actions;
-    int count = old_count;
-    for (int i = 0; i < count; i++) {
+    int current_count = old_count;
+    for (int i = 0; i < current_count; i++) {
         ScheduledAction* sa = &sched_actions[i];
         if (!sa->active) continue;
         if (time_ms >= sa->scheduled_time_ms) {

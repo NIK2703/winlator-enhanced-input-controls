@@ -3,18 +3,15 @@
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture", __VA_ARGS__)
 
-#define MOUSE_BTN_LEFT   0
-#define MOUSE_BTN_MIDDLE 2
-
-// Binding group indices — replace magic numbers in g_type_to_group
-#define GROUP_UNMAPPED    0
-#define GROUP_NON_DRAG    1
-#define GROUP_DRAG        2
-#define GROUP_COMP_DT     3
-#define GROUP_COMP_LP     4
-#define GROUP_TP_NON_DRAG 5
-#define GROUP_TP_DRAG     6
-#define GROUP_COUNT       7
+// Binding group indices — names match FingerBindings fields they resolve to
+#define GROUP_UNMAPPED          0
+#define GROUP_SINGLE_TAP        1  // → fb->single_tap
+#define GROUP_DOUBLE_TAP        2  // → fb->double_tap
+#define GROUP_LONG_PRESS        3  // → fb->long_press
+#define GROUP_SINGLE_TAP_DRAG   4  // → fb->single_tap_drag
+#define GROUP_DOUBLE_TAP_DRAG   5  // → fb->double_tap_drag
+#define GROUP_LONG_PRESS_DRAG   6  // → fb->long_press_drag
+#define GROUP_COUNT             7
 
 // ============================================================
 // Per-finger gesture context
@@ -68,70 +65,73 @@ const GesturePairSlot* select_gesture_slot(const TouchFinger* f) {
 // ============================================================
 static const TouchBinding* group_get(int g, const FingerBindings* fb) {
     switch (g) {
-    case GROUP_NON_DRAG:    return fb->single_tap;
-    case GROUP_DRAG:        return fb->double_tap;
-    case GROUP_COMP_DT:     return fb->long_press;
-    case GROUP_COMP_LP:     return fb->single_tap_drag;
-    case GROUP_TP_NON_DRAG: return fb->double_tap_drag;
-    case GROUP_TP_DRAG:     return fb->long_press_drag;
+    case GROUP_SINGLE_TAP:      return fb->single_tap;
+    case GROUP_DOUBLE_TAP:      return fb->double_tap;
+    case GROUP_LONG_PRESS:      return fb->long_press;
+    case GROUP_SINGLE_TAP_DRAG: return fb->single_tap_drag;
+    case GROUP_DOUBLE_TAP_DRAG: return fb->double_tap_drag;
+    case GROUP_LONG_PRESS_DRAG: return fb->long_press_drag;
     default: return NULL;
     }
 }
 
 static int group_get_count(int g, const FingerBindings* fb) {
     switch (g) {
-    case GROUP_NON_DRAG:    return fb->single_tap_count;
-    case GROUP_DRAG:        return fb->double_tap_count;
-    case GROUP_COMP_DT:     return fb->long_press_count;
-    case GROUP_COMP_LP:     return fb->single_tap_drag_count;
-    case GROUP_TP_NON_DRAG: return fb->double_tap_drag_count;
-    case GROUP_TP_DRAG:     return fb->long_press_drag_count;
+    case GROUP_SINGLE_TAP:      return fb->single_tap_count;
+    case GROUP_DOUBLE_TAP:      return fb->double_tap_count;
+    case GROUP_LONG_PRESS:      return fb->long_press_count;
+    case GROUP_SINGLE_TAP_DRAG: return fb->single_tap_drag_count;
+    case GROUP_DOUBLE_TAP_DRAG: return fb->double_tap_drag_count;
+    case GROUP_LONG_PRESS_DRAG: return fb->long_press_drag_count;
     default: return 0;
     }
 }
 
 static bool group_get_cached(int g, const TouchFinger* f) {
     switch (g) {
-    case GROUP_NON_DRAG:    return f->cached_has_active_single_tap;
-    case GROUP_DRAG:        return f->cached_has_active_double_tap;
-    case GROUP_COMP_DT:     return f->cached_has_active_long_press;
-    case GROUP_COMP_LP:     return f->cached_has_active_single_tap_drag;
-    case GROUP_TP_NON_DRAG: return f->cached_has_active_double_tap_drag;
-    case GROUP_TP_DRAG:     return f->cached_has_active_long_press_drag;
+    case GROUP_SINGLE_TAP:      return f->cached_has_active_single_tap;
+    case GROUP_DOUBLE_TAP:      return f->cached_has_active_double_tap;
+    case GROUP_LONG_PRESS:      return f->cached_has_active_long_press;
+    case GROUP_SINGLE_TAP_DRAG: return f->cached_has_active_single_tap_drag;
+    case GROUP_DOUBLE_TAP_DRAG: return f->cached_has_active_double_tap_drag;
+    case GROUP_LONG_PRESS_DRAG: return f->cached_has_active_long_press_drag;
     default: return false;
     }
 }
 
 // Canonical mapping: GestureType → group
 static const int g_type_to_group[GESTURE_TYPE_COUNT] = {
-    [GESTURE_SINGLE_TAP]        = GROUP_NON_DRAG,
-    [GESTURE_LONG_PRESS]        = GROUP_COMP_DT,
-    [GESTURE_DOUBLE_TAP]        = GROUP_DRAG,
-    [GESTURE_SINGLE_TAP_DRAG]   = GROUP_COMP_LP,
-    [GESTURE_LONG_PRESS_DRAG]   = GROUP_TP_DRAG,
-    [GESTURE_DOUBLE_TAP_DRAG]   = GROUP_TP_NON_DRAG,
-    [GESTURE_SINGLE_2ND]        = GROUP_NON_DRAG,
-    [GESTURE_DOUBLE_2ND]        = GROUP_DRAG,
-    [GESTURE_SINGLE_DRAG_2ND]   = GROUP_COMP_LP,
-    [GESTURE_DOUBLE_DRAG_2ND]   = GROUP_TP_NON_DRAG,
+    [GESTURE_SINGLE_TAP]        = GROUP_SINGLE_TAP,
+    [GESTURE_LONG_PRESS]        = GROUP_LONG_PRESS,
+    [GESTURE_DOUBLE_TAP]        = GROUP_DOUBLE_TAP,
+    [GESTURE_SINGLE_TAP_DRAG]   = GROUP_SINGLE_TAP_DRAG,
+    [GESTURE_LONG_PRESS_DRAG]   = GROUP_LONG_PRESS_DRAG,
+    [GESTURE_DOUBLE_TAP_DRAG]   = GROUP_DOUBLE_TAP_DRAG,
+    [GESTURE_SINGLE_2ND]        = GROUP_SINGLE_TAP,
+    [GESTURE_DOUBLE_2ND]        = GROUP_DOUBLE_TAP,
+    [GESTURE_SINGLE_DRAG_2ND]   = GROUP_SINGLE_TAP_DRAG,
+    [GESTURE_DOUBLE_DRAG_2ND]   = GROUP_DOUBLE_TAP_DRAG,
 };
 
-static bool gesture_type_resolve(GestureType type, const FingerBindings* fb,
-                                  const TouchBinding** out, int* out_count, const TouchFinger* f) {
-    if (type < 0 || type >= GESTURE_TYPE_COUNT) { *out = NULL; *out_count = 0; return false; }
+static void gesture_type_resolve_binding(GestureType type, const FingerBindings* fb,
+                                          const TouchBinding** out, int* out_count) {
+    if (type < 0 || type >= GESTURE_TYPE_COUNT) { *out = NULL; *out_count = 0; return; }
     int g = g_type_to_group[type];
-    if (g == GROUP_UNMAPPED) { *out = NULL; *out_count = 0; return false; }
+    if (g == GROUP_UNMAPPED) { *out = NULL; *out_count = 0; return; }
     *out = group_get(g, fb);
     *out_count = group_get_count(g, fb);
-    return f ? group_get_cached(g, f) : false;
+}
+
+static bool gesture_type_resolve_cached(GestureType type, const TouchFinger* f) {
+    if (type < 0 || type >= GESTURE_TYPE_COUNT) return false;
+    int g = g_type_to_group[type];
+    if (g == GROUP_UNMAPPED) return false;
+    return group_get_cached(g, f);
 }
 
 static bool gesture_type_has_binding(GestureType type, const FingerBindings* fb,
                                      const TouchFinger* f) {
-    if (type < 0 || type >= GESTURE_TYPE_COUNT) return false;
-    int g = g_type_to_group[type];
-    if (g == GROUP_UNMAPPED) return false;
-    return f ? group_get_cached(g, f) : false;
+    return gesture_type_resolve_cached(type, f);
 }
 
 void resolve_binding_slot(
@@ -150,8 +150,8 @@ void resolve_binding_slot(
         // NOTE: setup_second_finger_bindings maps 2nd-variant bindings into
         // PRIMARY fields (single_tap ← S2, double_tap ← D2, etc.) and NULLs
         // the 2nd-variant fields. So S2/D2 slots resolve from PRIMARY fields.
-        gesture_type_resolve(slot->bindings_non_drag, fb, non_drag, non_drag_count, NULL);
-        gesture_type_resolve(slot->bindings_drag, fb, drag, drag_count, NULL);
+        gesture_type_resolve_binding(slot->bindings_non_drag, fb, non_drag, non_drag_count);
+        gesture_type_resolve_binding(slot->bindings_drag, fb, drag, drag_count);
     }
 }
 
