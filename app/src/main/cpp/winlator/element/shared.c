@@ -299,6 +299,7 @@ void force_release_element_toggles(TouchElement* e, TouchActionResult* restrict 
         }
         e->selected = false;
         e->visual_active = false;
+        e->visual_gesture_active = false;
         mark_element_dirty(e);
     }
     if (e->gesture_toggled) {
@@ -349,6 +350,7 @@ void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, To
         && !e->gesture_swipe_triggered && !e->gesture_long_press_triggered
         && !e->gesture_toggled && !e->lp_toggled) {
         e->visual_active = false;
+        e->visual_gesture_active = false;
     }
 }
 
@@ -369,8 +371,10 @@ void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     // 3. release_element_bindings has its own early-return for no-binding elements,
     //    but this path must still clean up engaged state and visual state regardless.
     // Toggle buttons that still have any active toggle keep their visual activation
-    if (!element_is_toggle_active(e))
+    if (!element_is_toggle_active(e)) {
         e->visual_active = false;
+        e->visual_gesture_active = false;
+    }
     mark_element_dirty(e);
     // Clean up leaked gesture flags: element-specific up may early-return
     // (e.g., toggle buttons that stay selected) without clearing these,
@@ -429,9 +433,12 @@ void release_element_bindings(TouchElement* e, TouchActionResult* restrict resul
         e->long_press_arm = false;
         e->gesture_timer_armed = false;
         e->visual_long_press_active = false;
+        e->visual_gesture_active = false;
     }
-    if (!element_is_toggle_active(e))
+    if (!element_is_toggle_active(e)) {
         e->visual_active = false;
+        e->visual_gesture_active = false;
+    }
     mark_element_dirty(e);
 }
 
@@ -515,6 +522,7 @@ void element_reset_runtime(TouchElement* e) {
     e->selected = false;
     e->gesture_suppressed = false;
     e->visual_active = false;
+    e->visual_gesture_active = false;
 
     // Bulk-zero gesture flags: long_press_arm, gesture_swipe_triggered,
     // gesture_long_press_triggered, gesture_timer_armed, lp_toggled,

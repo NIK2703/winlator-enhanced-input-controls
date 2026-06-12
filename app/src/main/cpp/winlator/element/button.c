@@ -29,6 +29,7 @@ static inline int element_index(const TouchElement* e) {
 static inline void deselect_button(TouchElement* e) {
     e->selected = false;
     e->visual_active = false;
+    e->visual_gesture_active = false;
     mark_element_dirty(e);
 }
 
@@ -175,6 +176,7 @@ static void handle_default_down(TouchElement* e, bool has_primary, uint64_t time
         if (!has_primary && !e->gesture_swipe_triggered && !e->gesture_long_press_triggered
             && !e->gesture_toggled && !e->lp_toggled) {
             e->visual_active = false;
+            e->visual_gesture_active = false;
             TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (defer_primary)", element_index(e), e->bindings[0].type);
         }
         return;
@@ -196,6 +198,7 @@ static void handle_default_down(TouchElement* e, bool has_primary, uint64_t time
         }
     } else if (!e->cached_has_toggle) {
         e->visual_active = false;
+        e->visual_gesture_active = false;
         TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_down[%d] type=%d visual=0 (no_primary)", element_index(e), e->bindings[0].type);
     }
 }
@@ -224,6 +227,7 @@ static bool handle_gesture_swipe(TouchElement* e, float dx, float dy, bool has_p
             if (dist_sq > gesture_threshold * gesture_threshold) {
                 e->gesture_swipe_triggered = true;
                 if (gf) gf->gesture_activated_in_touch = true;
+                e->visual_gesture_active = true;
                 e->long_press_arm = false;
                 e->gesture_long_press_triggered = false;
                 if (e->button_gesture_haptic > 0)
@@ -272,6 +276,7 @@ static void handle_toggle_move(TouchElement* e, bool has_primary, bool inside, T
         return;
     }
     e->visual_active = false;
+    e->visual_gesture_active = false;
     TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (toggle_track_outside_notsel)", element_index(e), e->bindings[0].type);
 }
 
@@ -305,6 +310,7 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
         && e->activation_mode != ACTIVATION_TRACK && e->activation_mode != ACTIVATION_HOVER) {
         if (!element_is_toggle_active(e) && !e->long_press_arm && !e->gesture_timer_armed) {
             e->visual_active = false;
+            e->visual_gesture_active = false;
         }
         return;
     }
@@ -315,6 +321,7 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
         button_auto_repeat_move(e, inside, time_ms, result);
         if (!inside) {
             e->visual_active = false;
+            e->visual_gesture_active = false;
             TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (auto_repeat_left)", element_index(e), e->bindings[0].type);
         }
         return;
@@ -333,6 +340,7 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
         && !element_has_any_gesture_activity(e)
         && !e->gesture_timer_armed) {
         e->visual_active = false;
+        e->visual_gesture_active = false;
         TP_LOG(ANDROID_LOG_DEBUG, LOG_TAG, "button_move[%d] type=%d visual=0 (none_primary)", element_index(e), e->bindings[0].type);
     }
 }
@@ -358,6 +366,7 @@ static bool handle_button_up_toggle_release(TouchElement* e, TouchActionResult* 
         if (has_primary)
             release_binding(result, &e->bindings[0]);
         e->visual_active = false;
+        e->visual_gesture_active = false;
     }
     e->defer_primary = false;
     mark_element_dirty(e);

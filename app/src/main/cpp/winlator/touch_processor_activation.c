@@ -64,8 +64,10 @@ void activation_deactivate_all(void) {
     TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_deactivate_all count=%d", g_state.element_count);
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
-        if (!element_is_toggle_active(e))
+        if (!element_is_toggle_active(e)) {
             e->visual_active = false;
+            e->visual_gesture_active = false;
+        }
     }
     mark_all_dirty();
 }
@@ -117,8 +119,10 @@ void activation_reset(void) {
     }
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
-        if (!element_is_toggle_active(e))
+        if (!element_is_toggle_active(e)) {
             e->visual_active = false;
+            e->visual_gesture_active = false;
+        }
     }
     mark_all_dirty();
 }

@@ -78,6 +78,7 @@ static void init_element_visuals(TouchElement* e) {
     e->visual_x = (float)e->x;
     e->visual_y = (float)e->y;
     e->visual_active = false;
+    e->visual_gesture_active = false;
     e->engaged = false;
     e->current_ptr_id = -1;
     int idx = (int)(e - g_state.elements);
@@ -558,6 +559,7 @@ static void process_button_gesture_timer(TouchElement* e, int finger_idx, uint64
             e->gesture_swipe_triggered = true;
             if (_gt_f) _gt_f->gesture_activated_in_touch = true;
             e->visual_active = true;
+            e->visual_gesture_active = true;
             mark_element_dirty(e);
             e->gesture_timer_armed = false;
             toggle_alternate_bindings(e, &e->gesture_toggled, e->cached_gesture_has_toggle,
@@ -655,8 +657,10 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
 
         if (__builtin_expect(e->engaged && e->current_ptr_id < 0, 0)) {
             e->engaged = false;
-            if (!element_is_toggle_active(e))
+            if (!element_is_toggle_active(e)) {
                 e->visual_active = false;
+                e->visual_gesture_active = false;
+            }
             mark_element_dirty(e);
         }
 

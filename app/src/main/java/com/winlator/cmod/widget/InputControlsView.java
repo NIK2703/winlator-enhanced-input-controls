@@ -607,7 +607,12 @@ public class InputControlsView extends View {
                 (flags & 4) != 0,
                 (flags & 8) != 0,
                 (flags & 16) != 0,
-                scroll[i]
+                scroll[i],
+                (flags & 64) != 0,
+                (flags & 32) != 0,
+                (flags & 128) != 0,
+                (flags & 256) != 0,
+                (flags & 512) != 0
             );
         }
         Log.w("Winlator_Controls", "syncVisualStates: synced=" + n + " active=" + activeCount);

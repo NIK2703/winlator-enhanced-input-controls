@@ -3,6 +3,7 @@ package com.winlator.cmod.inputcontrols;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.CornerPathEffect;
@@ -14,6 +15,7 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Xfermode;
 import android.os.SystemClock;
 import android.util.Base64;
@@ -135,11 +137,17 @@ public class ControlElement {
     private boolean boundingBoxNeedsUpdate = true;
     private static final int LAYER_FILL = 0;
     private static final int LAYER_COMBINED = 1;
+    private static final int LAYER_GLOW = 2;
+    private static final int LAYER_STROKE_TEXT = 3;
 
     private Bitmap cacheCombined;
     private Bitmap cacheFill;
+    private Bitmap cacheGlow;
+    private Bitmap cacheStrokeText;
     private boolean cacheCombinedDirty = true;
     private boolean cacheFillDirty = true;
+    private boolean cacheGlowDirty = true;
+    private boolean cacheStrokeTextDirty = true;
     private Bitmap dpadPetalStroke;
     private Bitmap dpadPetalFill;
     private boolean dpadCacheDirty = true;
@@ -162,6 +170,11 @@ public class ControlElement {
     private BindPackage gesturePackageVal;
     private boolean buildingCache;
     private boolean active;
+    private boolean gestureActive;
+    private boolean longPressActive;
+    private boolean slotToggled;
+    private boolean lpToggled;
+    private boolean gestureToggled;
     private Range range;
     private byte orientation;
     private PointF currentPosition;
@@ -792,16 +805,19 @@ public class ControlElement {
     public void setCustomIconData(String customIconData) {
         String oldFillKey = visualKey(LAYER_FILL);
         String oldCombinedKey = visualKey(LAYER_COMBINED);
+        String oldStrokeTextKey = visualKey(LAYER_STROKE_TEXT);
         String oldDiskFillKey = diskKey(LAYER_FILL);
         String oldDiskCombinedKey = diskKey(LAYER_COMBINED);
+        String oldDiskStrokeTextKey = diskKey(LAYER_STROKE_TEXT);
         this.customIconData = customIconData != null ? customIconData : "";
         customIcon = null;
         invalidateElementCache();
         sharedPool.remove(oldFillKey);
         sharedPool.remove(oldCombinedKey);
+        sharedPool.remove(oldStrokeTextKey);
         if (inputControlsView != null) {
             File dir = cacheDir();
-            for (String key : new String[]{oldDiskCombinedKey, oldDiskFillKey}) {
+            for (String key : new String[]{oldDiskCombinedKey, oldDiskFillKey, oldDiskStrokeTextKey}) {
                 File f = new File(dir, key + ".png");
                 if (f.exists()) f.delete();
             }
@@ -936,7 +952,7 @@ public class ControlElement {
     }
 
     public boolean isEngaged() {
-        return hasAnyAction() && (active || (hasAnySlotToggle() && selected));
+        return hasAnyAction() && (active || slotToggled || lpToggled || gestureToggled);
     }
 
     public void invalidateElementCache() {
@@ -947,6 +963,8 @@ public class ControlElement {
         colorFilterSecondary = null;
         cacheCombined = null;
         cacheFill = null;
+        cacheGlow = null;
+        cacheStrokeText = null;
         dpadPetalStroke = null;
         dpadPetalFill = null;
         cacheThumbFillActive = null;
@@ -955,13 +973,16 @@ public class ControlElement {
         cacheThumbStrokeSelected = null;
         cacheCombinedDirty = true;
         cacheFillDirty = true;
+        cacheGlowDirty = true;
+        cacheStrokeTextDirty = true;
         dpadCacheDirty = true;
         cacheThumbDirty = true;
         if (inputControlsView != null) {
             File dir = cacheDir();
             String combinedKey = diskKey(LAYER_COMBINED);
             String fillKey = diskKey(LAYER_FILL);
-            for (String name : new String[]{combinedKey, fillKey, fillKey + "_dpad_stroke", fillKey + "_dpad_fill"}) {
+            String strokeTextKey = diskKey(LAYER_STROKE_TEXT);
+            for (String name : new String[]{combinedKey, fillKey, strokeTextKey, fillKey + "_dpad_stroke", fillKey + "_dpad_fill"}) {
                 File f = new File(dir, name + ".png");
                 if (f.exists()) f.delete();
             }
@@ -973,6 +994,8 @@ public class ControlElement {
         dpadPathEffect = null;
         cacheCombined = null;
         cacheFill = null;
+        cacheGlow = null;
+        cacheStrokeText = null;
         dpadPetalStroke = null;
         dpadPetalFill = null;
         cacheThumbFillActive = null;
@@ -981,6 +1004,8 @@ public class ControlElement {
         cacheThumbStrokeSelected = null;
         cacheCombinedDirty = true;
         cacheFillDirty = true;
+        cacheGlowDirty = true;
+        cacheStrokeTextDirty = true;
         dpadCacheDirty = true;
         cacheThumbDirty = true;
     }
@@ -993,6 +1018,10 @@ public class ControlElement {
         } else {
             ensureCombinedCache();
             ensureFillCache();
+            if (type == Type.BUTTON || type == Type.TRACKPAD) {
+                ensureStrokeTextCache();
+                ensureGlowCache();
+            }
             if (type == Type.STICK) ensureThumbCaches();
         }
     }
@@ -1046,11 +1075,16 @@ public class ControlElement {
     private String diskKey(int layer) {
         ControlsProfile p = inputControlsView.getProfile();
         int pid = p != null ? p.id : 0;
-        String prefix = layer == LAYER_FILL ? "f_" : "c_";
+        String prefix;
+        switch (layer) {
+            case LAYER_FILL: prefix = "f_"; break;
+            case LAYER_STROKE_TEXT: prefix = "s_"; break;
+            default: prefix = "c_"; break;
+        }
         String raw = pid + "|" + type.ordinal() + "|" + shape.ordinal() + "|" + elementWidth + "|" + elementHeight
             + "|" + getEffectiveCornerRadius() + "|" + scale
             + "|" + cachedStrokeWidth + "|" + cachedFillAlphaInactive;
-        if (layer == LAYER_FILL || layer == LAYER_COMBINED) {
+        if (layer == LAYER_FILL || layer == LAYER_COMBINED || layer == LAYER_STROKE_TEXT) {
             raw += "|" + getDisplayText() + "|" + iconId;
             if (hasCustomIcon()) raw += "|" + customIconData;
         }
@@ -1064,6 +1098,7 @@ public class ControlElement {
         switch (layer) {
             case 0: return base + "_" + getDisplayText() + "_" + iconId + customSuffix + "_fill";
             case 1: return base + "_" + getDisplayText() + "_" + iconId + customSuffix + "_combined";
+            case 3: return base + "_" + getDisplayText() + "_" + iconId + customSuffix + "_stroketext";
             default: return base;
         }
     }
@@ -1203,8 +1238,23 @@ public class ControlElement {
                     int snappingSize = inputControlsView.getSnappingSize();
                     ControlsProfile prof = inputControlsView.getProfile();
                     float strW = snappingSize * (prof != null ? prof.getStrokeWidth() : 0.2f);
-                    // Draw full button shape as fill mask
-                    drawButtonShape(c, box, snappingSize, paint);
+                    float halfStroke = strW * 0.5f;
+                    // Draw expanded fill shape to match inactive button outer boundary
+                    switch (shape) {
+                        case CIRCLE:
+                            c.drawCircle(box.centerX(), box.centerY(), box.width() * 0.5f + halfStroke, paint);
+                            break;
+                        case RECT: {
+                            float r = getEffectiveCornerRadius() * snappingSize * scale;
+                            if (r > 0)
+                                c.drawRoundRect(box.left - halfStroke, box.top - halfStroke,
+                                    box.right + halfStroke, box.bottom + halfStroke, r, r, paint);
+                            else
+                                c.drawRect(box.left - halfStroke, box.top - halfStroke,
+                                    box.right + halfStroke, box.bottom + halfStroke, paint);
+                            break;
+                        }
+                    }
                     // Punch out text/icon as transparent stencil
                     float cx = box.centerX();
                     float cy = box.centerY();
@@ -1265,6 +1315,142 @@ public class ControlElement {
             saveToDisk(diskKey(LAYER_FILL), cacheFill);
         }
         cacheFillDirty = false;
+    }
+
+    private void ensureGlowCache() {
+        if (!cacheGlowDirty && cacheGlow != null) return;
+        Rect box = getBoundingBox();
+        int snappingSize = inputControlsView.getSnappingSize();
+        float strokeWidth = snappingSize * cachedStrokeWidth;
+        float halfStroke = strokeWidth * 0.5f;
+        float glowThickness = 3.0f * snappingSize;
+        float glowRadius = glowThickness;
+        int blurPad = (int)Math.ceil(glowRadius) + 4;
+        int pad = strokePad() + (int)Math.ceil(glowRadius) + blurPad;
+        int w = box.width() + pad * 2;
+        int h = box.height() + pad * 2;
+        if (w <= 0 || h <= 0) return;
+        cacheGlow = null;
+        cacheGlow = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(cacheGlow);
+        c.translate(-box.left + pad, -box.top + pad);
+        float cx = box.centerX();
+        float cy = box.centerY();
+        Path fullPath = new Path();
+        fullPath.addRect(box.left - pad, box.top - pad, box.right + pad, box.bottom + pad, Path.Direction.CW);
+        Path buttonPath = new Path();
+        switch (shape) {
+            case CIRCLE:
+                buttonPath.addCircle(cx, cy, box.width() * 0.5f + halfStroke, Path.Direction.CW);
+                break;
+            case RECT: {
+                float r = getEffectiveCornerRadius() * snappingSize * scale;
+                if (r > 0) {
+                    buttonPath.addRoundRect(box.left - halfStroke, box.top - halfStroke,
+                        box.right + halfStroke, box.bottom + halfStroke, r, r, Path.Direction.CW);
+                } else {
+                    buttonPath.addRect(box.left - halfStroke, box.top - halfStroke,
+                        box.right + halfStroke, box.bottom + halfStroke, Path.Direction.CW);
+                }
+                break;
+            }
+        }
+        fullPath.op(buttonPath, Path.Op.DIFFERENCE);
+        c.clipPath(fullPath);
+        float expand = glowRadius * 0.3f;
+        Path glowFillPath = new Path();
+        switch (shape) {
+            case CIRCLE:
+                glowFillPath.addCircle(cx, cy, box.width() * 0.5f + halfStroke + expand, Path.Direction.CW);
+                break;
+            case RECT: {
+                float r = getEffectiveCornerRadius() * snappingSize * scale;
+                float er = r + expand;
+                if (r > 0) {
+                    glowFillPath.addRoundRect(
+                        box.left - halfStroke - expand, box.top - halfStroke - expand,
+                        box.right + halfStroke + expand, box.bottom + halfStroke + expand,
+                        er, er, Path.Direction.CW);
+                } else {
+                    glowFillPath.addRect(
+                        box.left - halfStroke - expand, box.top - halfStroke - expand,
+                        box.right + halfStroke + expand, box.bottom + halfStroke + expand,
+                        Path.Direction.CW);
+                }
+                break;
+            }
+        }
+        Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        glowPaint.setStyle(Paint.Style.FILL);
+        glowPaint.setColor(Color.argb(140, 255, 255, 255));
+        glowPaint.setMaskFilter(new BlurMaskFilter(glowRadius * 0.3f, BlurMaskFilter.Blur.NORMAL));
+        c.drawPath(glowFillPath, glowPaint);
+        glowPaint.setMaskFilter(null);
+        glowPaint.setMaskFilter(new BlurMaskFilter(glowRadius, BlurMaskFilter.Blur.NORMAL));
+        c.drawPath(glowFillPath, glowPaint);
+        glowPaint.setMaskFilter(null);
+        cacheGlowDirty = false;
+    }
+
+    private void ensureStrokeTextCache() {
+        if (!cacheStrokeTextDirty && cacheStrokeText != null) return;
+        Rect box = getBoundingBox();
+        int snappingSize = inputControlsView.getSnappingSize();
+        float strokeWidth = snappingSize * cachedStrokeWidth;
+        int pad = strokePad();
+        int w = box.width() + pad * 2;
+        int h = box.height() + pad * 2;
+        if (w <= 0 || h <= 0) return;
+        cacheStrokeText = null;
+        String vKey = visualKey(LAYER_STROKE_TEXT);
+        cacheStrokeText = obtainPoolBitmap(vKey, w, h);
+        if (cacheStrokeText == null) {
+            cacheStrokeText = loadFromDisk(diskKey(LAYER_STROKE_TEXT));
+            if (cacheStrokeText != null && (cacheStrokeText.getWidth() != w || cacheStrokeText.getHeight() != h)) {
+                cacheStrokeText.recycle();
+                cacheStrokeText = null;
+            }
+        }
+        if (cacheStrokeText == null) {
+            cacheStrokeText = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(cacheStrokeText);
+            c.translate(-box.left + pad, -box.top + pad);
+            Paint paint = inputControlsView.getPaint();
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(strokeWidth);
+            paint.setColor(ColorUtils.setAlphaComponent(Color.WHITE, 255));
+            drawButtonShape(c, box, snappingSize, paint);
+            float cx = box.centerX();
+            float cy = box.centerY();
+            paint.setStyle(Paint.Style.FILL);
+            Bitmap customIconBitmap = getCustomIcon();
+            if (customIconBitmap != null) {
+                int margin = (int)(snappingSize * (shape == Shape.CIRCLE ? 2.0f : 1.0f) * scale);
+                int halfSize = (int)((Math.min(box.width(), box.height()) - margin) * 0.5f);
+                drawIconSrcRect.set(0, 0, customIconBitmap.getWidth(), customIconBitmap.getHeight());
+                drawIconDstRect.set((int)(cx - halfSize), (int)(cy - halfSize), (int)(cx + halfSize), (int)(cy + halfSize));
+                c.drawBitmap(customIconBitmap, drawIconSrcRect, drawIconDstRect, paint);
+            }
+            else if (iconId > 0) {
+                Bitmap icon = inputControlsView.getIcon((byte)iconId);
+                if (icon != null) {
+                    int margin = (int)(snappingSize * (shape == Shape.CIRCLE ? 2.0f : 1.0f) * scale);
+                    int halfSize = (int)((Math.min(box.width(), box.height()) - margin) * 0.5f);
+                    drawIconSrcRect.set(0, 0, icon.getWidth(), icon.getHeight());
+                    drawIconDstRect.set((int)(cx - halfSize), (int)(cy - halfSize), (int)(cx + halfSize), (int)(cy + halfSize));
+                    c.drawBitmap(icon, drawIconSrcRect, drawIconDstRect, paint);
+                }
+            } else {
+                String text = getDisplayText();
+                paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, box.width() - strokeWidth * 2), snappingSize * 2 * scale));
+                paint.setTextAlign(Paint.Align.CENTER);
+                paint.setColor(ColorUtils.setAlphaComponent(Color.WHITE, 255));
+                c.drawText(text, x, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
+            }
+            sharedPool.put(vKey, cacheStrokeText);
+            saveToDisk(diskKey(LAYER_STROKE_TEXT), cacheStrokeText);
+        }
+        cacheStrokeTextDirty = false;
     }
 
     private void ensureThumbCaches() {
@@ -1449,18 +1635,69 @@ public class ControlElement {
 
             boolean engaged = isEngaged();
 
-            // 1. Engaged: BUTTON/TRACKPAD — fill cache replaces normal rendering (stencil: icon/text on white bg)
+            // 1. Engaged: BUTTON/TRACKPAD
             if (engaged && (type == Type.BUTTON || type == Type.TRACKPAD)) {
                 int savedColor = paint.getColor();
                 Paint.Style savedStyle = paint.getStyle();
                 float savedStrokeWidth = paint.getStrokeWidth();
-                ensureFillCache();
-                if (cacheFill != null) {
-                    int alpha = colorAlpha;
-                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, alpha));
-                    paint.setStyle(Paint.Style.FILL);
-                    canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, paint);
+                float lwStroke = snappingSize * cachedStrokeWidth;
+                float cx = box.centerX();
+                float cy = box.centerY();
+
+                boolean showFill = ((active && !gestureActive) || slotToggled) && !longPressActive && !(lpToggled && !slotToggled);
+                boolean showStrokeText = (gestureActive || longPressActive || gestureToggled || lpToggled) && !showFill;
+                boolean showGlow = (gestureActive && !longPressActive) || gestureToggled;
+                boolean showOuterStroke = longPressActive || lpToggled;
+
+                if (showFill) {
+                    ensureFillCache();
+                    if (cacheFill != null) {
+                        int fillAlpha = (gestureActive || gestureToggled) ? inactiveAlpha : colorAlpha;
+                        paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillAlpha));
+                        paint.setStyle(Paint.Style.FILL);
+                        canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, paint);
+                    }
                 }
+
+                if (showStrokeText) {
+                    ensureStrokeTextCache();
+                    if (cacheStrokeText != null) {
+                        paint.setColor(primaryColor);
+                        paint.setStyle(Paint.Style.FILL);
+                        canvas.drawBitmap(cacheStrokeText, box.left - pad, box.top - pad, paint);
+                    }
+                }
+
+                if (showGlow) {
+                    ensureGlowCache();
+                    if (cacheGlow != null) {
+                        int glowPad = (cacheGlow.getWidth() - box.width()) / 2;
+                        paint.setColor(ColorUtils.setAlphaComponent(primaryColor, colorAlpha));
+                        paint.setStyle(Paint.Style.FILL);
+                        canvas.drawBitmap(cacheGlow, box.left - glowPad, box.top - glowPad, paint);
+                    }
+                }
+
+                if (showOuterStroke) {
+                    float lpsWidth = lwStroke;
+                    float lpsOff = lwStroke * 0.5f + snappingSize * 0.1f + lpsWidth * 0.5f;
+                    paint.setColor(primaryColor);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(lpsWidth);
+                    switch (shape) {
+                        case CIRCLE:
+                            canvas.drawCircle(cx, cy, box.width() * 0.5f + lpsOff, paint);
+                            break;
+                        case RECT: {
+                            float r = getEffectiveCornerRadius() * snappingSize * scale;
+                            float er = r + lpsOff;
+                            canvas.drawRoundRect(box.left - lpsOff, box.top - lpsOff,
+                                box.right + lpsOff, box.bottom + lpsOff, er, er, paint);
+                            break;
+                        }
+                    }
+                }
+
                 paint.setStyle(savedStyle);
                 paint.setColor(savedColor);
                 paint.setStrokeWidth(savedStrokeWidth);
@@ -1488,12 +1725,27 @@ public class ControlElement {
             }
 
             // 3. Combined layer (shape + text/icon, overlay opacity baked in)
-            ensureCombinedCache();
-            if (cacheCombined != null)
-                canvas.drawBitmap(cacheCombined, box.left - pad, box.top - pad, null);
-            else {
-                draw(canvas);
-                return;
+            if (type == Type.BUTTON) {
+                ensureFillCache();
+                ensureStrokeTextCache();
+                if (cacheFill != null && cacheStrokeText != null) {
+                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, inactiveAlpha));
+                    paint.setStyle(Paint.Style.FILL);
+                    canvas.drawBitmap(cacheFill, box.left - pad, box.top - pad, paint);
+                    paint.setColor(primaryColor);
+                    canvas.drawBitmap(cacheStrokeText, box.left - pad, box.top - pad, paint);
+                } else {
+                    draw(canvas);
+                    return;
+                }
+            } else {
+                ensureCombinedCache();
+                if (cacheCombined != null)
+                    canvas.drawBitmap(cacheCombined, box.left - pad, box.top - pad, null);
+                else {
+                    draw(canvas);
+                    return;
+                }
             }
 
         // 4. Dynamic content
@@ -1639,32 +1891,104 @@ public class ControlElement {
                 float cx = boundingBox.centerX();
                 float cy = boundingBox.centerY();
 
-                paint.setStyle(Paint.Style.FILL);
-                paint.setColor(fillColor);
-                drawButtonShape(canvas, boundingBox, snappingSize, paint);
-                paint.setStyle(Paint.Style.STROKE);
-                paint.setColor(selected ? inputControlsView.getSecondaryColor() : primaryColor);
-                paint.setStrokeWidth(strokeWidth);
-                drawButtonShape(canvas, boundingBox, snappingSize, paint);
+                boolean showFill = ((active && !gestureActive) || slotToggled) && !longPressActive && !(lpToggled && !slotToggled);
+                boolean showStrokeText = (gestureActive || longPressActive || gestureToggled || lpToggled) && !showFill;
+                boolean showGlow = (gestureActive && !longPressActive) || gestureToggled;
+                boolean showOuterStroke = longPressActive || lpToggled;
 
-                Bitmap customIconBitmap = getCustomIcon();
-                if (customIconBitmap != null) {
-                    int margin = (int)(snappingSize * 1.5f * scale);
-                    int halfSize = (int)((Math.min(boundingBox.width(), boundingBox.height()) - margin) * 0.5f);
-                    drawIconSrcRect.set(0, 0, customIconBitmap.getWidth(), customIconBitmap.getHeight());
-                    drawIconDstRect.set((int)(cx - halfSize), (int)(cy - halfSize), (int)(cx + halfSize), (int)(cy + halfSize));
-                    canvas.drawBitmap(customIconBitmap, drawIconSrcRect, drawIconDstRect, paint);
+                if (showFill) {
+                    float halfStroke = strokeWidth * 0.5f;
+                    if (gestureActive || gestureToggled) {
+                        paint.setStyle(Paint.Style.FILL);
+                        paint.setColor(ColorUtils.setAlphaComponent(primaryColor, inactiveFillAlpha));
+                    } else {
+                        paint.setStyle(Paint.Style.FILL);
+                        paint.setColor(fillColor);
+                    }
+                    switch (shape) {
+                        case CIRCLE:
+                            canvas.drawCircle(cx, cy, boundingBox.width() * 0.5f + halfStroke, paint);
+                            break;
+                        case RECT: {
+                            float r = getEffectiveCornerRadius() * snappingSize * scale;
+                            if (r > 0)
+                                canvas.drawRoundRect(boundingBox.left - halfStroke, boundingBox.top - halfStroke,
+                                    boundingBox.right + halfStroke, boundingBox.bottom + halfStroke, r, r, paint);
+                            else
+                                canvas.drawRect(boundingBox.left - halfStroke, boundingBox.top - halfStroke,
+                                    boundingBox.right + halfStroke, boundingBox.bottom + halfStroke, paint);
+                            break;
+                        }
+                    }
                 }
-                else if (iconId > 0) {
-                    drawIcon(canvas, cx, cy, boundingBox.width(), boundingBox.height(), iconId);
+
+                if (showStrokeText) {
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setColor(slotToggled ? inputControlsView.getSecondaryColor() : primaryColor);
+                    paint.setStrokeWidth(strokeWidth);
+                    drawButtonShape(canvas, boundingBox, snappingSize, paint);
+
+                    Bitmap customIconBitmap = getCustomIcon();
+                    if (customIconBitmap != null) {
+                        int margin = (int)(snappingSize * 1.5f * scale);
+                        int halfSize = (int)((Math.min(boundingBox.width(), boundingBox.height()) - margin) * 0.5f);
+                        drawIconSrcRect.set(0, 0, customIconBitmap.getWidth(), customIconBitmap.getHeight());
+                        drawIconDstRect.set((int)(cx - halfSize), (int)(cy - halfSize), (int)(cx + halfSize), (int)(cy + halfSize));
+                        canvas.drawBitmap(customIconBitmap, drawIconSrcRect, drawIconDstRect, paint);
+                    }
+                    else if (iconId > 0) {
+                        drawIcon(canvas, cx, cy, boundingBox.width(), boundingBox.height(), iconId);
+                    }
+                    else {
+                        String text = getDisplayText();
+                        paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, boundingBox.width() - strokeWidth * 2), snappingSize * 2 * scale));
+                        paint.setTextAlign(Paint.Align.CENTER);
+                        paint.setStyle(Paint.Style.FILL);
+                        paint.setColor(primaryColor);
+                        canvas.drawText(text, x, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
+                    }
                 }
-                else {
-                    String text = getDisplayText();
-                    paint.setTextSize(Math.min(getTextSizeForWidth(paint, text, boundingBox.width() - strokeWidth * 2), snappingSize * 2 * scale));
-                    paint.setTextAlign(Paint.Align.CENTER);
-                    paint.setStyle(Paint.Style.FILL);
+
+                if (showGlow) {
+                    ensureGlowCache();
+                    if (cacheGlow != null) {
+                        int glowPad = (cacheGlow.getWidth() - boundingBox.width()) / 2;
+                        int savedColor = paint.getColor();
+                        Paint.Style savedStyle = paint.getStyle();
+                        float savedSW = paint.getStrokeWidth();
+                        paint.setColor(ColorUtils.setAlphaComponent(primaryColor, colorAlpha));
+                        paint.setStyle(Paint.Style.FILL);
+                        canvas.drawBitmap(cacheGlow, boundingBox.left - glowPad, boundingBox.top - glowPad, paint);
+                        paint.setStyle(savedStyle);
+                        paint.setColor(savedColor);
+                        paint.setStrokeWidth(savedSW);
+                    }
+                }
+
+                if (showOuterStroke) {
+                    float lpsWidth = strokeWidth;
+                    float lpsOff = strokeWidth * 0.5f + snappingSize * 0.1f + lpsWidth * 0.5f;
+                    int savedColor = paint.getColor();
+                    Paint.Style savedStyle = paint.getStyle();
+                    float savedSW = paint.getStrokeWidth();
                     paint.setColor(primaryColor);
-                    canvas.drawText(text, x, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(lpsWidth);
+                    switch (shape) {
+                        case CIRCLE:
+                            canvas.drawCircle(cx, cy, boundingBox.width() * 0.5f + lpsOff, paint);
+                            break;
+                        case RECT: {
+                            float r = getEffectiveCornerRadius() * snappingSize * scale;
+                            float er = r + lpsOff;
+                            canvas.drawRoundRect(boundingBox.left - lpsOff, boundingBox.top - lpsOff,
+                                boundingBox.right + lpsOff, boundingBox.bottom + lpsOff, er, er, paint);
+                            break;
+                        }
+                    }
+                    paint.setStyle(savedStyle);
+                    paint.setColor(savedColor);
+                    paint.setStrokeWidth(savedSW);
                 }
 
                 break;
@@ -1915,6 +2239,22 @@ public class ControlElement {
                 float innerRadius = (innerHeight / boundingBox.height()) * radius - (innerStrokeWidth * 0.5f + strokeWidth * 0.5f);
                 paint.setStrokeWidth(innerStrokeWidth);
                 canvas.drawRoundRect(boundingBox.left + offset, boundingBox.top + offset, boundingBox.right - offset, boundingBox.bottom - offset, innerRadius, innerRadius, paint);
+
+                if (engaged && gestureActive) {
+                    ensureGlowCache();
+                    if (cacheGlow != null) {
+                        int glowPad = (cacheGlow.getWidth() - boundingBox.width()) / 2;
+                        int savedColor = paint.getColor();
+                        Paint.Style savedStyle = paint.getStyle();
+                        float savedSW = paint.getStrokeWidth();
+                        paint.setColor(ColorUtils.setAlphaComponent(primaryColor, colorAlpha));
+                        paint.setStyle(Paint.Style.FILL);
+                        canvas.drawBitmap(cacheGlow, boundingBox.left - glowPad, boundingBox.top - glowPad, paint);
+                        paint.setStyle(savedStyle);
+                        paint.setColor(savedColor);
+                        paint.setStrokeWidth(savedSW);
+                    }
+                }
                 break;
             }
         }
@@ -2084,8 +2424,15 @@ public class ControlElement {
     public void syncVisualState(boolean active, float posX, float posY,
                          boolean petalUp, boolean petalRight,
                          boolean petalDown, boolean petalLeft,
-                         float rangeScrollOffset) {
+                         float rangeScrollOffset, boolean gestureActive,
+                         boolean longPressActive, boolean slotToggled,
+                         boolean lpToggled, boolean gestureToggled) {
         this.active = active;
+        this.gestureActive = gestureActive;
+        this.longPressActive = longPressActive;
+        this.slotToggled = slotToggled;
+        this.lpToggled = lpToggled;
+        this.gestureToggled = gestureToggled;
         if (type == Type.D_PAD) {
             states[0] = petalUp;
             states[1] = petalRight;

@@ -808,10 +808,6 @@ if (enableLogs) {
             if (cursorLock) touchpadView.requestPointerCapture();
         } else {
             touchpadView.releasePointerCapture();
-            // Reset native touch processor to clear stale finger/gesture state
-            if (nativeTouchProcessor != null) {
-                nativeTouchProcessor.reset();
-            }
         }
     }
     private void setupWineSystemFiles() {

@@ -95,6 +95,10 @@ static jint nativeSyncVisualState(JNIEnv* env, jclass clazz, jfloatArray positio
         if (g_state.elements[i].petal_active[2]) flags |= 8;
         if (g_state.elements[i].petal_active[3]) flags |= 16;
         if (g_state.elements[i].element_long_press_count > 0 && g_state.elements[i].visual_long_press_active) flags |= 32;
+        if (g_state.elements[i].visual_gesture_active) flags |= 64;
+        if (g_state.elements[i].selected) flags |= 128;
+        if (g_state.elements[i].lp_toggled) flags |= 256;
+        if (g_state.elements[i].gesture_toggled) flags |= 512;
         st[i] = flags;
         if (scroll) scroll[i] = g_state.elements[i].range_scroll_offset;
     }

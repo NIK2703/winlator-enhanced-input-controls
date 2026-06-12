@@ -69,6 +69,7 @@ static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* restr
         btn->selected = false;
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=0 (deselect)", (int)(btn - g_state.elements));
         btn->visual_active = false;
+        btn->visual_gesture_active = false;
     } else {
         for (int k = 0; k < MAX_BINDINGS_PER_ELEMENT; k++) {
             TouchBinding* tb = &btn->bindings[k];
@@ -397,8 +398,10 @@ bool activation_mode_up(int ptr_id, float x, float y, uint64_t time_ms,
             int idx = tb->element_indices[j];
             if (idx < 0 || idx >= g_state.element_count) continue;
             handle_element_up(&g_state.elements[idx], x, y, time_ms, result);
-            if (!element_is_toggle_active(&g_state.elements[idx]))
+            if (!element_is_toggle_active(&g_state.elements[idx])) {
                 g_state.elements[idx].visual_active = false;
+                g_state.elements[idx].visual_gesture_active = false;
+            }
         }
         reset_tracked_slot(tb, pid_slot);
         handled = true;

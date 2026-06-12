@@ -472,6 +472,7 @@ static void handle_toggle_entry(TouchElement* element, TouchActionResult* restri
         }
         element->selected = false;
         element->visual_active = false;
+        element->visual_gesture_active = false;
         mark_element_dirty(element);
         return;
     }

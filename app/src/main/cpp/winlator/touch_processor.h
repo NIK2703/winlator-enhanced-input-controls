@@ -140,6 +140,7 @@ typedef enum {
         bool defer_primary;
         bool auto_repeat_primary_pressed;
         bool visual_long_press_active;
+        bool visual_gesture_active;
         bool cached_lp_has_toggle;
         bool cached_gesture_has_toggle;
         bool cached_bind0_is_gamepad;
