@@ -244,6 +244,70 @@ void toggle_alternate_bindings(TouchElement* e, bool* toggled_flag, bool support
     }
 }
 
+// --- Visual layer computation (pure C, no Java transition) ---
+// Deterministically computes which render layers are active from boolean flags.
+// Called after any flag mutation on BUTTON elements.
+void update_visual_layers(TouchElement* e) {
+    if (e->type != ELEM_BUTTON) return;
+
+    int elem_idx = (int)(e - g_state.elements);
+    bool active = e->visual_active;
+    bool gesture_active = e->gesture_swipe_triggered || e->gesture_long_press_triggered;
+    bool lp_active = e->visual_long_press_active && e->element_long_press_count > 0;
+    bool selected = e->selected;
+    bool gesture_toggled = e->gesture_toggled;
+    bool lp_toggled = e->lp_toggled;
+    bool has_primary = element_has_primary(e);
+
+    // FILL: primary press fill with stencil. Mutually exclusive with STROKE_TEXT.
+    // Requires primary binding. Suppressed during gesture swipe.
+    // During long press: suppressed only when NOT selected (toggle OFF).
+    bool show_fill = has_primary && (active || selected)
+                     && !(gesture_active && !lp_active)
+                     && !(lp_active && !selected)
+                     && !(lp_toggled && !selected);
+
+    // STROKE_TEXT: inactive button outline + text/icon. Only when fill is NOT shown.
+    // Shows on press, gesture, toggle, or long press states.
+    bool show_stroke = !show_fill
+        && (active || lp_active || gesture_toggled || lp_toggled);
+
+    // GLOW: gesture glow halo. Suppressed during long press (lp_active → stroke+outer).
+    bool show_glow = (gesture_active || gesture_toggled) && !lp_active;
+
+    // OUTER_STROKE: long-press outer ring
+    bool show_outer = lp_active || lp_toggled;
+
+    uint32_t layers = 0;
+    if (show_fill)   layers |= VISUAL_LAYER_FILL;
+    if (show_stroke) layers |= VISUAL_LAYER_STROKE_TEXT;
+    if (show_glow)   layers |= VISUAL_LAYER_GLOW;
+    if (show_outer)  layers |= VISUAL_LAYER_OUTER_STROKE;
+
+    uint32_t old_layers = e->visual_layers;
+    e->visual_layers = layers;
+
+    // Pack per-layer alpha (8 bits each)
+    // During long press with primary toggle ON: fill at full opacity (not dimmed).
+    uint8_t fill_a   = show_fill   ? ((gesture_active && !lp_active) ? (uint8_t)e->fill_alpha_inactive : (uint8_t)255) : 0;
+    uint8_t stroke_a = show_stroke ? (uint8_t)255 : 0;
+    uint8_t glow_a   = show_glow   ? (uint8_t)255 : 0;
+    uint8_t outer_a  = show_outer  ? (uint8_t)255 : 0;
+
+    e->visual_alpha = ((uint32_t)outer_a << 24) | ((uint32_t)stroke_a << 16)
+                    | ((uint32_t)fill_a << 8) | (uint32_t)glow_a;
+
+    if (old_layers != layers) {
+        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis",
+            "update_layers[%d] flags: A=%d GA=%d LPA=%d SEL=%d GT=%d LPT=%d HP=%d "
+            "-> layers=0x%02X (F=%d ST=%d G=%d OS=%d) alpha: f=%d s=%d g=%d o=%d",
+            elem_idx,
+            active, gesture_active, lp_active, selected, gesture_toggled, lp_toggled, has_primary,
+            layers, show_fill, show_stroke, show_glow, show_outer,
+            fill_a, stroke_a, glow_a, outer_a);
+    }
+}
+
 void clear_element_gesture_flags(TouchElement* e, bool set_suppressed) {
     e->long_press_arm = false;
     e->gesture_long_press_triggered = false;
@@ -263,6 +327,7 @@ void release_toggled_alternate_bindings(TouchElement* e, TouchActionResult* rest
         release_bindings_list(result, e->element_long_press, e->element_long_press_count);
         e->lp_toggled = false;
     }
+    update_visual_layers(e);
 }
 
 void release_element_petals(TouchElement* e, TouchActionResult* restrict result) {
@@ -299,7 +364,6 @@ void force_release_element_toggles(TouchElement* e, TouchActionResult* restrict 
         }
         e->selected = false;
         e->visual_active = false;
-        e->visual_gesture_active = false;
         mark_element_dirty(e);
     }
     if (e->gesture_toggled) {
@@ -310,6 +374,7 @@ void force_release_element_toggles(TouchElement* e, TouchActionResult* restrict 
         release_bindings_list(result, e->element_long_press, e->element_long_press_count);
         e->lp_toggled = false;
     }
+    update_visual_layers(e);
 }
 
 bool finger_remove_engaged(TouchFinger* f, int16_t elem_idx) {
@@ -350,15 +415,19 @@ void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, To
         && !e->gesture_swipe_triggered && !e->gesture_long_press_triggered
         && !e->gesture_toggled && !e->lp_toggled) {
         e->visual_active = false;
-        e->visual_gesture_active = false;
+        update_visual_layers(e);
     }
 }
 
 void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     int release_ptr_id = e->current_ptr_id;
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_element_up[%d] type=%d ptr=%d", (int)(e - g_state.elements), e->type, e->current_ptr_id);
+    int ei = (int)(e - g_state.elements);
+    TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "ELEMENT_UP[%d] type=%d ptr=%d sel=%d eng=%d has_tog=%d has_ar=%d",
+        ei, e->type, e->current_ptr_id, e->selected, e->engaged, e->cached_has_toggle, e->cached_has_auto_repeat);
     if (e->type >= ELEM_TYPE_COUNT) { e->engaged = false; e->current_ptr_id = -1; return; }
     element_up_table[e->type](e, x, y, time_ms, result);
+    TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "ELEMENT_UP[%d] AFTER_DISPATCH sel=%d eng=%d ptr=%d",
+        ei, e->selected, e->engaged, e->current_ptr_id);
     e->engaged = false;
     e->current_ptr_id = -1;
     // NOTE: Cannot delegate to release_element_bindings() because:
@@ -371,19 +440,14 @@ void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, Touc
     // 3. release_element_bindings has its own early-return for no-binding elements,
     //    but this path must still clean up engaged state and visual state regardless.
     // Toggle buttons that still have any active toggle keep their visual activation
-    if (!element_is_toggle_active(e)) {
-        e->visual_active = false;
-        e->visual_gesture_active = false;
-    }
+    // via visual_layers — visual_active only tracks finger engagement.
+    e->visual_active = false;
     mark_element_dirty(e);
-    // Clean up leaked gesture flags: element-specific up may early-return
-    // (e.g., toggle buttons that stay selected) without clearing these,
-    // leaving gesture bindings pressed forever and breaking future gesture
-    // detection on subsequent finger-downs.
     release_non_toggle_gestures(e, result);
     e->gesture_timer_armed = false;
     e->gesture_swipe_triggered = false;
     e->gesture_long_press_triggered = false;
+    update_visual_layers(e);
     if (release_ptr_id >= 0) {
         TouchFinger* f = find_finger(release_ptr_id);
         if (__builtin_expect(f != NULL, 1))
@@ -406,6 +470,7 @@ void suppress_element_gestures(TouchElement* e, TouchActionResult* restrict resu
         release_bindings_list(result, e->element_gesture, e->element_gesture_count);
     }
     clear_element_gesture_flags(e, true);
+    update_visual_layers(e);
 }
 
 // WHEN: general teardown — releases primary binding (if not sticky/toggle-held) and
@@ -433,13 +498,12 @@ void release_element_bindings(TouchElement* e, TouchActionResult* restrict resul
         e->long_press_arm = false;
         e->gesture_timer_armed = false;
         e->visual_long_press_active = false;
-        e->visual_gesture_active = false;
     }
     if (!element_is_toggle_active(e)) {
         e->visual_active = false;
-        e->visual_gesture_active = false;
     }
     mark_element_dirty(e);
+    update_visual_layers(e);
 }
 
 void touch_finger_cache_bindings_state(TouchFinger* f) {
@@ -522,7 +586,6 @@ void element_reset_runtime(TouchElement* e) {
     e->selected = false;
     e->gesture_suppressed = false;
     e->visual_active = false;
-    e->visual_gesture_active = false;
 
     // Bulk-zero gesture flags: long_press_arm, gesture_swipe_triggered,
     // gesture_long_press_triggered, gesture_timer_armed, lp_toggled,
@@ -550,5 +613,6 @@ void element_reset_runtime(TouchElement* e) {
     e->range_hold_pressed = false;
     e->range_pending_tap_release = false;
     memset(e->petal_active, 0, sizeof(e->petal_active));
+    update_visual_layers(e);
 }
 

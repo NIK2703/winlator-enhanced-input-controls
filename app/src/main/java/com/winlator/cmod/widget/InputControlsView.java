@@ -284,7 +284,6 @@ public class InputControlsView extends View {
             }
         }
         readyToDraw = true;
-        Log.w("Winlator_Controls", "onDraw: profile=" + (profile != null) + " showTouchscreenControls=" + showTouchscreenControls + " elements=" + (profile != null && profile.isElementsLoaded() ? profile.getElements().size() : "N/A") + " cachedRenderingEnabled=" + cachedRenderingEnabled);
 
         if (editMode) {
             drawGrid(canvas);
@@ -593,7 +592,9 @@ public class InputControlsView extends View {
         float[] pos = nativeTouchProcessor.syncPositions;
         int[] st = nativeTouchProcessor.syncStates;
         float[] scroll = nativeTouchProcessor.syncScrollOffsets;
-        int n = nativeTouchProcessor.syncVisualState(pos, st, scroll);
+        int[] vl = nativeTouchProcessor.syncVisualLayers;
+        int[] va = nativeTouchProcessor.syncVisualAlphas;
+        int n = nativeTouchProcessor.syncVisualState(pos, st, scroll, vl, va);
         if (n > count) n = count;
         int activeCount = 0;
         for (int i = 0; i < n; i++) {
@@ -608,20 +609,15 @@ public class InputControlsView extends View {
                 (flags & 8) != 0,
                 (flags & 16) != 0,
                 scroll[i],
-                (flags & 64) != 0,
-                (flags & 32) != 0,
-                (flags & 128) != 0,
-                (flags & 256) != 0,
-                (flags & 512) != 0
+                vl[i],
+                va[i]
             );
         }
-        Log.w("Winlator_Controls", "syncVisualStates: synced=" + n + " active=" + activeCount);
         lastInvalidateMs = now;
         invalidate();
     }
 
     public void tick(long timeMs) {
-        Log.w("Winlator_Controls", "tick: start timeMs=" + timeMs + " nativeTP=" + nativeTouchProcessor);
         if (nativeTouchProcessor != null) {
             try {
                 nativeTouchProcessor.tick(timeMs);
@@ -806,7 +802,6 @@ public class InputControlsView extends View {
         {
             int actionIndex = event.getActionIndex();
             int pointerId = event.getPointerId(actionIndex);
-            Log.w("Winlator_Controls", "onTouchEvent: action=" + event.getActionMasked() + " pointerId=" + pointerId + " x=" + event.getX(actionIndex) + " y=" + event.getY(actionIndex) + " nativeTP=" + nativeTouchProcessor + " editMode=" + editMode);
         }
 
         // Route through native processor

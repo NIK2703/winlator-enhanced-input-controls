@@ -47,6 +47,7 @@ static void restore_element_gesture_state(TouchElement* element, const ElementGe
     element->gesture_timer_armed = state->gesture_timer_armed;
     element->gesture_toggled = state->gesture_toggled;
     element->lp_toggled = state->lp_toggled;
+    if (element->type == ELEM_BUTTON) update_visual_layers(element);
 }
 
 static inline int element_index(const TouchElement* element) {
@@ -68,15 +69,15 @@ static void gesture_restore_first_button_state(TouchFinger* finger, int pointer_
         state->lp_arm, state->gest_lp, state->gest_timer);
 #endif
     prev->long_press_arm = state->lp_arm;
+    prev->gesture_swipe_triggered = state->gest_swipe;
+    prev->gesture_long_press_triggered = state->gest_lp;
+    prev->gesture_timer_armed = state->gest_timer;
     if (state->gest_swipe || state->gest_lp) {
         gesture_repress_saved_bindings(prev, state->gest_swipe, state->gest_lp, result);
         prev->current_ptr_id = finger->ptr_id;
         prev->engaged = true;
-        prev->visual_active = true;
     }
-    prev->gesture_swipe_triggered = state->gest_swipe;
-    prev->gesture_long_press_triggered = state->gest_lp;
-    prev->gesture_timer_armed = state->gest_timer;
+    if (prev->type == ELEM_BUTTON) update_visual_layers(prev);
 }
 
 __attribute__((hot))
@@ -459,7 +460,7 @@ static void handle_toggle_entry(TouchElement* element, TouchActionResult* restri
     if (element_is_toggle_active(element)) {
         // Don't deselect via slide-over if a gesture/long-press toggle is still active
         if (element_has_gesture_toggle(element)) {
-            element->visual_active = true;
+            if (element->type == ELEM_BUTTON) update_visual_layers(element);
             mark_element_dirty(element);
             return;
         }
@@ -471,15 +472,14 @@ static void handle_toggle_entry(TouchElement* element, TouchActionResult* restri
             release_binding(result, &element->bindings[k]);
         }
         element->selected = false;
-        element->visual_active = false;
-        element->visual_gesture_active = false;
+        if (element->type == ELEM_BUTTON) update_visual_layers(element);
         mark_element_dirty(element);
         return;
     }
     if (element_has_primary(element))
         press_binding(result, &element->bindings[0], true);
     element->selected = true;
-    element->visual_active = true;
+    if (element->type == ELEM_BUTTON) update_visual_layers(element);
     element->gesture_timer_armed = true;
     mark_element_dirty(element);
 }

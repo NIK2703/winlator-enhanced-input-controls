@@ -77,34 +77,50 @@ static void visual_state_flush(void) {
 }
 
 // Bulk write all elements' visual state into Java arrays (1 JNI call replaces N×8 ByteBuffer reads)
-static jint nativeSyncVisualState(JNIEnv* env, jclass clazz, jfloatArray positions, jintArray states, jfloatArray scrollOffsets) {
+static jint nativeSyncVisualState(JNIEnv* env, jclass clazz, jfloatArray positions, jintArray states, jfloatArray scrollOffsets, jintArray visualLayers, jintArray visualAlphas) {
     int n = g_state.element_count;
     jfloat* pos = env->GetFloatArrayElements(positions, NULL);
     jint* st = env->GetIntArrayElements(states, NULL);
+    jint* vl = visualLayers ? env->GetIntArrayElements(visualLayers, NULL) : NULL;
+    jint* va = visualAlphas ? env->GetIntArrayElements(visualAlphas, NULL) : NULL;
     jfloat* scroll = scrollOffsets ? env->GetFloatArrayElements(scrollOffsets, NULL) : NULL;
     int max = env->GetArrayLength(positions) / 2;
     if (n > max) n = max;
     int active_count = 0;
     for (int i = 0; i < n; i++) {
-        pos[i*2] = g_state.elements[i].visual_x;
-        pos[i*2+1] = g_state.elements[i].visual_y;
-        int flags = g_state.elements[i].visual_active ? 1 : 0;
-        if (g_state.elements[i].visual_active) active_count++;
-        if (g_state.elements[i].petal_active[0]) flags |= 2;
-        if (g_state.elements[i].petal_active[1]) flags |= 4;
-        if (g_state.elements[i].petal_active[2]) flags |= 8;
-        if (g_state.elements[i].petal_active[3]) flags |= 16;
-        if (g_state.elements[i].element_long_press_count > 0 && g_state.elements[i].visual_long_press_active) flags |= 32;
-        if (g_state.elements[i].visual_gesture_active) flags |= 64;
-        if (g_state.elements[i].selected) flags |= 128;
-        if (g_state.elements[i].lp_toggled) flags |= 256;
-        if (g_state.elements[i].gesture_toggled) flags |= 512;
+        TouchElement* e = &g_state.elements[i];
+        pos[i*2] = e->visual_x;
+        pos[i*2+1] = e->visual_y;
+        int flags = e->visual_active ? 1 : 0;
+        if (e->visual_active) active_count++;
+        if (e->petal_active[0]) flags |= 2;
+        if (e->petal_active[1]) flags |= 4;
+        if (e->petal_active[2]) flags |= 8;
+        if (e->petal_active[3]) flags |= 16;
+        if (e->element_long_press_count > 0 && e->visual_long_press_active) flags |= 32;
+        if (e->visual_layers & VISUAL_LAYER_GLOW) flags |= 64;
+        if (e->selected) flags |= 128;
+        if (e->lp_toggled) flags |= 256;
+        if (e->gesture_toggled) flags |= 512;
+        if (e->visual_layers & VISUAL_LAYER_FILL) flags |= 1024;
+        if (e->visual_layers & VISUAL_LAYER_STROKE_TEXT) flags |= 2048;
         st[i] = flags;
-        if (scroll) scroll[i] = g_state.elements[i].range_scroll_offset;
+        if (vl) vl[i] = (int)e->visual_layers;
+        if (va) va[i] = (int)e->visual_alpha;
+        if (scroll) scroll[i] = e->range_scroll_offset;
+        if (e->visual_layers != 0) {
+            TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis",
+                "JNI_sync[%d] type=%d vl=0x%02X va=0x%08X flags=0x%04X "
+                "raw: A=%d SEL=%d GT=%d LPT=%d LPA=%d",
+                i, (int)e->type, e->visual_layers, e->visual_alpha, flags,
+                e->visual_active, e->selected, e->gesture_toggled, e->lp_toggled,
+                e->visual_long_press_active);
+        }
     }
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "nativeSyncVisualState: count=%d active=%d", n, active_count);
     env->ReleaseFloatArrayElements(positions, pos, 0);
     env->ReleaseIntArrayElements(states, st, 0);
+    if (vl) env->ReleaseIntArrayElements(visualLayers, vl, 0);
+    if (va) env->ReleaseIntArrayElements(visualAlphas, va, 0);
     if (scroll) env->ReleaseFloatArrayElements(scrollOffsets, scroll, 0);
     return (jint)n;
 }
@@ -923,6 +939,14 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
         elems[i].engaged = false;
         for (int p = 0; p < MAX_PETALS; p++) elems[i].petal_active[p] = false;
 
+        TP_LOG(ANDROID_LOG_WARN, "Winlator_JNI", "SET_ELEM[%d] b0=[t=%d k=%d ar=%d tog=%d st=%d] b1=[t=%d k=%d ar=%d tog=%d st=%d] b2=[t=%d k=%d ar=%d tog=%d st=%d] b3=[t=%d k=%d ar=%d tog=%d st=%d] has_tog=%d has_ar=%d",
+            i,
+            elems[i].bindings[0].type, elems[i].bindings[0].keycode, elems[i].bindings[0].auto_repeat, elems[i].bindings[0].toggle, (elems[i].primary_sticky_mask >> 0) & 1,
+            elems[i].bindings[1].type, elems[i].bindings[1].keycode, elems[i].bindings[1].auto_repeat, elems[i].bindings[1].toggle, (elems[i].primary_sticky_mask >> 1) & 1,
+            elems[i].bindings[2].type, elems[i].bindings[2].keycode, elems[i].bindings[2].auto_repeat, elems[i].bindings[2].toggle, (elems[i].primary_sticky_mask >> 2) & 1,
+            elems[i].bindings[3].type, elems[i].bindings[3].keycode, elems[i].bindings[3].auto_repeat, elems[i].bindings[3].toggle, (elems[i].primary_sticky_mask >> 3) & 1,
+            elems[i].cached_has_toggle, elems[i].cached_has_auto_repeat);
+
         env->DeleteLocalRef(je);
     }
 
@@ -1114,7 +1138,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
         {"nativeUpdateConfig", "(Lcom/winlator/cmod/inputcontrols/NativeTouchProcessor$NativeConfig;)V", (void*)nativeUpdateConfig},
         {"nativeGetElementGeometry", "()Ljava/nio/ByteBuffer;", (void*)nativeGetElementGeometry},
         {"nativeGetElementCount", "()I", (void*)nativeGetElementCount},
-        {"nativeSyncVisualState", "([F[I[F)I", (void*)nativeSyncVisualState},
+        {"nativeSyncVisualState", "([F[I[F[I[I)I", (void*)nativeSyncVisualState},
     };
 
     int result = env->RegisterNatives(clazz, methods, sizeof(methods)/sizeof(methods[0]));

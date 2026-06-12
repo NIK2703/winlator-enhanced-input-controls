@@ -618,6 +618,7 @@ void handle_gesture_move(TouchFinger* f, float x, float y, uint64_t time_ms, Tou
 void handle_gesture_up(TouchFinger* f, float x, float y, uint64_t time_ms, TouchActionResult* restrict result);
 
 // --- Element shared helpers (defined in element/shared.c) ---
+void update_visual_layers(TouchElement* e);
 void clear_element_gesture_flags(TouchElement* e, bool set_suppressed);
 void release_toggled_alternate_bindings(TouchElement* e, TouchActionResult* restrict result, bool check_triggered);
 void release_element_petals(TouchElement* e, TouchActionResult* restrict result);

@@ -37,6 +37,7 @@ void activation_activate_at(float x, float y) {
                         TouchElement* e = &g_state.elements[g_state.grid_cell_to_elems[j]];
                         bool hit = point_in_element(x, y, e);
                         e->visual_active = hit;
+                        if (e->type == ELEM_BUTTON) update_visual_layers(e);
                         if (hit) {
                             TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_activate_at[%d] type=%d visual=1 (hit)", (int)(e - g_state.elements), e->type);
                             e->visual_x = x;
@@ -50,6 +51,7 @@ void activation_activate_at(float x, float y) {
         for (int i = 0; i < g_state.element_count; i++) {
             bool hit = point_in_element(x, y, &g_state.elements[i]);
             g_state.elements[i].visual_active = hit;
+            if (g_state.elements[i].type == ELEM_BUTTON) update_visual_layers(&g_state.elements[i]);
             if (hit) {
                 TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_activate_at[%d] type=%d visual=1 (hit)", i, g_state.elements[i].type);
                 g_state.elements[i].visual_x = x;
@@ -65,8 +67,11 @@ void activation_deactivate_all(void) {
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
         if (!element_is_toggle_active(e)) {
-            e->visual_active = false;
-            e->visual_gesture_active = false;
+            if (e->type == ELEM_BUTTON) {
+                update_visual_layers(e);
+            } else {
+                e->visual_active = false;
+            }
         }
     }
     mark_all_dirty();
@@ -120,8 +125,11 @@ void activation_reset(void) {
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
         if (!element_is_toggle_active(e)) {
-            e->visual_active = false;
-            e->visual_gesture_active = false;
+            if (e->type == ELEM_BUTTON) {
+                update_visual_layers(e);
+            } else {
+                e->visual_active = false;
+            }
         }
     }
     mark_all_dirty();

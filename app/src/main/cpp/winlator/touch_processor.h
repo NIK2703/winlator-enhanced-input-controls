@@ -19,6 +19,12 @@ extern "C" {
 #define TRACKPAD_MAX_SPEED 20.0f
 #define BUTTON_MIN_KEEP_PRESSED_MS 300
 
+// --- Visual layer bits (computed by update_visual_layers) ---
+#define VISUAL_LAYER_FILL            (1u << 0)
+#define VISUAL_LAYER_STROKE_TEXT     (1u << 1)
+#define VISUAL_LAYER_GLOW            (1u << 2)
+#define VISUAL_LAYER_OUTER_STROKE    (1u << 3)
+
 // --- Binding types ---
 typedef enum {
     BINDING_NONE = 0,
@@ -123,6 +129,8 @@ typedef enum {
         // === WARM: accessed per-tick but conditionally or via dispatch ===
         int cached_auto_repeat_interval;
         bool visual_active;
+        uint32_t visual_layers;   // bitmask of VISUAL_LAYER_* (computed by update_visual_layers)
+        uint32_t visual_alpha;    // packed 8-bit alpha per layer
         float down_x;
         float down_y;
         uint64_t down_time_ms;
@@ -140,7 +148,6 @@ typedef enum {
         bool defer_primary;
         bool auto_repeat_primary_pressed;
         bool visual_long_press_active;
-        bool visual_gesture_active;
         bool cached_lp_has_toggle;
         bool cached_gesture_has_toggle;
         bool cached_bind0_is_gamepad;

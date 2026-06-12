@@ -314,15 +314,17 @@ public class NativeTouchProcessor {
     private static native ByteBuffer nativeGetElementGeometry();
     private static native int nativeGetElementCount();
     private static native void nativeSetDispatchPacked(int[] buf);
-    private static native int nativeSyncVisualState(float[] positions, int[] states, float[] scrollOffsets);
+    private static native int nativeSyncVisualState(float[] positions, int[] states, float[] scrollOffsets, int[] visualLayers, int[] visualAlphas);
 
     public final float[] syncPositions = new float[200 * 2];
     public final int[] syncStates = new int[200];
     public final float[] syncScrollOffsets = new float[200];
+    public final int[] syncVisualLayers = new int[200];
+    public final int[] syncVisualAlphas = new int[200];
 
-    public int syncVisualState(float[] outPositions, int[] outStates, float[] outScrollOffsets) {
+    public int syncVisualState(float[] outPositions, int[] outStates, float[] outScrollOffsets, int[] outVisualLayers, int[] outVisualAlphas) {
         if (!loaded) return 0;
-        return nativeSyncVisualState(outPositions, outStates, outScrollOffsets);
+        return nativeSyncVisualState(outPositions, outStates, outScrollOffsets, outVisualLayers, outVisualAlphas);
     }
 
     public void init(NativeConfig config) {

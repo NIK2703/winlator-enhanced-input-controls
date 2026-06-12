@@ -49,7 +49,7 @@ const ActivationModeParams ACTIVATION_MODE_HOVER = {
 static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* restrict result, uint64_t time_ms) {
     if (btn->selected) {
         if (element_has_gesture_toggle(btn)) {
-            btn->visual_active = true;
+            update_visual_layers(btn);
             TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=1 (blocked_other_toggle)", (int)(btn - g_state.elements));
             mark_element_dirty(btn);
             return;
@@ -68,8 +68,7 @@ static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* restr
             g_state.gesture_is_action_held = false;
         btn->selected = false;
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=0 (deselect)", (int)(btn - g_state.elements));
-        btn->visual_active = false;
-        btn->visual_gesture_active = false;
+        update_visual_layers(btn);
     } else {
         for (int k = 0; k < MAX_BINDINGS_PER_ELEMENT; k++) {
             TouchBinding* tb = &btn->bindings[k];
@@ -82,7 +81,7 @@ static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* restr
         btn->selected = true;
         btn->auto_repeat_last_time = time_ms;
         TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=1 (select)", (int)(btn - g_state.elements));
-        btn->visual_active = true;
+        update_visual_layers(btn);
     }
     mark_element_dirty(btn);
 }
@@ -399,8 +398,11 @@ bool activation_mode_up(int ptr_id, float x, float y, uint64_t time_ms,
             if (idx < 0 || idx >= g_state.element_count) continue;
             handle_element_up(&g_state.elements[idx], x, y, time_ms, result);
             if (!element_is_toggle_active(&g_state.elements[idx])) {
-                g_state.elements[idx].visual_active = false;
-                g_state.elements[idx].visual_gesture_active = false;
+                if (g_state.elements[idx].type == ELEM_BUTTON)
+                    update_visual_layers(&g_state.elements[idx]);
+                else {
+                    g_state.elements[idx].visual_active = false;
+                }
             }
         }
         reset_tracked_slot(tb, pid_slot);
