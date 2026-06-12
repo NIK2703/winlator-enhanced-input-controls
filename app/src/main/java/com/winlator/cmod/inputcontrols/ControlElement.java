@@ -146,6 +146,11 @@ public class ControlElement {
     public static final int VL_GLOW        = 4;   // bit 2
     public static final int VL_OUTER_STROKE = 8;   // bit 3
 
+    // Per-action visual flags (matches C VF_* defines)
+    public static final int VF_TAP      = 1;
+    public static final int VF_LONG_TAP = 2;
+    public static final int VF_GESTURE  = 4;
+
     private Bitmap cacheCombined;
     private Bitmap cacheFill;
     private Bitmap cacheGlow;
@@ -177,7 +182,9 @@ public class ControlElement {
     private BindPackage longPressPackageVal;
     private BindPackage gesturePackageVal;
     private boolean buildingCache;
-    private boolean active;
+    private boolean tapActive;
+    private boolean longTapActive;
+    private boolean gestureActive;
     private int visualLayers;
     private int visualAlphas;
     private Range range;
@@ -957,7 +964,7 @@ public class ControlElement {
     }
 
     public boolean isEngaged() {
-        return hasAnyAction() && (active || visualLayers != 0);
+        return hasAnyAction() && (tapActive || visualLayers != 0);
     }
 
     public void invalidateElementCache() {
@@ -1191,14 +1198,18 @@ public class ControlElement {
             Canvas c = new Canvas(cacheCombined);
             c.translate(-box.left + pad, -box.top + pad);
             boolean savedSelected = selected;
-            boolean savedActive = active;
+            boolean savedTapActive = tapActive;
+            boolean savedLongTapActive = longTapActive;
+            boolean savedGestureActive = gestureActive;
             boolean[] savedStates = scratchStates;
             scratchStates[0] = states[0];
             scratchStates[1] = states[1];
             scratchStates[2] = states[2];
             scratchStates[3] = states[3];
             selected = false;
-            active = false;
+            tapActive = false;
+            longTapActive = false;
+            gestureActive = false;
             Arrays.fill(states, false);
             inputControlsView.setCacheAlphaOverride(1.0f);
             buildingCache = true;
@@ -1206,7 +1217,9 @@ public class ControlElement {
             buildingCache = false;
             inputControlsView.setCacheAlphaOverride(-1);
             selected = savedSelected;
-            active = savedActive;
+            tapActive = savedTapActive;
+            longTapActive = savedLongTapActive;
+            gestureActive = savedGestureActive;
             states[0] = savedStates[0];
             states[1] = savedStates[1];
             states[2] = savedStates[2];
@@ -1395,7 +1408,7 @@ public class ControlElement {
         }
         Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         glowPaint.setStyle(Paint.Style.FILL);
-        glowPaint.setColor(Color.argb(140, 255, 255, 255));
+        glowPaint.setColor(Color.argb(96, 255, 255, 255));
         glowPaint.setMaskFilter(new BlurMaskFilter(glowRadius * 0.3f, BlurMaskFilter.Blur.NORMAL));
         c.drawPath(glowFillPath, glowPaint);
         glowPaint.setMaskFilter(null);
@@ -2474,10 +2487,10 @@ public class ControlElement {
     }
 
     /**
-     * Ultra-fast visual state sync from C — skips DPAD recomputation.
-     * Petal states are pre-computed in C and passed directly.
+     * Ultra-fast visual state sync from C — receives 3 packed visual flags
+     * (VF_TAP, VF_LONG_TAP, VF_GESTURE) plus pre-computed visual layers.
      */
-    public void syncVisualState(boolean active, float posX, float posY,
+    public void syncVisualState(int visFlags, float posX, float posY,
                          boolean petalUp, boolean petalRight,
                          boolean petalDown, boolean petalLeft,
                          float rangeScrollOffset,
@@ -2485,12 +2498,14 @@ public class ControlElement {
         if (type == Type.BUTTON && visualLayers != 0) {
             android.util.Log.d("Winlator_Vis",
 "Java_sync[@" + Integer.toHexString(hashCode()) + "]" 
-                + " active=" + active
+                + " vf=0x" + Integer.toHexString(visFlags)
                 + " vl=0x" + Integer.toHexString(visualLayers)
                 + " va=0x" + Integer.toHexString(visualAlphas)
                 + " engaged=" + isEngaged());
         }
-        this.active = active;
+        this.tapActive = (visFlags & VF_TAP) != 0;
+        this.longTapActive = (visFlags & VF_LONG_TAP) != 0;
+        this.gestureActive = (visFlags & VF_GESTURE) != 0;
         this.visualLayers = visualLayers;
         this.visualAlphas = visualAlphas;
         if (type == Type.D_PAD) {
@@ -2501,7 +2516,7 @@ public class ControlElement {
         }
         currentPosition.set(posX, posY);
         if (type == Type.RANGE_BUTTON && scroller != null) {
-            scroller.updateVisualState(active, posX, posY, rangeScrollOffset);
+            scroller.updateVisualState(tapActive, posX, posY, rangeScrollOffset);
         }
     }
 

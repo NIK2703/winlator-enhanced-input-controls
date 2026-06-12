@@ -6,7 +6,7 @@ int activation_get_visual_states(float* positions, uint8_t* active, int count) {
     for (int i = 0; i < limit; i++) {
         positions[i * 2] = g_state.elements[i].visual_x;
         positions[i * 2 + 1] = g_state.elements[i].visual_y;
-        active[i] = g_state.elements[i].visual_active ? 1 : 0;
+        active[i] = (g_state.elements[i].visual_flags & VF_TAP) ? 1 : 0;
     }
     return limit;
 }
@@ -15,7 +15,7 @@ bool activation_get_element_visual(int elem_index, float* out_x, float* out_y, b
     if (elem_index < 0 || elem_index >= g_state.element_count) return false;
     if (out_x) *out_x = g_state.elements[elem_index].visual_x;
     if (out_y) *out_y = g_state.elements[elem_index].visual_y;
-    if (out_active) *out_active = g_state.elements[elem_index].visual_active;
+    if (out_active) *out_active = (g_state.elements[elem_index].visual_flags & VF_TAP) != 0;
     return true;
 }
 
@@ -36,7 +36,7 @@ void activation_activate_at(float x, float y) {
                     for (int j = g_state.grid_cell_start[cell]; j < g_state.grid_cell_start[cell + 1]; j++) {
                         TouchElement* e = &g_state.elements[g_state.grid_cell_to_elems[j]];
                         bool hit = point_in_element(x, y, e);
-                        e->visual_active = hit;
+                        if (hit) vis_set(e, VF_TAP); else vis_clear(e, VF_TAP);
                         if (e->type == ELEM_BUTTON) update_visual_layers(e);
                         if (hit) {
                             TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_activate_at[%d] type=%d visual=1 (hit)", (int)(e - g_state.elements), e->type);
@@ -50,7 +50,7 @@ void activation_activate_at(float x, float y) {
     } else {
         for (int i = 0; i < g_state.element_count; i++) {
             bool hit = point_in_element(x, y, &g_state.elements[i]);
-            g_state.elements[i].visual_active = hit;
+            if (hit) vis_set(&g_state.elements[i], VF_TAP); else vis_clear(&g_state.elements[i], VF_TAP);
             if (g_state.elements[i].type == ELEM_BUTTON) update_visual_layers(&g_state.elements[i]);
             if (hit) {
                 TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_activate_at[%d] type=%d visual=1 (hit)", i, g_state.elements[i].type);
@@ -70,7 +70,7 @@ void activation_deactivate_all(void) {
             if (e->type == ELEM_BUTTON) {
                 update_visual_layers(e);
             } else {
-                e->visual_active = false;
+                vis_clear(e, VF_TAP);
             }
         }
     }
@@ -128,7 +128,7 @@ void activation_reset(void) {
             if (e->type == ELEM_BUTTON) {
                 update_visual_layers(e);
             } else {
-                e->visual_active = false;
+                vis_clear(e, VF_TAP);
             }
         }
     }

@@ -179,6 +179,21 @@ static inline void mark_element_dirty(TouchElement* e) {
     g_state.visual_dirty_mask[idx / 32] |= (1u << (idx % 32));
 }
 
+// --- Visual flag helpers (3-flag system) ---
+static inline void vis_set(TouchElement* e, uint8_t flag) {
+    if (!(e->visual_flags & flag)) {
+        e->visual_flags |= flag;
+        mark_element_dirty(e);
+    }
+}
+
+static inline void vis_clear(TouchElement* e, uint8_t flag) {
+    if (e->visual_flags & flag) {
+        e->visual_flags &= ~flag;
+        mark_element_dirty(e);
+    }
+}
+
 static inline void mark_all_dirty(void) {
     int n = g_state.element_count;
     for (int b = 0; b < 4; b++) {
@@ -279,7 +294,7 @@ static inline bool element_has_primary(const TouchElement* e) {
     return e->bindings[0].type != BINDING_NONE;
 }
 static inline bool element_has_any_gesture_activity(const TouchElement* e) {
-    return e->gesture_swipe_triggered || e->gesture_long_press_triggered
+    return (e->visual_flags & (VF_GESTURE | VF_LONG_TAP)) != 0
         || e->gesture_toggled || e->lp_toggled;
 }
 static inline bool element_has_gesture_toggle(const TouchElement* e) {

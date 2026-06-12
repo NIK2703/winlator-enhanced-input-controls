@@ -318,9 +318,12 @@ static bool handle_btn_move_transition(int ptr_id, float x, float y, TouchElemen
         if (f) finger_remove_engaged(f, prev_idx);
     }
 
-    if (curr_idx >= 0 && btn->cached_has_toggle && !btn->gesture_timer_armed) {
+    if (curr_idx >= 0 && btn->cached_has_toggle && !btn->gesture_timer_armed
+        && !btn->cached_has_long_press && !btn->cached_has_gesture) {
         toggle_slide_over(btn, result, time_ms);
         btn->gesture_timer_armed = true;
+        btn->current_ptr_id = ptr_id;
+        btn->engaged = true;
     } else if (curr_idx >= 0) {
         bool already_tracked = is_tracked(tb, curr_idx);
         if (!already_tracked && tb->count < MAX_TRACKED_PER_POINTER) {
@@ -356,9 +359,6 @@ int activation_mode_move_buttons(int ptr_id, float x, float y, uint64_t time_ms,
 
     case BTN_MOVE_ACCUM: {
         if (curr_idx < 0) break;
-        // Original handler TRACK had no toggle activation on move (empty block).
-        // Original activation.c TRACK had toggle_slide_over but it was buggy
-        // (deselected finger-down toggles on first move). Match handler behavior.
         if (!btn->cached_has_toggle) {
             if (!is_tracked(tb, curr_idx) && tb->count < MAX_TRACKED_PER_POINTER) {
                 tb->element_indices[tb->count++] = curr_idx;
@@ -367,6 +367,8 @@ int activation_mode_move_buttons(int ptr_id, float x, float y, uint64_t time_ms,
                     suppress_element_gestures(btn, result);
                 reset_first_tracked_long_press(tb);
             }
+        } else if (btn->current_ptr_id == ptr_id) {
+            handle_element_move(btn, x, y, time_ms, result);
         }
         break;
     }
@@ -401,7 +403,7 @@ bool activation_mode_up(int ptr_id, float x, float y, uint64_t time_ms,
                 if (g_state.elements[idx].type == ELEM_BUTTON)
                     update_visual_layers(&g_state.elements[idx]);
                 else {
-                    g_state.elements[idx].visual_active = false;
+                    vis_clear(&g_state.elements[idx], VF_TAP);
                 }
             }
         }

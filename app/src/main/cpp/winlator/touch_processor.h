@@ -25,6 +25,13 @@ extern "C" {
 #define VISUAL_LAYER_GLOW            (1u << 2)
 #define VISUAL_LAYER_OUTER_STROKE    (1u << 3)
 
+// --- Per-action visual flags (3-flag system) ---
+// Each flag tracks one independent visual activation source.
+// Set/cleared on action activate/deactivate; persistence governed by toggle state.
+#define VF_TAP       (1u << 0)  // Primary tap: finger on element OR tap-toggle ON
+#define VF_LONG_TAP  (1u << 1)  // Long press: LP timer fired OR LP-toggle ON
+#define VF_GESTURE   (1u << 2)  // Gesture: swipe/timer fired OR gesture-toggle ON
+
 // --- Binding types ---
 typedef enum {
     BINDING_NONE = 0,
@@ -128,7 +135,7 @@ typedef enum {
 
         // === WARM: accessed per-tick but conditionally or via dispatch ===
         int cached_auto_repeat_interval;
-        bool visual_active;
+        uint8_t visual_flags;     // VF_TAP | VF_LONG_TAP | VF_GESTURE (per-action visual state)
         uint32_t visual_layers;   // bitmask of VISUAL_LAYER_* (computed by update_visual_layers)
         uint32_t visual_alpha;    // packed 8-bit alpha per layer
         float down_x;

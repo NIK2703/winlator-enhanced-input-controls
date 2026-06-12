@@ -77,7 +77,7 @@ void touch_processor_update_config(const TouchProcessorConfig* config) {
 static void init_element_visuals(TouchElement* e) {
     e->visual_x = (float)e->x;
     e->visual_y = (float)e->y;
-    e->visual_active = false;
+    e->visual_flags = 0;
     e->visual_layers = 0;
     e->visual_alpha = 0;
     e->engaged = false;
@@ -545,6 +545,7 @@ static void process_button_long_press(TouchElement* e, int finger_idx, uint64_t 
             e->gesture_long_press_triggered = true;
             if (_lp_f) _lp_f->gesture_activated_in_touch = true;
             e->visual_long_press_active = true;
+            vis_set(e, VF_LONG_TAP);
             update_visual_layers(e);
             mark_element_dirty(e);
             e->long_press_arm = false;
@@ -568,6 +569,7 @@ static void process_button_gesture_timer(TouchElement* e, int finger_idx, uint64
         if (time_ms - e->down_time_ms >= GESTURE_TIMER_MS) {
             TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "tick[%d] type=%d visual=1 (gesture_timer_fire elapsed=%llu)", (int)(e - g_state.elements), e->type, (unsigned long long)(time_ms - e->down_time_ms));
             e->gesture_swipe_triggered = true;
+            vis_set(e, VF_GESTURE);
             if (_gt_f) _gt_f->gesture_activated_in_touch = true;
             update_visual_layers(e);
             mark_element_dirty(e);

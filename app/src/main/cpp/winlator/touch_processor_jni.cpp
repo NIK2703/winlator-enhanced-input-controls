@@ -13,8 +13,8 @@ static JavaVM* g_jvm = NULL;
 typedef struct {
     float visual_x;
     float visual_y;
-    int32_t visual_active;       // 0 or 1
-    int32_t petal_active[4];     // 0 or 1 each
+    int32_t visual_flags;       // packed: VF_TAP|VF_LONG_TAP|VF_GESTURE | petal[0-3]<<3 | layers<<7
+    int32_t petal_active[4];    // 0 or 1 each
     float range_scroll_offset;
     int32_t visual_long_press;   // 0 or 1 — long press activation visual
     // --- Render fields (Phase 1: native rendering support) ---
@@ -51,7 +51,7 @@ static void visual_state_flush(void) {
             TouchElement* e = &g_state.elements[idx];
             g_visual_buffer[idx].visual_x = e->visual_x;
             g_visual_buffer[idx].visual_y = e->visual_y;
-            g_visual_buffer[idx].visual_active = e->visual_active ? 1 : 0;
+            g_visual_buffer[idx].visual_flags = e->visual_flags;
             g_visual_buffer[idx].petal_active[0] = e->petal_active[0] ? 1 : 0;
             g_visual_buffer[idx].petal_active[1] = e->petal_active[1] ? 1 : 0;
             g_visual_buffer[idx].petal_active[2] = e->petal_active[2] ? 1 : 0;
@@ -64,9 +64,9 @@ static void visual_state_flush(void) {
             g_visual_buffer[idx].color_secondary = e->color_secondary;
             g_visual_buffer[idx].stroke_width = e->stroke_width;
             g_visual_buffer[idx].fill_alpha_inactive = e->fill_alpha_inactive;
-            if (e->visual_active) {
+            if (e->visual_flags) {
                 active_count++;
-                TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "flush[%d] type=%d active=1 pos=(%.0f,%.0f)", idx, (int)e->type, e->visual_x, e->visual_y);
+                TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "flush[%d] type=%d vf=0x%02X pos=(%.0f,%.0f)", idx, (int)e->type, e->visual_flags, e->visual_x, e->visual_y);
             }
             mask &= mask - 1;
         } while (mask);
@@ -91,31 +91,27 @@ static jint nativeSyncVisualState(JNIEnv* env, jclass clazz, jfloatArray positio
         TouchElement* e = &g_state.elements[i];
         pos[i*2] = e->visual_x;
         pos[i*2+1] = e->visual_y;
-        int flags = e->visual_active ? 1 : 0;
-        if (e->visual_active) active_count++;
-        if (e->petal_active[0]) flags |= 2;
-        if (e->petal_active[1]) flags |= 4;
-        if (e->petal_active[2]) flags |= 8;
-        if (e->petal_active[3]) flags |= 16;
-        if (e->element_long_press_count > 0 && e->visual_long_press_active) flags |= 32;
-        if (e->visual_layers & VISUAL_LAYER_GLOW) flags |= 64;
-        if (e->selected) flags |= 128;
-        if (e->lp_toggled) flags |= 256;
-        if (e->gesture_toggled) flags |= 512;
-        if (e->visual_layers & VISUAL_LAYER_FILL) flags |= 1024;
-        if (e->visual_layers & VISUAL_LAYER_STROKE_TEXT) flags |= 2048;
-        st[i] = flags;
+        // Pack flags: bits 0-2 = visual_flags (VF_TAP|VF_LONG_TAP|VF_GESTURE)
+        //             bits 3-6 = petal_active[0-3]
+        //             bits 7-10 = visual layers (FILL|STROKE_TEXT|GLOW|OUTER_STROKE)
+        //             bit 11 = visual_long_press_active
+        int flags = e->visual_flags & 0x7;
+        if (e->petal_active[0]) flags |= (1 << 3);
+        if (e->petal_active[1]) flags |= (1 << 4);
+        if (e->petal_active[2]) flags |= (1 << 5);
+        if (e->petal_active[3]) flags |= (1 << 6);
+        flags |= ((e->visual_layers & 0xF) << 7);
+        if (e->element_long_press_count > 0 && e->visual_long_press_active) flags |= (1 << 11);
+        if (e->visual_flags) active_count++;
         if (vl) vl[i] = (int)e->visual_layers;
         if (va) va[i] = (int)e->visual_alpha;
         if (scroll) scroll[i] = e->range_scroll_offset;
         if (e->visual_layers != 0) {
             TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis",
-                "JNI_sync[%d] type=%d vl=0x%02X va=0x%08X flags=0x%04X "
-                "raw: A=%d SEL=%d GT=%d LPT=%d LPA=%d",
-                i, (int)e->type, e->visual_layers, e->visual_alpha, flags,
-                e->visual_active, e->selected, e->gesture_toggled, e->lp_toggled,
-                e->visual_long_press_active);
+                "JNI_sync[%d] type=%d vf=0x%02X vl=0x%02X va=0x%08X flags=0x%04X",
+                i, (int)e->type, e->visual_flags, e->visual_layers, e->visual_alpha, flags);
         }
+        st[i] = flags;
     }
     env->ReleaseFloatArrayElements(positions, pos, 0);
     env->ReleaseIntArrayElements(states, st, 0);

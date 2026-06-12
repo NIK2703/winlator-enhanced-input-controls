@@ -595,8 +595,7 @@ static void handle_track_hover_move(TouchFinger* finger, float x, float y, uint6
         gesture_restore_first_button_state(finger, ptr_idx, saved_hovered_idx,
             hover_state, tracked, result);
 
-        if (curr_idx >= 0 && tracked->count > 0 && curr_idx == tracked->element_indices[0]
-            && !g_state.elements[curr_idx].cached_has_toggle) {
+        if (curr_idx >= 0 && tracked->count > 0 && curr_idx == tracked->element_indices[0]) {
             handle_element_move(&g_state.elements[curr_idx], x, y, time_ms, result);
             *had_element_move = true;
         }

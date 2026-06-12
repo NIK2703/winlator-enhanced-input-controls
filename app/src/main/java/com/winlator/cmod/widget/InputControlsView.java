@@ -600,14 +600,16 @@ public class InputControlsView extends View {
         for (int i = 0; i < n; i++) {
             ControlElement e = elements.get(i);
             int flags = st[i];
-            if ((flags & 1) != 0) activeCount++;
+            int visFlags = flags & 0x7;                        // bits 0-2: VF_TAP|VF_LONG_TAP|VF_GESTURE
+            if (visFlags != 0) activeCount++;
+            boolean petalUp    = (flags & (1 << 3)) != 0;     // bit 3
+            boolean petalRight = (flags & (1 << 4)) != 0;     // bit 4
+            boolean petalDown  = (flags & (1 << 5)) != 0;     // bit 5
+            boolean petalLeft  = (flags & (1 << 6)) != 0;     // bit 6
             e.syncVisualState(
-                (flags & 1) != 0,
+                visFlags,
                 pos[i*2], pos[i*2+1],
-                (flags & 2) != 0,
-                (flags & 4) != 0,
-                (flags & 8) != 0,
-                (flags & 16) != 0,
+                petalUp, petalRight, petalDown, petalLeft,
                 scroll[i],
                 vl[i],
                 va[i]

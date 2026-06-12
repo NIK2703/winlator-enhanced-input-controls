@@ -21,10 +21,10 @@ bool activation_get_element_visual(int elem_index, float* out_x, float* out_y, b
 
 // --- Batch Activation Operations ---
 
-// Activate all elements at the given point (sets visual_active for elements containing the point)
+// Activate all elements at the given point (sets VF_TAP for elements containing the point)
 void activation_activate_at(float x, float y);
 
-// Deactivate all elements (clears all visual_active flags)
+// Deactivate all elements (clears all VF_TAP flags)
 void activation_deactivate_all(void);
 
 // Get the number of tracked buttons for a given pointer
