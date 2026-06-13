@@ -228,7 +228,7 @@ static void handle_tp_finger_down(TouchFinger* finger, float x, float y, uint64_
     if (is_first) {
         g_state.scrolling = false;
         g_state.scroll_accum_y = 0;
-    } else if (is_second && !g_state.gesture_second_active) {
+    } else if (is_second) {
         save_pending_resume_action(main_finger);
         release_held_actions(result);
     }
@@ -237,7 +237,7 @@ static void handle_tp_finger_down(TouchFinger* finger, float x, float y, uint64_
         handle_sim_touch_down(finger, x, y, time_ms);
     }
 
-    if (is_second && !g_state.gesture_second_active)
+    if (is_second)
         setup_second_finger_bindings(finger);
     gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_DOWN, finger->x, finger->y);
 }

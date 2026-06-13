@@ -7,7 +7,6 @@
 #include <fstream>
 #include <algorithm>
 #include <mutex>
-#include <set>
 
 #include <fcntl.h>
 #include <dirent.h>
@@ -60,10 +59,9 @@ static bool lazy_init_done = false;
 static const char *hook_dir = nullptr;
 static bool vibration_enabled = true;
 volatile sig_atomic_t stop_flag = 0;
-static std::set<int> closed_fds;
 
 // POD flag — zero in BSS at load time, set to 1 after all C++ statics
-// (controller_map, mutex, closed_fds, ff_effects) are constructed.
+// (controller_map, mutex, ff_effects) are constructed.
 // During __libc_preinit_impl hooks fire before our .init_array runs;
 // this guard makes them pass through via syscall without touching C++ objects.
 volatile int g_hooks_ready = 0;
@@ -173,7 +171,7 @@ void send_vibration(int strong, int weak, uint16_t duration_ms, uint16_t slot) {
 
 __attribute__((constructor))
 static void library_init() {
-    // C++ statics (controller_map, mutex, closed_fds, ff_effects) are done.
+    // C++ statics (controller_map, mutex, ff_effects) are done.
     g_hooks_ready = 1;
 	// Deferred to lazy_init() — getenv() in constructors crashes
 	// on Android 13+ (MIUI/HyperOS) when loaded via LD_PRELOAD
@@ -262,7 +260,6 @@ EXPORT int open(const char *pathname, int flags, ...) {
 		Logger::log("Adding controller, fd %d event %s\n", fd, get_event(pathname));
 		{
 		    std::lock_guard<std::mutex> lock(controller_map_mutex);
-		    closed_fds.erase(fd);
 		    controller_map[fd] = strdup(get_event(pathname));
 		}
     }
@@ -307,7 +304,6 @@ EXPORT int openat(int dirfd, const char *pathname, int flags, ...) {
         Logger::log("Adding controller, fd %d event %s\n", fd, get_event(pathname));
         {
             std::lock_guard<std::mutex> lock(controller_map_mutex);
-            closed_fds.erase(fd);
             controller_map[fd] = strdup(get_event(pathname));
         }
     }
@@ -640,13 +636,6 @@ EXPORT int close(int fd) {
 
 	{
 	    std::lock_guard<std::mutex> lock(controller_map_mutex);
-	    if (closed_fds.count(fd)) {
-	        return 0;
-	    }
-	    // closed_fds is bounded by process lifetime: the OS recycles fd numbers,
-	    // and each fd is inserted at most once. The set cannot grow beyond the
-	    // maximum fd value the kernel assigns to this process.
-	    closed_fds.insert(fd);
 	    auto controller = controller_map.find(fd);
 	    if (controller != controller_map.end()) {
 	        Logger::log("Removing controller, fd %d event %s\n", controller->first, controller->second);
@@ -670,7 +659,6 @@ EXPORT ssize_t read(int fd, void *buf, size_t count) {
         int flags = fcntl(fd, F_GETFL);
         bool isNonBlock = flags & O_NONBLOCK;
         bytes_read = syscall(SYS_read, fd, buf, count);
-        int empty_retries = 0;
         setup_signal_handler();
         while(bytes_read == 0) {
             struct stat statbuf;
@@ -680,9 +668,6 @@ EXPORT ssize_t read(int fd, void *buf, size_t count) {
                 return -1;
             }
             if (isNonBlock) {
-                break;
-            }
-            if (++empty_retries > 50) {
                 break;
             }
             if (stop_flag) {
@@ -806,7 +791,7 @@ EXPORT ssize_t writev(int fd, const struct iovec *iov, int iovcnt) {
       filtered[filtered_count++] = iov[i];
     }
     if (filtered_count == 0)
-      return 0;
+      return (ssize_t)(iovcnt * sizeof(struct input_event));
     ssize_t written = real_writev(fd, filtered, filtered_count);
     if (written >= 0) {
         size_t total = 0;
