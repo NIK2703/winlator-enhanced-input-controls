@@ -186,7 +186,6 @@ void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
     if (__builtin_expect(g_state.gesture_double_tap_waiting, 0)) {
         gesture_cancel_double_tap_wait(result);
     }
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_element_down[%d] type=%d ptr=%d x=%.0f y=%.0f", (int)(e - g_state.elements), e->type, ptr_id, x, y);
     if (__builtin_expect(e->current_ptr_id >= 0, 0)) {
         return;
     }
@@ -269,9 +268,9 @@ void update_visual_layers(TouchElement* e) {
     bool show_stroke = !show_fill
         && (tap || lt || e->gesture_toggled || e->lp_toggled);
 
-    // GLOW: gesture glow halo. Suppressed during long press.
-    // Shows on active gesture OR gesture-toggle persistence.
-    bool show_glow = (ges || e->gesture_toggled) && !lt;
+    // GLOW: gesture glow halo. Shows on active gesture OR gesture-toggle persistence.
+    // NOT suppressed by long press — glow represents toggle state, not transient animation.
+    bool show_glow = ges || e->gesture_toggled;
 
     // OUTER_STROKE: long-press outer ring
     bool show_outer = lt || e->lp_toggled;
@@ -294,14 +293,7 @@ void update_visual_layers(TouchElement* e) {
     e->visual_alpha = ((uint32_t)outer_a << 24) | ((uint32_t)stroke_a << 16)
                     | ((uint32_t)fill_a << 8) | (uint32_t)glow_a;
 
-    if (old_layers != layers) {
-        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis",
-            "update_layers[%d] vf=0x%02X (T=%d LT=%d G=%d) sel=%d "
-            "-> layers=0x%02X (F=%d ST=%d G=%d OS=%d) alpha: f=%d s=%d g=%d o=%d",
-            elem_idx, vf, tap, lt, ges, selected,
-            layers, show_fill, show_stroke, show_glow, show_outer,
-            fill_a, stroke_a, glow_a, outer_a);
-    }
+
 }
 
 void clear_element_gesture_flags(TouchElement* e, bool set_suppressed) {
@@ -309,7 +301,6 @@ void clear_element_gesture_flags(TouchElement* e, bool set_suppressed) {
     e->gesture_long_press_triggered = false;
     e->gesture_swipe_triggered = false;
     e->gesture_timer_armed = false;
-    e->visual_long_press_active = false;
     vis_clear(e, VF_LONG_TAP | VF_GESTURE);
     if (set_suppressed) e->gesture_suppressed = true;
 }
@@ -421,12 +412,8 @@ void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, To
 void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     int release_ptr_id = e->current_ptr_id;
     int ei = (int)(e - g_state.elements);
-    TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "ELEMENT_UP[%d] type=%d ptr=%d sel=%d eng=%d has_tog=%d has_ar=%d",
-        ei, e->type, e->current_ptr_id, e->selected, e->engaged, e->cached_has_toggle, e->cached_has_auto_repeat);
     if (e->type >= ELEM_TYPE_COUNT) { e->engaged = false; e->current_ptr_id = -1; return; }
     element_up_table[e->type](e, x, y, time_ms, result);
-    TP_LOG(ANDROID_LOG_WARN, LOG_TAG, "ELEMENT_UP[%d] AFTER_DISPATCH sel=%d eng=%d ptr=%d",
-        ei, e->selected, e->engaged, e->current_ptr_id);
     e->engaged = false;
     e->current_ptr_id = -1;
     vis_clear(e, VF_TAP);
@@ -487,7 +474,6 @@ void release_element_bindings(TouchElement* e, TouchActionResult* restrict resul
     } else {
         e->long_press_arm = false;
         e->gesture_timer_armed = false;
-        e->visual_long_press_active = false;
         vis_clear(e, VF_LONG_TAP);
     }
     if (!element_is_toggle_active(e)) {
@@ -580,11 +566,8 @@ void element_reset_runtime(TouchElement* e) {
 
     // Bulk-zero gesture flags: long_press_arm, gesture_swipe_triggered,
     // gesture_long_press_triggered, gesture_timer_armed, lp_toggled,
-    // gesture_toggled, auto_repeat_primary_pressed,
-    // visual_long_press_active (8 bools contiguous from long_press_arm)
+    // gesture_toggled, auto_repeat_primary_pressed (7 bools contiguous from long_press_arm)
     // NOTE: defer_primary is intentionally NOT zeroed here.
-    // WARNING: This assumes long_press_arm through visual_long_press_active are contiguous bools.
-    // If struct layout changes, this must be updated.
     e->long_press_arm = false;
     e->gesture_swipe_triggered = false;
     e->gesture_long_press_triggered = false;
@@ -592,7 +575,6 @@ void element_reset_runtime(TouchElement* e) {
     e->lp_toggled = false;
     e->gesture_toggled = false;
     e->auto_repeat_primary_pressed = false;
-    e->visual_long_press_active = false;
 
     e->auto_repeat_last_time = 0;
     e->toggle_debounce_last_time = 0;

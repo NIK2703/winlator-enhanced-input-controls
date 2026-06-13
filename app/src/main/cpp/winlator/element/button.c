@@ -19,7 +19,6 @@ static inline int element_index(const TouchElement* e) {
 }
 
 static inline void clear_gesture_defer_state(TouchElement* e, TouchActionResult* restrict result) {
-    e->visual_long_press_active = false;
     e->gesture_long_press_triggered = false;
     vis_clear(e, VF_LONG_TAP);
     if (!e->lp_toggled)
@@ -78,6 +77,8 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
             return;
         if (has_primary) release_binding(result, &e->bindings[0]);
         e->selected = false;
+        e->auto_repeat_primary_pressed = false;
+        e->auto_repeat_last_time = 0;
         update_visual_layers(e);
         mark_element_dirty(e);
         return;
@@ -102,6 +103,7 @@ void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t
         }
         e->toggle_debounce_last_time = time_ms;
         e->selected = true;
+        e->auto_repeat_primary_pressed = true;
         e->auto_repeat_last_time = time_ms;
         update_visual_layers(e);
         return;
@@ -185,6 +187,7 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
     // Toggle+AR: latch visual to selected state
     if (e->cached_has_toggle && e->cached_has_auto_repeat) {
         if (e->selected) vis_set(e, VF_TAP); else vis_clear(e, VF_TAP);
+        update_visual_layers(e);
         return;
     }
 

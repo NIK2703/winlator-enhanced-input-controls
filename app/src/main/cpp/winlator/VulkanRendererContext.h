@@ -346,6 +346,7 @@ private:
     std::atomic<bool> isRunning{false};
     std::atomic<bool> fbResized{false};
     std::atomic<bool> gpuHangDetected{false};
+    std::atomic<int>  consecutiveFenceTimeouts{0};
     std::mutex        renderMutex;
     std::mutex        dirtyMutex;
     std::mutex        ahbTexCacheMutex;

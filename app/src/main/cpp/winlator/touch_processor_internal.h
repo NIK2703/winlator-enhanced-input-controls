@@ -13,7 +13,7 @@
 #include <math.h>
 #include <time.h>
 
-#define TP_LOG(prio, tag, fmt, ...) __android_log_print(prio, tag, fmt, ##__VA_ARGS__)
+#define TP_LOG(prio, tag, fmt, ...) ((void)0)
 #ifndef LOG_TAG
 #define LOG_TAG "Winlator_Touch"
 #endif
@@ -726,13 +726,6 @@ static inline void start_drag_with_binding(TouchFinger* f,
         same_as_held = bindings_equal(drag_binding, drag_count,
                         g_state.gesture_held_actions, g_state.gesture_held_count);
     }
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
-        "START_DRAG_WITH_BIND ptr=%d held=%d held_cnt=%d same=%d "
-        "drag_cnt=%d drag_type=%d drag_type0=%d",
-        f->ptr_id, g_state.gesture_is_action_held, g_state.gesture_held_count,
-        same_as_held, drag_count,
-        drag_binding ? drag_binding->type : -1,
-        drag_count > 0 ? drag_binding->type : -1);
     if (!same_as_held) {
         TouchBinding saved_ar[MAX_HELD_ACTIONS];
         int saved_ar_count = 0;

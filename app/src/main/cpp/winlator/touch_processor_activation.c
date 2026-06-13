@@ -20,7 +20,6 @@ bool activation_get_element_visual(int elem_index, float* out_x, float* out_y, b
 }
 
 void activation_activate_at(float x, float y) {
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_activate_at(%.0f,%.0f)", x, y);
     if (g_state.grid_cell_w > 0.0f && g_state.grid_cell_h > 0.0f) {
         if (x >= g_state.grid_min_x && x <= g_state.grid_max_x &&
             y >= g_state.grid_min_y && y <= g_state.grid_max_y) {
@@ -39,7 +38,6 @@ void activation_activate_at(float x, float y) {
                         if (hit) vis_set(e, VF_TAP); else vis_clear(e, VF_TAP);
                         if (e->type == ELEM_BUTTON) update_visual_layers(e);
                         if (hit) {
-                            TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_activate_at[%d] type=%d visual=1 (hit)", (int)(e - g_state.elements), e->type);
                             e->visual_x = x;
                             e->visual_y = y;
                         }
@@ -53,7 +51,6 @@ void activation_activate_at(float x, float y) {
             if (hit) vis_set(&g_state.elements[i], VF_TAP); else vis_clear(&g_state.elements[i], VF_TAP);
             if (g_state.elements[i].type == ELEM_BUTTON) update_visual_layers(&g_state.elements[i]);
             if (hit) {
-                TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_activate_at[%d] type=%d visual=1 (hit)", i, g_state.elements[i].type);
                 g_state.elements[i].visual_x = x;
                 g_state.elements[i].visual_y = y;
             }
@@ -63,7 +60,6 @@ void activation_activate_at(float x, float y) {
 }
 
 void activation_deactivate_all(void) {
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_deactivate_all count=%d", g_state.element_count);
     for (int i = 0; i < g_state.element_count; i++) {
         TouchElement* e = &g_state.elements[i];
         if (!element_is_toggle_active(e)) {
@@ -116,7 +112,6 @@ bool activation_handle_up(int ptr_id, float x, float y, uint64_t time_ms, TouchA
 }
 
 void activation_reset(void) {
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "activation_reset count=%d", g_state.element_count);
     for (int i = 0; i < MAX_FINGERS; i++) {
         g_state.tracked[i].ptr_id = -1;
         g_state.tracked[i].count = 0;

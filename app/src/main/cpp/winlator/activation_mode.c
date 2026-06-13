@@ -50,7 +50,6 @@ static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* restr
     if (btn->selected) {
         if (element_has_gesture_toggle(btn)) {
             update_visual_layers(btn);
-            TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=1 (blocked_other_toggle)", (int)(btn - g_state.elements));
             mark_element_dirty(btn);
             return;
         }
@@ -67,7 +66,6 @@ static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* restr
         if (g_state.gesture_held_count == 0)
             g_state.gesture_is_action_held = false;
         btn->selected = false;
-        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=0 (deselect)", (int)(btn - g_state.elements));
         update_visual_layers(btn);
     } else {
         for (int k = 0; k < MAX_BINDINGS_PER_ELEMENT; k++) {
@@ -80,7 +78,6 @@ static inline void toggle_slide_over(TouchElement* btn, TouchActionResult* restr
         }
         btn->selected = true;
         btn->auto_repeat_last_time = time_ms;
-        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "toggle_slide_over[%d] visual=1 (select)", (int)(btn - g_state.elements));
         update_visual_layers(btn);
     }
     mark_element_dirty(btn);
@@ -400,11 +397,8 @@ bool activation_mode_up(int ptr_id, float x, float y, uint64_t time_ms,
             if (idx < 0 || idx >= g_state.element_count) continue;
             handle_element_up(&g_state.elements[idx], x, y, time_ms, result);
             if (!element_is_toggle_active(&g_state.elements[idx])) {
-                if (g_state.elements[idx].type == ELEM_BUTTON)
-                    update_visual_layers(&g_state.elements[idx]);
-                else {
+                if (g_state.elements[idx].type != ELEM_BUTTON)
                     vis_clear(&g_state.elements[idx], VF_TAP);
-                }
             }
         }
         reset_tracked_slot(tb, pid_slot);

@@ -486,7 +486,6 @@ public class InputControlsView extends View {
     public synchronized void setProfile(ControlsProfile profile) {
         if (profile != null) {
             this.profile = profile;
-            Log.w("Winlator_Controls", "setProfile: name=" + profile.getName() + " elements=" + (profile.isElementsLoaded() ? profile.getElements().size() : "not_loaded"));
             deselectAllElements();
         }
         else this.profile = null;
@@ -504,7 +503,6 @@ public class InputControlsView extends View {
 
     public void setShowTouchscreenControls(boolean showTouchscreenControls) {
         this.showTouchscreenControls = showTouchscreenControls;
-        Log.w("Winlator_Controls", "setShowTouchscreenControls: " + showTouchscreenControls);
     }
 
     public float getOverlayOpacity() {
@@ -624,15 +622,11 @@ public class InputControlsView extends View {
             try {
                 nativeTouchProcessor.tick(timeMs);
             } catch (Exception e) {
-                Log.e("Winlator_Controls", "tick: exception in nativeTick", e);
             }
             try {
                 syncVisualStates();
             } catch (Exception e) {
-                Log.e("Winlator_Controls", "tick: exception in syncVisualStates", e);
             }
-        } else {
-            Log.w("Winlator_Controls", "tick: nativeTouchProcessor is NULL!");
         }
         if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
             int w = getWidth();
@@ -864,7 +858,6 @@ public class InputControlsView extends View {
                 }
                 return true;
             } catch (Exception e) {
-                Log.e("Winlator_Controls", "onTouchEvent: exception in native processing", e);
                 return true;
             }
         }

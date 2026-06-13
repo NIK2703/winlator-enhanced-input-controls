@@ -64,10 +64,6 @@ static void gesture_restore_first_button_state(TouchFinger* finger, int pointer_
     if (current_hovered == saved_hovered_idx) return;
     TouchElement* prev = &g_state.elements[saved_hovered_idx];
     if (prev != &g_state.elements[tracked->element_indices[0]]) return;
-#ifndef NDEBUG
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Hover", "gesture_HOVER restore lp_arm=%d gest_lp=%d gest_timer=%d",
-        state->lp_arm, state->gest_lp, state->gest_timer);
-#endif
     prev->long_press_arm = state->lp_arm;
     prev->gesture_swipe_triggered = state->gest_swipe;
     prev->gesture_long_press_triggered = state->gest_lp;
@@ -395,7 +391,6 @@ void handle_gesture_down(TouchFinger* finger, float x, float y, uint64_t time_ms
     }
     bool is_first = (g_state.gesture_main_ptr_id < 0);
     bool is_second = !is_first && (finger->ptr_id != g_state.gesture_main_ptr_id);
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_gesture_down ptr=%d role=%s", finger->ptr_id, is_first ? "main" : "second");
 
     if (is_first) {
         g_state.gesture_post_double_tap_drag = false;
@@ -532,11 +527,6 @@ static void handle_toggle_slide_over(TouchFinger* finger, float x, float y, uint
                         mark_element_dirty(toggle_btn);
                     }
                 } else if (mode != ACTIVATION_HOVER) {
-#ifndef NDEBUG
-                    int tbi = element_index(toggle_btn);
-                    if (!element_is_toggle_active(toggle_btn))
-                        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Hover", "gesture_toggle[%d] SELECT", tbi);
-#endif
                     handle_toggle_entry(toggle_btn, result);
                 }
             }
@@ -820,9 +810,6 @@ static void handle_move_gesture_and_cursor(
 // ============================================================
 __attribute__((hot))
 void handle_gesture_move(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
-#ifndef NDEBUG
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Hover", "gesture_MOVE ptr=%d x=%.0f y=%.0f engaged_cnt=%d", finger->ptr_id, x, y, finger->active);
-#endif
 
     const bool is_ts = g_state.cfg.is_ts;
     const bool is_tp = g_state.cfg.is_tp;
@@ -935,7 +922,6 @@ static void handle_tp_up(TouchFinger* finger, uint64_t time_ms, TouchActionResul
 // ============================================================
 __attribute__((hot))
 void handle_gesture_up(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "handle_gesture_up ptr=%d", finger->ptr_id);
     int ptr_idx = pointer_index(finger);
     TrackedButtons* tracked = &g_state.tracked[ptr_idx];
     bool had_tracked = false;

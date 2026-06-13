@@ -1453,6 +1453,7 @@ public class ControlElement {
             float cx = box.centerX();
             float cy = box.centerY();
             paint.setStyle(Paint.Style.FILL);
+            paint.setColorFilter(new PorterDuffColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN));
             Bitmap customIconBitmap = getCustomIcon();
             if (customIconBitmap != null) {
                 int margin = (int)(snappingSize * (shape == Shape.CIRCLE ? 2.0f : 1.0f) * scale);
@@ -1477,6 +1478,7 @@ public class ControlElement {
                 paint.setColor(ColorUtils.setAlphaComponent(Color.WHITE, 255));
                 c.drawText(text, x, (y - ((paint.descent() + paint.ascent()) * 0.5f)), paint);
             }
+            paint.setColorFilter(null);
             saveToDisk(diskKey(LAYER_STROKE_TEXT), cacheStrokeText);
             cacheStrokeText = applyOpacity(cacheStrokeText, getEffectiveOpacity());
             sharedPool.put(vKey, cacheStrokeText);
@@ -1720,16 +1722,7 @@ public class ControlElement {
 
             // 1. Engaged: BUTTON
             if (engaged && type == Type.BUTTON) {
-                if (visualLayers != 0) {
-                    android.util.Log.d("Winlator_Vis",
-"drawCached[@" + Integer.toHexString(hashCode()) + "]" 
-                        + " vl=0x" + Integer.toHexString(visualLayers)
-                        + " va=0x" + Integer.toHexString(visualAlphas)
-                        + " F=" + ((visualLayers & VL_FILL) != 0)
-                        + " ST=" + ((visualLayers & VL_STROKE_TEXT) != 0)
-                        + " G=" + ((visualLayers & VL_GLOW) != 0)
-                        + " OS=" + ((visualLayers & VL_OUTER_STROKE) != 0));
-                }
+
                 int savedColor = paint.getColor();
                 Paint.Style savedStyle = paint.getStyle();
                 float savedStrokeWidth = paint.getStrokeWidth();
@@ -1976,13 +1969,7 @@ public class ControlElement {
                 float cx = boundingBox.centerX();
                 float cy = boundingBox.centerY();
 
-                if (visualLayers != 0) {
-                    android.util.Log.d("Winlator_Vis",
-"draw[@" + Integer.toHexString(hashCode()) + "]" 
-                        + " vl=0x" + Integer.toHexString(visualLayers)
-                        + " va=0x" + Integer.toHexString(visualAlphas)
-                        + " engaged=" + engaged);
-                }
+
 
                 // GLOW
                 if ((visualLayers & VL_GLOW) != 0) {
@@ -2495,14 +2482,7 @@ public class ControlElement {
                          boolean petalDown, boolean petalLeft,
                          float rangeScrollOffset,
                          int visualLayers, int visualAlphas) {
-        if (type == Type.BUTTON && visualLayers != 0) {
-            android.util.Log.d("Winlator_Vis",
-"Java_sync[@" + Integer.toHexString(hashCode()) + "]" 
-                + " vf=0x" + Integer.toHexString(visFlags)
-                + " vl=0x" + Integer.toHexString(visualLayers)
-                + " va=0x" + Integer.toHexString(visualAlphas)
-                + " engaged=" + isEngaged());
-        }
+
         this.tapActive = (visFlags & VF_TAP) != 0;
         this.longTapActive = (visFlags & VF_LONG_TAP) != 0;
         this.gestureActive = (visFlags & VF_GESTURE) != 0;

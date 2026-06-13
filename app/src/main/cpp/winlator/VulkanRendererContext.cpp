@@ -9,7 +9,8 @@
 #include "window_vert.h"
 #include "window_frag.h"
 
-#define FENCE_TIMEOUT_NS 5000000000ULL
+#define FENCE_TIMEOUT_NS 1000000000ULL
+#define GPU_HANG_RECOVERY_THRESHOLD 3
 
 VulkanRendererContext::VulkanRendererContext(ANativeWindow* win, int cW, int cH, void* aHandle)
     : window(win), surfaceWidth(cW), surfaceHeight(cH), containerWidth(cW), containerHeight(cH),
@@ -457,8 +458,10 @@ void VulkanRendererContext::ensureElementOverlayTex(int w, int h) {
     if (elementOverlayW == w && elementOverlayH == h && elementOverlayImg != VK_NULL_HANDLE)
         return;
     if (elementOverlayImg != VK_NULL_HANDLE) {
-        RLOG("ensureElementOverlayTex: waiting for device idle before cleanup");
-        vk_.DeviceWaitIdle(device);
+        RLOG("ensureElementOverlayTex: waiting for in-flight fence before cleanup");
+        if (!inFlightFences.empty()) {
+            vk_.WaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, FENCE_TIMEOUT_NS);
+        }
         cleanupElementOverlay();
     }
     elementOverlayW = w;
@@ -649,16 +652,28 @@ void VulkanRendererContext::endOneTime(VkCommandBuffer cb) {
     { std::lock_guard<std::mutex> lk(oneTimeFenceMutex);
       VkResult fenceResult = vk_.WaitForFences(device, 1, &oneTimeFence, VK_TRUE, FENCE_TIMEOUT_NS);
       if (fenceResult == VK_TIMEOUT) {
-          RLOG_E("FENCE TIMEOUT in endOneTime (pre-submit wait) - GPU may be hung, continuing");
-          gpuHangDetected.store(true);
+          int count = consecutiveFenceTimeouts.fetch_add(1) + 1;
+          RLOG_E("FENCE TIMEOUT in endOneTime (pre-submit wait) - count=%d", count);
+          if (count >= GPU_HANG_RECOVERY_THRESHOLD) {
+              gpuHangDetected.store(true);
+              consecutiveFenceTimeouts.store(0);
+          }
+      } else {
+          consecutiveFenceTimeouts.store(0);
       }
       vk_.ResetFences(device, 1, &oneTimeFence);
       VkSubmitInfo si{}; si.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO; si.commandBufferCount=1; si.pCommandBuffers=&cb;
       vk_.QueueSubmit(graphicsQueue,1,&si,oneTimeFence);
       fenceResult = vk_.WaitForFences(device,1,&oneTimeFence,VK_TRUE,FENCE_TIMEOUT_NS);
       if (fenceResult == VK_TIMEOUT) {
-          RLOG_E("FENCE TIMEOUT in endOneTime (post-submit wait) - GPU may be hung, continuing");
-          gpuHangDetected.store(true);
+          int count = consecutiveFenceTimeouts.fetch_add(1) + 1;
+          RLOG_E("FENCE TIMEOUT in endOneTime (post-submit wait) - count=%d", count);
+          if (count >= GPU_HANG_RECOVERY_THRESHOLD) {
+              gpuHangDetected.store(true);
+              consecutiveFenceTimeouts.store(0);
+          }
+      } else {
+          consecutiveFenceTimeouts.store(0);
       }
     }
     vk_.FreeCommandBuffers(device,cmdPool,1,&cb);
@@ -1059,7 +1074,7 @@ void VulkanRendererContext::renderLoop() {
             fbResized.store(true);
         }
         { std::unique_lock<std::mutex> lk(dirtyMutex);
-          dirtyCV.wait(lk,[this]{
+          dirtyCV.wait_for(lk, std::chrono::milliseconds(2), [this]{
               return !isRunning||vsyncSignaled.load()||
                   (!surfaceDetached.load()&&(needsRender.load()||fbResized.load()))||
                   cursorMoved.load(); }); }
@@ -1083,8 +1098,14 @@ void VulkanRendererContext::flushDeleteQueue() {
     if (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, inFlightFences[currentFrame]) == VK_NOT_READY) {
         VkResult fenceResult = vk_.WaitForFences(device,1,&inFlightFences[currentFrame],VK_TRUE,FENCE_TIMEOUT_NS);
         if (fenceResult == VK_TIMEOUT) {
-            RLOG_E("FENCE TIMEOUT in flushDeleteQueue - GPU may be hung, continuing cleanup");
-            gpuHangDetected.store(true);
+            int count = consecutiveFenceTimeouts.fetch_add(1) + 1;
+            RLOG_E("FENCE TIMEOUT in flushDeleteQueue - count=%d", count);
+            if (count >= GPU_HANG_RECOVERY_THRESHOLD) {
+                gpuHangDetected.store(true);
+                consecutiveFenceTimeouts.store(0);
+            }
+        } else {
+            consecutiveFenceTimeouts.store(0);
         }
     }
     for (auto& wt:deleteQueue) {
@@ -1123,8 +1144,11 @@ void VulkanRendererContext::renderFrame() {
         for (auto& f:inFlightFences) {
             VkResult fenceResult = vk_.WaitForFences(device,1,&f,VK_TRUE,FENCE_TIMEOUT_NS);
             if (fenceResult == VK_TIMEOUT) {
-                RLOG_E("FENCE TIMEOUT in renderFrame (fbResized fence wait) - GPU may be hung");
-                gpuHangDetected.store(true);
+                int count = consecutiveFenceTimeouts.fetch_add(1) + 1;
+                RLOG_E("FENCE TIMEOUT in renderFrame (fbResized fence wait) - count=%d", count);
+                if (count >= GPU_HANG_RECOVERY_THRESHOLD) gpuHangDetected.store(true);
+            } else {
+                consecutiveFenceTimeouts.store(0);
             }
         }
         cleanupSwapchain();
@@ -1150,9 +1174,12 @@ ok=true;}catch(...){}
     if (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, inFlightFences[currentFrame]) == VK_NOT_READY) {
         VkResult fenceResult = vk_.WaitForFences(device,1,&inFlightFences[currentFrame],VK_TRUE,FENCE_TIMEOUT_NS);
         if (fenceResult == VK_TIMEOUT) {
-            RLOG_E("FENCE TIMEOUT in renderFrame (current frame fence) - GPU may be hung, triggering recreation");
-            gpuHangDetected.store(true);
-            fbResized.store(true);
+            int count = consecutiveFenceTimeouts.fetch_add(1) + 1;
+            RLOG_E("FENCE TIMEOUT in renderFrame (current frame fence) - count=%d", count);
+            if (count >= GPU_HANG_RECOVERY_THRESHOLD) {
+                gpuHangDetected.store(true);
+                fbResized.store(true);
+            }
             return;
         }
         currentFenceWaited = true;
@@ -1179,9 +1206,12 @@ ok=true;}catch(...){}
         if (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, imgInFlight[imgIdx]) == VK_NOT_READY) {
             VkResult fenceResult = vk_.WaitForFences(device,1,&imgInFlight[imgIdx],VK_TRUE,FENCE_TIMEOUT_NS);
             if (fenceResult == VK_TIMEOUT) {
-                RLOG_E("FENCE TIMEOUT in renderFrame (imgInFlight fence) - GPU may be hung, triggering recreation");
-                gpuHangDetected.store(true);
-                fbResized.store(true);
+                int count = consecutiveFenceTimeouts.fetch_add(1) + 1;
+                RLOG_E("FENCE TIMEOUT in renderFrame (imgInFlight fence) - count=%d", count);
+                if (count >= GPU_HANG_RECOVERY_THRESHOLD) {
+                    gpuHangDetected.store(true);
+                    fbResized.store(true);
+                }
                 return;
             }
         }
@@ -1569,6 +1599,8 @@ void VulkanRendererContext::initScanout() {
 void VulkanRendererContext::destroyScanout() {
     if (!scanoutActive.load()) return;
     scanoutActive.store(false);
+
+    std::unique_lock<std::shared_mutex> frameLock(frameMutex);
 
     if (scanoutGameSC || scanoutCursorSC) {
         void* t = ST_CREATE();

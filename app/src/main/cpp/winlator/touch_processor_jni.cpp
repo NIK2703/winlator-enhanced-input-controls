@@ -57,7 +57,7 @@ static void visual_state_flush(void) {
             g_visual_buffer[idx].petal_active[2] = e->petal_active[2] ? 1 : 0;
             g_visual_buffer[idx].petal_active[3] = e->petal_active[3] ? 1 : 0;
             g_visual_buffer[idx].range_scroll_offset = e->range_scroll_offset;
-            g_visual_buffer[idx].visual_long_press = e->visual_long_press_active ? 1 : 0;
+            g_visual_buffer[idx].visual_long_press = (e->visual_flags & VF_LONG_TAP) ? 1 : 0;
             g_visual_buffer[idx].opacity = e->opacity;
             g_visual_buffer[idx].corner_radius = e->corner_radius;
             g_visual_buffer[idx].color_primary = e->color_primary;
@@ -66,14 +66,11 @@ static void visual_state_flush(void) {
             g_visual_buffer[idx].fill_alpha_inactive = e->fill_alpha_inactive;
             if (e->visual_flags) {
                 active_count++;
-                TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "flush[%d] type=%d vf=0x%02X pos=(%.0f,%.0f)", idx, (int)e->type, e->visual_flags, e->visual_x, e->visual_y);
             }
             mask &= mask - 1;
         } while (mask);
     }
-    if (active_count > 0 || n > 0) {
-        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "flush: total=%d active=%d dirty=0", n, active_count);
-    }
+
 }
 
 // Bulk write all elements' visual state into Java arrays (1 JNI call replaces N×8 ByteBuffer reads)
@@ -94,23 +91,19 @@ static jint nativeSyncVisualState(JNIEnv* env, jclass clazz, jfloatArray positio
         // Pack flags: bits 0-2 = visual_flags (VF_TAP|VF_LONG_TAP|VF_GESTURE)
         //             bits 3-6 = petal_active[0-3]
         //             bits 7-10 = visual layers (FILL|STROKE_TEXT|GLOW|OUTER_STROKE)
-        //             bit 11 = visual_long_press_active
+        //             bit 11 = long press active (VF_LONG_TAP + has LP bindings)
         int flags = e->visual_flags & 0x7;
         if (e->petal_active[0]) flags |= (1 << 3);
         if (e->petal_active[1]) flags |= (1 << 4);
         if (e->petal_active[2]) flags |= (1 << 5);
         if (e->petal_active[3]) flags |= (1 << 6);
         flags |= ((e->visual_layers & 0xF) << 7);
-        if (e->element_long_press_count > 0 && e->visual_long_press_active) flags |= (1 << 11);
+        if (e->element_long_press_count > 0 && (e->visual_flags & VF_LONG_TAP)) flags |= (1 << 11);
         if (e->visual_flags) active_count++;
         if (vl) vl[i] = (int)e->visual_layers;
         if (va) va[i] = (int)e->visual_alpha;
         if (scroll) scroll[i] = e->range_scroll_offset;
-        if (e->visual_layers != 0) {
-            TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis",
-                "JNI_sync[%d] type=%d vf=0x%02X vl=0x%02X va=0x%08X flags=0x%04X",
-                i, (int)e->type, e->visual_flags, e->visual_layers, e->visual_alpha, flags);
-        }
+
         st[i] = flags;
     }
     env->ReleaseFloatArrayElements(positions, pos, 0);
@@ -222,7 +215,6 @@ struct CachedFieldIDs {
     if ((env)->ExceptionCheck()) { \
         (env)->ExceptionDescribe(); \
         (env)->ExceptionClear(); \
-        TP_LOG(ANDROID_LOG_ERROR, "Winlator_JNI", "JNI exception: %s", msg); \
         return; \
     } \
 } while(0)
@@ -231,7 +223,6 @@ struct CachedFieldIDs {
     if ((env)->ExceptionCheck()) { \
         (env)->ExceptionDescribe(); \
         (env)->ExceptionClear(); \
-        TP_LOG(ANDROID_LOG_ERROR, "Winlator_JNI", "JNI exception: %s", msg); \
         return retval; \
     } \
 } while(0)
@@ -573,7 +564,7 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
 static void cache_config_field_ids(JNIEnv* env, jobject config) {
     if (g_config.configClass) env->DeleteGlobalRef(g_config.configClass);
     jclass cls = env->GetObjectClass(config);
-    if (!cls) { TP_LOG(ANDROID_LOG_ERROR, "Winlator_JNI", "nativeInit: GetObjectClass failed"); return; }
+    if (!cls) { return; }
     g_config.configClass = (jclass)env->NewGlobalRef(cls);
 
     struct { jfieldID* dst; const char* name; const char* sig; } scalar[] = {
@@ -722,11 +713,6 @@ static void nativeInit(JNIEnv* env, jclass clazz, jobject config) {
     memset(&c, 0, sizeof(c));
     read_config_from_java(env, config, &c);
     touch_processor_init(&c);
-
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "nativeInit: touch_mode=%d input_mode=%d screen=%dx%d caps={gesture=%d drag=%d dt=%d lp=%d lpt=%d}",
-        c.touch_mode, c.input_mode, c.screen_w, c.screen_h,
-        c.caps_has_gesture_bindings, c.caps_has_drag_bindings,
-        c.caps_has_double_tap, c.caps_has_long_press, c.caps_has_long_press_timer);
 }
 
 #pragma pack(push, 1)
@@ -818,7 +804,6 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
     cache_element_field_ids(env);
 
     jsize len = env->GetArrayLength(elements);
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "nativeSetElements: array_len=%d", (int)len);
     if (len > MAX_ELEMENTS) len = MAX_ELEMENTS;
 
     TouchElement elems[MAX_ELEMENTS];
@@ -835,7 +820,6 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
         elems[i].w = env->GetFloatField(je, g_elem.w);
         elems[i].h = env->GetFloatField(je, g_elem.h);
         elems[i].scale = env->GetFloatField(je, g_elem.scale);
-        TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Controls", "  elem[%d] type=%d x=%d y=%d scale=%.2f", i, (int)elems[i].type, elems[i].x, elems[i].y, elems[i].scale);
         elems[i].passthrough_touch = env->GetBooleanField(je, g_elem.passthroughTouch);
         elems[i].activation_mode = (ActivationMode)env->GetIntField(je, g_elem.activationMode);
         elems[i].range_ordinal = env->GetIntField(je, g_elem.rangeOrdinal);
@@ -935,14 +919,6 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
         elems[i].engaged = false;
         for (int p = 0; p < MAX_PETALS; p++) elems[i].petal_active[p] = false;
 
-        TP_LOG(ANDROID_LOG_WARN, "Winlator_JNI", "SET_ELEM[%d] b0=[t=%d k=%d ar=%d tog=%d st=%d] b1=[t=%d k=%d ar=%d tog=%d st=%d] b2=[t=%d k=%d ar=%d tog=%d st=%d] b3=[t=%d k=%d ar=%d tog=%d st=%d] has_tog=%d has_ar=%d",
-            i,
-            elems[i].bindings[0].type, elems[i].bindings[0].keycode, elems[i].bindings[0].auto_repeat, elems[i].bindings[0].toggle, (elems[i].primary_sticky_mask >> 0) & 1,
-            elems[i].bindings[1].type, elems[i].bindings[1].keycode, elems[i].bindings[1].auto_repeat, elems[i].bindings[1].toggle, (elems[i].primary_sticky_mask >> 1) & 1,
-            elems[i].bindings[2].type, elems[i].bindings[2].keycode, elems[i].bindings[2].auto_repeat, elems[i].bindings[2].toggle, (elems[i].primary_sticky_mask >> 2) & 1,
-            elems[i].bindings[3].type, elems[i].bindings[3].keycode, elems[i].bindings[3].auto_repeat, elems[i].bindings[3].toggle, (elems[i].primary_sticky_mask >> 3) & 1,
-            elems[i].cached_has_toggle, elems[i].cached_has_auto_repeat);
-
         env->DeleteLocalRef(je);
     }
 
@@ -965,7 +941,6 @@ static void nativeSetSimTouchScreen(JNIEnv* env, jclass clazz, jboolean enabled)
 }
 
 static void dispatch_and_flush(JNIEnv* env, const TouchActionResult* r, const char* event_name) {
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_Vis", "event=%s trigger_flush", event_name);
     visual_state_flush();
     dispatch_actions_batch(env, r);
 }
@@ -994,10 +969,8 @@ static void nativeTick(JNIEnv* env, jclass clazz, jlong timeMs) {
 }
 
 static void nativeReset(JNIEnv* env, jclass clazz) {
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_JNI", "nativeReset called");
     touch_processor_reset();
     memset(g_visual_buffer, 0, sizeof(g_visual_buffer));
-    TP_LOG(ANDROID_LOG_DEBUG, "Winlator_JNI", "nativeReset done");
 }
 
 static jobject nativeGetVisualBuffer(JNIEnv* env, jclass clazz) {
