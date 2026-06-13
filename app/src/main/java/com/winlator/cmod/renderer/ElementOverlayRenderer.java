@@ -105,6 +105,9 @@ public class ElementOverlayRenderer {
         return overlayCanvas != null;
     }
 
+    private long diagRenderCount = 0;
+    private long diagSlowRenders = 0;
+
     private void doRender() {
         if (!needsRender) return;
         needsRender = false;
@@ -117,6 +120,8 @@ public class ElementOverlayRenderer {
             return;
         }
 
+        long renderStart = System.nanoTime();
+
         // Clear to transparent
         overlayBitmap.eraseColor(0x00000000);
 
@@ -125,6 +130,13 @@ public class ElementOverlayRenderer {
 
         // Upload pixels to Vulkan
         uploadToVulkan();
+
+        long renderElapsedUs = (System.nanoTime() - renderStart) / 1000;
+        diagRenderCount++;
+        if (renderElapsedUs > 10000) {
+            diagSlowRenders++;
+            Log.e("DIAG_OVERLAY", "SLOW RENDER #" + diagRenderCount + " " + renderElapsedUs + "us");
+        }
     }
 
     private void uploadToVulkan() {

@@ -164,8 +164,14 @@ public class FakeInputWriter {
             writeEvent(EV_SYN, SYN_REPORT, 0);
             buffer.flip();
             try {
+                long writeStart = System.nanoTime();
                 channel.write(buffer);
+                long writeElapsedUs = (System.nanoTime() - writeStart) / 1000;
+                if (writeElapsedUs > 5000) {
+                    android.util.Log.e("DIAG_FAKEINPUT", "SLOW WRITE " + writeElapsedUs + "us");
+                }
             } catch (IOException e) {
+                android.util.Log.e("DIAG_FAKEINPUT", "WRITE FAILED: " + e.getMessage());
             }
         }
     }
@@ -272,9 +278,14 @@ public class FakeInputWriter {
             writeEvent(EV_SYN, SYN_REPORT, 0);
             buffer.flip();
             try {
+                long writeStart = System.nanoTime();
                 channel.write(buffer);
+                long writeElapsedUs = (System.nanoTime() - writeStart) / 1000;
+                if (writeElapsedUs > 5000) {
+                    android.util.Log.e("DIAG_FAKEINPUT", "SLOW GAMEPAD WRITE " + writeElapsedUs + "us");
+                }
             } catch (IOException e) {
-                // Write failed — invalidate prev state so next write retries everything
+                android.util.Log.e("DIAG_FAKEINPUT", "GAMEPAD WRITE FAILED: " + e.getMessage());
                 resetPrevState();
                 close();
             }

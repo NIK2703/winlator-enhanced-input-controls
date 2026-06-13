@@ -36,6 +36,10 @@ public class ClientSocket {
         writerThread.start();
     }
 
+    private volatile long diagWriteCount = 0;
+    private volatile long diagSlowWrites = 0;
+    private volatile long diagBlockedWrites = 0;
+
     private void writeLoop() {
         ByteBuffer buf;
         while (running) {
@@ -55,6 +59,7 @@ public class ClientSocket {
 
             int offset = 0;
             int remaining = buf.remaining();
+            long writeStart = System.nanoTime();
             while (remaining > 0 && running) {
                 int written = write(fd, buf, offset, remaining);
                 if (written > 0) {
@@ -62,6 +67,7 @@ public class ClientSocket {
                     remaining -= written;
                 }
                 else if (written == 0) {
+                    diagBlockedWrites++;
                     try {
                         Thread.sleep(1);
                     }
@@ -73,6 +79,13 @@ public class ClientSocket {
                 else {
                     break;
                 }
+            }
+            long writeElapsedUs = (System.nanoTime() - writeStart) / 1000;
+            diagWriteCount++;
+            if (writeElapsedUs > 10000) {
+                diagSlowWrites++;
+                android.util.Log.e("DIAG_SOCKET", "SLOW WRITE fd=" + fd + " " + writeElapsedUs + "us"
+                    + " blocked=" + diagBlockedWrites);
             }
             pendingBytes.addAndGet(-(buf.limit() - remaining));
         }

@@ -79,7 +79,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         public void run() {
             try {
                 if (nativeHandle != 0 && !xServerView.isEventExecutorHealthy()) {
-                    android.util.Log.w("VulkanRenderer", "Watchdog detected eventExecutor hang, restarting");
+                    android.util.Log.e("DIAG_WATCHDOG", "eventExecutor HUNG, restarting");
                     xServerView.restartEventExecutor();
                 }
             } finally {

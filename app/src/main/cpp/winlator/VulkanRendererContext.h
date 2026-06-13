@@ -347,6 +347,13 @@ private:
     std::atomic<bool> fbResized{false};
     std::atomic<bool> gpuHangDetected{false};
     std::atomic<int>  consecutiveFenceTimeouts{0};
+    std::atomic<uint64_t> diagFramesRendered{0};
+    std::atomic<uint64_t> diagVsyncCount{0};
+    std::atomic<uint64_t> diagFenceWaits{0};
+    std::atomic<uint64_t> diagFenceWaitNs{0};
+    std::atomic<uint64_t> diagRenderWakeups{0};
+    std::atomic<uint64_t> diagWinTexUpdates{0};
+    uint64_t           diagLastStatusLogNs = 0;
     std::mutex        renderMutex;
     std::mutex        dirtyMutex;
     std::mutex        ahbTexCacheMutex;

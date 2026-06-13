@@ -11,6 +11,13 @@
 
 #define FENCE_TIMEOUT_NS 1000000000ULL
 #define GPU_HANG_RECOVERY_THRESHOLD 3
+#define DIAG_STATUS_INTERVAL_NS 5000000000ULL
+
+static inline uint64_t diag_monotonic_ns() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
 
 VulkanRendererContext::VulkanRendererContext(ANativeWindow* win, int cW, int cH, void* aHandle)
     : window(win), surfaceWidth(cW), surfaceHeight(cH), containerWidth(cW), containerHeight(cH),
@@ -1079,6 +1086,22 @@ void VulkanRendererContext::renderLoop() {
                   (!surfaceDetached.load()&&(needsRender.load()||fbResized.load()))||
                   cursorMoved.load(); }); }
         if (!isRunning) break;
+        diagRenderWakeups.fetch_add(1);
+
+        uint64_t nowNs = diag_monotonic_ns();
+        if (nowNs - diagLastStatusLogNs >= DIAG_STATUS_INTERVAL_NS) {
+            diagLastStatusLogNs = nowNs;
+            uint64_t frames = diagFramesRendered.load();
+            uint64_t vsyncs = diagVsyncCount.load();
+            uint64_t waits = diagFenceWaits.load();
+            uint64_t waitNs = diagFenceWaitNs.load();
+            uint64_t wakeups = diagRenderWakeups.load();
+            uint64_t wintex = diagWinTexUpdates.load();
+            double avgWaitMs = waits > 0 ? (double)waitNs / (double)waits / 1000000.0 : 0.0;
+            RLOG_E("DIAG RENDER: frames=%llu vsyncs=%llu wakeups=%llu wintex=%llu fenceWaits=%llu avgFenceWait=%.1fms gpuHangs=%d",
+                (unsigned long long)frames, (unsigned long long)vsyncs, (unsigned long long)wakeups,
+                (unsigned long long)wintex, (unsigned long long)waits, avgWaitMs, (int)gpuHangDetected.load());
+        }
 
         if (swapchain == VK_NULL_HANDLE || cmdBufs.empty()) {
             vsyncSignaled.store(false, std::memory_order_relaxed);
@@ -1089,6 +1112,7 @@ void VulkanRendererContext::renderLoop() {
 }
 
 void VulkanRendererContext::onVsync() {
+    diagVsyncCount.fetch_add(1);
     vsyncSignaled.store(true, std::memory_order_release);
     dirtyCV.notify_one();
 }
@@ -1172,15 +1196,21 @@ ok=true;}catch(...){}
     if (currentFrame >= cmdBufs.size() || cmdBufs[currentFrame] == VK_NULL_HANDLE) return;
     bool currentFenceWaited = false;
     if (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, inFlightFences[currentFrame]) == VK_NOT_READY) {
+        uint64_t fwNs = diag_monotonic_ns();
         VkResult fenceResult = vk_.WaitForFences(device,1,&inFlightFences[currentFrame],VK_TRUE,FENCE_TIMEOUT_NS);
+        uint64_t fwElapsed = diag_monotonic_ns() - fwNs;
+        diagFenceWaits.fetch_add(1);
+        diagFenceWaitNs.fetch_add(fwElapsed);
         if (fenceResult == VK_TIMEOUT) {
             int count = consecutiveFenceTimeouts.fetch_add(1) + 1;
-            RLOG_E("FENCE TIMEOUT in renderFrame (current frame fence) - count=%d", count);
+            RLOG_E("FENCE TIMEOUT in renderFrame (current frame fence) - count=%d wait=%.1fms", count, fwElapsed/1000000.0);
             if (count >= GPU_HANG_RECOVERY_THRESHOLD) {
                 gpuHangDetected.store(true);
                 fbResized.store(true);
             }
             return;
+        } else if (fwElapsed > 100000000ULL) {
+            RLOG_E("SLOW FENCE WAIT in renderFrame (current frame) - %.1fms", fwElapsed/1000000.0);
         }
         currentFenceWaited = true;
     }
@@ -1286,6 +1316,7 @@ ok=true;}catch(...){}
     pi.waitSemaphoreCount=1; pi.pWaitSemaphores=sSem; pi.swapchainCount=1; pi.pSwapchains=scs; pi.pImageIndices=&imgIdx;
     res=vk_.QueuePresentKHR(graphicsQueue,&pi);
     if (res==VK_ERROR_OUT_OF_DATE_KHR||res==VK_ERROR_SURFACE_LOST_KHR) fbResized.store(true);
+    else diagFramesRendered.fetch_add(1);
     currentFrame=(currentFrame+1)%MAX_FRAMES_IN_FLIGHT;
 }
 
@@ -1366,6 +1397,7 @@ void VulkanRendererContext::updateCursorImage(void* px, short w, short h, short 
 
 void VulkanRendererContext::updateWindowContent(int64_t id, void* px, short w, short h, short stride, int, int) {
     if (!px||w<=0||h<=0) return;
+    diagWinTexUpdates.fetch_add(1);
     std::lock_guard<std::mutex> lk(renderMutex);
     WinTex& wt=texMap[id];
     if (wt.img==VK_NULL_HANDLE || wt.w!=w || wt.h!=h) {
@@ -1396,6 +1428,7 @@ void VulkanRendererContext::updateWindowContent(int64_t id, void* px, short w, s
 
 void VulkanRendererContext::updateWindowContentAHB(int64_t id, AHardwareBuffer* ahb, short, short, int, int) {
     if (!ahb) return;
+    diagWinTexUpdates.fetch_add(1);
     std::lock_guard<std::mutex> lk(renderMutex);
     WinTex& wt=texMap[id];
 

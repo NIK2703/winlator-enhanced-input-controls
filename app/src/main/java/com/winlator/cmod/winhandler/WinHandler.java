@@ -355,6 +355,9 @@ public class WinHandler {
         });
     }
 
+    private long diagKeepaliveCount = 0;
+    private long diagLastKeepaliveLogMs = 0;
+
     private void startKeepaliveMonitor() {
         keepaliveHandler = new Handler(android.os.Looper.getMainLooper());
         keepaliveRunnable = new Runnable() {
@@ -363,10 +366,11 @@ public class WinHandler {
                 if (!running) return;
                 if (initReceived) {
                     long now = System.currentTimeMillis();
-                    if (now - lastKeepaliveTime > KEEPALIVE_TIMEOUT_MS) {
+                    long sinceLast = now - lastKeepaliveTime;
+                    if (sinceLast > KEEPALIVE_TIMEOUT_MS) {
                         if (!wineKeepaliveFailed) {
                             wineKeepaliveFailed = true;
-                            Log.w(TAG, "Wine keepalive timeout - no response for " + KEEPALIVE_TIMEOUT_MS + "ms");
+                            Log.e("DIAG_WINE", "KEEPALIVE TIMEOUT - no response for " + sinceLast + "ms (total received=" + diagKeepaliveCount + ")");
                             if (activity != null) {
                                 activity.runOnUiThread(() -> {
                                     activity.onWineKeepaliveTimeout();
@@ -375,6 +379,12 @@ public class WinHandler {
                         }
                     } else {
                         wineKeepaliveFailed = false;
+                    }
+                    if (diagLastKeepaliveLogMs == 0) diagLastKeepaliveLogMs = now;
+                    if (now - diagLastKeepaliveLogMs >= 5000) {
+                        Log.e("DIAG_WINE", "keepalive status: received=" + diagKeepaliveCount
+                            + " sinceLast=" + sinceLast + "ms failed=" + wineKeepaliveFailed);
+                        diagLastKeepaliveLogMs = now;
                     }
                 }
                 keepaliveHandler.postDelayed(this, KEEPALIVE_INTERVAL_MS);
@@ -564,6 +574,7 @@ public class WinHandler {
             case RequestCodes.CURSOR_POS_FEEDBACK: {
                 wineKeepaliveReceived = true;
                 lastKeepaliveTime = System.currentTimeMillis();
+                diagKeepaliveCount++;
                 short x = receiveData.getShort();
                 short y = receiveData.getShort();
                 XServer xServer = activity.getXServer();

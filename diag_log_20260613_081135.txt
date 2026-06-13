@@ -1,0 +1,127 @@
+--------- beginning of main
+06-13 08:11:52.072  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=445 vsyncs=277 wakeups=447 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:11:52.125  3048  3048 E Winlator_TP: DIAG: ticks=598 slow=0 gap=0 totalActions=0 interval=5012ms
+06-13 08:11:52.125  3048  3048 E DIAG_JAVA_TICK: ticks=598 slow=0 interval=5012ms
+06-13 08:11:57.080  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=888 vsyncs=577 wakeups=890 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:11:57.138  3048  3048 E Winlator_TP: DIAG: ticks=1245 slow=0 gap=0 totalActions=2 interval=5012ms
+06-13 08:11:57.138  3048  3048 E DIAG_JAVA_TICK: ticks=1245 slow=0 interval=5012ms
+06-13 08:12:02.082  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=1332 vsyncs=848 wakeups=1334 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:02.137  3048  3048 E Winlator_TP: DIAG: ticks=1870 slow=0 gap=1 totalActions=4 interval=5000ms
+06-13 08:12:02.137  3048  3048 E DIAG_JAVA_TICK: ticks=1870 slow=0 interval=5000ms
+06-13 08:12:07.084  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=1775 vsyncs=1147 wakeups=1777 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:07.145  3048  3048 E Winlator_TP: DIAG: ticks=2558 slow=0 gap=1 totalActions=6 interval=5008ms
+06-13 08:12:07.145  3048  3048 E DIAG_JAVA_TICK: ticks=2558 slow=0 interval=5008ms
+06-13 08:12:12.084  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=2219 vsyncs=1446 wakeups=2221 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:12.158  3048  3048 E Winlator_TP: DIAG: ticks=3259 slow=0 gap=1 totalActions=6 interval=5012ms
+06-13 08:12:12.158  3048  3048 E DIAG_JAVA_TICK: ticks=3259 slow=0 interval=5012ms
+06-13 08:12:17.092  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=2660 vsyncs=1746 wakeups=2662 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:17.158  3048  3048 E Winlator_TP: DIAG: ticks=3965 slow=0 gap=1 totalActions=10 interval=5000ms
+06-13 08:12:17.158  3048  3048 E DIAG_JAVA_TICK: ticks=3965 slow=0 interval=5000ms
+06-13 08:12:22.101  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=3100 vsyncs=2046 wakeups=3102 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:22.164  3048  3048 E Winlator_TP: DIAG: ticks=4630 slow=0 gap=1 totalActions=10 interval=5007ms
+06-13 08:12:22.164  3048  3048 E DIAG_JAVA_TICK: ticks=4630 slow=0 interval=5007ms
+06-13 08:12:27.109  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=3541 vsyncs=2346 wakeups=3543 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:27.164  3048  3048 E Winlator_TP: DIAG: ticks=5363 slow=0 gap=1 totalActions=11 interval=5000ms
+06-13 08:12:27.165  3048  3048 E DIAG_JAVA_TICK: ticks=5363 slow=0 interval=5000ms
+06-13 08:12:32.111  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=3981 vsyncs=2645 wakeups=3983 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:32.172  3048  3048 E Winlator_TP: DIAG: ticks=6122 slow=0 gap=1 totalActions=18 interval=5008ms
+06-13 08:12:32.173  3048  3048 E DIAG_JAVA_TICK: ticks=6122 slow=0 interval=5008ms
+06-13 08:12:37.116  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=4421 vsyncs=2945 wakeups=4423 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:37.175  3048  3048 E Winlator_TP: DIAG: ticks=6785 slow=0 gap=1 totalActions=23 interval=5003ms
+06-13 08:12:37.175  3048  3048 E DIAG_JAVA_TICK: ticks=6785 slow=0 interval=5003ms
+06-13 08:12:42.122  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=4861 vsyncs=3244 wakeups=4863 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:42.179  3048  3048 E Winlator_TP: DIAG: ticks=7559 slow=0 gap=1 totalActions=23 interval=5004ms
+06-13 08:12:42.179  3048  3048 E DIAG_JAVA_TICK: ticks=7559 slow=0 interval=5004ms
+06-13 08:12:47.130  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=5301 vsyncs=3544 wakeups=5303 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:47.191  3048  3048 E Winlator_TP: DIAG: ticks=8265 slow=0 gap=1 totalActions=26 interval=5012ms
+06-13 08:12:47.191  3048  3048 E DIAG_JAVA_TICK: ticks=8265 slow=0 interval=5012ms
+06-13 08:12:52.135  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=5741 vsyncs=3844 wakeups=5743 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:52.195  3048  3048 E Winlator_TP: DIAG: ticks=8967 slow=0 gap=1 totalActions=32 interval=5003ms
+06-13 08:12:52.195  3048  3048 E DIAG_JAVA_TICK: ticks=8967 slow=0 interval=5003ms
+06-13 08:12:57.141  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=6180 vsyncs=4143 wakeups=6182 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:12:57.201  3048  3048 E Winlator_TP: DIAG: ticks=9737 slow=0 gap=1 totalActions=42 interval=5006ms
+06-13 08:12:57.201  3048  3048 E DIAG_JAVA_TICK: ticks=9737 slow=0 interval=5006ms
+06-13 08:13:02.146  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=6620 vsyncs=4443 wakeups=6622 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:02.212  3048  3048 E Winlator_TP: DIAG: ticks=10475 slow=0 gap=1 totalActions=47 interval=5012ms
+06-13 08:13:02.212  3048  3048 E DIAG_JAVA_TICK: ticks=10475 slow=0 interval=5012ms
+06-13 08:13:07.150  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=7061 vsyncs=4742 wakeups=7063 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:07.223  3048  3048 E Winlator_TP: DIAG: ticks=11186 slow=0 gap=1 totalActions=47 interval=5010ms
+06-13 08:13:07.223  3048  3048 E DIAG_JAVA_TICK: ticks=11186 slow=0 interval=5010ms
+06-13 08:13:12.161  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=7502 vsyncs=5042 wakeups=7504 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:12.222  3048  3048 E Winlator_TP: DIAG: ticks=11992 slow=0 gap=1 totalActions=52 interval=5000ms
+06-13 08:13:12.222  3048  3048 E DIAG_JAVA_TICK: ticks=11992 slow=0 interval=5000ms
+06-13 08:13:17.163  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=7942 vsyncs=5342 wakeups=7944 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:17.229  3048  3048 E Winlator_TP: DIAG: ticks=12733 slow=0 gap=1 totalActions=61 interval=5007ms
+06-13 08:13:17.229  3048  3048 E DIAG_JAVA_TICK: ticks=12733 slow=0 interval=5007ms
+06-13 08:13:22.169  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=8383 vsyncs=5641 wakeups=8385 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:22.242  3048  3048 E Winlator_TP: DIAG: ticks=13559 slow=0 gap=1 totalActions=67 interval=5012ms
+06-13 08:13:22.242  3048  3048 E DIAG_JAVA_TICK: ticks=13559 slow=0 interval=5012ms
+06-13 08:13:27.177  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=8824 vsyncs=5941 wakeups=8826 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:27.242  3048  3048 E Winlator_TP: DIAG: ticks=14434 slow=0 gap=1 totalActions=71 interval=5001ms
+06-13 08:13:27.242  3048  3048 E DIAG_JAVA_TICK: ticks=14434 slow=0 interval=5001ms
+06-13 08:13:32.178  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=9264 vsyncs=6240 wakeups=9266 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:32.249  3048  3048 E Winlator_TP: DIAG: ticks=15174 slow=0 gap=1 totalActions=77 interval=5007ms
+06-13 08:13:32.249  3048  3048 E DIAG_JAVA_TICK: ticks=15174 slow=0 interval=5007ms
+06-13 08:13:37.188  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=9705 vsyncs=6540 wakeups=9707 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:37.249  3048  3048 E Winlator_TP: DIAG: ticks=15924 slow=0 gap=1 totalActions=87 interval=5000ms
+06-13 08:13:37.250  3048  3048 E DIAG_JAVA_TICK: ticks=15924 slow=0 interval=5000ms
+06-13 08:13:42.197  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=10145 vsyncs=6840 wakeups=10147 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:42.250  3048  3048 E Winlator_TP: DIAG: ticks=16719 slow=0 gap=1 totalActions=91 interval=5000ms
+06-13 08:13:42.250  3048  3048 E DIAG_JAVA_TICK: ticks=16719 slow=0 interval=5000ms
+06-13 08:13:47.207  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=10585 vsyncs=7140 wakeups=10587 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:47.253  3048  3048 E Winlator_TP: DIAG: ticks=17447 slow=0 gap=1 totalActions=92 interval=5004ms
+06-13 08:13:47.253  3048  3048 E DIAG_JAVA_TICK: ticks=17447 slow=0 interval=5004ms
+06-13 08:13:52.213  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=11025 vsyncs=7440 wakeups=11027 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:52.263  3048  3048 E Winlator_TP: DIAG: ticks=18237 slow=0 gap=1 totalActions=92 interval=5010ms
+06-13 08:13:52.264  3048  3048 E DIAG_JAVA_TICK: ticks=18237 slow=0 interval=5010ms
+06-13 08:13:57.215  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=11464 vsyncs=7739 wakeups=11466 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:13:57.276  3048  3048 E Winlator_TP: DIAG: ticks=18931 slow=0 gap=1 totalActions=92 interval=5012ms
+06-13 08:13:57.276  3048  3048 E DIAG_JAVA_TICK: ticks=18931 slow=0 interval=5012ms
+06-13 08:14:02.225  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=11904 vsyncs=8039 wakeups=11906 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:02.275  3048  3048 E Winlator_TP: DIAG: ticks=19771 slow=0 gap=1 totalActions=100 interval=5000ms
+06-13 08:14:02.276  3048  3048 E DIAG_JAVA_TICK: ticks=19771 slow=0 interval=5000ms
+06-13 08:14:07.232  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=12344 vsyncs=8338 wakeups=12346 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:07.283  3048  3048 E Winlator_TP: DIAG: ticks=20475 slow=0 gap=1 totalActions=100 interval=5008ms
+06-13 08:14:07.283  3048  3048 E DIAG_JAVA_TICK: ticks=20475 slow=0 interval=5008ms
+06-13 08:14:12.236  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=12783 vsyncs=8638 wakeups=12785 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:12.295  3048  3048 E Winlator_TP: DIAG: ticks=21273 slow=0 gap=1 totalActions=100 interval=5012ms
+06-13 08:14:12.295  3048  3048 E DIAG_JAVA_TICK: ticks=21273 slow=0 interval=5012ms
+06-13 08:14:17.238  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=13222 vsyncs=8937 wakeups=13224 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:17.295  3048  3048 E Winlator_TP: DIAG: ticks=21946 slow=0 gap=1 totalActions=100 interval=5000ms
+06-13 08:14:17.295  3048  3048 E DIAG_JAVA_TICK: ticks=21946 slow=0 interval=5000ms
+06-13 08:14:22.245  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=13662 vsyncs=9237 wakeups=13664 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:22.296  3048  3048 E Winlator_TP: DIAG: ticks=22654 slow=0 gap=1 totalActions=100 interval=5000ms
+06-13 08:14:22.296  3048  3048 E DIAG_JAVA_TICK: ticks=22654 slow=0 interval=5000ms
+06-13 08:14:27.255  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=14102 vsyncs=9537 wakeups=14104 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:27.298  3048  3048 E Winlator_TP: DIAG: ticks=23334 slow=0 gap=1 totalActions=100 interval=5002ms
+06-13 08:14:27.298  3048  3048 E DIAG_JAVA_TICK: ticks=23334 slow=0 interval=5002ms
+06-13 08:14:32.267  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=14542 vsyncs=9837 wakeups=14544 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:32.310  3048  3048 E Winlator_TP: DIAG: ticks=24051 slow=0 gap=1 totalActions=100 interval=5013ms
+06-13 08:14:32.310  3048  3048 E DIAG_JAVA_TICK: ticks=24051 slow=0 interval=5013ms
+06-13 08:14:37.273  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=14844 vsyncs=10137 wakeups=14846 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:37.321  3048  3048 E Winlator_TP: DIAG: ticks=24621 slow=0 gap=1 totalActions=100 interval=5011ms
+06-13 08:14:37.321  3048  3048 E DIAG_JAVA_TICK: ticks=24621 slow=0 interval=5011ms
+06-13 08:14:42.276  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=15139 vsyncs=10436 wakeups=15141 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:42.322  3048  3048 E Winlator_TP: DIAG: ticks=24965 slow=0 gap=1 totalActions=100 interval=5000ms
+06-13 08:14:42.322  3048  3048 E DIAG_JAVA_TICK: ticks=24965 slow=0 interval=5000ms
+06-13 08:14:47.293  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=15434 vsyncs=10736 wakeups=15436 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:47.330  3048  3048 E Winlator_TP: DIAG: ticks=25436 slow=0 gap=1 totalActions=100 interval=5008ms
+06-13 08:14:47.330  3048  3048 E DIAG_JAVA_TICK: ticks=25436 slow=0 interval=5008ms
+06-13 08:14:52.296  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=15730 vsyncs=11036 wakeups=15732 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:52.331  3048  3048 E Winlator_TP: DIAG: ticks=25931 slow=0 gap=1 totalActions=100 interval=5001ms
+06-13 08:14:52.331  3048  3048 E DIAG_JAVA_TICK: ticks=25931 slow=0 interval=5001ms
+06-13 08:14:57.313  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=16028 vsyncs=11336 wakeups=16030 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:14:57.336  3048  3048 E Winlator_TP: DIAG: ticks=26410 slow=0 gap=1 totalActions=100 interval=5006ms
+06-13 08:14:57.337  3048  3048 E DIAG_JAVA_TICK: ticks=26410 slow=0 interval=5006ms
+06-13 08:15:02.325  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=16326 vsyncs=11636 wakeups=16328 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:15:02.336  3048  3048 E Winlator_TP: DIAG: ticks=26888 slow=0 gap=1 totalActions=100 interval=5000ms
+06-13 08:15:02.336  3048  3048 E DIAG_JAVA_TICK: ticks=26888 slow=0 interval=5000ms
+06-13 08:15:07.341  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=16624 vsyncs=11936 wakeups=16626 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:15:07.343  3048  3048 E Winlator_TP: DIAG: ticks=27341 slow=0 gap=1 totalActions=100 interval=5007ms
+06-13 08:15:07.343  3048  3048 E DIAG_JAVA_TICK: ticks=27341 slow=0 interval=5007ms
+06-13 08:15:12.343  3048  3048 E Winlator_TP: DIAG: ticks=27907 slow=0 gap=1 totalActions=100 interval=5000ms
+06-13 08:15:12.343  3048  3048 E DIAG_JAVA_TICK: ticks=27907 slow=0 interval=5000ms
+06-13 08:15:12.350  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=16922 vsyncs=12236 wakeups=16924 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0
+06-13 08:15:17.351  3048  3048 E Winlator_TP: DIAG: ticks=28568 slow=0 gap=1 totalActions=100 interval=5008ms
+06-13 08:15:17.351  3048  3048 E DIAG_JAVA_TICK: ticks=28568 slow=0 interval=5008ms
+06-13 08:15:17.356  3048 28244 E Winlator_Renderer: DIAG RENDER: frames=17359 vsyncs=12536 wakeups=17361 fenceWaits=0 avgFenceWait=0.0ms gpuHangs=0

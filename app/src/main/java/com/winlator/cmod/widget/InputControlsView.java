@@ -617,7 +617,13 @@ public class InputControlsView extends View {
         invalidate();
     }
 
+    private long diagLastTickStatusMs = 0;
+    private long diagTickCount = 0;
+    private long diagSlowTicks = 0;
+
     public void tick(long timeMs) {
+        diagTickCount++;
+        long tickStart = System.nanoTime();
         if (nativeTouchProcessor != null) {
             try {
                 nativeTouchProcessor.tick(timeMs);
@@ -627,6 +633,16 @@ public class InputControlsView extends View {
                 syncVisualStates();
             } catch (Exception e) {
             }
+        }
+        long tickElapsedUs = (System.nanoTime() - tickStart) / 1000;
+        if (tickElapsedUs > 16000) {
+            diagSlowTicks++;
+        }
+        if (diagLastTickStatusMs == 0) diagLastTickStatusMs = timeMs;
+        if (timeMs - diagLastTickStatusMs >= 5000) {
+            Log.e("DIAG_JAVA_TICK", "ticks=" + diagTickCount + " slow=" + diagSlowTicks
+                + " interval=" + (timeMs - diagLastTickStatusMs) + "ms");
+            diagLastTickStatusMs = timeMs;
         }
         if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
             int w = getWidth();

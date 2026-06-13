@@ -12,6 +12,12 @@ void init_bezier_lut(void);
 #define DEFAULT_AUTO_REPEAT_INTERVAL_MS 100
 #define HIGH_ACTION_COUNT_THRESHOLD 16
 #define TICK_BUDGET_US 16000
+static uint64_t tp_diag_tick_count = 0;
+static uint64_t tp_diag_slow_ticks = 0;
+static uint64_t tp_diag_gap_ticks = 0;
+static uint64_t tp_diag_last_status_ms = 0;
+static uint64_t tp_diag_last_tick_ms = 0;
+static uint64_t tp_diag_total_actions = 0;
 TouchProcessorState g_state;
 
 void touch_processor_init(const TouchProcessorConfig* config) {
@@ -545,7 +551,12 @@ static void tick_end(struct timespec* start, int action_count) {
     uint64_t elapsed = (end.tv_sec - start->tv_sec) * 1000000
                      + (end.tv_nsec - start->tv_nsec) / 1000;
     if (__builtin_expect(elapsed > TICK_BUDGET_US, 0)) {
+        tp_diag_slow_ticks++;
+        if (elapsed > 100000) {
+            __android_log_print(ANDROID_LOG_ERROR, "Winlator_TP", "DIAG: EXTREMELY SLOW TICK %luus (>100ms!)", (unsigned long)elapsed);
+        }
     }
+    tp_diag_total_actions += action_count;
     if (action_count > HIGH_ACTION_COUNT_THRESHOLD) {
     }
 }
@@ -578,6 +589,21 @@ static void process_range_button_tick(uint64_t time_ms, TouchActionResult* restr
 
 TouchActionResult touch_processor_tick(uint64_t time_ms) {
     TouchActionResult result; result.count = 0;
+
+    tp_diag_tick_count++;
+    if (tp_diag_last_tick_ms != 0 && time_ms - tp_diag_last_tick_ms > TICK_GAP_WARNING_MS) {
+        tp_diag_gap_ticks++;
+    }
+    tp_diag_last_tick_ms = time_ms;
+
+    if (tp_diag_last_status_ms == 0) tp_diag_last_status_ms = time_ms;
+    if (time_ms - tp_diag_last_status_ms >= 5000) {
+        __android_log_print(ANDROID_LOG_ERROR, "Winlator_TP", "DIAG: ticks=%lu slow=%lu gap=%lu totalActions=%lu interval=%lums",
+            (unsigned long)tp_diag_tick_count, (unsigned long)tp_diag_slow_ticks,
+            (unsigned long)tp_diag_gap_ticks, (unsigned long)tp_diag_total_actions,
+            (unsigned long)(time_ms - tp_diag_last_status_ms));
+        tp_diag_last_status_ms = time_ms;
+    }
 
     if (__builtin_expect(g_state.last_tick_time != 0 && time_ms - g_state.last_tick_time > TICK_GAP_WARNING_MS, 0)) {
         }

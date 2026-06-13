@@ -749,7 +749,7 @@ static bool move_resolve_drag(
     };
     bool drag_ok = resolve_drag_binding(&resolve_ctx, &drag_binding, &drag_count);
 
-    if (!drag_ok && params->non_drag_count > 0) {
+    if (!drag_ok && !g_state.cfg.is_tp && params->non_drag_count > 0) {
         drag_binding = params->non_drag;
         drag_count = params->non_drag_count;
         drag_ok = true;

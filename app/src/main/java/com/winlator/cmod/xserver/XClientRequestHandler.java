@@ -31,6 +31,9 @@ public class XClientRequestHandler implements RequestHandler {
     public static final byte RESPONSE_CODE_SUCCESS = 1;
     public static final int MAX_REQUEST_LENGTH = 65535;
 
+    private static long diagRequestCount = 0;
+    private static long diagLastRequestLogMs = 0;
+
     @Override
     public boolean handleRequest(Client client) throws IOException {
         XClient xClient = (XClient)client.getTag();
@@ -38,7 +41,15 @@ public class XClientRequestHandler implements RequestHandler {
         XOutputStream outputStream = client.getOutputStream();
 
         if (xClient.isAuthenticated()) {
-            return handleNormalRequest(xClient, inputStream, outputStream);
+            boolean result = handleNormalRequest(xClient, inputStream, outputStream);
+            diagRequestCount++;
+            long now = System.currentTimeMillis();
+            if (diagLastRequestLogMs == 0) diagLastRequestLogMs = now;
+            if (now - diagLastRequestLogMs >= 5000) {
+                android.util.Log.e("DIAG_X11", "requests=" + diagRequestCount + " interval=" + (now - diagLastRequestLogMs) + "ms");
+                diagLastRequestLogMs = now;
+            }
+            return result;
         }
         else return handleAuthRequest(xClient, inputStream, outputStream);
     }
