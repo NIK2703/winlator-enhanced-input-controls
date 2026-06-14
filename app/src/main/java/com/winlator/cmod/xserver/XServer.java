@@ -2,6 +2,7 @@ package com.winlator.cmod.xserver;
 
 import android.graphics.Rect;
 
+import android.util.Log;
 import android.util.SparseArray;
 
 import com.winlator.cmod.inputcontrols.InputMode;
@@ -267,6 +268,7 @@ public class XServer {
     }
 
     public void injectPointerButtonPress(Pointer.Button buttonCode) {
+        Log.d("SigTrace", "XSERVER_PRESS code=" + buttonCode.code() + " name=" + buttonCode.name());
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             pointer.setButton(buttonCode, true);
 
@@ -276,6 +278,7 @@ public class XServer {
     }
 
     public void injectPointerButtonRelease(Pointer.Button buttonCode) {
+        Log.d("SigTrace", "XSERVER_RELEASE code=" + buttonCode.code() + " name=" + buttonCode.name());
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             pointer.setButton(buttonCode, false);
 

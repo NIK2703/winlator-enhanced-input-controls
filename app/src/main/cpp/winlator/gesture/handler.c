@@ -250,17 +250,22 @@ static void process_element_hit(TouchElement* element, TouchFinger* finger,
         g_state.passthrough_active = true;
 
     ActivationMode activation_mode = element->activation_mode;
+    int eidx = (int)(element - g_state.elements);
     if (activation_mode == ACTIVATION_LOCK) {
         if (!*found_lock) {
+            __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "HIT_LOCK elem=%d type=%d", eidx, element->type);
             handle_element_down(element, finger->ptr_id, x, y, time_ms, result);
             *found_lock = true;
         }
     } else if (element->type != ELEM_BUTTON) {
         if (!*handled) {
+            __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "HIT_NONBTN elem=%d type=%d bind0=%d engaged=%d", eidx, element->type, element->bindings[0].type, element->engaged);
             handle_element_down(element, finger->ptr_id, x, y, time_ms, result);
+            __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "HIT_NONBTN_AFTER elem=%d engaged=%d current_ptr=%d", eidx, element->engaged, element->current_ptr_id);
             if (element->engaged && !element->passthrough_touch) *handled = true;
         }
     } else if (*btn == NULL) {
+        __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "HIT_BTN elem=%d type=%d act=%d bind0=%d", eidx, element->type, activation_mode, element->bindings[0].type);
         *btn = element;
     }
 }
@@ -323,6 +328,7 @@ static bool handle_gesture_down_element(TouchFinger* finger, float x, float y, u
     }
 
     hit_test_elements_down(finger, x, y, time_ms, result, has_passthrough, &found_lock, &handled, &btn);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "GDOWN_ELEMENT found_lock=%d handled=%d btn=%p", found_lock, handled, (void*)btn);
     if (found_lock) return true;
 
     // TRACK/HOVER BUTTON
@@ -331,6 +337,7 @@ static bool handle_gesture_down_element(TouchFinger* finger, float x, float y, u
         if (btn->activation_mode == ACTIVATION_TRACK || btn->activation_mode == ACTIVATION_HOVER) {
             TrackedButtons* tracked = get_tracked_buttons(finger->ptr_id);
             bool already = is_tracked(tracked, element_index(btn));
+            __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "GDOWN_TRACK_HOVER elem=%d already=%d", element_index(btn), already);
             if (!already) {
                 int16_t prev_ptr = btn->current_ptr_id;
                 handle_element_down(btn, finger->ptr_id, x, y, time_ms, result);
@@ -936,10 +943,12 @@ void handle_gesture_up(TouchFinger* finger, float x, float y, uint64_t time_ms, 
     const int ptr_id = finger->ptr_id;
     bool had_element = false;
     TouchFinger* finger_up = find_finger(ptr_id);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "GUP ptr=%d finger_up=%p engaged_count=%d", ptr_id, (void*)finger_up, finger_up ? finger_up->engaged_elem_count : -1);
     if (finger_up != NULL) {
         uint8_t count = finger_up->engaged_elem_count;
         for (uint8_t i = 0; i < count; i++) {
             TouchElement* element = &g_state.elements[finger_up->engaged_elem_indices[i]];
+            __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "GUP engaged[%d] elem=%d current_ptr=%d match=%d", i, finger_up->engaged_elem_indices[i], element->current_ptr_id, element->current_ptr_id == ptr_id);
             if (element->current_ptr_id == ptr_id) {
                 handle_element_up(element, x, y, time_ms, result);
                 had_element = true;
@@ -947,6 +956,7 @@ void handle_gesture_up(TouchFinger* finger, float x, float y, uint64_t time_ms, 
         }
         finger_up->engaged_elem_count = 0;
     }
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "GUP had_tracked=%d had_element=%d result_count=%d", had_tracked, had_element, result->count);
     if (had_tracked || had_element) {
         if (g_state.gesture_main_ptr_id == ptr_id) {
             g_state.gesture_main_ptr_id = INVALID_PTR_ID;

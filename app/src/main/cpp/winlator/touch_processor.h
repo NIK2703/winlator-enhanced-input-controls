@@ -130,6 +130,7 @@ typedef enum {
         bool cached_has_long_press;
         bool cached_has_gesture;
         bool cached_has_any_binding;
+        uint8_t cached_petal_mask;   // bitmask: bit i = bindings[i] != BINDING_NONE (fast petal iteration)
         // Bindings (pushed to end of HOT — 40 bytes, accessed on every element interaction)
         TouchBinding bindings[4];
 

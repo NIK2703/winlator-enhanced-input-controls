@@ -353,6 +353,7 @@ public class XInput2Extension implements Extension {
 
     public void emitRawButton(int deviceId, int buttonNumber, boolean pressed) {
         int maskBit = pressed ? XI_RawButtonPress_MASK : XI_RawButtonRelease_MASK;
+        android.util.Log.d("SigTrace", "XINPUT2_EMIT btn=" + buttonNumber + " pressed=" + pressed + " selections=" + selections.size());
 
         for (Selection sel : selections) {
             if (!matchesSelection(sel, deviceId)) continue;
@@ -360,7 +361,9 @@ public class XInput2Extension implements Extension {
 
             try {
                 sendXIRawButtonToClient(sel.client, deviceId, buttonNumber, pressed);
+                android.util.Log.d("SigTrace", "XINPUT2_SENT btn=" + buttonNumber + " pressed=" + pressed);
             } catch (IOException ignored) {
+                android.util.Log.d("SigTrace", "XINPUT2_SEND_FAILED btn=" + buttonNumber + " pressed=" + pressed);
             }
         }
     }

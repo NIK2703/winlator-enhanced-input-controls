@@ -43,6 +43,9 @@ static inline void clear_gesture_and_release_lp(TouchElement* e, TouchActionResu
 void element_button_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     (void)ptr_id; (void)x; (void)y;
     bool has_primary = element_has_primary(e);
+    int eidx = (int)(e - g_state.elements);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "BTN_DOWN elem=%d has_primary=%d toggle=%d sel=%d lp=%d gesture=%d defer=%d act=%d bind0_type=%d sticky=0x%x",
+        eidx, has_primary, e->cached_has_toggle, e->selected, e->cached_has_long_press, e->cached_has_gesture, e->defer_primary, e->activation_mode, e->bindings[0].type, e->primary_sticky_mask);
 
     // Toggle ON: re-press = toggle OFF
     if (e->cached_has_toggle && e->selected) {
@@ -255,6 +258,9 @@ void element_button_move(TouchElement* e, float x, float y, uint64_t time_ms, To
 // Toggle: skip release (binding stays held). Non-toggle: release binding.
 void element_button_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     bool has_primary = element_has_primary(e);
+    int eidx = (int)(e - g_state.elements);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "BTN_UP elem=%d has_primary=%d toggle=%d auto_rep=%d sel=%d defer=%d lp_trig=%d gest_trig=%d sticky=0x%x result_before=%d",
+        eidx, has_primary, e->cached_has_toggle, e->cached_has_auto_repeat, e->selected, e->defer_primary, e->gesture_long_press_triggered, e->gesture_swipe_triggered, e->primary_sticky_mask, result->count);
 
     // Toggle+AR: keep repeating if selected
     if (e->cached_has_toggle && e->cached_has_auto_repeat) {

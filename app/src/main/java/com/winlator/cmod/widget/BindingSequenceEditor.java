@@ -15,7 +15,7 @@ import com.winlator.cmod.contentdialog.BindingPickerDialog;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.inputcontrols.BindPackage;
-import com.winlator.cmod.inputcontrols.Binding;
+import com.winlator.cmod.inputcontrols.Bind;
 
 public class BindingSequenceEditor {
     public static View createView(Context context, String label, int helpTextResId,
@@ -152,7 +152,7 @@ public class BindingSequenceEditor {
             bp.sync();
 
             for (int i = 0; i < bp.size(); i++) {
-                final Binding currentBinding = bp.get(i);
+                final Bind currentBinding = bp.get(i);
                 final int seqIndex = i;
                 View row = LayoutInflater.from(context).inflate(R.layout.binding_sequence_item, llItems, false);
                 final TextView btBinding = row.findViewById(R.id.BTBinding);
@@ -194,10 +194,10 @@ public class BindingSequenceEditor {
 
         int buttonHeight = (int) UnitUtils.dpToPx(36);
         Button btAdd = new Button(context, null, 0, R.style.ButtonNeutral);
-        btAdd.setText("+ Add Binding");
+        btAdd.setText("+ Add Bind");
         btAdd.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, buttonHeight));
         btAdd.setOnClickListener((v) -> {
-            bp.add(Binding.NONE);
+            bp.add(Bind.NONE);
             if (onChanged != null) onChanged.run();
             if (populateRef[0] != null) populateRef[0].run();
 

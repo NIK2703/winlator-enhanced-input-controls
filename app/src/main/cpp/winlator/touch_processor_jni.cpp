@@ -383,6 +383,17 @@ static void dispatch_actions_batch(JNIEnv* env, const TouchActionResult* r) {
         }
     }
 
+    for (int i = 0; i < n; i++) {
+        const char* act_name = "UNK";
+        switch (packed[i*4]) {
+            case 3: act_name = "PTR_BTN_PRESS"; break;
+            case 4: act_name = "PTR_BTN_RELEASE"; break;
+            case 5: act_name = "KEY_PRESS"; break;
+            case 6: act_name = "KEY_RELEASE"; break;
+            case 7: act_name = "MOUSE_EVENT"; break;
+        }
+        __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "DISPATCH act[%d] type=%d arg0=%d (%s)", i, packed[i*4], packed[i*4+1], act_name);
+    }
     env->ReleaseIntArrayElements(g_dispatch_packed, packed, 0);
     env->CallVoidMethod(g_dispatch_obj, g_dispatchAllActions, n);
     JNI_CHECK(env, "dispatchAllActions");
@@ -832,20 +843,10 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
         elems[i].corner_radius = env->GetFloatField(je, g_elem.cornerRadius);
         elems[i].opacity = env->GetFloatField(je, g_elem.opacity);
 
-        elems[i].element_long_press_count = read_binding_list(env,
-            (jintArray)env->GetObjectField(je, g_elem.elementLongPress), elems[i].element_long_press, 8);
-        {
-            jint lpToggle = env->GetIntField(je, g_elem.longPressToggleBitmask);
-            for (int k = 0; k < elems[i].element_long_press_count; k++)
-                elems[i].element_long_press[k].toggle = (lpToggle >> k) & 1;
-        }
-        elems[i].element_gesture_count = read_binding_list(env,
-            (jintArray)env->GetObjectField(je, g_elem.elementGesture), elems[i].element_gesture, 8);
-        {
-            jint gToggle = env->GetIntField(je, g_elem.gestureToggleBitmask);
-            for (int k = 0; k < elems[i].element_gesture_count; k++)
-                elems[i].element_gesture[k].toggle = (gToggle >> k) & 1;
-        }
+        elems[i].element_long_press_count = 0;
+        elems[i].element_gesture_count = 0;
+        elems[i].primary_sticky_mask = 0;
+
         jintArray bindingTypes = (jintArray)env->GetObjectField(je, g_elem.bindingTypes);
         if (bindingTypes) {
             jint* bt = env->GetIntArrayElements(bindingTypes, NULL);
@@ -866,52 +867,66 @@ static void nativeSetElements(JNIEnv* env, jclass clazz, jobjectArray elements) 
             env->ReleaseIntArrayElements(bindingTypes, bt, JNI_ABORT);
         }
 
-        {
-            jintArray stickyArr = (jintArray)env->GetObjectField(je, g_elem.bindingSticky);
-            if (stickyArr) {
-                jint* sticky = env->GetIntArrayElements(stickyArr, NULL);
-                jsize stickyLen = env->GetArrayLength(stickyArr);
-                int mask = 0;
-                for (int j = 0; j < stickyLen && j < 4; j++) {
-                    if (sticky[j] != 0) mask |= (1 << j);
+        if (elems[i].type == ELEM_BUTTON) {
+            elems[i].element_long_press_count = read_binding_list(env,
+                (jintArray)env->GetObjectField(je, g_elem.elementLongPress), elems[i].element_long_press, 8);
+            {
+                jint lpToggle = env->GetIntField(je, g_elem.longPressToggleBitmask);
+                for (int k = 0; k < elems[i].element_long_press_count; k++)
+                    elems[i].element_long_press[k].toggle = (lpToggle >> k) & 1;
+            }
+            elems[i].element_gesture_count = read_binding_list(env,
+                (jintArray)env->GetObjectField(je, g_elem.elementGesture), elems[i].element_gesture, 8);
+            {
+                jint gToggle = env->GetIntField(je, g_elem.gestureToggleBitmask);
+                for (int k = 0; k < elems[i].element_gesture_count; k++)
+                    elems[i].element_gesture[k].toggle = (gToggle >> k) & 1;
+            }
+            {
+                jintArray stickyArr = (jintArray)env->GetObjectField(je, g_elem.bindingSticky);
+                if (stickyArr) {
+                    jint* sticky = env->GetIntArrayElements(stickyArr, NULL);
+                    jsize stickyLen = env->GetArrayLength(stickyArr);
+                    int mask = 0;
+                    for (int j = 0; j < stickyLen && j < 4; j++) {
+                        if (sticky[j] != 0) mask |= (1 << j);
+                    }
+                    elems[i].primary_sticky_mask = mask;
+                    env->ReleaseIntArrayElements(stickyArr, sticky, JNI_ABORT);
                 }
-                elems[i].primary_sticky_mask = mask;
-                env->ReleaseIntArrayElements(stickyArr, sticky, JNI_ABORT);
-            } else {
-                elems[i].primary_sticky_mask = 0;
             }
-        }
-        {
-            jintArray toggleArr = (jintArray)env->GetObjectField(je, g_elem.bindingToggle);
-            if (toggleArr) {
-                jint* toggles = env->GetIntArrayElements(toggleArr, NULL);
-                jsize toggleLen = env->GetArrayLength(toggleArr);
-                for (int j = 0; j < toggleLen && j < 4; j++)
-                    if (toggles[j] & 1)
-                        elems[i].bindings[j].toggle = true;
-                env->ReleaseIntArrayElements(toggleArr, toggles, JNI_ABORT);
+            {
+                jintArray toggleArr = (jintArray)env->GetObjectField(je, g_elem.bindingToggle);
+                if (toggleArr) {
+                    jint* toggles = env->GetIntArrayElements(toggleArr, NULL);
+                    jsize toggleLen = env->GetArrayLength(toggleArr);
+                    for (int j = 0; j < toggleLen && j < 4; j++)
+                        if (toggles[j] & 1)
+                            elems[i].bindings[j].toggle = true;
+                    env->ReleaseIntArrayElements(toggleArr, toggles, JNI_ABORT);
+                }
             }
-        }
-        {
-            jintArray arArr = (jintArray)env->GetObjectField(je, g_elem.bindingAutoRepeat);
-            if (arArr) {
-                jint* ar = env->GetIntArrayElements(arArr, NULL);
-                jsize arLen = env->GetArrayLength(arArr);
-                for (int j = 0; j < arLen && j < 4; j++)
-                    if (ar[j] & 1)
-                        elems[i].bindings[j].auto_repeat = true;
-                env->ReleaseIntArrayElements(arArr, ar, JNI_ABORT);
+            {
+                jintArray arArr = (jintArray)env->GetObjectField(je, g_elem.bindingAutoRepeat);
+                if (arArr) {
+                    jint* ar = env->GetIntArrayElements(arArr, NULL);
+                    jsize arLen = env->GetArrayLength(arArr);
+                    for (int j = 0; j < arLen && j < 4; j++)
+                        if (ar[j] & 1)
+                            elems[i].bindings[j].auto_repeat = true;
+                    env->ReleaseIntArrayElements(arArr, ar, JNI_ABORT);
+                }
             }
-        }
-        {
-            jintArray arIntervalArr = (jintArray)env->GetObjectField(je, g_elem.bindingAutoRepeatIntervalMs);
-            if (arIntervalArr) {
-                jint* arInterval = env->GetIntArrayElements(arIntervalArr, NULL);
-                jsize arIntervalLen = env->GetArrayLength(arIntervalArr);
-                for (int j = 0; j < arIntervalLen && j < 4; j++)
-                    if (arInterval[j] > 0)
-                        elems[i].bindings[j].auto_repeat_interval_ms = arInterval[j];
-                env->ReleaseIntArrayElements(arIntervalArr, arInterval, JNI_ABORT);
+            {
+                jintArray arIntervalArr = (jintArray)env->GetObjectField(je, g_elem.bindingAutoRepeatIntervalMs);
+                if (arIntervalArr) {
+                    jint* arInterval = env->GetIntArrayElements(arIntervalArr, NULL);
+                    jsize arIntervalLen = env->GetArrayLength(arIntervalArr);
+                    for (int j = 0; j < arIntervalLen && j < 4; j++)
+                        if (arInterval[j] > 0)
+                            elems[i].bindings[j].auto_repeat_interval_ms = arInterval[j];
+                    env->ReleaseIntArrayElements(arIntervalArr, arInterval, JNI_ABORT);
+                }
             }
         }
 
@@ -941,6 +956,11 @@ static void nativeSetSimTouchScreen(JNIEnv* env, jclass clazz, jboolean enabled)
 }
 
 static void dispatch_and_flush(JNIEnv* env, const TouchActionResult* r, const char* event_name) {
+    if (r && r->count > 0) {
+        for (int i = 0; i < r->count && i < 8; i++) {
+            __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "EVT_%s act[%d] type=%d a0=%d a1=%d", event_name, i, (int)r->actions[i].type, r->actions[i].pointer_button.button, 0);
+        }
+    }
     visual_state_flush();
     dispatch_actions_batch(env, r);
 }

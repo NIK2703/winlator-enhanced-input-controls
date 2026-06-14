@@ -119,10 +119,11 @@ static void compute_element_caps(TouchElement* e, int index) {
 static void cache_element_flags(TouchElement* e) {
     e->cached_has_long_press = e->element_long_press_count > 0 && e->element_long_press[0].type != BINDING_NONE;
     e->cached_has_gesture = e->element_gesture_count > 0 && e->element_gesture[0].type != BINDING_NONE;
-    e->cached_has_any_binding = e->bindings[0].type != BINDING_NONE
-                             || e->bindings[1].type != BINDING_NONE
-                             || e->bindings[2].type != BINDING_NONE
-                             || e->bindings[3].type != BINDING_NONE;
+    e->cached_petal_mask = 0;
+    for (int k = 0; k < MAX_BINDINGS_PER_ELEMENT; k++)
+        if (e->bindings[k].type != BINDING_NONE)
+            e->cached_petal_mask |= (1 << k);
+    e->cached_has_any_binding = e->cached_petal_mask != 0;
     e->cached_auto_repeat_interval = DEFAULT_AUTO_REPEAT_INTERVAL_MS;
     for (int k = 0; k < MAX_BINDINGS_PER_ELEMENT; k++) {
         if ((e->bindings[k].toggle || e->bindings[k].auto_repeat) && e->bindings[k].auto_repeat_interval_ms > 0) {
@@ -130,12 +131,20 @@ static void cache_element_flags(TouchElement* e) {
             break;
         }
     }
-    e->cached_lp_has_toggle = false;
-    for (int k = 0; k < e->element_long_press_count; k++)
-        if (e->element_long_press[k].toggle) { e->cached_lp_has_toggle = true; break; }
-    e->cached_gesture_has_toggle = false;
-    for (int k = 0; k < e->element_gesture_count; k++)
-        if (e->element_gesture[k].toggle) { e->cached_gesture_has_toggle = true; break; }
+    if (e->element_long_press_count > 0) {
+        e->cached_lp_has_toggle = false;
+        for (int k = 0; k < e->element_long_press_count; k++)
+            if (e->element_long_press[k].toggle) { e->cached_lp_has_toggle = true; break; }
+    } else {
+        e->cached_lp_has_toggle = false;
+    }
+    if (e->element_gesture_count > 0) {
+        e->cached_gesture_has_toggle = false;
+        for (int k = 0; k < e->element_gesture_count; k++)
+            if (e->element_gesture[k].toggle) { e->cached_gesture_has_toggle = true; break; }
+    } else {
+        e->cached_gesture_has_toggle = false;
+    }
     e->cached_bind0_is_gamepad = is_gamepad_binding(&e->bindings[0]);
     e->cached_bind0_is_right_stick = is_right_stick_binding(e);
 }
@@ -225,6 +234,19 @@ void touch_processor_set_elements(const TouchElement* elements, int count) {
     restore_toggle_state(&saved_toggle, save_n);
     mark_all_dirty();
     build_spatial_grid();
+
+    for (int i = 0; i < n; i++) {
+        TouchElement* e = &g_state.elements[i];
+        __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+            "ELEM[%d] type=%d x=%d y=%d w=%.2f h=%.2f sc=%.2f hw=%.1f hh=%.1f L=%.1f R=%.1f T=%.1f B=%.1f b0=%d",
+            i, e->type, e->x, e->y, e->w, e->h, e->scale,
+            e->hw, e->hh, e->cached_left, e->cached_right, e->cached_top, e->cached_bottom,
+            e->bindings[0].type);
+    }
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "GRID x=[%.1f..%.1f] y=[%.1f..%.1f] cw=%.1f ch=%.1f snap=%.1f",
+        g_state.grid_min_x, g_state.grid_max_x, g_state.grid_min_y, g_state.grid_max_y,
+        g_state.grid_cell_w, g_state.grid_cell_h, g_state.snapping_size);
 }
 
 void touch_processor_set_snapping_size(float size) {
@@ -258,9 +280,11 @@ static void finger_init(TouchFinger* f, int ptr_id) {
 TouchActionResult touch_processor_on_finger_down(int ptr_id, float x, float y, uint64_t time_ms) {
     TouchActionResult result; result.count = 0;
     TouchFinger* f = find_finger(ptr_id);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "TP_DOWN ptr=%d found_finger=%d active_fingers=%d elements=%d", ptr_id, f != NULL, g_state.active_finger_count, g_state.element_count);
     if (!f) {
         f = find_free_finger();
         if (!f) {
+            __android_log_print(ANDROID_LOG_WARN, "SigTrace", "TP_DOWN NO FREE FINGER! ptr=%d", ptr_id);
             return result;
         }
         finger_init(f, ptr_id);
@@ -308,12 +332,32 @@ TouchActionResult touch_processor_on_finger_move(int ptr_id, float x, float y, u
 TouchActionResult touch_processor_on_finger_up(int ptr_id, float x, float y, uint64_t time_ms) {
     TouchActionResult result; result.count = 0;
     TouchFinger* f = find_finger(ptr_id);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "TP_UP ptr=%d found_finger=%d single_tap_deferred=%d state=%d engaged=%d sched=%d held=%d",
+        ptr_id, f != NULL, f ? f->single_tap_deferred : -1, f ? f->state : -1,
+        f ? f->engaged_elem_count : -1,
+        g_state.scheduled_action_count, g_state.gesture_held_count);
     if (__builtin_expect(!f, 0)) {
+        __android_log_print(ANDROID_LOG_WARN, "SigTrace", "TP_UP FINGER NOT FOUND! ptr=%d", ptr_id);
         return result;
     }
     f->x = x; f->y = y;
     if (gesture_processing_needed())
         handle_gesture_up(f, x, y, time_ms, &result);
+
+    // Guarantee: any scheduled press from gesture path MUST be cancelled on finger UP.
+    // release_held_actions may not run in all code paths (e.g. early returns in
+    // handle_gesture_up), so we cancel here as a safety net to prevent orphaned presses.
+    if (g_state.scheduled_action_count > 0) {
+        int cancelled = 0;
+        for (int i = 0; i < g_state.scheduled_action_count; i++) {
+            if (g_state.scheduled_actions[i].active) {
+                g_state.scheduled_actions[i].active = false;
+                cancelled++;
+            }
+        }
+        if (cancelled > 0)
+            __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "TP_UP cancelled_sched=%d", cancelled);
+    }
     if (result.count == 0) {
     }
     if (__builtin_expect(f->single_tap_deferred, 0)) {

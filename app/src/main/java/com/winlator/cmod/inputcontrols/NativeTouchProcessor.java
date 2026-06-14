@@ -3,6 +3,7 @@ package com.winlator.cmod.inputcontrols;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.util.Log;
 
 import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.widget.InputControlsView;
@@ -21,9 +22,6 @@ import com.winlator.cmod.core.HapticUtils;
 import com.winlator.cmod.inputcontrols.TouchActivationMode;
 
 public class NativeTouchProcessor {
-    private static final int BINDING_KEYBOARD_FIRST = 0x100;
-    private static final int BINDING_KEYBOARD_LAST = 0x400;
-    private static final int BINDING_GAMEPAD_BASE = 0x500;
     private static boolean loaded;
     private static final XKeycode[] KEYCODES_BY_ID = new XKeycode[256];
     private static final HashMap<Integer, XKeycode> keycodeMap = new HashMap<>();
@@ -536,141 +534,66 @@ public class NativeTouchProcessor {
                 ne.orientation = ce.getOrientation();
             }
 
-            ne.elementLongPress = bindingListToEncoded(ce.getBindingsList(ControlElement.BindingSection.LONG_PRESS));
-            ne.elementGesture = bindingListToEncoded(ce.getBindingsList(ControlElement.BindingSection.GESTURE));
+            if (ce.getType() == ControlElement.Type.BUTTON) {
+                ne.elementLongPress = bindingListToEncoded(ce.getBindingsList(ControlElement.BindingSection.LONG_PRESS));
+                ne.elementGesture = bindingListToEncoded(ce.getBindingsList(ControlElement.BindingSection.GESTURE));
+            }
 
-            ne.bindingTypes = new int[ce.getBindingCount() * 2];
-            for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
-                Binding b = ce.getBindingAt(j);
-                int typeVal;
-                int keycodeVal = 0;
-                if (b == null || b == Binding.NONE) {
-                    typeVal = 0;
-                } else if (b.isGamepad()) {
-                    int ordinal = b.ordinal() - Binding.GAMEPAD_BUTTON_A.ordinal();
-                    typeVal = BINDING_GAMEPAD_BASE + ordinal;
-                    keycodeVal = ordinal;
-                } else if (b == Binding.MOUSE_LEFT_BUTTON) {
-                    typeVal = 1;
-                } else if (b == Binding.MOUSE_RIGHT_BUTTON) {
-                    typeVal = 2;
-                } else if (b == Binding.MOUSE_MIDDLE_BUTTON) {
-                    typeVal = 3;
-                } else if (b == Binding.MOUSE_SCROLL_UP) {
-                    typeVal = 6;
-                } else if (b == Binding.MOUSE_SCROLL_DOWN) {
-                    typeVal = 7;
-                } else if (b == Binding.MOUSE_MOVE_LEFT) {
-                    typeVal = 8;
-                } else if (b == Binding.MOUSE_MOVE_RIGHT) {
-                    typeVal = 9;
-                } else if (b == Binding.MOUSE_MOVE_UP) {
-                    typeVal = 10;
-                } else if (b == Binding.MOUSE_MOVE_DOWN) {
-                    typeVal = 11;
-                } else if (b.isModifier()) {
-                    Binding kb = b.toKeyboardBinding();
-                    if (kb != null) {
-                        typeVal = BINDING_KEYBOARD_FIRST + kb.keycode.id;
-                        keycodeVal = kb.keycode.id;
-                    } else {
-                        typeVal = 0;
-                    }
-                } else if (b.isKeyboard()) {
-                    typeVal = BINDING_KEYBOARD_FIRST + b.keycode.id;
-                    keycodeVal = b.keycode.id;
-                } else {
-                    typeVal = 0;
+            ne.bindingTypes = encodeElementBindings(ce);
+            if (ce.getType() == ControlElement.Type.BUTTON) {
+                ne.bindingSticky = new int[ce.getBindingCount()];
+                for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
+                    BindPackage pkg = ce.getSlotPackage(j);
+                    ne.bindingSticky[j] = pkg != null ? pkg.encodeStickyBitmask() : 0;
                 }
-                ne.bindingTypes[j * 2] = typeVal;
-                ne.bindingTypes[j * 2 + 1] = keycodeVal;
-            }
-            ne.bindingSticky = new int[ce.getBindingCount()];
-            for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
-                BindPackage pkg = ce.getSlotPackage(j);
-                ne.bindingSticky[j] = pkg != null ? pkg.encodeStickyBitmask() : 0;
-            }
-            ne.bindingToggle = new int[ce.getBindingCount()];
-            for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
-                BindPackage pkg = ce.getSlotPackage(j);
-                ne.bindingToggle[j] = pkg != null ? pkg.encodeToggleBitmask() : 0;
-            }
-            ne.bindingAutoRepeat = new int[ce.getBindingCount()];
-            for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
-                BindPackage pkg = ce.getSlotPackage(j);
-                ne.bindingAutoRepeat[j] = pkg != null ? pkg.encodeAutoRepeatBitmask() : 0;
-            }
-            ne.bindingAutoRepeatIntervalMs = new int[ce.getBindingCount()];
-            for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
-                BindPackage pkg = ce.getSlotPackage(j);
-                ne.bindingAutoRepeatIntervalMs[j] = pkg != null ? pkg.getAutoRepeatIntervalMs() : 100;
-            }
-            ne.longPressToggleBitmask = ce.computeToggleBitmask(ControlElement.BindingSection.LONG_PRESS);
-            ne.gestureToggleBitmask = ce.computeToggleBitmask(ControlElement.BindingSection.GESTURE);
-            if (ne.bindingToggle != null) {
-                for (int j = 0; j < ne.bindingToggle.length && j < 4; j++) {
+                ne.bindingToggle = new int[ce.getBindingCount()];
+                for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
+                    BindPackage pkg = ce.getSlotPackage(j);
+                    ne.bindingToggle[j] = pkg != null ? pkg.encodeToggleBitmask() : 0;
                 }
+                ne.bindingAutoRepeat = new int[ce.getBindingCount()];
+                for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
+                    BindPackage pkg = ce.getSlotPackage(j);
+                    ne.bindingAutoRepeat[j] = pkg != null ? pkg.encodeAutoRepeatBitmask() : 0;
+                }
+                ne.bindingAutoRepeatIntervalMs = new int[ce.getBindingCount()];
+                for (int j = 0; j < ce.getBindingCount() && j < 4; j++) {
+                    BindPackage pkg = ce.getSlotPackage(j);
+                    ne.bindingAutoRepeatIntervalMs[j] = pkg != null ? pkg.getAutoRepeatIntervalMs() : 100;
+                }
+                ne.longPressToggleBitmask = ce.computeToggleBitmask(ControlElement.BindingSection.LONG_PRESS);
+                ne.gestureToggleBitmask = ce.computeToggleBitmask(ControlElement.BindingSection.GESTURE);
             }
             arr[i] = ne;
         }
         return arr;
     }
 
-    private static int[] bindingListToEncoded(List<Binding> list) {
-        if (list == null) return new int[0];
-        int count = 0;
-        for (Binding b : list) {
-            if (b != null && b != Binding.NONE) count++;
-        }
+    private static int[] encodeElementBindings(ControlElement ce) {
+        int count = Math.min(ce.getBindingCount(), 4);
         int[] result = new int[count * 2];
-        int idx = 0;
-        for (Binding b : list) {
-            if (b == null || b == Binding.NONE) continue;
-            int typeVal;
-            int keycodeVal = 0;
-            if (b == Binding.MOUSE_LEFT_BUTTON) {
-                typeVal = 1;
-            } else if (b == Binding.MOUSE_RIGHT_BUTTON) {
-                typeVal = 2;
-            } else if (b == Binding.MOUSE_MIDDLE_BUTTON) {
-                typeVal = 3;
-            } else if (b == Binding.MOUSE_SCROLL_UP) {
-                typeVal = 6;
-            } else if (b == Binding.MOUSE_SCROLL_DOWN) {
-                typeVal = 7;
-            } else if (b.isMouseMove()) {
-                if (b == Binding.MOUSE_MOVE_LEFT) typeVal = 8;
-                else if (b == Binding.MOUSE_MOVE_RIGHT) typeVal = 9;
-                else if (b == Binding.MOUSE_MOVE_UP) typeVal = 10;
-                else typeVal = 11;
-            } else if (b.isKeyboard()) {
-                typeVal = BINDING_KEYBOARD_FIRST + b.keycode.id;
-                keycodeVal = b.keycode.id;
-            } else if (b.isGamepad()) {
-                int ordinal = b.ordinal() - Binding.GAMEPAD_BUTTON_A.ordinal();
-                typeVal = BINDING_GAMEPAD_BASE + ordinal;
-                keycodeVal = ordinal;
-            } else if (b.isModifier()) {
-                Binding kb = b.toKeyboardBinding();
-                if (kb != null) {
-                    typeVal = BINDING_KEYBOARD_FIRST + kb.keycode.id;
-                    keycodeVal = kb.keycode.id;
-                } else {
-                    typeVal = 0;
-                }
-            } else {
-                typeVal = 0;
+        for (int j = 0; j < count; j++) {
+            Bind b = ce.getBindingAt(j);
+            if (b != null && b != Bind.NONE) {
+                result[j * 2] = b.encodeTypeValue();
+                result[j * 2 + 1] = b.encodeKeyValue();
             }
-            result[idx++] = typeVal;
-            result[idx++] = keycodeVal;
         }
         return result;
     }
 
+    private static int[] bindingListToEncoded(List<Bind> list) {
+        if (list == null) return new int[0];
+        BindPackage bp = new BindPackage(list);
+        return bp.encode();
+    }
+
     public void onFingerDown(int ptrId, float x, float y, long eventTime) {
         if (!loaded || !running) {
+            Log.d("SigTrace", "JAVA_DOWN SKIP loaded=" + loaded + " running=" + running);
             return;
         }
+        Log.d("SigTrace", "JAVA_DOWN ptr=" + ptrId + " x=" + x + " y=" + y + " t=" + eventTime);
         nativeOnFingerDown(ptrId, x, y, eventTime);
     }
 
@@ -683,8 +606,10 @@ public class NativeTouchProcessor {
 
     public void onFingerUp(int ptrId, float x, float y, long eventTime) {
         if (!loaded || !running) {
+            Log.d("SigTrace", "JAVA_UP SKIP loaded=" + loaded + " running=" + running);
             return;
         }
+        Log.d("SigTrace", "JAVA_UP ptr=" + ptrId + " x=" + x + " y=" + y + " t=" + eventTime);
         nativeOnFingerUp(ptrId, x, y, eventTime);
     }
 
@@ -735,10 +660,12 @@ public class NativeTouchProcessor {
     }
 
     public void injectPointerButtonPress(int button) {
+        Log.d("SigTrace", "INJECT_PRESS button_idx=" + button + " xServer=" + (xServer != null));
         if (xServer != null) xServer.injectPointerButtonPress(POINTER_BUTTONS[button]);
     }
 
     public void injectPointerButtonRelease(int button) {
+        Log.d("SigTrace", "INJECT_RELEASE button_idx=" + button + " xServer=" + (xServer != null));
         if (xServer != null) xServer.injectPointerButtonRelease(POINTER_BUTTONS[button]);
     }
 
@@ -818,6 +745,7 @@ public class NativeTouchProcessor {
     public void dispatchAllActions(int count) {
         int[] buf = dispatchPacked;
         if (buf == null) return;
+        Log.d("SigTrace", "DISPATCH_ALL count=" + count);
         try {
             for (int i = 0; i < count; i++) {
                 int base = i * 4;
@@ -825,6 +753,7 @@ public class NativeTouchProcessor {
                 int a0 = buf[base + 1];
                 int a1 = buf[base + 2];
                 int a2 = buf[base + 3];
+                Log.d("SigTrace", "DISPATCH_ALL act[" + i + "] type=" + type + " a0=" + a0 + " a1=" + a1);
                 if (type == 13 || type == 14) {
                 }
                 switch (type) {

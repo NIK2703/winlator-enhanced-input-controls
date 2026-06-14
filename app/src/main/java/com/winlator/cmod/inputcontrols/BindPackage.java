@@ -9,10 +9,8 @@ import java.util.Collections;
 import java.util.List;
 
 public class BindPackage {
-    private static final int BINDING_KEYBOARD_FIRST = 0x100;
-    private static final int BINDING_GAMEPAD_BASE = 0x500;
 
-    private final List<Binding> bindings = new ArrayList<>();
+    private final List<Bind> bindings = new ArrayList<>();
     private final List<Boolean> stickyFlags = new ArrayList<>();
     private boolean toggleSwitch = false;
     private boolean autoRepeat = false;
@@ -20,8 +18,8 @@ public class BindPackage {
 
     public BindPackage() {}
 
-    public BindPackage(List<Binding> bindings) {
-        for (Binding b : bindings) {
+    public BindPackage(List<Bind> bindings) {
+        for (Bind b : bindings) {
             this.bindings.add(b);
             this.stickyFlags.add(false);
         }
@@ -29,7 +27,7 @@ public class BindPackage {
         this.autoRepeat = false;
     }
 
-    public BindPackage(List<Binding> bindings, List<Boolean> stickyFlags) {
+    public BindPackage(List<Bind> bindings, List<Boolean> stickyFlags) {
         for (int i = 0; i < bindings.size(); i++) {
             this.bindings.add(bindings.get(i));
             this.stickyFlags.add(i < stickyFlags.size() && stickyFlags.get(i) != null && stickyFlags.get(i));
@@ -46,7 +44,7 @@ public class BindPackage {
         this.autoRepeatIntervalMs = other.autoRepeatIntervalMs;
     }
 
-    public List<Binding> getBindings() {
+    public List<Bind> getBindings() {
         return Collections.unmodifiableList(bindings);
     }
 
@@ -63,8 +61,8 @@ public class BindPackage {
     public int getAutoRepeatIntervalMs() { return autoRepeatIntervalMs; }
     public void setAutoRepeatIntervalMs(int autoRepeatIntervalMs) { this.autoRepeatIntervalMs = autoRepeatIntervalMs; }
 
-    public Binding get(int index) {
-        return index >= 0 && index < bindings.size() ? bindings.get(index) : Binding.NONE;
+    public Bind get(int index) {
+        return index >= 0 && index < bindings.size() ? bindings.get(index) : Bind.NONE;
     }
 
     public int size() {
@@ -72,8 +70,8 @@ public class BindPackage {
     }
 
     public boolean isEmpty() {
-        for (Binding b : bindings) {
-            if (b != null && b != Binding.NONE) return false;
+        for (Bind b : bindings) {
+            if (b != null && b != Bind.NONE) return false;
         }
         return true;
     }
@@ -86,12 +84,12 @@ public class BindPackage {
         this.autoRepeatIntervalMs = 300;
     }
 
-    public void add(Binding binding) {
+    public void add(Bind binding) {
         bindings.add(binding);
         stickyFlags.add(false);
     }
 
-    public void set(int index, Binding binding) {
+    public void set(int index, Bind binding) {
         if (index >= 0 && index < bindings.size()) {
             bindings.set(index, binding);
         }
@@ -102,6 +100,23 @@ public class BindPackage {
             bindings.remove(index);
             stickyFlags.remove(index);
         }
+    }
+
+    public BindPackage withBindingToggled(Bind binding, boolean add) {
+        BindPackage copy = new BindPackage(this);
+        if (add) {
+            if (!copy.bindings.contains(binding)) {
+                copy.bindings.add(binding);
+                copy.stickyFlags.add(false);
+            }
+        } else {
+            int idx = copy.bindings.indexOf(binding);
+            if (idx >= 0) {
+                copy.bindings.remove(idx);
+                if (idx < copy.stickyFlags.size()) copy.stickyFlags.remove(idx);
+            }
+        }
+        return copy;
     }
 
     public boolean isSticky(int index) {
@@ -120,50 +135,15 @@ public class BindPackage {
 
     public int[] encode() {
         int count = 0;
-        for (Binding b : bindings) {
-            if (b != null && b != Binding.NONE) count++;
+        for (Bind b : bindings) {
+            if (b != null && b != Bind.NONE) count++;
         }
         int[] result = new int[count * 2];
         int idx = 0;
-        for (Binding b : bindings) {
-            if (b == null || b == Binding.NONE) continue;
-            int typeVal;
-            int keycodeVal = 0;
-            if (b == Binding.MOUSE_LEFT_BUTTON) {
-                typeVal = 1;
-            } else if (b == Binding.MOUSE_RIGHT_BUTTON) {
-                typeVal = 2;
-            } else if (b == Binding.MOUSE_MIDDLE_BUTTON) {
-                typeVal = 3;
-            } else if (b == Binding.MOUSE_SCROLL_UP) {
-                typeVal = 6;
-            } else if (b == Binding.MOUSE_SCROLL_DOWN) {
-                typeVal = 7;
-            } else if (b.isMouseMove()) {
-                if (b == Binding.MOUSE_MOVE_LEFT) typeVal = 8;
-                else if (b == Binding.MOUSE_MOVE_RIGHT) typeVal = 9;
-                else if (b == Binding.MOUSE_MOVE_UP) typeVal = 10;
-                else typeVal = 11;
-            } else if (b.isKeyboard()) {
-                typeVal = BINDING_KEYBOARD_FIRST + b.keycode.id;
-                keycodeVal = b.keycode.id;
-            } else if (b.isGamepad()) {
-                int ordinal = b.ordinal() - Binding.GAMEPAD_BUTTON_A.ordinal();
-                typeVal = BINDING_GAMEPAD_BASE + ordinal;
-                keycodeVal = ordinal;
-            } else if (b.isModifier()) {
-                Binding kb = b.toKeyboardBinding();
-                if (kb != null) {
-                    typeVal = BINDING_KEYBOARD_FIRST + kb.keycode.id;
-                    keycodeVal = kb.keycode.id;
-                } else {
-                    typeVal = 0;
-                }
-            } else {
-                typeVal = 0;
-            }
-            result[idx++] = typeVal;
-            result[idx++] = keycodeVal;
+        for (Bind b : bindings) {
+            if (b == null || b == Bind.NONE) continue;
+            result[idx++] = b.encodeTypeValue();
+            result[idx++] = b.encodeKeyValue();
         }
         return result;
     }
@@ -172,8 +152,8 @@ public class BindPackage {
         int mask = 0;
         int nonNoneIdx = 0;
         for (int i = 0; i < bindings.size(); i++) {
-            Binding b = bindings.get(i);
-            if (b == null || b == Binding.NONE) continue;
+            Bind b = bindings.get(i);
+            if (b == null || b == Bind.NONE) continue;
             if (i < stickyFlags.size() && stickyFlags.get(i) != null && stickyFlags.get(i)) {
                 mask |= (1 << nonNoneIdx);
             }
@@ -186,8 +166,8 @@ public class BindPackage {
         int mask = 0;
         int nonNoneIdx = 0;
         for (int i = 0; i < bindings.size(); i++) {
-            Binding b = bindings.get(i);
-            if (b == null || b == Binding.NONE) continue;
+            Bind b = bindings.get(i);
+            if (b == null || b == Bind.NONE) continue;
             if (toggleSwitch) {
                 mask |= (1 << nonNoneIdx);
             }
@@ -200,8 +180,8 @@ public class BindPackage {
         int mask = 0;
         int nonNoneIdx = 0;
         for (int i = 0; i < bindings.size(); i++) {
-            Binding b = bindings.get(i);
-            if (b == null || b == Binding.NONE) continue;
+            Bind b = bindings.get(i);
+            if (b == null || b == Bind.NONE) continue;
             if (autoRepeat) {
                 mask |= (1 << nonNoneIdx);
             }
@@ -212,8 +192,8 @@ public class BindPackage {
 
     public JSONArray toJSONArray() {
         JSONArray arr = new JSONArray();
-        for (Binding b : bindings) {
-            if (b != null && b != Binding.NONE) arr.put(b.name());
+        for (Bind b : bindings) {
+            if (b != null && b != Bind.NONE) arr.put(b.name());
         }
         return arr;
     }
@@ -224,8 +204,8 @@ public class BindPackage {
             JSONArray bindingsArr = new JSONArray();
             JSONArray stickyArr = new JSONArray();
             for (int i = 0; i < bindings.size(); i++) {
-                Binding b = bindings.get(i);
-                if (b != null && b != Binding.NONE) {
+                Bind b = bindings.get(i);
+                if (b != null && b != Bind.NONE) {
                     bindingsArr.put(b.name());
                     stickyArr.put(isSticky(i));
                 }
@@ -239,7 +219,7 @@ public class BindPackage {
         return obj;
     }
 
-    public static BindPackage fromJSON(JSONObject obj, Binding defaultBinding) {
+    public static BindPackage fromJSON(JSONObject obj, Bind defaultBinding) {
         JSONArray bindingsArray = obj.optJSONArray("bindings");
         BindPackage bp = fromJSONArray(bindingsArray, defaultBinding);
         bp.setToggleSwitch(obj.optBoolean("toggleSwitch", false));
@@ -263,7 +243,7 @@ public class BindPackage {
         return arr;
     }
 
-    public static BindPackage fromJSONArray(JSONArray arr, Binding defaultBinding) {
+    public static BindPackage fromJSONArray(JSONArray arr, Bind defaultBinding) {
         BindPackage bp = new BindPackage();
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -277,7 +257,7 @@ public class BindPackage {
         return bp;
     }
 
-    public static BindPackage fromJSONArray(JSONArray arr, JSONArray stickyArr, Binding defaultBinding) {
+    public static BindPackage fromJSONArray(JSONArray arr, JSONArray stickyArr, Bind defaultBinding) {
         BindPackage bp = fromJSONArray(arr, defaultBinding);
         if (stickyArr != null) {
             for (int i = 0; i < stickyArr.length() && i < bp.bindings.size(); i++) {
@@ -290,7 +270,7 @@ public class BindPackage {
         return bp;
     }
 
-    public static BindPackage fromSingle(Binding binding) {
+    public static BindPackage fromSingle(Bind binding) {
         BindPackage bp = new BindPackage();
         bp.bindings.add(binding);
         bp.stickyFlags.add(false);

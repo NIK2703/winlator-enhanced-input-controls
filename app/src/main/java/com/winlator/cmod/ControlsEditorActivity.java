@@ -29,10 +29,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.contentdialog.BindingPickerDialog;
 import com.winlator.cmod.contentdialog.ContentDialog;
 
 import com.winlator.cmod.inputcontrols.BindPackage;
-import com.winlator.cmod.inputcontrols.Binding;
+import com.winlator.cmod.inputcontrols.Bind;
 import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.IconPackManager;
@@ -644,18 +645,18 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         container.removeAllViews();
 
         ControlElement.Type type = element.getType();
-        boolean showMenu = type == ControlElement.Type.BUTTON;
         if (type == ControlElement.Type.BUTTON) {
+            boolean showMenu = true;
             loadBindingSection(element, container, ControlElement.BindingSection.SLOT_0, R.string.binding, showMenu);
             if (!element.getBindingAutoRepeat(ControlElement.BindingSection.SLOT_0))
                 loadBindingSection(element, container, ControlElement.BindingSection.LONG_PRESS, "Long Press", showMenu);
             loadBindingSection(element, container, ControlElement.BindingSection.GESTURE, "Gesture", showMenu);
         }
         else if (type == ControlElement.Type.D_PAD || type == ControlElement.Type.STICK || type == ControlElement.Type.TRACKPAD) {
-            loadBindingSection(element, container, ControlElement.BindingSection.SLOT_0, R.string.binding_up, showMenu);
-            loadBindingSection(element, container, ControlElement.BindingSection.SLOT_1, R.string.binding_right, showMenu);
-            loadBindingSection(element, container, ControlElement.BindingSection.SLOT_2, R.string.binding_down, showMenu);
-            loadBindingSection(element, container, ControlElement.BindingSection.SLOT_3, R.string.binding_left, showMenu);
+            loadBind(element, container, 0, "Up");
+            loadBind(element, container, 1, "Right");
+            loadBind(element, container, 2, "Down");
+            loadBind(element, container, 3, "Left");
         }
     }
 
@@ -677,15 +678,50 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         container.addView(view);
     }
 
-    private void toggleBindingModifier(ControlElement element, ControlElement.BindingSection section, Binding modBinding, boolean add, Runnable populate) {
+    private void loadBind(final ControlElement element, LinearLayout container, int slotIndex, String label) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        rowLp.topMargin = (int) UnitUtils.dpToPx(4);
+        row.setLayoutParams(rowLp);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(label);
+        tvTitle.setTextSize(14);
+        row.addView(tvTitle);
+
+        final Bind[] currentBinding = new Bind[1];
+        currentBinding[0] = element.getBind(slotIndex);
+
+        final TextView btBinding = new TextView(this);
+        btBinding.setText(currentBinding[0] != null && currentBinding[0] != Bind.NONE ? currentBinding[0].toString() : "None");
+        btBinding.setTextSize(16);
+        int btnH = (int) UnitUtils.dpToPx(42);
+        btBinding.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                btnH));
+        btBinding.setPadding((int) UnitUtils.dpToPx(12), 0, (int) UnitUtils.dpToPx(36), 0);
+        btBinding.setGravity(android.view.Gravity.LEFT | android.view.Gravity.CENTER_VERTICAL);
+        btBinding.setBackgroundResource(R.drawable.combo_box);
+        btBinding.setOnClickListener((v) -> {
+            BindingPickerDialog.show(this, currentBinding[0] != null ? currentBinding[0] : Bind.NONE, (newBinding) -> {
+                currentBinding[0] = newBinding;
+                btBinding.setText(newBinding != null && newBinding != Bind.NONE ? newBinding.toString() : "None");
+                element.setBind(slotIndex, newBinding);
+                profile.save();
+                inputControlsView.invalidate();
+            });
+        });
+        row.addView(btBinding);
+
+        container.addView(row);
+    }
+
+    private void toggleBindingModifier(ControlElement element, ControlElement.BindingSection section, Bind modBinding, boolean add, Runnable populate) {
         BindPackage src = element.getBindingPackage(section);
-        List<Binding> seq = new ArrayList<>(src.getBindings());
-        if (add) seq.add(modBinding);
-        else seq.remove(modBinding);
-        BindPackage newPkg = new BindPackage(seq, src.getStickyFlags());
-        newPkg.setToggleSwitch(src.isToggleSwitch());
-        newPkg.setAutoRepeat(src.isAutoRepeat());
-        newPkg.setAutoRepeatIntervalMs(src.getAutoRepeatIntervalMs());
+        BindPackage newPkg = src.withBindingToggled(modBinding, add);
         element.setBindingPackage(section, newPkg);
         profile.save();
         inputControlsView.invalidate();

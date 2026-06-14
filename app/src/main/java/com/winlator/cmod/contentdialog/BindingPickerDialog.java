@@ -15,12 +15,13 @@ import com.google.android.material.tabs.TabLayout;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
-import com.winlator.cmod.inputcontrols.Binding;
+import com.winlator.cmod.core.UnitUtils;
+import com.winlator.cmod.inputcontrols.Bind;
 
 import java.util.function.Consumer;
 
 public class BindingPickerDialog {
-    public static void show(Context context, Binding currentBinding, final Consumer<Binding> onSelected) {
+    public static void show(Context context, Bind currentBinding, final Consumer<Bind> onSelected) {
         View view = LayoutInflater.from(context).inflate(R.layout.content_dialog_binding_picker, null);
 
         AlertDialog dialog = new AlertDialog.Builder(context)
@@ -28,7 +29,7 @@ public class BindingPickerDialog {
                 .setView(view)
                 .setPositiveButton("Cancel", (d, which) -> d.dismiss())
                 .setNegativeButton("None", (d, which) -> {
-                    if (onSelected != null) onSelected.accept(Binding.NONE);
+                    if (onSelected != null) onSelected.accept(Bind.NONE);
                     d.dismiss();
                 })
                 .create();
@@ -37,9 +38,9 @@ public class BindingPickerDialog {
         AppUtils.setupTabLayout(view, R.id.TabLayout,
             R.id.FLTabMouse, R.id.FLTabKeyboard, R.id.FLTabGamepad);
 
-        populateTab(context, view, R.id.FLTabMouse, Binding.mouseBindingValues(), Binding.mouseBindingLabels(), currentBinding, onSelected, dialog);
-        populateTab(context, view, R.id.FLTabKeyboard, Binding.keyboardBindingValues(), Binding.keyboardBindingLabels(), currentBinding, onSelected, dialog);
-        populateTab(context, view, R.id.FLTabGamepad, Binding.gamepadBindingValues(), Binding.gamepadBindingLabels(), currentBinding, onSelected, dialog);
+        populateTab(context, view, R.id.FLTabMouse, Bind.mouseBindingValues(), Bind.mouseBindingLabels(), currentBinding, onSelected, dialog);
+        populateTab(context, view, R.id.FLTabKeyboard, Bind.keyboardBindingValues(), Bind.keyboardBindingLabels(), currentBinding, onSelected, dialog);
+        populateTab(context, view, R.id.FLTabGamepad, Bind.gamepadBindingValues(), Bind.gamepadBindingLabels(), currentBinding, onSelected, dialog);
 
         dialog.show();
 
@@ -54,10 +55,12 @@ public class BindingPickerDialog {
         }
     }
 
-    private static void populateTab(Context context, View root, int containerId, Binding[] values, String[] labels, Binding current, final Consumer<Binding> onSelected, final AlertDialog dialog) {
+    private static void populateTab(Context context, View root, int containerId, Bind[] values, String[] labels, Bind current, final Consumer<Bind> onSelected, final AlertDialog dialog) {
         FrameLayout container = root.findViewById(containerId);
         LinearLayout outer = new LinearLayout(context);
         outer.setOrientation(LinearLayout.VERTICAL);
+        int padH = (int) UnitUtils.dpToPx(12);
+        outer.setPadding(padH, 0, padH, 0);
 
         final int activeColor = context.getResources().getColor(R.color.colorAccent, context.getTheme());
         int cols = 4;
@@ -72,7 +75,7 @@ public class BindingPickerDialog {
                 outer.addView(row);
             }
 
-            final Binding binding = values[i];
+            final Bind binding = values[i];
             TextView cell = (TextView) LayoutInflater.from(context).inflate(R.layout.content_dialog_binding_picker_item, outer, false);
             cell.setText(labels[i]);
             if (binding == current) {

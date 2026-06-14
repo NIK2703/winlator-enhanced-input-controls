@@ -32,7 +32,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.contentdialog.ContentDialog;
-import com.winlator.cmod.inputcontrols.Binding;
+import com.winlator.cmod.inputcontrols.Bind;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.ExternalControllerBinding;
@@ -82,7 +82,7 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
     }
 
 
-    private void updateControllerBinding(int keyCode, Binding binding) {
+    private void updateControllerBinding(int keyCode, Bind binding) {
         if (keyCode == KeyEvent.KEYCODE_UNKNOWN)
             return;
 
@@ -122,7 +122,7 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
             byte sign = Mathf.sign(value);
             if (sign != 0) {
                 int keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
-                updateControllerBinding(keyCode, Binding.NONE); // Or prompt the user to select a binding
+                updateControllerBinding(keyCode, Bind.NONE); // Or prompt the user to select a binding
             }
         }
     }
@@ -140,13 +140,13 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
 
             boolean l2Pressed = l2Value > 0.8f;
             if (l2Pressed && !l2WasPressed) {
-                updateControllerBinding(KeyEvent.KEYCODE_BUTTON_L2, Binding.NONE);
+                updateControllerBinding(KeyEvent.KEYCODE_BUTTON_L2, Bind.NONE);
             }
             l2WasPressed = l2Pressed;
 
             boolean r2Pressed = r2Value > 0.8f;
             if (r2Pressed && !r2WasPressed) {
-                updateControllerBinding(KeyEvent.KEYCODE_BUTTON_R2, Binding.NONE);
+                updateControllerBinding(KeyEvent.KEYCODE_BUTTON_R2, Bind.NONE);
             }
             r2WasPressed = r2Pressed;
 
@@ -159,7 +159,7 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (isGamepadKeyCode(keyCode)) {
-            updateControllerBinding(keyCode, Binding.NONE);
+            updateControllerBinding(keyCode, Bind.NONE);
             return true;
         }
         return super.onKeyDown(keyCode, event);
@@ -247,13 +247,13 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
                 String[] bindingEntries = null;
                 switch (holder.bindingType.getSelectedItemPosition()) {
                     case 0:
-                        bindingEntries = Binding.keyboardBindingLabels();
+                        bindingEntries = Bind.keyboardBindingLabels();
                         break;
                     case 1:
-                        bindingEntries = Binding.mouseBindingLabels();
+                        bindingEntries = Bind.mouseBindingLabels();
                         break;
                     case 2:
-                        bindingEntries = Binding.gamepadBindingLabels();
+                        bindingEntries = Bind.gamepadBindingLabels();
                         break;
                 }
 
@@ -273,7 +273,7 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
                 }
             });
 
-            Binding selectedBinding = item.getBinding();
+            Bind selectedBinding = item.getBinding();
             if (selectedBinding.isKeyboard()) {
                 holder.bindingType.setSelection(0, false);
             } else if (selectedBinding.isMouse()) {
@@ -285,16 +285,16 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
             holder.binding.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    Binding binding = Binding.NONE;
+                    Bind binding = Bind.NONE;
                     switch (holder.bindingType.getSelectedItemPosition()) {
                         case 0:
-                            binding = Binding.keyboardBindingValues()[position];
+                            binding = Bind.keyboardBindingValues()[position];
                             break;
                         case 1:
-                            binding = Binding.mouseBindingValues()[position];
+                            binding = Bind.mouseBindingValues()[position];
                             break;
                         case 2:
-                            binding = Binding.gamepadBindingValues()[position];
+                            binding = Bind.gamepadBindingValues()[position];
                             break;
                     }
 

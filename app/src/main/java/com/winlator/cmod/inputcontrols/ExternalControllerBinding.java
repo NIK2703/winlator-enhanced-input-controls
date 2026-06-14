@@ -18,7 +18,7 @@ public class ExternalControllerBinding {
     public static final byte AXIS_RZ_NEGATIVE = -7;
     public static final byte AXIS_RZ_POSITIVE = -8;
     private short keyCode;
-    private Binding binding = Binding.NONE;
+    private Bind binding = Bind.NONE;
 
     public int getKeyCode() {
         return keyCode;
@@ -28,11 +28,11 @@ public class ExternalControllerBinding {
         this.keyCode = (short)keyCode;
     }
 
-    public Binding getBinding() {
+    public Bind getBinding() {
         return binding;
     }
 
-    public void setBinding(Binding binding) {
+    public void setBinding(Bind binding) {
         this.binding = binding;
     }
 

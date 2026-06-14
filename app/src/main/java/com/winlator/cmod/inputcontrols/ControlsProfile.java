@@ -74,15 +74,15 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public static final int GESTURE_COUNT = GestureType.COUNT;
 
     // === Unified gesture bindings (primary storage) ===
-    private BindPackage gestureSingleTapAction = BindPackage.fromSingle(Binding.MOUSE_LEFT_BUTTON);
+    private BindPackage gestureSingleTapAction = BindPackage.fromSingle(Bind.MOUSE_LEFT_BUTTON);
     private BindPackage gestureLongPressAction = new BindPackage();
     private BindPackage gestureDoubleTapAction = new BindPackage();
-    private BindPackage gestureSingleTap2ndFingerAction = BindPackage.fromSingle(Binding.MOUSE_RIGHT_BUTTON);
+    private BindPackage gestureSingleTap2ndFingerAction = BindPackage.fromSingle(Bind.MOUSE_RIGHT_BUTTON);
     private BindPackage gestureDoubleTap2ndFingerAction = new BindPackage();
     private BindPackage gestureSingleTapDragAction = new BindPackage();
     private BindPackage gestureLongPressDragAction = new BindPackage();
     private BindPackage gestureDoubleTapDragAction = new BindPackage();
-    private BindPackage gestureSingleTap2ndFingerDragAction = BindPackage.fromSingle(Binding.MOUSE_LEFT_BUTTON);
+    private BindPackage gestureSingleTap2ndFingerDragAction = BindPackage.fromSingle(Bind.MOUSE_LEFT_BUTTON);
     private BindPackage gestureDoubleTap2ndFingerDragAction = new BindPackage();
 
     private boolean gestureSettingsLoaded = false;
@@ -203,25 +203,25 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.dragMode = dragMode;
     }
 
-    public List<Binding> getSingleTapAction() { return getGestureSingleTapAction().getBindings(); }
-    public void setSingleTapAction(Binding binding) { setGestureSingleTapAction(BindPackage.fromSingle(binding)); }
-    public void setSingleTapAction(List<Binding> bindings) { setGestureSingleTapAction(new BindPackage(bindings)); }
+    public List<Bind> getSingleTapAction() { return getGestureSingleTapAction().getBindings(); }
+    public void setSingleTapAction(Bind binding) { setGestureSingleTapAction(BindPackage.fromSingle(binding)); }
+    public void setSingleTapAction(List<Bind> bindings) { setGestureSingleTapAction(new BindPackage(bindings)); }
 
-    public List<Binding> getLongPressAction() { return getGestureLongPressAction().getBindings(); }
-    public void setLongPressAction(Binding binding) { setGestureLongPressAction(BindPackage.fromSingle(binding)); }
-    public void setLongPressAction(List<Binding> bindings) { setGestureLongPressAction(new BindPackage(bindings)); }
+    public List<Bind> getLongPressAction() { return getGestureLongPressAction().getBindings(); }
+    public void setLongPressAction(Bind binding) { setGestureLongPressAction(BindPackage.fromSingle(binding)); }
+    public void setLongPressAction(List<Bind> bindings) { setGestureLongPressAction(new BindPackage(bindings)); }
 
-    public List<Binding> getDoubleTapAction() { return getGestureDoubleTapAction().getBindings(); }
-    public void setDoubleTapAction(Binding binding) { setGestureDoubleTapAction(BindPackage.fromSingle(binding)); }
-    public void setDoubleTapAction(List<Binding> bindings) { setGestureDoubleTapAction(new BindPackage(bindings)); }
+    public List<Bind> getDoubleTapAction() { return getGestureDoubleTapAction().getBindings(); }
+    public void setDoubleTapAction(Bind binding) { setGestureDoubleTapAction(BindPackage.fromSingle(binding)); }
+    public void setDoubleTapAction(List<Bind> bindings) { setGestureDoubleTapAction(new BindPackage(bindings)); }
 
-    public List<Binding> getSingleTap2ndFingerAction() { return getGestureSingleTap2ndFingerAction().getBindings(); }
-    public void setSingleTap2ndFingerAction(Binding binding) { setGestureSingleTap2ndFingerAction(BindPackage.fromSingle(binding)); }
-    public void setSingleTap2ndFingerAction(List<Binding> bindings) { setGestureSingleTap2ndFingerAction(new BindPackage(bindings)); }
+    public List<Bind> getSingleTap2ndFingerAction() { return getGestureSingleTap2ndFingerAction().getBindings(); }
+    public void setSingleTap2ndFingerAction(Bind binding) { setGestureSingleTap2ndFingerAction(BindPackage.fromSingle(binding)); }
+    public void setSingleTap2ndFingerAction(List<Bind> bindings) { setGestureSingleTap2ndFingerAction(new BindPackage(bindings)); }
 
-    public List<Binding> getDoubleTap2ndFingerAction() { return getGestureDoubleTap2ndFingerAction().getBindings(); }
-    public void setDoubleTap2ndFingerAction(Binding binding) { setGestureDoubleTap2ndFingerAction(BindPackage.fromSingle(binding)); }
-    public void setDoubleTap2ndFingerAction(List<Binding> bindings) { setGestureDoubleTap2ndFingerAction(new BindPackage(bindings)); }
+    public List<Bind> getDoubleTap2ndFingerAction() { return getGestureDoubleTap2ndFingerAction().getBindings(); }
+    public void setDoubleTap2ndFingerAction(Bind binding) { setGestureDoubleTap2ndFingerAction(BindPackage.fromSingle(binding)); }
+    public void setDoubleTap2ndFingerAction(List<Bind> bindings) { setGestureDoubleTap2ndFingerAction(new BindPackage(bindings)); }
 
     public int getDoubleTapTimeout() {
         ensureGestureSettingsLoaded();
@@ -361,67 +361,67 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.touchActivationMode = mode;
     }
 
-    public List<Binding> getSingleTapDragAction() { return getGestureSingleTapDragAction().getBindings(); }
-    public void setSingleTapDragAction(Binding binding) { setGestureSingleTapDragAction(BindPackage.fromSingle(binding)); }
-    public void setSingleTapDragAction(List<Binding> bindings) { setGestureSingleTapDragAction(new BindPackage(bindings)); }
+    public List<Bind> getSingleTapDragAction() { return getGestureSingleTapDragAction().getBindings(); }
+    public void setSingleTapDragAction(Bind binding) { setGestureSingleTapDragAction(BindPackage.fromSingle(binding)); }
+    public void setSingleTapDragAction(List<Bind> bindings) { setGestureSingleTapDragAction(new BindPackage(bindings)); }
 
-    public List<Binding> getLongPressDragAction() { return getGestureLongPressDragAction().getBindings(); }
-    public void setLongPressDragAction(Binding binding) { setGestureLongPressDragAction(BindPackage.fromSingle(binding)); }
-    public void setLongPressDragAction(List<Binding> bindings) { setGestureLongPressDragAction(new BindPackage(bindings)); }
+    public List<Bind> getLongPressDragAction() { return getGestureLongPressDragAction().getBindings(); }
+    public void setLongPressDragAction(Bind binding) { setGestureLongPressDragAction(BindPackage.fromSingle(binding)); }
+    public void setLongPressDragAction(List<Bind> bindings) { setGestureLongPressDragAction(new BindPackage(bindings)); }
 
-    public List<Binding> getDoubleTapDragAction() { return getGestureDoubleTapDragAction().getBindings(); }
-    public void setDoubleTapDragAction(Binding binding) { setGestureDoubleTapDragAction(BindPackage.fromSingle(binding)); }
-    public void setDoubleTapDragAction(List<Binding> bindings) { setGestureDoubleTapDragAction(new BindPackage(bindings)); }
+    public List<Bind> getDoubleTapDragAction() { return getGestureDoubleTapDragAction().getBindings(); }
+    public void setDoubleTapDragAction(Bind binding) { setGestureDoubleTapDragAction(BindPackage.fromSingle(binding)); }
+    public void setDoubleTapDragAction(List<Bind> bindings) { setGestureDoubleTapDragAction(new BindPackage(bindings)); }
 
-    public List<Binding> getSingleTap2ndFingerDragAction() { return getGestureSingleTap2ndFingerDragAction().getBindings(); }
-    public void setSingleTap2ndFingerDragAction(Binding binding) { setGestureSingleTap2ndFingerDragAction(BindPackage.fromSingle(binding)); }
-    public void setSingleTap2ndFingerDragAction(List<Binding> bindings) { setGestureSingleTap2ndFingerDragAction(new BindPackage(bindings)); }
+    public List<Bind> getSingleTap2ndFingerDragAction() { return getGestureSingleTap2ndFingerDragAction().getBindings(); }
+    public void setSingleTap2ndFingerDragAction(Bind binding) { setGestureSingleTap2ndFingerDragAction(BindPackage.fromSingle(binding)); }
+    public void setSingleTap2ndFingerDragAction(List<Bind> bindings) { setGestureSingleTap2ndFingerDragAction(new BindPackage(bindings)); }
 
-    public List<Binding> getDoubleTap2ndFingerDragAction() { return getGestureDoubleTap2ndFingerDragAction().getBindings(); }
-    public void setDoubleTap2ndFingerDragAction(Binding binding) { setGestureDoubleTap2ndFingerDragAction(BindPackage.fromSingle(binding)); }
-    public void setDoubleTap2ndFingerDragAction(List<Binding> bindings) { setGestureDoubleTap2ndFingerDragAction(new BindPackage(bindings)); }
+    public List<Bind> getDoubleTap2ndFingerDragAction() { return getGestureDoubleTap2ndFingerDragAction().getBindings(); }
+    public void setDoubleTap2ndFingerDragAction(Bind binding) { setGestureDoubleTap2ndFingerDragAction(BindPackage.fromSingle(binding)); }
+    public void setDoubleTap2ndFingerDragAction(List<Bind> bindings) { setGestureDoubleTap2ndFingerDragAction(new BindPackage(bindings)); }
 
     // === Unified gesture binding getters/setters (primary storage) ===
 
     public BindPackage getGestureSingleTapAction() { return getGestureAction(GESTURE_SINGLE_TAP); }
     public void setGestureSingleTapAction(BindPackage bp) { setGestureAction(GESTURE_SINGLE_TAP, bp); }
-    public void setGestureSingleTapAction(List<Binding> bindings) { setGestureAction(GESTURE_SINGLE_TAP, new BindPackage(bindings)); }
+    public void setGestureSingleTapAction(List<Bind> bindings) { setGestureAction(GESTURE_SINGLE_TAP, new BindPackage(bindings)); }
 
     public BindPackage getGestureLongPressAction() { return getGestureAction(GESTURE_LONG_PRESS); }
     public void setGestureLongPressAction(BindPackage bp) { setGestureAction(GESTURE_LONG_PRESS, bp); }
-    public void setGestureLongPressAction(List<Binding> bindings) { setGestureAction(GESTURE_LONG_PRESS, new BindPackage(bindings)); }
+    public void setGestureLongPressAction(List<Bind> bindings) { setGestureAction(GESTURE_LONG_PRESS, new BindPackage(bindings)); }
 
     public BindPackage getGestureDoubleTapAction() { return getGestureAction(GESTURE_DOUBLE_TAP); }
     public void setGestureDoubleTapAction(BindPackage bp) { setGestureAction(GESTURE_DOUBLE_TAP, bp); }
-    public void setGestureDoubleTapAction(List<Binding> bindings) { setGestureAction(GESTURE_DOUBLE_TAP, new BindPackage(bindings)); }
+    public void setGestureDoubleTapAction(List<Bind> bindings) { setGestureAction(GESTURE_DOUBLE_TAP, new BindPackage(bindings)); }
 
     public BindPackage getGestureSingleTap2ndFingerAction() { return getGestureAction(GESTURE_SINGLE_2ND); }
     public void setGestureSingleTap2ndFingerAction(BindPackage bp) { setGestureAction(GESTURE_SINGLE_2ND, bp); }
-    public void setGestureSingleTap2ndFingerAction(List<Binding> bindings) { setGestureAction(GESTURE_SINGLE_2ND, new BindPackage(bindings)); }
+    public void setGestureSingleTap2ndFingerAction(List<Bind> bindings) { setGestureAction(GESTURE_SINGLE_2ND, new BindPackage(bindings)); }
 
     public BindPackage getGestureDoubleTap2ndFingerAction() { return getGestureAction(GESTURE_DOUBLE_2ND); }
     public void setGestureDoubleTap2ndFingerAction(BindPackage bp) { setGestureAction(GESTURE_DOUBLE_2ND, bp); }
-    public void setGestureDoubleTap2ndFingerAction(List<Binding> bindings) { setGestureAction(GESTURE_DOUBLE_2ND, new BindPackage(bindings)); }
+    public void setGestureDoubleTap2ndFingerAction(List<Bind> bindings) { setGestureAction(GESTURE_DOUBLE_2ND, new BindPackage(bindings)); }
 
     public BindPackage getGestureSingleTapDragAction() { return getGestureAction(GESTURE_SINGLE_TAP_DRAG); }
     public void setGestureSingleTapDragAction(BindPackage bp) { setGestureAction(GESTURE_SINGLE_TAP_DRAG, bp); }
-    public void setGestureSingleTapDragAction(List<Binding> bindings) { setGestureAction(GESTURE_SINGLE_TAP_DRAG, new BindPackage(bindings)); }
+    public void setGestureSingleTapDragAction(List<Bind> bindings) { setGestureAction(GESTURE_SINGLE_TAP_DRAG, new BindPackage(bindings)); }
 
     public BindPackage getGestureLongPressDragAction() { return getGestureAction(GESTURE_LONG_PRESS_DRAG); }
     public void setGestureLongPressDragAction(BindPackage bp) { setGestureAction(GESTURE_LONG_PRESS_DRAG, bp); }
-    public void setGestureLongPressDragAction(List<Binding> bindings) { setGestureAction(GESTURE_LONG_PRESS_DRAG, new BindPackage(bindings)); }
+    public void setGestureLongPressDragAction(List<Bind> bindings) { setGestureAction(GESTURE_LONG_PRESS_DRAG, new BindPackage(bindings)); }
 
     public BindPackage getGestureDoubleTapDragAction() { return getGestureAction(GESTURE_DOUBLE_TAP_DRAG); }
     public void setGestureDoubleTapDragAction(BindPackage bp) { setGestureAction(GESTURE_DOUBLE_TAP_DRAG, bp); }
-    public void setGestureDoubleTapDragAction(List<Binding> bindings) { setGestureAction(GESTURE_DOUBLE_TAP_DRAG, new BindPackage(bindings)); }
+    public void setGestureDoubleTapDragAction(List<Bind> bindings) { setGestureAction(GESTURE_DOUBLE_TAP_DRAG, new BindPackage(bindings)); }
 
     public BindPackage getGestureSingleTap2ndFingerDragAction() { return getGestureAction(GESTURE_SINGLE_DRAG_2ND); }
     public void setGestureSingleTap2ndFingerDragAction(BindPackage bp) { setGestureAction(GESTURE_SINGLE_DRAG_2ND, bp); }
-    public void setGestureSingleTap2ndFingerDragAction(List<Binding> bindings) { setGestureAction(GESTURE_SINGLE_DRAG_2ND, new BindPackage(bindings)); }
+    public void setGestureSingleTap2ndFingerDragAction(List<Bind> bindings) { setGestureAction(GESTURE_SINGLE_DRAG_2ND, new BindPackage(bindings)); }
 
     public BindPackage getGestureDoubleTap2ndFingerDragAction() { return getGestureAction(GESTURE_DOUBLE_DRAG_2ND); }
     public void setGestureDoubleTap2ndFingerDragAction(BindPackage bp) { setGestureAction(GESTURE_DOUBLE_DRAG_2ND, bp); }
-    public void setGestureDoubleTap2ndFingerDragAction(List<Binding> bindings) { setGestureAction(GESTURE_DOUBLE_DRAG_2ND, new BindPackage(bindings)); }
+    public void setGestureDoubleTap2ndFingerDragAction(List<Bind> bindings) { setGestureAction(GESTURE_DOUBLE_DRAG_2ND, new BindPackage(bindings)); }
 
     public BindPackage getGestureAction(int gestureIndex) {
         ensureGestureSettingsLoaded();
@@ -510,10 +510,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 "singleTapDragAction", "longPressDragAction", "doubleTapDragAction",
                 "singleTap2ndFingerAction", "doubleTap2ndFingerAction",
                 "singleTap2ndFingerDragAction", "doubleTap2ndFingerDragAction"};
-            Binding[] gestureDefaults = {Binding.MOUSE_LEFT_BUTTON, Binding.NONE, Binding.NONE,
-                Binding.NONE, Binding.NONE, Binding.NONE,
-                Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
-                Binding.MOUSE_LEFT_BUTTON, Binding.NONE};
+            Bind[] gestureDefaults = {Bind.MOUSE_LEFT_BUTTON, Bind.NONE, Bind.NONE,
+                Bind.NONE, Bind.NONE, Bind.NONE,
+                Bind.MOUSE_RIGHT_BUTTON, Bind.NONE,
+                Bind.MOUSE_LEFT_BUTTON, Bind.NONE};
 
             for (int i = 0; i < gestureKeys.length; i++) {
                 if (gestureData.has(gestureKeys[i])) {
@@ -555,10 +555,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 "singleTapDragAction", "longPressDragAction", "doubleTapDragAction",
                 "singleTap2ndFingerAction", "doubleTap2ndFingerAction",
                 "singleTap2ndFingerDragAction", "doubleTap2ndFingerDragAction"};
-            Binding[] gestureDefaults = {Binding.MOUSE_LEFT_BUTTON, Binding.NONE, Binding.NONE,
-                Binding.NONE, Binding.NONE, Binding.NONE,
-                Binding.MOUSE_RIGHT_BUTTON, Binding.NONE,
-                Binding.MOUSE_LEFT_BUTTON, Binding.NONE};
+            Bind[] gestureDefaults = {Bind.MOUSE_LEFT_BUTTON, Bind.NONE, Bind.NONE,
+                Bind.NONE, Bind.NONE, Bind.NONE,
+                Bind.MOUSE_RIGHT_BUTTON, Bind.NONE,
+                Bind.MOUSE_LEFT_BUTTON, Bind.NONE};
 
             for (int i = 0; i < gestureKeys.length; i++) {
                 if (gestureData.has(gestureKeys[i])) {
@@ -599,10 +599,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         return defaultValue;
     }
 
-    public static Binding parseBinding(String value, Binding defaultValue) {
+    public static Bind parseBinding(String value, Bind defaultValue) {
         if (value == null) return defaultValue;
         try {
-            return Binding.valueOf(value);
+            return Bind.valueOf(value);
         }
         catch (IllegalArgumentException e) {
             return defaultValue;
@@ -792,7 +792,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                     JSONObject controllerBindingJSONObject = controllerBindingsJSONArray.getJSONObject(j);
                     ExternalControllerBinding controllerBinding = new ExternalControllerBinding();
                     controllerBinding.setKeyCode(controllerBindingJSONObject.getInt("keyCode"));
-                    controllerBinding.setBinding(Binding.fromString(controllerBindingJSONObject.getString("binding")));
+                    controllerBinding.setBinding(Bind.fromString(controllerBindingJSONObject.getString("binding")));
                     controller.addControllerBinding(controllerBinding);
                 }
                 controllers.add(controller);
@@ -880,60 +880,120 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 if (elementJSONObject.has("orientation")) element.setOrientation((byte)elementJSONObject.getInt("orientation"));
 
                 boolean hasGamepadBinding = true;
-                JSONArray slotPackagesArray = elementJSONObject.optJSONArray("slotPackages");
-                if (slotPackagesArray != null) {
-                    for (int j = 0; j < slotPackagesArray.length(); j++) {
-                        JSONObject pkgObj = slotPackagesArray.getJSONObject(j);
-                        BindPackage pkg = BindPackage.fromJSON(pkgObj, Binding.NONE);
-                        element.setSlotPackage(j, pkg);
-                        for (int k = 0; k < pkg.size(); k++) {
-                            Binding b = pkg.get(k);
-                            if (b != null && !b.isGamepad()) hasGamepadBinding = false;
-                        }
+                // Try new simple format first (non-BUTTON)
+                JSONArray bindsArray = elementJSONObject.optJSONArray("binds");
+                if (bindsArray != null && element.getType() != ControlElement.Type.BUTTON) {
+                    for (int j = 0; j < bindsArray.length() && j < 4; j++) {
+                        String bName = bindsArray.optString(j, "NONE");
+                        Bind b = parseBinding(bName, Bind.NONE);
+                        element.setBind(j, b);
+                        if (b != null && !b.isGamepad()) hasGamepadBinding = false;
                     }
                 }
-                else {
-                    JSONArray oldBindingsArray = elementJSONObject.optJSONArray("bindings");
-                    if (oldBindingsArray != null && oldBindingsArray.length() > 0) {
-                        try {
-                            boolean isFlat = oldBindingsArray.get(0) instanceof String;
-                            boolean oldToggleSwitch = elementJSONObject.optBoolean("toggleSwitch", false);
-                            if (isFlat) {
-                                for (int j = 0; j < oldBindingsArray.length(); j++) {
-                                    String bName = oldBindingsArray.optString(j, "NONE");
-                                    BindPackage pkg = BindPackage.fromSingle(parseBinding(bName, Binding.NONE));
-                                    pkg.setToggleSwitch(oldToggleSwitch);
-                                    element.setSlotPackage(j, pkg);
-                                    Binding b = pkg.get(0);
-                                    if (b != null && !b.isGamepad()) hasGamepadBinding = false;
+                else if (element.getType() != ControlElement.Type.BUTTON) {
+                    // Migration: read first bind from each slotPackages and store as binds
+                    boolean migrated = false;
+                    JSONArray slotPackagesArray = elementJSONObject.optJSONArray("slotPackages");
+                    if (slotPackagesArray != null) {
+                        for (int j = 0; j < slotPackagesArray.length() && j < 4; j++) {
+                            JSONObject pkgObj = slotPackagesArray.getJSONObject(j);
+                            BindPackage pkg = BindPackage.fromJSON(pkgObj, Bind.NONE);
+                            Bind b = pkg.size() > 0 ? pkg.get(0) : Bind.NONE;
+                            element.setBind(j, b);
+                            if (b != null && !b.isGamepad()) hasGamepadBinding = false;
+                            migrated = true;
+                        }
+                    }
+                    if (!migrated) {
+                        JSONArray oldBindingsArray = elementJSONObject.optJSONArray("bindings");
+                        if (oldBindingsArray != null && oldBindingsArray.length() > 0) {
+                            try {
+                                boolean isFlat = oldBindingsArray.get(0) instanceof String;
+                                boolean oldToggleSwitch = elementJSONObject.optBoolean("toggleSwitch", false);
+                                if (isFlat) {
+                                    for (int j = 0; j < oldBindingsArray.length() && j < 4; j++) {
+                                        String bName = oldBindingsArray.optString(j, "NONE");
+                                        Bind b = parseBinding(bName, Bind.NONE);
+                                        element.setBind(j, b);
+                                        if (b != null && !b.isGamepad()) hasGamepadBinding = false;
+                                    }
                                 }
-                            }
-                            else {
-                                for (int j = 0; j < oldBindingsArray.length(); j++) {
-                                    JSONArray seqArray = oldBindingsArray.getJSONArray(j);
-                                    BindPackage pkg = BindPackage.fromJSONArray(seqArray, Binding.NONE);
-                                    pkg.setToggleSwitch(oldToggleSwitch);
-                                    element.setSlotPackage(j, pkg);
-                                    for (int k = 0; k < pkg.size(); k++) {
-                                        Binding b = pkg.get(k);
+                                else {
+                                    for (int j = 0; j < oldBindingsArray.length() && j < 4; j++) {
+                                        JSONArray seqArray = oldBindingsArray.getJSONArray(j);
+                                        Bind b = seqArray.length() > 0 ? parseBinding(seqArray.optString(0, "NONE"), Bind.NONE) : Bind.NONE;
+                                        element.setBind(j, b);
                                         if (b != null && !b.isGamepad()) hasGamepadBinding = false;
                                     }
                                 }
                             }
+                            catch (JSONException e2) {
+                            }
                         }
-                        catch (JSONException e2) {
+                    }
+                    // Remove old slotPackages/bindings from element data to avoid re-migration
+                    elementJSONObject.remove("slotPackages");
+                    elementJSONObject.remove("bindings");
+                }
+                else {
+                    // Existing slotPackages / legacy bindings loading (for BUTTON and backward compat)
+                    JSONArray slotPackagesArray = elementJSONObject.optJSONArray("slotPackages");
+                    if (slotPackagesArray != null) {
+                        for (int j = 0; j < slotPackagesArray.length(); j++) {
+                            JSONObject pkgObj = slotPackagesArray.getJSONObject(j);
+                            BindPackage pkg = BindPackage.fromJSON(pkgObj, Bind.NONE);
+                            element.setSlotPackage(j, pkg);
+                            for (int k = 0; k < pkg.size(); k++) {
+                                Bind b = pkg.get(k);
+                                if (b != null && !b.isGamepad()) hasGamepadBinding = false;
+                            }
+                        }
+                    }
+                    else {
+                        JSONArray oldBindingsArray = elementJSONObject.optJSONArray("bindings");
+                        if (oldBindingsArray != null && oldBindingsArray.length() > 0) {
+                            try {
+                                boolean isFlat = oldBindingsArray.get(0) instanceof String;
+                                boolean oldToggleSwitch = elementJSONObject.optBoolean("toggleSwitch", false);
+                                if (isFlat) {
+                                    for (int j = 0; j < oldBindingsArray.length(); j++) {
+                                        String bName = oldBindingsArray.optString(j, "NONE");
+                                        BindPackage pkg = BindPackage.fromSingle(parseBinding(bName, Bind.NONE));
+                                        pkg.setToggleSwitch(oldToggleSwitch);
+                                        element.setSlotPackage(j, pkg);
+                                        Bind b = pkg.get(0);
+                                        if (b != null && !b.isGamepad()) hasGamepadBinding = false;
+                                    }
+                                }
+                                else {
+                                    for (int j = 0; j < oldBindingsArray.length(); j++) {
+                                        JSONArray seqArray = oldBindingsArray.getJSONArray(j);
+                                        BindPackage pkg = BindPackage.fromJSONArray(seqArray, Bind.NONE);
+                                        pkg.setToggleSwitch(oldToggleSwitch);
+                                        element.setSlotPackage(j, pkg);
+                                        for (int k = 0; k < pkg.size(); k++) {
+                                            Bind b = pkg.get(k);
+                                            if (b != null && !b.isGamepad()) hasGamepadBinding = false;
+                                        }
+                                    }
+                                }
+                            }
+                            catch (JSONException e2) {
+                            }
                         }
                     }
                 }
 
-                if (elementJSONObject.has("longPressPackage")) {
-                    JSONObject lpObj = elementJSONObject.getJSONObject("longPressPackage");
-                    element.setBindingPackage(ControlElement.BindingSection.LONG_PRESS, BindPackage.fromJSON(lpObj, Binding.NONE));
-                }
+                if (element.getType() == ControlElement.Type.BUTTON) {
+                    if (elementJSONObject.has("longPressPackage")) {
+                        JSONObject lpObj = elementJSONObject.getJSONObject("longPressPackage");
+                        element.setBindingPackage(ControlElement.BindingSection.LONG_PRESS, BindPackage.fromJSON(lpObj, Bind.NONE));
+                    }
 
-                if (elementJSONObject.has("gesturePackage")) {
-                    JSONObject gObj = elementJSONObject.getJSONObject("gesturePackage");
-                    element.setBindingPackage(ControlElement.BindingSection.GESTURE, BindPackage.fromJSON(gObj, Binding.NONE));
+                    if (elementJSONObject.has("gesturePackage")) {
+                        JSONObject gObj = elementJSONObject.getJSONObject("gesturePackage");
+                        element.setBindingPackage(ControlElement.BindingSection.GESTURE, BindPackage.fromJSON(gObj, Bind.NONE));
+                    }
                 }
 
                 if (!virtualGamepad && hasGamepadBinding) virtualGamepad = true;

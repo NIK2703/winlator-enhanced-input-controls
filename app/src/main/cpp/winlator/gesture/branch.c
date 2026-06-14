@@ -332,6 +332,15 @@ static inline void execute_and_cleanup_deferred(
     (void)ctx;
     if (count > 0)
         execute_actions(result, bindings, count);
+    /* When binding_delay > 0, execute_actions() schedules the PRESS via
+     * schedule_action() instead of adding it immediately.  Flush those
+     * scheduled presses NOW so they become real held-actions, then
+     * release_held_actions() can cancel remaining schedules safely and
+     * dispatch the matching RELEASE.  Without this flush the scheduled
+     * PRESS would be cancelled before ever firing, producing only a
+     * RELEASE (orphaned button state). */
+    process_scheduled_actions(result, UINT64_MAX);
+    release_held_actions(result);
     deactivate_finger(f);
 }
 
@@ -382,9 +391,14 @@ static void tick_deferred_single_tap(TouchFinger* f, GestureFingerCtx* ctx,
     };
     TapPathResult path = execute_tap_path(f, ctx, result, time_ms, &tap_params);
 
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "TAP_TICK path=%d result=%d held_before=%d is_held=%d",
+        path, result->count, g_state.gesture_held_count, g_state.gesture_is_action_held);
+    release_held_actions(result);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "TAP_TICK after_release result=%d is_held=%d held=%d",
+        result->count, g_state.gesture_is_action_held, g_state.gesture_held_count);
+
     if (path == TAP_PATH_ENTER_DT) return;
 
-    release_held_actions(result);
     f->state = GESTURE_STATE_IDLE;
     g_state.gesture_main_ptr_id = INVALID_PTR_ID;
     execute_and_cleanup_deferred(result, NULL, 0, f, ctx);
@@ -567,6 +581,7 @@ static bool up_handle_tap_waiting(TouchFinger* f, GestureFingerCtx* ctx,
 
     // TAP_PATH_ENTER_DT: entered DT/SDTW waiting.
     if (path == TAP_PATH_ENTER_DT) {
+        release_held_actions(result);
         if (slot->is_second_finger)
             cleanup_second_finger(f, ctx, result);
         return true;

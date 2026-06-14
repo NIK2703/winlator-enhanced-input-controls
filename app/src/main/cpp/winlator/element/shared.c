@@ -134,9 +134,11 @@ void element_set_petals(TouchElement* e, float nx, float ny, float dead_zone, To
     bool raw_down = ny >= dead_zone;
     bool raw_left = nx <= -dead_zone;
     bool states[MAX_PETALS] = {raw_up, raw_right, raw_down, raw_left};
-    for (int i = 0; i < MAX_PETALS; i++) {
+    uint8_t mask = e->cached_petal_mask;
+    while (mask) {
+        int i = __builtin_ctz(mask);
+        mask &= mask - 1;
         const TouchBinding* b = &e->bindings[i];
-        if (b->type == BINDING_NONE) continue;
         bool active = states[i];
         if (active != e->petal_active[i]) {
             e->petal_active[i] = active;
@@ -181,15 +183,18 @@ _Static_assert(
     "ELEM_TYPE_COUNT must match dispatch table sizes");
 
 void handle_element_down(TouchElement* e, int ptr_id, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+    int eidx = (int)(e - g_state.elements);
     // Elements always take priority: cancel any pending double-tap gesture
     // so the touch engages the element instead of triggering gesture bindings.
     if (__builtin_expect(g_state.gesture_double_tap_waiting, 0)) {
         gesture_cancel_double_tap_wait(result);
     }
     if (__builtin_expect(e->current_ptr_id >= 0, 0)) {
+        __android_log_print(ANDROID_LOG_WARN, "SigTrace", "EL_DOWN REJECTED elem=%d already_occupied_by_ptr=%d new_ptr=%d", eidx, e->current_ptr_id, ptr_id);
         return;
     }
     if (e->type >= ELEM_TYPE_COUNT) return;
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "EL_DOWN elem=%d type=%d ptr=%d bind0=%d engaged_before=%d", eidx, e->type, ptr_id, e->bindings[0].type, e->engaged);
     e->current_ptr_id = ptr_id;
     e->down_x = x;
     e->down_y = y;
@@ -319,10 +324,13 @@ void release_toggled_alternate_bindings(TouchElement* e, TouchActionResult* rest
 }
 
 void release_element_petals(TouchElement* e, TouchActionResult* restrict result) {
-    for (int i = 0; i < MAX_PETALS; i++) {
+    uint8_t mask = e->cached_petal_mask;
+    while (mask) {
+        int i = __builtin_ctz(mask);
+        mask &= mask - 1;
         if (__builtin_expect(e->petal_active[i], 0)) {
             e->petal_active[i] = false;
-            if (e->bindings[i].type != BINDING_NONE && !(e->primary_sticky_mask & (1 << i)))
+            if (!(e->primary_sticky_mask & (1 << i)))
                 release_binding(result, &e->bindings[i]);
         }
     }
@@ -410,8 +418,9 @@ void handle_element_move(TouchElement* e, float x, float y, uint64_t time_ms, To
 }
 
 void handle_element_up(TouchElement* e, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
+    int eidx = (int)(e - g_state.elements);
     int release_ptr_id = e->current_ptr_id;
-    int ei = (int)(e - g_state.elements);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "EL_UP elem=%d type=%d ptr=%d engaged=%d selected=%d defer=%d", eidx, e->type, release_ptr_id, e->engaged, e->selected, e->defer_primary);
     if (e->type >= ELEM_TYPE_COUNT) { e->engaged = false; e->current_ptr_id = -1; return; }
     element_up_table[e->type](e, x, y, time_ms, result);
     e->engaged = false;
