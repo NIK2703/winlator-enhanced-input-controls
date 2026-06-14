@@ -422,13 +422,16 @@ public class BindingSequenceEditor {
                 final Bind binding = finalDirBp.get(i);
                 TextView tvBind = new TextView(context);
                 tvBind.setText(binding.toString());
-                tvBind.setTextSize(12);
+                tvBind.setTextSize(16);
                 tvBind.setTextColor(colorAccent);
-                tvBind.setPadding(6, 4, 6, 4);
                 tvBind.setBackgroundResource(R.drawable.combo_box);
+                tvBind.setPadding((int) UnitUtils.dpToPx(12), 0, (int) UnitUtils.dpToPx(36), 0);
+                tvBind.setGravity(android.view.Gravity.LEFT | android.view.Gravity.CENTER_VERTICAL);
+                tvBind.setMaxLines(1);
+                tvBind.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 LinearLayout.LayoutParams lpBind = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
-                        (int) UnitUtils.dpToPx(30));
+                        (int) UnitUtils.dpToPx(42));
                 lpBind.rightMargin = (int) UnitUtils.dpToPx(4);
                 tvBind.setLayoutParams(lpBind);
 

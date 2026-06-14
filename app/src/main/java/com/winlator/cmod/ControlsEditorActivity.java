@@ -653,10 +653,21 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             loadBindingSection(element, container, ControlElement.BindingSection.GESTURE, "Gesture", showMenu);
         }
         else if (type == ControlElement.Type.D_PAD || type == ControlElement.Type.STICK || type == ControlElement.Type.TRACKPAD) {
-            loadBind(element, container, 0, "Up");
-            loadBind(element, container, 1, "Right");
-            loadBind(element, container, 2, "Down");
-            loadBind(element, container, 3, "Left");
+            String[] labels = {"Up", "Right", "Down", "Left"};
+            int[] slotIndices = {0, 1, 2, 3};
+
+            // Measure longest label to determine first column width
+            android.graphics.Paint paint = new android.graphics.Paint();
+            paint.setTextSize(UnitUtils.dpToPx(14));
+            float maxLabelWidth = 0;
+            for (String l : labels) {
+                maxLabelWidth = Math.max(maxLabelWidth, paint.measureText(l));
+            }
+            int labelWidthPx = (int) Math.ceil(maxLabelWidth) + (int) UnitUtils.dpToPx(12);
+
+            for (int i = 0; i < 4; i++) {
+                loadBindRow(element, container, slotIndices[i], labels[i], labelWidthPx);
+            }
         }
     }
 
@@ -702,9 +713,53 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         btBinding.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 btnH));
+        btBinding.setBackgroundResource(R.drawable.combo_box);
         btBinding.setPadding((int) UnitUtils.dpToPx(12), 0, (int) UnitUtils.dpToPx(36), 0);
         btBinding.setGravity(android.view.Gravity.LEFT | android.view.Gravity.CENTER_VERTICAL);
+        btBinding.setOnClickListener((v) -> {
+            BindingPickerDialog.show(this, currentBinding[0] != null ? currentBinding[0] : Bind.NONE, (newBinding) -> {
+                currentBinding[0] = newBinding;
+                btBinding.setText(newBinding != null && newBinding != Bind.NONE ? newBinding.toString() : "None");
+                element.setBind(slotIndex, newBinding);
+                profile.save();
+                inputControlsView.invalidate();
+            });
+        });
+        row.addView(btBinding);
+
+        container.addView(row);
+    }
+
+    private void loadBindRow(final ControlElement element, LinearLayout container, int slotIndex, String label, int labelWidthPx) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        rowLp.topMargin = (int) UnitUtils.dpToPx(4);
+        row.setLayoutParams(rowLp);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(label);
+        tvTitle.setTextSize(14);
+        tvTitle.setWidth(labelWidthPx);
+        tvTitle.setGravity(android.view.Gravity.LEFT | android.view.Gravity.CENTER_VERTICAL);
+        row.addView(tvTitle);
+
+        final Bind[] currentBinding = new Bind[1];
+        currentBinding[0] = element.getBind(slotIndex);
+
+        final TextView btBinding = new TextView(this);
+        btBinding.setText(currentBinding[0] != null && currentBinding[0] != Bind.NONE ? currentBinding[0].toString() : "None");
+        btBinding.setTextSize(16);
+        int btnH = (int) UnitUtils.dpToPx(42);
+        LinearLayout.LayoutParams bindLp = new LinearLayout.LayoutParams(
+                0, btnH, 1);
+        btBinding.setLayoutParams(bindLp);
         btBinding.setBackgroundResource(R.drawable.combo_box);
+        btBinding.setPadding((int) UnitUtils.dpToPx(12), 0, (int) UnitUtils.dpToPx(36), 0);
+        btBinding.setGravity(android.view.Gravity.LEFT | android.view.Gravity.CENTER_VERTICAL);
         btBinding.setOnClickListener((v) -> {
             BindingPickerDialog.show(this, currentBinding[0] != null ? currentBinding[0] : Bind.NONE, (newBinding) -> {
                 currentBinding[0] = newBinding;
