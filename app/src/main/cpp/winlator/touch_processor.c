@@ -40,7 +40,8 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     if (g_state.cfg.cursor_acceleration_factor <= 0.0f) g_state.cfg.cursor_acceleration_factor = DEFAULT_CURSOR_ACCEL_FACTOR;
     if (g_state.cfg.xform_scale_x <= 0.0f) g_state.cfg.xform_scale_x = 1.0f;
     if (g_state.cfg.xform_scale_y <= 0.0f) g_state.cfg.xform_scale_y = 1.0f;
-    if (g_state.cfg.scroll_threshold_px <= 0) g_state.cfg.scroll_threshold_px = 20;
+    if (g_state.cfg.scroll_threshold_px <= 0) g_state.cfg.scroll_threshold_px = 30;
+    if (g_state.cfg.scroll_hold_threshold_px <= 0) g_state.cfg.scroll_hold_threshold_px = 100;
     g_state.cfg.bindings_generation = 1;
     compute_gesture_caps(&g_state.cfg);
 }

@@ -136,6 +136,7 @@ struct CachedFieldIDs {
     jfieldID viewOffsetX;
     jfieldID viewOffsetY;
     jfieldID gestureLongPressHaptic;
+    jfieldID scrollBindHaptic;
     jfieldID hapticEnabled;
     jfieldID tsSingleTap;
     jfieldID tsLongPress;
@@ -216,6 +217,10 @@ struct CachedFieldIDs {
     jfieldID scrollBindingsLeft;
     jfieldID scrollBindingsRight;
     jfieldID scrollThresholdPx;
+    jfieldID scrollHoldThresholdPx;
+    jfieldID scrollHoldV;
+    jfieldID scrollHoldH;
+    jfieldID scrollHoldHaptic;
 };
 
 #define JNI_CHECK(env, msg) do { \
@@ -464,6 +469,7 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
     c->view_offset_x = env->GetFloatField(config, g_config.viewOffsetX);
     c->view_offset_y = env->GetFloatField(config, g_config.viewOffsetY);
     c->gesture_long_press_haptic = env->GetIntField(config, g_config.gestureLongPressHaptic);
+    c->scroll_bind_haptic = env->GetIntField(config, g_config.scrollBindHaptic);
     c->haptic_enabled = env->GetBooleanField(config, g_config.hapticEnabled);
 
     struct BindingSlotPair { GestureBindingSlot* slot; jfieldID fid; };
@@ -580,6 +586,8 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
 
     // Read scroll mode bindings: 5 gestures × 4 directions
     c->scroll_threshold_px = env->GetIntField(config, g_config.scrollThresholdPx);
+    c->scroll_hold_threshold_px = env->GetIntField(config, g_config.scrollHoldThresholdPx);
+    c->scroll_hold_haptic = env->GetIntField(config, g_config.scrollHoldHaptic);
     struct { jfieldID fid; int dir; } scroll_dirs[] = {
         { g_config.scrollBindingsUp, SCROLL_DIR_UP },
         { g_config.scrollBindingsDown, SCROLL_DIR_DOWN },
@@ -599,6 +607,26 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
             }
         }
         env->DeleteLocalRef(dirArray);
+    }
+
+    // Read scroll hold flags
+    jbooleanArray holdV = (jbooleanArray)env->GetObjectField(config, g_config.scrollHoldV);
+    if (holdV) {
+        jboolean* elems = env->GetBooleanArrayElements(holdV, NULL);
+        jsize len = env->GetArrayLength(holdV);
+        for (int i = 0; i < len && i < 5; i++)
+            c->scroll_hold_v[i] = elems[i];
+        env->ReleaseBooleanArrayElements(holdV, elems, 0);
+        env->DeleteLocalRef(holdV);
+    }
+    jbooleanArray holdH = (jbooleanArray)env->GetObjectField(config, g_config.scrollHoldH);
+    if (holdH) {
+        jboolean* elems = env->GetBooleanArrayElements(holdH, NULL);
+        jsize len = env->GetArrayLength(holdH);
+        for (int i = 0; i < len && i < 5; i++)
+            c->scroll_hold_h[i] = elems[i];
+        env->ReleaseBooleanArrayElements(holdH, elems, 0);
+        env->DeleteLocalRef(holdH);
     }
 }
 
@@ -629,6 +657,7 @@ static void cache_config_field_ids(JNIEnv* env, jobject config) {
         { &g_config.viewOffsetX, "viewOffsetX", "F" },
         { &g_config.viewOffsetY, "viewOffsetY", "F" },
         { &g_config.gestureLongPressHaptic, "gestureLongPressHaptic", "I" },
+        { &g_config.scrollBindHaptic, "scrollBindHaptic", "I" },
         { &g_config.hapticEnabled, "hapticEnabled", "Z" },
     };
     for (int i = 0; i < (int)(sizeof(scalar)/sizeof(scalar[0])); i++) {
@@ -680,6 +709,10 @@ static void cache_config_field_ids(JNIEnv* env, jobject config) {
         { &g_config.scrollBindingsLeft, "scrollBindingsLeft", "[[I" },
         { &g_config.scrollBindingsRight, "scrollBindingsRight", "[[I" },
         { &g_config.scrollThresholdPx, "scrollThresholdPx", "I" },
+        { &g_config.scrollHoldThresholdPx, "scrollHoldThresholdPx", "I" },
+        { &g_config.scrollHoldV, "scrollHoldV", "[Z" },
+        { &g_config.scrollHoldH, "scrollHoldH", "[Z" },
+        { &g_config.scrollHoldHaptic, "scrollHoldHaptic", "I" },
     };
     for (int i = 0; i < (int)(sizeof(scroll_fields)/sizeof(scroll_fields[0])); i++) {
         *scroll_fields[i].dst = env->GetFieldID(cls, scroll_fields[i].name, scroll_fields[i].sig);

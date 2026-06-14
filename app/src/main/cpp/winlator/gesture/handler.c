@@ -611,6 +611,7 @@ static void handle_cursor_move(TouchFinger* finger, float x, float y, uint64_t t
     int active_count = active_finger_count();
     if (!g_state.cfg.is_tp || g_state.scrolling || active_count > 2) return;
     if (finger->scroll_mode) return; // cursor frozen in scroll mode
+    if (g_state.gesture_second_active && finger->ptr_id != g_state.gesture_main_ptr_id) return;
     if (g_state.sim_touch_screen) {
         if (finger->travel_x > MAX_TAP_TRAVEL || finger->travel_y > MAX_TAP_TRAVEL)
             g_state.sim_continue_click = false;

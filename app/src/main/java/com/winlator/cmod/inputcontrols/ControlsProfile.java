@@ -50,6 +50,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private int buttonLongPressHaptic = 1;
     private int buttonGestureHaptic = 5;
     private int gestureLongPressHaptic = 3;
+    private int scrollBindHaptic = 3;
+    private int scrollHoldHaptic = 1;
+    private int scrollHoldThreshold = 100;
     private int dragThreshold = 10;
     private int gestureThreshold = 20;
     private int doubleTapDistance = 50;
@@ -91,7 +94,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private final BindPackage[] gestureScrollDown = new BindPackage[5];
     private final BindPackage[] gestureScrollLeft = new BindPackage[5];
     private final BindPackage[] gestureScrollRight = new BindPackage[5];
-    private int scrollThreshold = 20;
+    private int scrollThreshold = 30;
+    private final boolean[] scrollHoldV = new boolean[5];
+    private final boolean[] scrollHoldH = new boolean[5];
 
     private boolean gestureSettingsLoaded = false;
 
@@ -295,6 +300,33 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.gestureLongPressHaptic = clamp(value, 0, 5);
     }
 
+    public int getScrollBindHaptic() {
+        ensureGestureSettingsLoaded();
+        return scrollBindHaptic;
+    }
+
+    public void setScrollBindHaptic(int value) {
+        this.scrollBindHaptic = clamp(value, 0, 5);
+    }
+
+    public int getScrollHoldHaptic() {
+        ensureGestureSettingsLoaded();
+        return scrollHoldHaptic;
+    }
+
+    public void setScrollHoldHaptic(int value) {
+        this.scrollHoldHaptic = clamp(value, 0, 5);
+    }
+
+    public int getScrollHoldThreshold() {
+        ensureGestureSettingsLoaded();
+        return scrollHoldThreshold;
+    }
+
+    public void setScrollHoldThreshold(int threshold) {
+        this.scrollHoldThreshold = clamp(threshold, 5, 100);
+    }
+
     public int getDragThreshold() {
         ensureGestureSettingsLoaded();
         return dragThreshold;
@@ -469,6 +501,24 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         this.scrollThreshold = clamp(threshold, 5, 100);
     }
 
+    public boolean getScrollHoldV(int slot) {
+        ensureGestureSettingsLoaded();
+        return scrollHoldV[slot];
+    }
+
+    public void setScrollHoldV(int slot, boolean value) {
+        scrollHoldV[slot] = value;
+    }
+
+    public boolean getScrollHoldH(int slot) {
+        ensureGestureSettingsLoaded();
+        return scrollHoldH[slot];
+    }
+
+    public void setScrollHoldH(int slot, boolean value) {
+        scrollHoldH[slot] = value;
+    }
+
     public static int scrollGestureSlotForDragGesture(int gestureType) {
         if (gestureType == GESTURE_SINGLE_TAP_DRAG) return 0;
         if (gestureType == GESTURE_LONG_PRESS_DRAG) return 1;
@@ -522,6 +572,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (data.has("buttonLongPressHaptic")) buttonLongPressHaptic = clamp(data.getInt("buttonLongPressHaptic"), 0, 5);
             if (data.has("buttonGestureHaptic")) buttonGestureHaptic = clamp(data.getInt("buttonGestureHaptic"), 0, 5);
             if (data.has("gestureLongPressHaptic")) gestureLongPressHaptic = clamp(data.getInt("gestureLongPressHaptic"), 0, 5);
+            if (data.has("scrollBindHaptic")) scrollBindHaptic = clamp(data.getInt("scrollBindHaptic"), 0, 5);
+            if (data.has("scrollHoldHaptic")) scrollHoldHaptic = clamp(data.getInt("scrollHoldHaptic"), 0, 5);
+            if (data.has("scrollHoldThreshold")) scrollHoldThreshold = clamp(data.getInt("scrollHoldThreshold"), 5, 100);
             if (data.has("dragThreshold")) dragThreshold = clamp(data.getInt("dragThreshold"), 0, 30);
             if (data.has("doubleTapDistance")) doubleTapDistance = clamp(data.getInt("doubleTapDistance"), 10, 100);
             if (data.has("gestureThreshold")) gestureThreshold = clamp(data.getInt("gestureThreshold"), 10, 50);
@@ -609,6 +662,17 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             }
             if (gestureData.has("scrollThreshold"))
                 scrollThreshold = clamp(gestureData.getInt("scrollThreshold"), 5, 100);
+
+            if (gestureData.has("scrollHoldV")) {
+                JSONArray arr = gestureData.getJSONArray("scrollHoldV");
+                for (int i = 0; i < Math.min(arr.length(), 5); i++)
+                    scrollHoldV[i] = arr.getBoolean(i);
+            }
+            if (gestureData.has("scrollHoldH")) {
+                JSONArray arr = gestureData.getJSONArray("scrollHoldH");
+                for (int i = 0; i < Math.min(arr.length(), 5); i++)
+                    scrollHoldH[i] = arr.getBoolean(i);
+            }
         }
         catch (JSONException e) {
 
@@ -709,6 +773,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (buttonLongPressHaptic != 1) data.put("buttonLongPressHaptic", buttonLongPressHaptic);
             if (buttonGestureHaptic != 5) data.put("buttonGestureHaptic", buttonGestureHaptic);
             if (gestureLongPressHaptic != 3) data.put("gestureLongPressHaptic", gestureLongPressHaptic);
+            if (scrollBindHaptic != 3) data.put("scrollBindHaptic", scrollBindHaptic);
+            if (scrollHoldHaptic != 1) data.put("scrollHoldHaptic", scrollHoldHaptic);
+            if (scrollHoldThreshold != 100) data.put("scrollHoldThreshold", scrollHoldThreshold);
             if (dragThreshold != 10) data.put("dragThreshold", dragThreshold);
             if (doubleTapDistance != 50) data.put("doubleTapDistance", doubleTapDistance);
             if (gestureThreshold != 20) data.put("gestureThreshold", gestureThreshold);
@@ -780,7 +847,23 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 }
             }
             if (hasAnyScroll) unifiedGestureData.put("scrollBindings", scrollData);
-            if (scrollThreshold != 20) unifiedGestureData.put("scrollThreshold", scrollThreshold);
+            if (scrollThreshold != 30) unifiedGestureData.put("scrollThreshold", scrollThreshold);
+
+            boolean hasHoldV = false, hasHoldH = false;
+            for (int i = 0; i < 5; i++) {
+                if (scrollHoldV[i]) hasHoldV = true;
+                if (scrollHoldH[i]) hasHoldH = true;
+            }
+            if (hasHoldV) {
+                JSONArray arr = new JSONArray();
+                for (int i = 0; i < 5; i++) arr.put(scrollHoldV[i]);
+                unifiedGestureData.put("scrollHoldV", arr);
+            }
+            if (hasHoldH) {
+                JSONArray arr = new JSONArray();
+                for (int i = 0; i < 5; i++) arr.put(scrollHoldH[i]);
+                unifiedGestureData.put("scrollHoldH", arr);
+            }
 
             data.put("gestureSettings", unifiedGestureData);
 
@@ -921,6 +1004,9 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             if (profileJSONObject.has("buttonLongPressHaptic")) buttonLongPressHaptic = clamp(profileJSONObject.getInt("buttonLongPressHaptic"), 0, 5);
             if (profileJSONObject.has("buttonGestureHaptic")) buttonGestureHaptic = clamp(profileJSONObject.getInt("buttonGestureHaptic"), 0, 5);
             if (profileJSONObject.has("gestureLongPressHaptic")) gestureLongPressHaptic = clamp(profileJSONObject.getInt("gestureLongPressHaptic"), 0, 5);
+            if (profileJSONObject.has("scrollBindHaptic")) scrollBindHaptic = clamp(profileJSONObject.getInt("scrollBindHaptic"), 0, 5);
+            if (profileJSONObject.has("scrollHoldHaptic")) scrollHoldHaptic = clamp(profileJSONObject.getInt("scrollHoldHaptic"), 0, 5);
+            if (profileJSONObject.has("scrollHoldThreshold")) scrollHoldThreshold = clamp(profileJSONObject.getInt("scrollHoldThreshold"), 5, 100);
             if (profileJSONObject.has("dragThreshold")) dragThreshold = clamp(profileJSONObject.getInt("dragThreshold"), 0, 30);
             if (profileJSONObject.has("strokeWidth")) strokeWidth = (float)profileJSONObject.getDouble("strokeWidth");
             if (profileJSONObject.has("fillAlphaInactive")) fillAlphaInactive = profileJSONObject.getInt("fillAlphaInactive");

@@ -308,17 +308,27 @@ typedef struct {
     bool scroll_mode;
     float scroll_origin_x;
     float scroll_origin_y;
+    float scroll_hold_origin_x;  // never reset — for zone-based hold calculations
+    float scroll_hold_origin_y;
     float scroll_accum[SCROLL_DIR_COUNT]; // accumulated distance per direction
     int scroll_active_dir;                 // currently firing direction (-1 = none)
     int scroll_gesture_index;              // which drag gesture's scroll bindings to use
+
+    // Scroll hold mode state: 0=none, 1=first dir held, 2=second dir held
+    int8_t scroll_hold_v_state;  // vertical: 0=none, 1=UP held, 2=DOWN held
+    int8_t scroll_hold_h_state;  // horizontal: 0=none, 1=LEFT held, 2=RIGHT held
 
     // Pending scroll mode resume (saved when second finger interrupts scroll mode)
     bool pending_scroll_mode;
     float pending_scroll_origin_x;
     float pending_scroll_origin_y;
+    float pending_scroll_hold_origin_x;
+    float pending_scroll_hold_origin_y;
     float pending_scroll_accum[SCROLL_DIR_COUNT];
     int pending_scroll_active_dir;
     int pending_scroll_gesture_index;
+    int8_t pending_scroll_hold_v_state;
+    int8_t pending_scroll_hold_h_state;
 } TouchFinger;
 
 typedef enum {
@@ -360,6 +370,8 @@ typedef struct {
 
     // Haptic
     int gesture_long_press_haptic;
+    int scroll_bind_haptic;
+    int scroll_hold_haptic;
     bool haptic_enabled;
 
     // Gesture bindings — indexed by GestureType
@@ -369,7 +381,10 @@ typedef struct {
 
     // Scroll mode bindings — indexed by drag gesture slot (0=Sd, 1=Ld, 2=Dd, 3=Sd2, 4=Dd2)
     ScrollGestureBindings scroll_bindings[5];
-    int scroll_threshold_px;  // distance in pixels to trigger a scroll binding fire
+    int scroll_threshold_px;  // distance in pixels to trigger a scroll binding fire (normal mode, default 30)
+    int scroll_hold_threshold_px;  // threshold for hold mode (default 60)
+    bool scroll_hold_v[5];    // vertical hold mode per gesture slot
+    bool scroll_hold_h[5];    // horizontal hold mode per gesture slot
 
     // Render config (shared across all elements)
     uint32_t color_primary;       // default 0xFFFFFFFF (white)

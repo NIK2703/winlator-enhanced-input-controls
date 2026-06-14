@@ -80,7 +80,6 @@ public class InputControlsFragment extends Fragment {
     private TextView tvLongPressDelay;
     private Spinner spButtonLongPressHaptic;
     private Spinner spButtonGestureHaptic;
-    private Spinner spGestureLongPressHaptic;
     private SeekBar sbGestureThreshold;
     private TextView tvGestureThreshold;
     private SeekBar sbDoubleTapDistance;
@@ -238,10 +237,6 @@ public class InputControlsFragment extends Fragment {
         spButtonGestureHaptic = setupHapticSpinner(view, R.id.SPButtonGestureHaptic,
             profile -> profile.getButtonGestureHaptic(),
             (profile, value) -> { profile.setButtonGestureHaptic(value); profile.save(); });
-
-        spGestureLongPressHaptic = setupHapticSpinner(view, R.id.SPGestureLongPressHaptic,
-            profile -> profile.getGestureLongPressHaptic(),
-            (profile, value) -> { profile.setGestureLongPressHaptic(value); profile.save(); });
 
         tvGestureThreshold = view.findViewById(R.id.TVGestureThreshold);
         sbGestureThreshold = view.findViewById(R.id.SBGestureThreshold);
@@ -493,7 +488,6 @@ public class InputControlsFragment extends Fragment {
                     tvLongPressDelay.setText(lpDelay + " ms");
                     spButtonLongPressHaptic.setSelection(currentProfile.getButtonLongPressHaptic());
                     spButtonGestureHaptic.setSelection(currentProfile.getButtonGestureHaptic());
-                    spGestureLongPressHaptic.setSelection(currentProfile.getGestureLongPressHaptic());
                     int gThreshold = currentProfile.getGestureThreshold();
                     sbGestureThreshold.setProgress(gThreshold - 10);
                     tvGestureThreshold.setText(gThreshold + " px");

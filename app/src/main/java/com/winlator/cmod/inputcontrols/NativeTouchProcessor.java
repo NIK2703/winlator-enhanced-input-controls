@@ -70,6 +70,8 @@ public class NativeTouchProcessor {
         public int screenW;
         public int screenH;
         public int gestureLongPressHaptic;
+        public int scrollBindHaptic;
+        public int scrollHoldHaptic;
         public boolean hapticEnabled;
         public int gestureThresholdPx;
         public float xformScaleX = 1.0f;
@@ -165,7 +167,10 @@ public class NativeTouchProcessor {
         public int[][] scrollBindingsDown = new int[5][];
         public int[][] scrollBindingsLeft = new int[5][];
         public int[][] scrollBindingsRight = new int[5][];
-        public int scrollThresholdPx = 20;
+        public boolean[] scrollHoldV = new boolean[5];
+        public boolean[] scrollHoldH = new boolean[5];
+        public int scrollThresholdPx = 30;
+        public int scrollHoldThresholdPx = 100;
     }
 
     public static class NativeElement {
@@ -473,7 +478,9 @@ public class NativeTouchProcessor {
         c.screenW = screenW;
         c.screenH = screenH;
         c.gestureLongPressHaptic = profile.getGestureLongPressHaptic();
-        c.hapticEnabled = c.gestureLongPressHaptic > 0;
+        c.scrollBindHaptic = profile.getScrollBindHaptic();
+        c.scrollHoldHaptic = profile.getScrollHoldHaptic();
+        c.hapticEnabled = c.gestureLongPressHaptic > 0 || c.scrollBindHaptic > 0 || c.scrollHoldHaptic > 0;
         c.gestureThresholdPx = profile.getGestureThreshold();
         c.cursorAccelerationThreshold = 6;
         c.cursorAccelerationFactor = 1.25f;
@@ -507,6 +514,7 @@ public class NativeTouchProcessor {
 
         // Scroll mode bindings
         c.scrollThresholdPx = profile.getScrollThreshold();
+        c.scrollHoldThresholdPx = profile.getScrollHoldThreshold();
         String[] dirKeys = {"up", "down", "left", "right"};
         String[] slotKeys = {"Sd", "Ld", "Dd", "Sd2", "Dd2"};
         StringBuilder sb = new StringBuilder();
@@ -516,6 +524,8 @@ public class NativeTouchProcessor {
             c.scrollBindingsDown[s] = profile.getScrollBinding(s, 1).encode();
             c.scrollBindingsLeft[s] = profile.getScrollBinding(s, 2).encode();
             c.scrollBindingsRight[s] = profile.getScrollBinding(s, 3).encode();
+            c.scrollHoldV[s] = profile.getScrollHoldV(s);
+            c.scrollHoldH[s] = profile.getScrollHoldH(s);
             int total = c.scrollBindingsUp[s].length + c.scrollBindingsDown[s].length
                       + c.scrollBindingsLeft[s].length + c.scrollBindingsRight[s].length;
             if (total > 0) {

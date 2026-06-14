@@ -674,14 +674,85 @@ static void up_prelude_second_finger(TouchFinger* f,
 
 // Determine which direction has dominant accumulated movement and fire its binding
 static void scroll_mode_process(TouchFinger* f, TouchActionResult* restrict result) {
+    int si = f->scroll_gesture_index;
+    if (si < 0 || si >= 5) return;
+
     float dx = f->x - f->scroll_origin_x;
     float dy = f->y - f->scroll_origin_y;
-    float adx = fabsf(dx);
-    float ady = fabsf(dy);
+    float hdx = f->x - f->scroll_hold_origin_x;
+    float hdy = f->y - f->scroll_hold_origin_y;
+    static const char* dir_names[] = {"UP", "DOWN", "LEFT", "RIGHT"};
 
-    // Determine dominant direction
+    // --- Hold mode: zone-based relative to hold origin (never reset) ---
+    // Vertical hold
+    if (g_state.cfg.scroll_hold_v[si]) {
+        float threshold = (float)g_state.cfg.scroll_hold_threshold_px;
+        int new_state;
+        if (fabsf(hdy) < threshold) new_state = 0;
+        else new_state = (hdy < 0) ? 1 : 2;
+
+        if (new_state != f->scroll_hold_v_state) {
+            if (g_state.cfg.scroll_hold_haptic > 0)
+                add_action(result, ACT_HAPTIC, g_state.cfg.scroll_hold_haptic, 0, 0);
+
+            // Release both vertical bindings first
+            for (int d = SCROLL_DIR_UP; d <= SCROLL_DIR_DOWN; d++) {
+                const GestureBindingSlot* s = &g_state.cfg.scroll_bindings[si].dirs[d];
+                for (int i = 0; i < s->count; i++)
+                    release_binding(result, &s->arr[i]);
+            }
+
+            if (new_state != 0) {
+                int new_dir = (new_state == 1) ? SCROLL_DIR_UP : SCROLL_DIR_DOWN;
+                const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[new_dir];
+                for (int i = 0; i < slot->count; i++)
+                    press_binding(result, &slot->arr[i], true);
+                __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "HOLD V →%s",
+                    dir_names[new_dir]);
+            } else {
+                __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "HOLD V →NONE");
+            }
+            f->scroll_hold_v_state = new_state;
+        }
+    }
+
+    // Horizontal hold
+    if (g_state.cfg.scroll_hold_h[si]) {
+        float threshold = (float)g_state.cfg.scroll_hold_threshold_px;
+        int new_state;
+        if (fabsf(hdx) < threshold) new_state = 0;
+        else new_state = (hdx < 0) ? 1 : 2;
+
+        if (new_state != f->scroll_hold_h_state) {
+            if (g_state.cfg.scroll_hold_haptic > 0)
+                add_action(result, ACT_HAPTIC, g_state.cfg.scroll_hold_haptic, 0, 0);
+
+            // Release both horizontal bindings first
+            for (int d = SCROLL_DIR_LEFT; d <= SCROLL_DIR_RIGHT; d++) {
+                const GestureBindingSlot* s = &g_state.cfg.scroll_bindings[si].dirs[d];
+                for (int i = 0; i < s->count; i++)
+                    release_binding(result, &s->arr[i]);
+            }
+
+            if (new_state != 0) {
+                int new_dir = (new_state == 1) ? SCROLL_DIR_LEFT : SCROLL_DIR_RIGHT;
+                const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[new_dir];
+                for (int i = 0; i < slot->count; i++)
+                    press_binding(result, &slot->arr[i], true);
+                __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "HOLD H →%s",
+                    dir_names[new_dir]);
+            } else {
+                __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "HOLD H →NONE");
+            }
+            f->scroll_hold_h_state = new_state;
+        }
+    }
+
+    // --- Normal scroll mode: fire on threshold ---
     int dir = -1;
     float dominant = 0.0f;
+    float adx = fabsf(dx);
+    float ady = fabsf(dy);
     if (ady > adx && ady > 0.0f) {
         dir = (dy < 0.0f) ? SCROLL_DIR_UP : SCROLL_DIR_DOWN;
         dominant = ady;
@@ -689,38 +760,28 @@ static void scroll_mode_process(TouchFinger* f, TouchActionResult* restrict resu
         dir = (dx < 0.0f) ? SCROLL_DIR_LEFT : SCROLL_DIR_RIGHT;
         dominant = adx;
     }
+    if (dir < 0) return;
 
-    if (dir < 0) {
-        __android_log_print(ANDROID_LOG_VERBOSE, "ScrollDbg", "scroll_process: NO MOVEMENT dx=%.1f dy=%.1f", dx, dy);
-        return;
-    }
+    bool is_vert = (dir == SCROLL_DIR_UP || dir == SCROLL_DIR_DOWN);
+    if (is_vert ? g_state.cfg.scroll_hold_v[si] : g_state.cfg.scroll_hold_h[si])
+        return; // hold mode handles this axis
 
-    float threshold = (float)g_state.cfg.scroll_threshold_px;
-    int si = f->scroll_gesture_index;
-    if (si < 0 || si >= 5) {
-        __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "scroll_process: BAD slot=%d", si);
-        return;
-    }
-
-    const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[dir];
-
-    // Accumulate distance in the dominant axis
     f->scroll_accum[dir] += dominant;
-
-    static const char* dir_names[] = {"UP", "DOWN", "LEFT", "RIGHT"};
-
-    // Reset origin to current position for incremental accumulation
     f->scroll_origin_x = f->x;
     f->scroll_origin_y = f->y;
 
-    // Fire binding when threshold is reached
-    if (f->scroll_accum[dir] >= threshold && slot->count > 0) {
-        f->scroll_accum[dir] -= threshold;
-        int before = result->count;
-        execute_actions(result, slot->arr, slot->count);
-        __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL FIRE dir=%s slot=%d result_count=%d->%d",
-            dir_names[dir], si, before, result->count);
-    }
+    float threshold = (float)g_state.cfg.scroll_threshold_px;
+    if (f->scroll_accum[dir] < threshold) return;
+    f->scroll_accum[dir] -= threshold;
+
+    const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[dir];
+    if (slot->count == 0) return;
+
+    if (g_state.cfg.scroll_bind_haptic > 0)
+        add_action(result, ACT_HAPTIC, g_state.cfg.scroll_bind_haptic, 0, 0);
+    execute_actions(result, slot->arr, slot->count);
+    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL FIRE dir=%s slot=%d",
+        dir_names[dir], si);
 }
 
 static void handle_move_scroll_mode(TouchFinger* f, GestureFingerCtx* ctx,
@@ -964,14 +1025,17 @@ static bool handle_move_resolve(TouchFinger* f, GestureFingerCtx* ctx,
 
     move_resolve_binding(f, ctx, mc->slot, mc->is_d_slot, &mc->resolved);
 
+    TouchFinger* main_finger_tp = NULL;
     if (mc->slot->is_second_finger && g_state.cfg.is_tp) {
-        TouchFinger* main_finger = find_finger(g_state.gesture_main_ptr_id);
-        if (main_finger) {
-            *dx += main_finger->x - g_state.gesture_second_main_ref_x;
-            *dy += main_finger->y - g_state.gesture_second_main_ref_y;
+        main_finger_tp = find_finger(g_state.gesture_main_ptr_id);
+        if (main_finger_tp) {
+            *dx += main_finger_tp->x - g_state.gesture_second_main_ref_x;
+            *dy += main_finger_tp->y - g_state.gesture_second_main_ref_y;
         }
     }
-    if (fabsf(*dx) <= g_state.cfg.drag_threshold_px && fabsf(*dy) <= g_state.cfg.drag_threshold_px) {
+    float check_dx = main_finger_tp ? main_finger_tp->x - g_state.gesture_second_main_ref_x : *dx;
+    float check_dy = main_finger_tp ? main_finger_tp->y - g_state.gesture_second_main_ref_y : *dy;
+    if (fabsf(check_dx) <= g_state.cfg.drag_threshold_px && fabsf(check_dy) <= g_state.cfg.drag_threshold_px) {
         return false;
     }
     return true;

@@ -5,10 +5,14 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -17,7 +21,7 @@ import com.google.android.material.tabs.TabLayout;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
-import com.winlator.cmod.core.UnitUtils;
+import com.winlator.cmod.core.HapticUtils;
 import com.winlator.cmod.inputcontrols.Bind;
 import com.winlator.cmod.inputcontrols.BindPackage;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
@@ -80,6 +84,18 @@ public class GestureSettingsActivity extends AppCompatActivity {
         View llScrollThreshold = view.findViewById(R.id.LLScrollThreshold);
         NumberPicker npScrollThreshold = view.findViewById(R.id.NPScrollThreshold);
         npScrollThreshold.setValue(profile.getScrollThreshold());
+
+        View llScrollHoldThreshold = view.findViewById(R.id.LLScrollHoldThreshold);
+        NumberPicker npScrollHoldThreshold = view.findViewById(R.id.NPScrollHoldThreshold);
+        npScrollHoldThreshold.setValue(profile.getScrollHoldThreshold());
+
+        LinearLayout llHapticSection = view.findViewById(R.id.LLHapticSection);
+        setupHapticRow(llHapticSection, "Gesture Long Press", profile.getGestureLongPressHaptic(),
+            value -> { profile.setGestureLongPressHaptic(value); profile.save(); });
+        setupHapticRow(llHapticSection, "Scroll Bind", profile.getScrollBindHaptic(),
+            value -> { profile.setScrollBindHaptic(value); profile.save(); });
+        setupHapticRow(llHapticSection, "Scroll Hold", profile.getScrollHoldHaptic(),
+            value -> { profile.setScrollHoldHaptic(value); profile.save(); });
 
         View llCursorSpeed = view.findViewById(R.id.LLCursorSpeed);
         SeekBar sbCursorSpeed = view.findViewById(R.id.SBCursorSpeed);
@@ -164,8 +180,20 @@ public class GestureSettingsActivity extends AppCompatActivity {
                     scrollBps.put(dirKeys[dir], storedScroll);
                     if (storedScroll.size() > 0) hasScrollBindings = true;
                 }
+                boolean holdV = profile.getScrollHoldV(scrollSlotIndex);
+                boolean holdH = profile.getScrollHoldH(scrollSlotIndex);
+                scrollBindingValues.put("hold_v_" + gestureIdx, holdV ? BindPackage.fromSingle(Bind.NONE) : null);
+                scrollBindingValues.put("hold_h_" + gestureIdx, holdH ? BindPackage.fromSingle(Bind.NONE) : null);
+                scrollBps.put("hold_v", holdV ? BindPackage.fromSingle(Bind.NONE) : null);
+                scrollBps.put("hold_h", holdH ? BindPackage.fromSingle(Bind.NONE) : null);
+                final int slotIdx = scrollSlotIndex;
+                final int gestureIdxFinal = gestureIdx;
                 section = BindingSequenceEditor.createDragView(this, sectionLabels[i], sectionHelpResIds[i],
-                        stored, () -> {}, scrollBps, hasScrollBindings);
+                        stored, () -> {}, scrollBps, hasScrollBindings,
+                        (holdKey, enabled) -> {
+                            scrollBindingValues.put(holdKey + "_" + gestureIdxFinal,
+                                enabled ? BindPackage.fromSingle(Bind.NONE) : null);
+                        });
             } else {
                 section = BindingSequenceEditor.createView(this, sectionLabels[i], sectionHelpResIds[i],
                         stored, () -> {});
@@ -176,6 +204,7 @@ public class GestureSettingsActivity extends AppCompatActivity {
         updateSingleTapDragVisibility(llSingleFinger, isTouchpad);
         updateCursorSpeedVisibility(llCursorSpeed, isTouchpad);
         updateScrollThresholdVisibility(llScrollThreshold, isTouchpad);
+        updateScrollThresholdVisibility(llScrollHoldThreshold, isTouchpad);
 
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
@@ -184,6 +213,7 @@ public class GestureSettingsActivity extends AppCompatActivity {
                 updateSingleTapDragVisibility(llSingleFinger, tpMode);
                 updateCursorSpeedVisibility(llCursorSpeed, tpMode);
                 updateScrollThresholdVisibility(llScrollThreshold, tpMode);
+                updateScrollThresholdVisibility(llScrollHoldThreshold, tpMode);
             }
             @Override
             public void onTabUnselected(TabLayout.Tab tab) {}
@@ -193,6 +223,7 @@ public class GestureSettingsActivity extends AppCompatActivity {
                 updateSingleTapDragVisibility(llSingleFinger, tpMode);
                 updateCursorSpeedVisibility(llCursorSpeed, tpMode);
                 updateScrollThresholdVisibility(llScrollThreshold, tpMode);
+                updateScrollThresholdVisibility(llScrollHoldThreshold, tpMode);
             }
         });
     }
@@ -232,6 +263,8 @@ public class GestureSettingsActivity extends AppCompatActivity {
         float speed = 0.25f + (sbCursorSpeed.getProgress() / 55.0f) * 2.75f;
         profile.setCursorSpeed(speed);
         profile.setScrollThreshold(npScrollThreshold.getValue());
+        NumberPicker npScrollHoldThreshold = findViewById(R.id.NPScrollHoldThreshold);
+        profile.setScrollHoldThreshold(npScrollHoldThreshold.getValue());
 
         String[] saveKeys = {"single", "single_drag", "long", "long_drag",
             "double", "double_drag",
@@ -262,6 +295,10 @@ public class GestureSettingsActivity extends AppCompatActivity {
                     profile.setScrollBinding(slot, dir, scrollBp);
                 }
             }
+            BindPackage holdVbp = scrollBindingValues.get("hold_v_" + dragGestureIndices[slot]);
+            profile.setScrollHoldV(slot, holdVbp != null);
+            BindPackage holdHbp = scrollBindingValues.get("hold_h_" + dragGestureIndices[slot]);
+            profile.setScrollHoldH(slot, holdHbp != null);
         }
 
         profile.save();
@@ -291,5 +328,69 @@ public class GestureSettingsActivity extends AppCompatActivity {
                 setViewEnabled(group.getChildAt(i), enabled);
             }
         }
+    }
+
+    private void setupHapticRow(LinearLayout container, String label, int currentValue, java.util.function.IntConsumer setter) {
+        LayoutInflater inflater = LayoutInflater.from(this);
+        View row = inflater.inflate(R.layout.haptic_row, container, false);
+
+        TextView tvLabel = row.findViewById(R.id.TVHapticLabel);
+        tvLabel.setText(label);
+
+        Spinner spinner = row.findViewById(R.id.SPHaptic);
+        String[] labels = new String[HapticUtils.getTypeCount()];
+        for (int i = 0; i < labels.length; i++) {
+            labels[i] = HapticUtils.getName(HapticUtils.getType(i));
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, labels);
+        spinner.setAdapter(adapter);
+
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View v, int position, long id) {
+                HapticUtils.perform(GestureSettingsActivity.this, HapticUtils.getType(position));
+                setter.accept(position);
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        final int selectedValue = currentValue;
+        spinner.post(() -> spinner.setSelection(selectedValue, false));
+
+        container.addView(row);
+    }
+
+    private void setupNumberPickerRow(LinearLayout container, String label, int currentValue,
+                                       int minValue, int maxValue, int step,
+                                       java.util.function.IntConsumer setter) {
+        LayoutInflater inflater = LayoutInflater.from(this);
+        View row = inflater.inflate(R.layout.haptic_row, container, false);
+
+        TextView tvLabel = row.findViewById(R.id.TVHapticLabel);
+        tvLabel.setText(label);
+
+        Spinner spinner = row.findViewById(R.id.SPHaptic);
+        int count = ((maxValue - minValue) / step) + 1;
+        String[] labels = new String[count];
+        for (int i = 0; i < count; i++) {
+            labels[i] = String.valueOf(minValue + i * step);
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, labels);
+        spinner.setAdapter(adapter);
+
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View v, int position, long id) {
+                setter.accept(minValue + position * step);
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        int selectedIndex = (currentValue - minValue) / step;
+        spinner.post(() -> spinner.setSelection(selectedIndex, false));
+
+        container.addView(row);
     }
 }

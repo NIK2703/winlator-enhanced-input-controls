@@ -180,6 +180,36 @@
                 app:value="20" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/LLScrollHoldThreshold"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Scroll Hold Threshold (px)" />
+
+            <com.winlator.cmod.widget.NumberPicker
+                android:id="@+id/NPScrollHoldThreshold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:minValue="5"
+                app:maxValue="200"
+                app:step="1"
+                app:value="100" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/LLHapticSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

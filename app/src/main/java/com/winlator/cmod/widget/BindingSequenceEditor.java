@@ -18,6 +18,7 @@ import com.winlator.cmod.inputcontrols.BindPackage;
 import com.winlator.cmod.inputcontrols.Bind;
 
 import java.util.HashMap;
+import java.util.function.BiConsumer;
 
 public class BindingSequenceEditor {
 
@@ -38,19 +39,28 @@ public class BindingSequenceEditor {
                                        final BindPackage bp, final Runnable onChanged,
                                        HashMap<String, BindPackage> scrollBindings,
                                        boolean initialScrollActive) {
-        return createViewInternal(context, label, helpTextResId, bp, onChanged, true, true, scrollBindings, initialScrollActive);
+        return createViewInternal(context, label, helpTextResId, bp, onChanged, true, true, scrollBindings, initialScrollActive, null);
+    }
+
+    public static View createDragView(Context context, String label, int helpTextResId,
+                                       final BindPackage bp, final Runnable onChanged,
+                                       HashMap<String, BindPackage> scrollBindings,
+                                       boolean initialScrollActive,
+                                       java.util.function.BiConsumer<String, Boolean> onHoldChanged) {
+        return createViewInternal(context, label, helpTextResId, bp, onChanged, true, true, scrollBindings, initialScrollActive, onHoldChanged);
     }
 
     private static View createViewInternal(Context context, String label, int helpTextResId,
                                             final BindPackage bp, final Runnable onChanged, boolean showMenu,
                                             boolean isDragGesture, HashMap<String, BindPackage> scrollBindings) {
-        return createViewInternal(context, label, helpTextResId, bp, onChanged, showMenu, isDragGesture, scrollBindings, false);
+        return createViewInternal(context, label, helpTextResId, bp, onChanged, showMenu, isDragGesture, scrollBindings, false, null);
     }
 
     private static View createViewInternal(Context context, String label, int helpTextResId,
                                             final BindPackage bp, final Runnable onChanged, boolean showMenu,
                                             boolean isDragGesture, HashMap<String, BindPackage> scrollBindings,
-                                            boolean initialScrollActive) {
+                                            boolean initialScrollActive,
+                                            java.util.function.BiConsumer<String, Boolean> onHoldChanged) {
         final LinearLayout section = new LinearLayout(context);
         section.setOrientation(LinearLayout.VERTICAL);
         section.setLayoutParams(new LinearLayout.LayoutParams(
@@ -210,7 +220,7 @@ public class BindingSequenceEditor {
             section.addView(normalContent);
 
             // Scroll bindings content (4 directional rows)
-            populateScrollBindings(context, scrollContainer[0], scrollBindings, colorAccent, onChanged);
+            populateScrollBindings(context, scrollContainer[0], scrollBindings, colorAccent, onChanged, onHoldChanged);
             section.addView(scrollContainer[0]);
 
         } else {
@@ -382,7 +392,8 @@ public class BindingSequenceEditor {
 
     private static void populateScrollBindings(Context context, LinearLayout container,
                                                 HashMap<String, BindPackage> scrollBindings,
-                                                int colorAccent, final Runnable onChanged) {
+                                                int colorAccent, final Runnable onChanged,
+                                                java.util.function.BiConsumer<String, Boolean> onHoldChanged) {
         if (scrollBindings == null) return;
 
         android.graphics.Paint paint = new android.graphics.Paint();
@@ -393,22 +404,62 @@ public class BindingSequenceEditor {
         }
         int labelWidthPx = (int) Math.ceil(maxLabelWidth) + (int) UnitUtils.dpToPx(12);
 
+        // Vertical section with hold toggle
+        LinearLayout verticalHeader = new LinearLayout(context);
+        verticalHeader.setOrientation(LinearLayout.HORIZONTAL);
+        verticalHeader.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        verticalHeader.setPadding(0, (int) UnitUtils.dpToPx(8), 0, 0);
+
         TextView tvVertical = new TextView(context);
         tvVertical.setText("Vertical");
         tvVertical.setTextSize(14);
         tvVertical.setTextColor(0xcccccccc);
-        tvVertical.setPadding(0, (int) UnitUtils.dpToPx(8), 0, 0);
-        container.addView(tvVertical);
+        LinearLayout.LayoutParams vLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        tvVertical.setLayoutParams(vLp);
+        verticalHeader.addView(tvVertical);
+
+        android.widget.Switch swHoldV = new android.widget.Switch(context);
+        swHoldV.setText("Hold");
+        swHoldV.setTextSize(12);
+        swHoldV.setTextColor(0xcccccccc);
+        swHoldV.setChecked(scrollBindings.containsKey("hold_v") && scrollBindings.get("hold_v") != null);
+        swHoldV.setOnCheckedChangeListener((btn, checked) -> {
+            scrollBindings.put("hold_v", checked ? BindPackage.fromSingle(Bind.NONE) : null);
+            if (onHoldChanged != null) onHoldChanged.accept("hold_v", checked);
+            if (onChanged != null) onChanged.run();
+        });
+        verticalHeader.addView(swHoldV);
+        container.addView(verticalHeader);
 
         addScrollDirRow(context, container, scrollBindings, "up", "Up", labelWidthPx, colorAccent, onChanged);
         addScrollDirRow(context, container, scrollBindings, "down", "Down", labelWidthPx, colorAccent, onChanged);
+
+        // Horizontal section with hold toggle
+        LinearLayout horizontalHeader = new LinearLayout(context);
+        horizontalHeader.setOrientation(LinearLayout.HORIZONTAL);
+        horizontalHeader.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        horizontalHeader.setPadding(0, (int) UnitUtils.dpToPx(8), 0, 0);
 
         TextView tvHorizontal = new TextView(context);
         tvHorizontal.setText("Horizontal");
         tvHorizontal.setTextSize(14);
         tvHorizontal.setTextColor(0xcccccccc);
-        tvHorizontal.setPadding(0, (int) UnitUtils.dpToPx(8), 0, 0);
-        container.addView(tvHorizontal);
+        LinearLayout.LayoutParams hLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        tvHorizontal.setLayoutParams(hLp);
+        horizontalHeader.addView(tvHorizontal);
+
+        android.widget.Switch swHoldH = new android.widget.Switch(context);
+        swHoldH.setText("Hold");
+        swHoldH.setTextSize(12);
+        swHoldH.setTextColor(0xcccccccc);
+        swHoldH.setChecked(scrollBindings.containsKey("hold_h") && scrollBindings.get("hold_h") != null);
+        swHoldH.setOnCheckedChangeListener((btn, checked) -> {
+            scrollBindings.put("hold_h", checked ? BindPackage.fromSingle(Bind.NONE) : null);
+            if (onHoldChanged != null) onHoldChanged.accept("hold_h", checked);
+            if (onChanged != null) onChanged.run();
+        });
+        horizontalHeader.addView(swHoldH);
+        container.addView(horizontalHeader);
 
         addScrollDirRow(context, container, scrollBindings, "left", "Left", labelWidthPx, colorAccent, onChanged);
         addScrollDirRow(context, container, scrollBindings, "right", "Right", labelWidthPx, colorAccent, onChanged);
