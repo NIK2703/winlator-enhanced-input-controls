@@ -102,6 +102,12 @@
             android:exported="false" />
 
         <activity
+            android:name="com.winlator.cmod.contentdialog.GestureSettingsActivity"
+            android:theme="@style/AppTheme"
+            android:parentActivityName="com.winlator.cmod.InputControlsFragment"
+            android:exported="false" />
+
+        <activity
             android:name="com.winlator.cmod.ExternalControllerBindingsActivity"
             android:theme="@style/AppTheme"
             android:screenOrientation="sensor"

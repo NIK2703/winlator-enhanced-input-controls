@@ -44,7 +44,7 @@ import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
-import com.winlator.cmod.contentdialog.GestureSettingsDialog;
+import com.winlator.cmod.contentdialog.GestureSettingsActivity;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
@@ -67,6 +67,7 @@ import java.util.function.Function;
 
 public class InputControlsFragment extends Fragment {
     private static final String INPUT_CONTROLS_URL = "https://raw.githubusercontent.com/brunodev85/winlator/main/input_controls/%s";
+    private static final int REQUEST_GESTURE_SETTINGS = 1001;
     private InputControlsManager manager;
     private ControlsProfile currentProfile;
     private Runnable updateLayout;
@@ -126,6 +127,9 @@ public class InputControlsFragment extends Fragment {
                 AppUtils.showToast(getContext(), R.string.unable_to_import_profile);
             }
             importProfileCallback = null;
+        } else if (requestCode == REQUEST_GESTURE_SETTINGS) {
+            loadProfileSpinner(getView().findViewById(R.id.SProfile));
+            XServerDisplayActivity.updateGestureConfig();
         }
     }
 
@@ -390,13 +394,9 @@ public class InputControlsFragment extends Fragment {
 
         view.findViewById(R.id.BTGestureSettings).setOnClickListener((v) -> {
             if (currentProfile != null) {
-                GestureSettingsDialog dialog = new GestureSettingsDialog(getContext(), currentProfile);
-                dialog.setOnSaveListener((savedProfile) -> {
-                    loadProfileSpinner(view.findViewById(R.id.SProfile));
-                    XServerDisplayActivity.updateGestureConfig();
-                    AppUtils.showToast(getContext(), "Gesture settings saved");
-                });
-                dialog.show();
+                Intent intent = new Intent(getContext(), GestureSettingsActivity.class);
+                intent.putExtra("profile_id", currentProfile.id);
+                startActivityForResult(intent, REQUEST_GESTURE_SETTINGS);
             } else {
                 AppUtils.showToast(context, R.string.no_profile_selected);
             }

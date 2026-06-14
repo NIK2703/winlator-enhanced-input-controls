@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/TabLayoutInputMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"
+            android:background="?tabLayoutBackground"
+            app:tabGravity="center"
+            app:tabMode="auto">
+
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Touchpad" />
+
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Touchscreen" />
+        </com.google.android.material.tabs.TabLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Long Press Timeout (ms)" />
+
+            <com.winlator.cmod.widget.NumberPicker
+                android:id="@+id/NPLongPressTimeout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:minValue="50"
+                app:maxValue="500"
+                app:step="10"
+                app:value="200" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Double Tap Timeout (ms)" />
+
+            <com.winlator.cmod.widget.NumberPicker
+                android:id="@+id/NPDoubleTapTimeout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:minValue="50"
+                app:maxValue="500"
+                app:step="10"
+                app:value="150" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Drag Threshold (px)" />
+
+            <com.winlator.cmod.widget.NumberPicker
+                android:id="@+id/NPDragThreshold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:minValue="0"
+                app:maxValue="30"
+                app:step="1"
+                app:value="10" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Single Tap Delay (ms)" />
+
+            <com.winlator.cmod.widget.NumberPicker
+                android:id="@+id/NPSingleTapDelay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:minValue="0"
+                app:maxValue="10"
+                app:step="1"
+                app:value="0" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/LLCursorSpeed"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Cursor Speed" />
+
+            <SeekBar
+                android:id="@+id/SBCursorSpeed"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2"
+                android:max="55"
+                android:progress="15" />
+
+            <TextView
+                android:id="@+id/TVCursorSpeed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="100%"
+                android:minWidth="48dp"
+                android:gravity="end"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/LLScrollThreshold"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Scroll Threshold (px)" />
+
+            <com.winlator.cmod.widget.NumberPicker
+                android:id="@+id/NPScrollThreshold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:minValue="5"
+                app:maxValue="100"
+                app:step="1"
+                app:value="20" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Single Finger Gestures"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="@color/colorPrimary"
+            android:layout_marginTop="8dp" />
+
+        <View style="@style/HorizontalLine" />
+
+        <LinearLayout
+            android:id="@+id/LLSingleFinger"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <LinearLayout
+            android:id="@+id/LLHoldGestures"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/LLHoldGesturesContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Two-Finger Gestures"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="@color/colorPrimary" />
+
+            <ImageView
+                android:id="@+id/BTHelpTwoFinger"
+                style="@style/HelpButton" />
+        </LinearLayout>
+
+        <View style="@style/HorizontalLine" />
+
+        <LinearLayout
+            android:id="@+id/LLTwoFinger"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+    </LinearLayout>
+</ScrollView>
