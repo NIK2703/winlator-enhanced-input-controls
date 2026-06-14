@@ -553,7 +553,6 @@ static void tick_end(struct timespec* start, int action_count) {
     if (__builtin_expect(elapsed > TICK_BUDGET_US, 0)) {
         tp_diag_slow_ticks++;
         if (elapsed > 100000) {
-            __android_log_print(ANDROID_LOG_ERROR, "Winlator_TP", "DIAG: EXTREMELY SLOW TICK %luus (>100ms!)", (unsigned long)elapsed);
         }
     }
     tp_diag_total_actions += action_count;
@@ -598,10 +597,6 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
 
     if (tp_diag_last_status_ms == 0) tp_diag_last_status_ms = time_ms;
     if (time_ms - tp_diag_last_status_ms >= 5000) {
-        __android_log_print(ANDROID_LOG_ERROR, "Winlator_TP", "DIAG: ticks=%lu slow=%lu gap=%lu totalActions=%lu interval=%lums",
-            (unsigned long)tp_diag_tick_count, (unsigned long)tp_diag_slow_ticks,
-            (unsigned long)tp_diag_gap_ticks, (unsigned long)tp_diag_total_actions,
-            (unsigned long)(time_ms - tp_diag_last_status_ms));
         tp_diag_last_status_ms = time_ms;
     }
 

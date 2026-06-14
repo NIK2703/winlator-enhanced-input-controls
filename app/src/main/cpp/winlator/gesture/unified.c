@@ -1,7 +1,7 @@
 #include "../touch_processor_internal.h"
 #include "types.h"
 
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture", __VA_ARGS__)
+#define LOGD(...) do {} while(0)
 
 // Binding group indices — names match FingerBindings fields they resolve to
 #define GROUP_UNMAPPED          0
@@ -217,8 +217,6 @@ const GesturePairSlot* select_slot_common(
 static void execute_pending_second_dt(TouchFinger* f, TouchActionResult* restrict result) {
     if (g_state.pending_second_double_count > 0
         && !g_state.gesture_is_action_held) {
-        LOGD("CLEANUP ptr=%d PENDING_D2 cnt=%d",
-            f->ptr_id, g_state.pending_second_double_count);
         execute_actions(result, g_state.pending_second_double,
             g_state.pending_second_double_count);
     }
@@ -249,7 +247,6 @@ void cleanup_second_finger(TouchFinger* f, GestureFingerCtx* ctx,
     // finger DOWN can be recognized (otherwise it hits branch.c:46 as "3rd+ finger").
     // Preserve second_double_tap_waiting for the SDTW confirm check.
     if (ctx->dt_waiting) {
-        LOGD("CLEANUP ptr=%d SDTW_JUST_ENTERED preserve dt_waiting", f->ptr_id);
         release_second_finger_buttons(result, false);
         g_state.gesture_second_active = false;
         f->state = GESTURE_STATE_DOUBLE_TAP_WAITING;

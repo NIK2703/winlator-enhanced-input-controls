@@ -1702,14 +1702,10 @@ public class ControlElement {
                 for (int i = 0; i < 4; i++) {
                     canvas.save();
                     canvas.rotate(i * 90, cx, cy);
-                    if (engagedDpad && states[i]) {
-                        paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillActive));
-                        canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, paint);
-                    } else {
-                        canvas.drawBitmap(dpadPetalStroke, box.left - pad, box.top - pad, null);
-                        paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillInactive));
-                        canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, paint);
-                    }
+                    canvas.drawBitmap(dpadPetalStroke, box.left - pad, box.top - pad, null);
+                    int fillAlpha = (engagedDpad && states[i]) ? fillActive : fillInactive;
+                    paint.setColor(ColorUtils.setAlphaComponent(primaryColor, fillAlpha));
+                    canvas.drawBitmap(dpadPetalFill, box.left - pad, box.top - pad, paint);
                     canvas.restore();
                 }
                 paint.setStyle(Paint.Style.STROKE);

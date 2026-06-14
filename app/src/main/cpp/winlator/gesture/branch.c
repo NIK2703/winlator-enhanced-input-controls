@@ -1,16 +1,10 @@
-#include <android/log.h>
 #include <inttypes.h>
 #include "../touch_processor_internal.h"
 #include "types.h"
 #include "branch.h"
 
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture", __VA_ARGS__)
-
-#ifdef TOUCH_MOVE_DEBUG
-#define LOGD_MOVE(...) LOGD(__VA_ARGS__)
-#else
+#define LOGD(...) do {} while(0)
 #define LOGD_MOVE(...) do {} while(0)
-#endif
 
 // =========================================================================
 // INLINE HELPERS (branch.c local, need g_state)
@@ -139,7 +133,6 @@ static inline bool should_execute_deferred(
 }
 
 static void cleanup_main_finger(TouchFinger* f, GestureFingerCtx* ctx) {
-    LOGD("UP ptr=%d CLEANUP_MAIN", f->ptr_id);
     f->state = GESTURE_STATE_IDLE;
     *ctx = (GestureFingerCtx){0};
     ctx->is_second_finger = f->is_second_finger;
@@ -229,8 +222,7 @@ static TapPathResult tap_path_normal(
 
     // Single tap
     if (params->is_second_finger) {
-        if (params->fallback_count > 0)
-            execute_actions(result, params->fallback, params->fallback_count);
+        execute_if_not_held(result, params->fallback, params->fallback_count);
     } else {
         execute_if_not_held(result, params->non_drag, params->non_drag_count);
     }
@@ -271,8 +263,6 @@ static void tick_lp_timer(TouchFinger* f, GestureFingerCtx* ctx,
         || time_ms - f->down_time_ms < (uint64_t)g_state.cfg.long_press_timeout_ms) /* int→u64: prevent sign extension */
         return;
 
-    LOGD("TICK ptr=%d LP_TIMER_FIRE elapsed=%" PRIu64,
-        f->ptr_id, time_ms - f->down_time_ms);
     gesture_clear_second_finger_state();
     g_state.second_tap_fallback_count = 0;
 
@@ -282,20 +272,17 @@ static void tick_lp_timer(TouchFinger* f, GestureFingerCtx* ctx,
 
     if (long_press_plan.pulse_on_up) {
         if (long_press_plan.drag_available) {
-            LOGD("TICK ptr=%d LP_PULSE_ON_UP+DRAG_AVAIL -> pending lx_cnt=%d", f->ptr_id, resolved.non_drag_count);
             copy_bindings_bounded(resolved.non_drag, resolved.non_drag_count,
                 ctx->pending_long_press.items, &ctx->pending_long_press.count, FALLBACK_MAX);
             copy_bindings_bounded(resolved.non_drag, resolved.non_drag_count,
                 g_state.gesture_pending_deferred_long_press,
                 &g_state.gesture_pending_deferred_long_press_count, FALLBACK_MAX);
         } else {
-            LOGD("TICK ptr=%d LP_PULSE_ON_UP+NO_DRAG -> exec lx_cnt=%d", f->ptr_id, resolved.non_drag_count);
             execute_actions(result, resolved.non_drag, resolved.non_drag_count);
             f->cached_has_active_single_tap = false;
         }
         f->cached_has_long_press_timer = false;
     } else {
-        LOGD("TICK ptr=%d LP_HOLD lx_cnt=%d", f->ptr_id, resolved.non_drag_count);
         execute_actions_hold(result, resolved.non_drag, resolved.non_drag_count);
         f->cached_has_long_press_timer = false;
     }
@@ -318,8 +305,6 @@ static void tick_s_hold_timer(TouchFinger* f, GestureFingerCtx* ctx,
         || resolved.non_drag_count == 0)
         return;
 
-    LOGD("TICK ptr=%d S_HOLD_FIRE delay=%d exec=%d sx_cnt=%d",
-        f->ptr_id, f->single_tap_hold_delay_ms, slot->is_second_finger, resolved.non_drag_count);
     f->single_tap_hold_delay_ms = 0;
     if (slot->is_second_finger)
         execute_actions(result, resolved.non_drag, resolved.non_drag_count);
@@ -358,13 +343,9 @@ static void tick_dt_timeout(TouchFinger* f, GestureFingerCtx* ctx,
         || time_ms - ctx->dt_wait_start_time < (uint64_t)g_state.cfg.double_tap_timeout_ms) /* int→u64: prevent sign extension */
         return;
 
-    LOGD("TICK ptr=%d DT_TIMEOUT uses_fb=%d fallback_cnt=%d deferred_cnt=%d",
-        f->ptr_id, slot->is_second_finger, ctx->fallback.count,
-        g_state.gesture_deferred_tap_count);
     reset_dt_ctx(ctx);
 
     if (slot->is_second_finger) {
-        LOGD("TICK ptr=%d DT_TIMEOUT_SDTW fallback_cnt=%d", f->ptr_id, ctx->fallback.count);
         execute_and_cleanup_deferred(result, ctx->fallback.items, ctx->fallback.count, f, ctx);
         ctx->fallback.count = 0;
         reset_second_gesture_state();
@@ -373,8 +354,6 @@ static void tick_dt_timeout(TouchFinger* f, GestureFingerCtx* ctx,
             main_finger->state = GESTURE_STATE_IDLE;
     } else {
         if (g_state.gesture_deferred_tap_count > 0) {
-            LOGD("TICK ptr=%d DT_TIMEOUT_S_FALLBACK cnt=%d",
-                f->ptr_id, g_state.gesture_deferred_tap_count);
         }
         execute_and_cleanup_deferred(result, g_state.gesture_deferred_tap,
             g_state.gesture_deferred_tap_count, f, ctx);
@@ -389,8 +368,6 @@ static void tick_deferred_single_tap(TouchFinger* f, GestureFingerCtx* ctx,
     if (!f->single_tap_deferred || time_ms < f->single_tap_deferred_time)
         return;
 
-    LOGD("TICK ptr=%d DEFERRED_TAP_FIRE deferred_d=%d post_dt=%d dt_consumed=%d",
-        f->ptr_id, ctx->deferred_double.count, ctx->post_double_tap_drag, ctx->dt_consumed);
     f->single_tap_deferred = false;
 
     const GesturePairSlot* ds_slot = select_s_slot(f);
@@ -407,7 +384,6 @@ static void tick_deferred_single_tap(TouchFinger* f, GestureFingerCtx* ctx,
 
     if (path == TAP_PATH_ENTER_DT) return;
 
-    LOGD("TICK ptr=%d DEFERRED_DONE", f->ptr_id);
     release_held_actions(result);
     f->state = GESTURE_STATE_IDLE;
     g_state.gesture_main_ptr_id = INVALID_PTR_ID;
@@ -434,7 +410,6 @@ static bool down_handle_sdtw(TouchFinger* f, GestureFingerCtx* ctx,
     bool sdtw_pos_valid = sdtw_dist <= g_state.cfg.double_tap_distance_px;
 
     if (sdtw_time_valid && sdtw_pos_valid) {
-        LOGD("DOWN ptr=%d SDTW_CONFIRM dist=%.1f", f->ptr_id, sdtw_dist);
         gesture_clear_second_finger_state();
         const GesturePairSlot* double_tap_slot = select_dt_slot(f);
         GesturePairPlan double_tap_plan = resolve_gesture_pair(f, double_tap_slot);
@@ -444,6 +419,21 @@ static bool down_handle_sdtw(TouchFinger* f, GestureFingerCtx* ctx,
             &g_state.pending_second_double_count, FALLBACK_MAX,
             &g_state.gesture_post_double_tap_drag);
         ctx->post_double_tap_drag = g_state.gesture_post_double_tap_drag;
+
+        // When Dd2 is NOT configured: populate ctx->deferred_double so
+        // select_slot_common() returns SLOT_D2() for drag resolution
+        // (matching single-finger D-only behavior where ctx->deferred_double
+        // is populated by handle_dt_waiting_on_down). Also clear
+        // pending_second_double to prevent on_drag_start() from firing D2
+        // again when it's already held.
+        // When Dd2 IS configured: leave ctx->deferred_double empty so
+        // on_drag_start() handles D2 execution from pending_second_double.
+        if (!g_state.gesture_post_double_tap_drag) {
+            copy_bindings_bounded(f->bindings.double_tap, f->bindings.double_tap_count,
+                ctx->deferred_double.items, &ctx->deferred_double.count, FALLBACK_MAX);
+            g_state.pending_second_double_count = 0;
+        }
+
         f->cached_has_long_press_timer = false;
         f->down_time_ms = time_ms;
         f->state = GESTURE_STATE_TAP_WAITING;
@@ -451,8 +441,6 @@ static bool down_handle_sdtw(TouchFinger* f, GestureFingerCtx* ctx,
         return true;
     }
 
-    LOGD("DOWN ptr=%d SDTW_CANCEL time_ok=%d pos_ok=%d dist=%.1f",
-        f->ptr_id, sdtw_time_valid, sdtw_pos_valid, sdtw_dist);
     gesture_clear_second_finger_state();
     return false;
 }
@@ -465,13 +453,11 @@ static bool down_handle_global_dt(TouchFinger* f, GestureFingerCtx* ctx,
 
     TouchFinger* main_dt_finger = find_finger(g_state.gesture_main_ptr_id);
     if (!main_dt_finger) {
-        LOGD("DOWN ptr=%d GLOBAL_DT_CANCEL (main finger gone)", f->ptr_id);
         gesture_cancel_double_tap_wait(result);
         return false;
     }
 
     if (gesture_is_within_tap_distance(f->x, f->y)) {
-        LOGD("DOWN ptr=%d GLOBAL_DT_CONFIRM (second finger)", f->ptr_id);
         double_tap_confirm_internal(result, main_dt_finger);
         main_dt_finger->state = GESTURE_STATE_TAP_WAITING;
         reset_finger_tap_state(main_dt_finger);
@@ -482,7 +468,6 @@ static bool down_handle_global_dt(TouchFinger* f, GestureFingerCtx* ctx,
         return true;
     }
 
-    LOGD("DOWN ptr=%d GLOBAL_DT_CANCEL (second finger)", f->ptr_id);
     gesture_cancel_double_tap_wait(result);
     return false;
 }
@@ -507,7 +492,6 @@ static DownRole assign_down_role(TouchFinger* f) {
     if (g_state.gesture_main_ptr_id == INVALID_PTR_ID) {
         f->is_second_finger = false;
         g_state.gesture_main_ptr_id = f->ptr_id;
-        LOGD("DOWN ptr=%d ROLE_MAIN", f->ptr_id);
         return ROLE_MAIN;
     }
     if (f->ptr_id != g_state.gesture_main_ptr_id) {
@@ -521,10 +505,8 @@ static DownRole assign_down_role(TouchFinger* f) {
                 g_state.gesture_second_main_ref_y = main_finger->y;
                 main_finger->cached_has_long_press_timer = false;
             }
-            LOGD("DOWN ptr=%d ROLE_SECOND main_ptr=%d", f->ptr_id, g_state.gesture_main_ptr_id);
             return ROLE_SECOND;
         }
-        LOGD("DOWN ptr=%d IGNORE_3RD_PLUS", f->ptr_id);
         f->state = GESTURE_STATE_IDLE;
         return ROLE_IGNORED;
     }
@@ -537,7 +519,6 @@ static bool handle_dt_waiting_on_down(TouchFinger* f, GestureFingerCtx* ctx,
         return false;
 
     if (gesture_is_within_tap_distance(f->x, f->y)) {
-        LOGD("DOWN ptr=%d DT_CONFIRM", f->ptr_id);
         const GesturePairSlot* dt_slot = select_dt_slot(f);
         GesturePairPlan double_tap_plan = resolve_gesture_pair(f, dt_slot);
         confirm_double_tap(result, double_tap_plan,
@@ -552,7 +533,6 @@ static bool handle_dt_waiting_on_down(TouchFinger* f, GestureFingerCtx* ctx,
         return true;
     }
 
-    LOGD("DOWN ptr=%d DT_CANCEL (out of range)", f->ptr_id);
     gesture_cancel_double_tap_wait(result);
     return false;
 }
@@ -565,11 +545,8 @@ static bool up_handle_tap_waiting(TouchFinger* f, GestureFingerCtx* ctx,
                                   TouchActionResult* restrict result, uint64_t time_ms,
                                   const GesturePairSlot* slot,
                                   const TouchBinding* non_drag, int non_drag_count) {
-    LOGD("UP ptr=%d TAP_WAITING deferred=%d dt_consumed=%d post_dt=%d",
-        f->ptr_id, f->single_tap_deferred, ctx->dt_consumed, ctx->post_double_tap_drag);
 
     if (slot == SLOT_S() && g_state.cfg.single_tap_delay_ms > 0) {
-        LOGD("UP ptr=%d DEFER_SINGLE_TAP delay=%d", f->ptr_id, g_state.cfg.single_tap_delay_ms);
         f->single_tap_deferred = true;
         f->single_tap_deferred_time = time_ms + g_state.cfg.single_tap_delay_ms;
         return true;
@@ -611,8 +588,6 @@ static bool up_handle_tap_waiting(TouchFinger* f, GestureFingerCtx* ctx,
 
 static void up_handle_long_pressing(TouchFinger* f, GestureFingerCtx* ctx,
                                     TouchActionResult* restrict result) {
-    LOGD("UP ptr=%d LONG_PRESSING pending_lp=%d active_lp=%d",
-        f->ptr_id, ctx->pending_long_press.count, f->cached_has_active_long_press);
     if (f->cached_has_active_double_tap || f->cached_has_active_double_tap_drag)
         execute_deferred_double(result);
     if (ctx->pending_long_press.count > 0) {
@@ -628,7 +603,6 @@ static void up_handle_long_pressing(TouchFinger* f, GestureFingerCtx* ctx,
 
 static void up_handle_dragging(TouchFinger* f, GestureFingerCtx* ctx,
                                TouchActionResult* restrict result) {
-    LOGD("UP ptr=%d DRAGGING deferred_d=%d", f->ptr_id, ctx->deferred_double.count);
     if (should_execute_deferred(ctx->deferred_double.items, ctx->deferred_double.count,
             g_state.gesture_held_actions, g_state.gesture_held_count))
         execute_actions(result, ctx->deferred_double.items, ctx->deferred_double.count);
@@ -640,7 +614,6 @@ static void up_handle_dt_waiting(TouchFinger* f, GestureFingerCtx* ctx,
                                  TouchActionResult* restrict result,
                                  const GesturePairSlot* slot,
                                  const TouchBinding* non_drag, int non_drag_count) {
-    LOGD("UP ptr=%d DT_WAITING x_cnt=%d sec=%d", f->ptr_id, non_drag_count, slot->is_second_finger);
     if (non_drag_count > 0)
         execute_actions(result, non_drag, non_drag_count);
     if (!f->cached_has_active_single_tap_drag)
@@ -654,8 +627,6 @@ static void up_handle_dt_waiting(TouchFinger* f, GestureFingerCtx* ctx,
 
 static void up_handle_default(TouchFinger* f, GestureFingerCtx* ctx,
                                TouchActionResult* restrict result) {
-    LOGD("UP ptr=%d DEFAULT state=%d post_dt_drag=%d",
-        f->ptr_id, f->state, ctx->post_double_tap_drag);
     if (ctx->post_double_tap_drag) {
         ctx->post_double_tap_drag = false;
         release_held_actions(result);
@@ -668,18 +639,15 @@ static void up_prelude_second_finger(TouchFinger* f,
     if (!slot->is_second_finger)
         return;
     if (!g_state.gesture_second_active) {
-        LOGD("UP ptr=%d SECOND_NOT_ACTIVE -> return", f->ptr_id);
         return;
     }
     if (g_state.gesture_is_action_held) {
         bool has_dt_for_sdtw = f->cached_has_active_double_tap
             && f->state != GESTURE_STATE_DRAGGING;
         if (has_dt_for_sdtw) {
-            LOGD("UP ptr=%d HELD_S2_DT_SDTW -> release+clear", f->ptr_id);
             release_held_actions(result);
             gesture_clear_second_finger_state();
         } else {
-            LOGD("UP ptr=%d HELD_S2_CLEAR", f->ptr_id);
             gesture_clear_second_finger_state();
         }
     }
@@ -753,12 +721,8 @@ static bool move_resolve_drag(
         drag_binding = params->non_drag;
         drag_count = params->non_drag_count;
         drag_ok = true;
-        LOGD("MOVE ptr=%d POST_TIER_FALLBACK x_cnt=%d -> use non-drag as drag",
-            f->ptr_id, params->non_drag_count);
     }
 
-    LOGD("MOVE ptr=%d DRAG_RESOLVE ok=%d slot_nd=%d drag_cnt=%d is_d2=%d",
-        f->ptr_id, drag_ok, slot->bindings_non_drag, drag_count, slot == SLOT_D2());
 
     *out_binding = drag_binding;
     *out_count   = drag_count;
@@ -777,18 +741,6 @@ static void move_resolve_binding(TouchFinger* f, GestureFingerCtx* ctx,
                                  &resolved->drag, &resolved->drag_count);
     }
     if (slot->is_second_finger) {
-        LOGD("MOVE ptr=%d SLOT3_RESOLVE nd=%d x_cnt=%d xd_cnt=%d "
-            "x_type0=%d xd_type0=%d held=%d "
-            "hdt=%d hdd=%d hst=%d hsdd=%d "
-            "fb_cnt=%d",
-            f->ptr_id, slot->bindings_non_drag, resolved->non_drag_count, resolved->drag_count,
-            resolved->non_drag ? resolved->non_drag->type : -1, resolved->drag ? resolved->drag->type : -1,
-            g_state.gesture_is_action_held,
-            f->cached_has_active_double_tap,
-            f->cached_has_active_double_tap_drag,
-            f->cached_has_active_single_tap,
-            f->cached_has_active_single_tap_drag,
-            ctx->fallback.count);
     }
 }
 
@@ -800,7 +752,6 @@ static bool move_handle_gates(TouchFinger* f, GestureFingerCtx* ctx,
         int effective_second_drag_count = g_state.cfg.is_tp
             ? g_state.cfg.tp[slot->tp_drag].count : xd_cnt;
         if (!effective_second_drag_count) {
-            LOGD("MOVE ptr=%d HELD_NO_DRAG_BINDINGS -> DRAG_NO_BINDING", f->ptr_id);
             ctx->pending_double.count = 0;
             start_drag_no_binding(f, result);
             return false;
@@ -808,12 +759,10 @@ static bool move_handle_gates(TouchFinger* f, GestureFingerCtx* ctx,
     }
 
     if (is_d_slot && g_state.cfg.is_tp && g_state.gesture_second_active) {
-        LOGD("MOVE ptr=%d TP_GATE (second active)", f->ptr_id);
         ctx->post_double_tap_drag = false;
         return false;
     }
     if (!slot->is_second_finger && g_state.cfg.is_tp && !g_state.cfg.caps_has_drag_bindings) {
-        LOGD("MOVE ptr=%d TP_GATE (no drag bindings)", f->ptr_id);
         return false;
     }
     return true;
@@ -831,7 +780,6 @@ static void up_handle_tp_early_exit(TouchFinger* f, GestureFingerCtx* ctx,
         return;
 
     if (!current_mode_has_gestures()) {
-        LOGD("UP ptr=%d TP_NO_GESTURES -> cleanup_main", f->ptr_id);
         release_held_actions(result);
         reset_main_gesture_state();
         cleanup_main_finger(f, ctx);
@@ -840,8 +788,6 @@ static void up_handle_tp_early_exit(TouchFinger* f, GestureFingerCtx* ctx,
 
     if (f->cached_has_moved_beyond_threshold
         || (time_ms - f->down_time_ms) >= TP_EARLY_EXIT_MS) {
-        LOGD("UP ptr=%d TP_EARLY_EXIT moved=%d dt=%" PRIu64,
-            f->ptr_id, f->cached_has_moved_beyond_threshold, time_ms - f->down_time_ms);
         if (g_state.gesture_double_tap_consumed) {
             g_state.gesture_double_tap_consumed = false;
             execute_if_not_held(result, non_drag, non_drag_count);
@@ -861,7 +807,6 @@ static void handle_down(TouchFinger* f, GestureFingerCtx* ctx,
                         TouchActionResult* restrict result, uint64_t time_ms)
 {
     g_state.gesture_is_down_event = true;
-    LOGD("DOWN ptr=%d state=%d", f->ptr_id, f->state);
 
     DownRole role = assign_down_role(f);
     if (role == ROLE_IGNORED)
@@ -876,7 +821,6 @@ static void handle_down(TouchFinger* f, GestureFingerCtx* ctx,
     reset_finger_ctx(ctx, f->is_second_finger);
 
     if (!current_mode_has_gestures() && !g_state.gesture_double_tap_waiting) {
-        LOGD("DOWN ptr=%d NO_GESTURES -> IDLE", f->ptr_id);
         f->state = GESTURE_STATE_IDLE;
         return;
     }
@@ -899,11 +843,15 @@ static void handle_down(TouchFinger* f, GestureFingerCtx* ctx,
 
     GesturePairPlan plan = resolve_gesture_pair(f, slot);
     if (g_state.cfg.is_ts && !g_state.gesture_is_action_held) {
-        LOGD("DOWN ptr=%d TS_TAP_DOWN x_cnt=%d pulse_on_up=%d hold=%d drag=%d",
-            f->ptr_id, resolved.non_drag_count, plan.pulse_on_up, plan.hold_delay_ms, plan.drag_available);
         execute_tap_on_finger_down(f, result, time_ms, plan, true, resolved.non_drag, resolved.non_drag_count);
+    } else if (g_state.cfg.is_tp && slot->is_second_finger
+               && resolved.non_drag_count > 0
+               && !plan.pulse_on_up && !plan.press_on_drag
+               && !g_state.gesture_is_action_held) {
+        // TP mode, S2-only (no Sd2, no D2 competition): execute S2 on
+        // finger-down as hold, release on finger-up via cleanup_second_finger.
+        execute_actions_hold(result, resolved.non_drag, resolved.non_drag_count);
     } else {
-        LOGD("DOWN ptr=%d TP_NO_DOWN_ACTION x_cnt=%d", f->ptr_id, resolved.non_drag_count);
     }
 }
 
@@ -925,18 +873,15 @@ static bool handle_move_resolve(TouchFinger* f, GestureFingerCtx* ctx,
                                 MoveContext* mc)
 {
     if (f->state != GESTURE_STATE_TAP_WAITING && f->state != GESTURE_STATE_LONG_PRESSING) {
-        LOGD_MOVE("MOVE ptr=%d SKIP (state=%d)", f->ptr_id, f->state);
         return false;
     }
 
     if (ctx->dt_waiting) {
-        LOGD("MOVE ptr=%d CANCEL_DT_WAITING", f->ptr_id);
         gesture_cancel_double_tap_wait(result);
     }
 
     mc->slot = select_slot_common(f, ctx, false);
     if (!mc->slot) {
-        LOGD("MOVE ptr=%d NO_SLOT (second LP)", f->ptr_id);
         return false;
     }
     mc->is_d_slot = (mc->slot == SLOT_D());
@@ -951,7 +896,6 @@ static bool handle_move_resolve(TouchFinger* f, GestureFingerCtx* ctx,
         }
     }
     if (fabsf(*dx) <= g_state.cfg.drag_threshold_px && fabsf(*dy) <= g_state.cfg.drag_threshold_px) {
-        LOGD_MOVE("MOVE ptr=%d BELOW_THRESHOLD dx=%.1f dy=%.1f", f->ptr_id, *dx, *dy);
         return false;
     }
     return true;
@@ -965,7 +909,6 @@ static bool handle_move_second_finger(TouchFinger* f, GestureFingerCtx* ctx,
                                       const TouchBinding* drag_binding, int drag_count)
 {
     if (mc->slot->is_second_finger && g_state.gesture_is_action_held) {
-        LOGD("MOVE ptr=%d POST_RESOLVE_HELD drag_cnt=%d", f->ptr_id, drag_count);
         execute_actions_hold(result, drag_binding, drag_count);
         start_drag_no_binding(f, result);
         return true;
@@ -983,7 +926,6 @@ static void handle_move_apply(TouchFinger* f, GestureFingerCtx* ctx,
         ctx->pending_double.count = 0;
     if (mc->is_d_slot) ctx->post_double_tap_drag = false;
 
-    LOGD("MOVE ptr=%d DRAG_START drag_cnt=%d", f->ptr_id, drag_count);
     start_drag_with_binding(f, result, drag_binding, drag_count);
     if (mc->is_d_slot && g_state.gesture_second_active)
         mark_second_finger_dragging(f, result);
@@ -993,7 +935,6 @@ static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
                         TouchActionResult* restrict result, uint64_t time_ms,
                         float dx, float dy)
 {
-    LOGD_MOVE("MOVE ptr=%d state=%d", f->ptr_id, f->state);
 
     MoveContext mc;
     if (!handle_move_resolve(f, ctx, result, &dx, &dy, &mc))
@@ -1007,7 +948,6 @@ static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
 
     if (!current_mode_has_gesture(mc.slot->bindings_non_drag)
         && !current_mode_has_gesture(mc.slot->bindings_drag)) {
-        LOGD("MOVE ptr=%d NO_GESTURE -> DRAG_NO_BINDING", f->ptr_id);
         start_drag_no_binding(f, result);
         return;
     }
@@ -1040,12 +980,9 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
     g_state.gesture_is_down_event = false;
     f->tap_up_x = f->x;
     f->tap_up_y = f->y;
-    LOGD("UP ptr=%d state=%d sec=%d", f->ptr_id, f->state, f->is_second_finger);
 
     const GesturePairSlot* slot = select_slot_common(f, ctx, true);
     ResolvedBindings resolved = resolve_slot(f, slot);
-    LOGD("UP ptr=%d slot=%p x_cnt=%d xd_cnt=%d", f->ptr_id, (void*)slot,
-        resolved.non_drag_count, resolved.drag_count);
 
     up_prelude_second_finger(f, result, slot);
 
@@ -1078,7 +1015,6 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
             break;
     }
 
-    LOGD("UP ptr=%d CLEANUP sec=%d", f->ptr_id, slot->is_second_finger);
     if (slot->is_second_finger) {
         cleanup_second_finger(f, ctx, result);
         return;
@@ -1092,24 +1028,15 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
 static void handle_tick(TouchFinger* f, GestureFingerCtx* ctx,
                         TouchActionResult* restrict result, uint64_t time_ms)
 {
-    LOGD_MOVE("TICK ptr=%d state=%d lp_timer=%d held=%d moved=%d",
-        f->ptr_id, f->state,
-        f->cached_has_long_press_timer,
-        g_state.gesture_is_action_held,
-        f->cached_has_moved_beyond_threshold);
 
     const GesturePairSlot* slot = select_gesture_slot(f);
     if (!slot) {
-        LOGD("TICK ptr=%d NO_SLOT", f->ptr_id);
         return;
     }
 
-    LOGD("TICK ptr=%d slot_nd=%d", f->ptr_id, slot->bindings_non_drag);
 
     if (f->cached_has_long_press_timer
         && (f->cached_has_moved_beyond_threshold || g_state.gesture_is_action_held)) {
-        LOGD("TICK ptr=%d LP_TIMER_CANCEL moved=%d held=%d",
-            f->ptr_id, f->cached_has_moved_beyond_threshold, g_state.gesture_is_action_held);
         f->cached_has_long_press_timer = false;
     }
 

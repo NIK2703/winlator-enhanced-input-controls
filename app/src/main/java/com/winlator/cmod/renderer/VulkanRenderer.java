@@ -79,7 +79,6 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         public void run() {
             try {
                 if (nativeHandle != 0 && !xServerView.isEventExecutorHealthy()) {
-                    android.util.Log.e("DIAG_WATCHDOG", "eventExecutor HUNG, restarting");
                     xServerView.restartEventExecutor();
                 }
             } finally {
@@ -158,7 +157,6 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 long h = nativeHandle;
                 if (h != 0) nativeOnVsync(h, frameTimeNs);
             } catch (Exception e) {
-                android.util.Log.e("VulkanRenderer", "vsync callback error", e);
             } finally {
                 if (vsyncRunning) android.view.Choreographer.getInstance().postFrameCallback(this);
             }
@@ -188,7 +186,6 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 }
                 if (scenePending.compareAndSet(true, false)) {
                     lastForceResetTime.set(now);
-                    android.util.Log.w("VulkanRenderer", "scenePending force-reset after 10s timeout");
                     queueSceneUpdate();
                 }
             }
@@ -452,7 +449,6 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
             }
             nativeSetRenderList(nativeHandle, ids, xs, ys, n);
         } catch (Exception e) {
-            android.util.Log.e("VulkanRenderer", "pushRenderList failed", e);
         }
     }
 

@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <android/bitmap.h>
-#include <android/log.h>
+
 #ifdef __ARM_NEON
 #include <arm_neon.h>
 #endif
@@ -116,7 +116,6 @@ Java_com_winlator_cmod_xserver_Drawable_drawBitmap(JNIEnv *env, jclass obj,
     int *dstDataAddr = (*env)->GetDirectBufferAddress(env, dstData);
 
     if (!srcDataAddr || !dstDataAddr) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in drawBitmap");
         return;
     }
 
@@ -141,7 +140,6 @@ Java_com_winlator_cmod_xserver_Drawable_copyArea(JNIEnv *env, jclass obj, jshort
     uint8_t *dstDataAddr = (*env)->GetDirectBufferAddress(env, dstData);
 
     if (!srcDataAddr || !dstDataAddr) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in copyArea");
         return;
     }
 
@@ -173,7 +171,6 @@ Java_com_winlator_cmod_xserver_Drawable_copyAreaOp(JNIEnv *env, jclass obj, jsho
     uint8_t *dstDataAddr = (*env)->GetDirectBufferAddress(env, dstData);
 
     if (!srcDataAddr || !dstDataAddr) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in copyAreaOp");
         return;
     }
 
@@ -182,7 +179,6 @@ Java_com_winlator_cmod_xserver_Drawable_copyAreaOp(JNIEnv *env, jclass obj, jsho
     jlong maxSrcOffset = (jlong)(srcX + width - 1 + (jlong)(srcY + height - 1) * srcStride) * BYTES_PER_PIXEL + (BYTES_PER_PIXEL - 1);
     jlong maxDstOffset = (jlong)(dstX + width - 1 + (jlong)(dstY + height - 1) * dstStride) * BYTES_PER_PIXEL + (BYTES_PER_PIXEL - 1);
     if (maxSrcOffset >= srcLength || maxDstOffset >= dstLength) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Buffer overflow in copyAreaOp");
         return;
     }
 
@@ -207,14 +203,12 @@ Java_com_winlator_cmod_xserver_Drawable_fillRect(JNIEnv *env, jclass obj, jshort
     uint8_t *dataAddr = (*env)->GetDirectBufferAddress(env, data);
 
     if (!dataAddr) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in fillRect");
         return;
     }
 
     jlong bufLength = (*env)->GetDirectBufferCapacity(env, data);
     jlong maxOffset = (jlong)(x + width - 1 + (jlong)(y + height - 1) * stride) * BYTES_PER_PIXEL + (BYTES_PER_PIXEL - 1);
     if (maxOffset >= bufLength) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Buffer overflow in fillRect");
         return;
     }
 
@@ -224,7 +218,6 @@ Java_com_winlator_cmod_xserver_Drawable_fillRect(JNIEnv *env, jclass obj, jshort
     uint8_t stackRow[FILL_ROW_STACK_SIZE * BYTES_PER_PIXEL];
     uint8_t *row;
     if (!alloc_fill_row(stackRow, &row, width)) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to allocate memory for row");
         return;
     }
 
@@ -245,7 +238,6 @@ Java_com_winlator_cmod_xserver_Drawable_drawLine(JNIEnv *env, jclass obj, jshort
     uint8_t *dataAddr = (*env)->GetDirectBufferAddress(env, data);
 
     if (!dataAddr) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in drawLine");
         return;
     }
 
@@ -261,7 +253,6 @@ Java_com_winlator_cmod_xserver_Drawable_drawLine(JNIEnv *env, jclass obj, jshort
     uint8_t stackRow[FILL_ROW_STACK_SIZE * BYTES_PER_PIXEL];
     uint8_t *row;
     if (!alloc_fill_row(stackRow, &row, lineWidth)) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to allocate memory for row");
         return;
     }
 
@@ -329,7 +320,6 @@ Java_com_winlator_cmod_xserver_Drawable_drawAlphaMaskedBitmap(JNIEnv *env, jclas
     uint32_t *dstDataAddr = (*env)->GetDirectBufferAddress(env, dstData);
 
     if (!srcDataAddr || !maskDataAddr || !dstDataAddr) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in drawAlphaMaskedBitmap");
         return;
     }
 
@@ -373,7 +363,6 @@ Java_com_winlator_cmod_xserver_Drawable_fromBitmap(JNIEnv *env, jclass obj, jobj
     char *dataAddr = (*env)->GetDirectBufferAddress(env, data);
 
     if (!dataAddr) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL buffer address in fromBitmap");
         return;
     }
 
@@ -381,11 +370,9 @@ Java_com_winlator_cmod_xserver_Drawable_fromBitmap(JNIEnv *env, jclass obj, jobj
     uint8_t *pixels;
 
     if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to get bitmap info in fromBitmap");
         return;
     }
     if (AndroidBitmap_lockPixels(env, bitmap, (void**)&pixels) < 0) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to lock bitmap pixels in fromBitmap");
         return;
     }
 
@@ -407,7 +394,6 @@ Java_com_winlator_cmod_xserver_Pixmap_toBitmap(JNIEnv *env, jclass obj, jobject 
     char *maskDataAddr = maskData ? (*env)->GetDirectBufferAddress(env, maskData) : NULL;
 
     if (!colorDataAddr) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: NULL color data address in toBitmap");
         return;
     }
 
@@ -415,11 +401,9 @@ Java_com_winlator_cmod_xserver_Pixmap_toBitmap(JNIEnv *env, jclass obj, jobject 
     uint8_t *pixels;
 
     if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to get bitmap info in toBitmap");
         return;
     }
     if (AndroidBitmap_lockPixels(env, bitmap, (void**)&pixels) < 0) {
-        __android_log_print(ANDROID_LOG_ERROR, "System.out", "Error: Failed to lock bitmap pixels in toBitmap");
         return;
     }
 

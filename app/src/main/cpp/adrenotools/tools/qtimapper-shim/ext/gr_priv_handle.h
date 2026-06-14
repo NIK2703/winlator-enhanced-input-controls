@@ -133,26 +133,15 @@ struct private_handle_t {
 
   ~private_handle_t() {
     magic = 0;
-    ALOGE_IF(DBG_HANDLE, "Deleting buffer handle %p", this);
   }
 
   static int validate(const native_handle* h) {
     auto* hnd = static_cast<const private_handle_t*>(h);
     if (!h || h->version != sizeof(native_handle) || h->numInts != NumInts() ||
         h->numFds != kNumFds) {
-      ALOGE("Invalid gralloc handle (at %p): ver(%d/%zu) ints(%d/%d) fds(%d/%d)", h,
-            h ? h->version : -1, sizeof(native_handle), h ? h->numInts : -1, NumInts(),
-            h ? h->numFds : -1, kNumFds);
       return -EINVAL;
     }
     if (hnd->magic != kMagic) {
-      ALOGE("handle = %p  invalid  magic(%c%c%c%c/%c%c%c%c)", hnd,
-            hnd ? (((hnd->magic >> 24) & 0xFF) ? ((hnd->magic >> 24) & 0xFF) : '-') : '?',
-            hnd ? (((hnd->magic >> 16) & 0xFF) ? ((hnd->magic >> 16) & 0xFF) : '-') : '?',
-            hnd ? (((hnd->magic >> 8) & 0xFF) ? ((hnd->magic >> 8) & 0xFF) : '-') : '?',
-            hnd ? (((hnd->magic >> 0) & 0xFF) ? ((hnd->magic >> 0) & 0xFF) : '-') : '?',
-            (kMagic >> 24) & 0xFF, (kMagic >> 16) & 0xFF, (kMagic >> 8) & 0xFF,
-            (kMagic >> 0) & 0xFF);
       return -EINVAL;
     }
 

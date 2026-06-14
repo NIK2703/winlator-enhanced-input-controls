@@ -18,7 +18,6 @@ import android.graphics.Rect;
 import android.os.Handler;
 import android.os.Looper;
 
-import android.util.Log;
 import android.util.SparseArray;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -640,8 +639,6 @@ public class InputControlsView extends View {
         }
         if (diagLastTickStatusMs == 0) diagLastTickStatusMs = timeMs;
         if (timeMs - diagLastTickStatusMs >= 5000) {
-            Log.e("DIAG_JAVA_TICK", "ticks=" + diagTickCount + " slow=" + diagSlowTicks
-                + " interval=" + (timeMs - diagLastTickStatusMs) + "ms");
             diagLastTickStatusMs = timeMs;
         }
         if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {

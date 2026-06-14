@@ -3,7 +3,6 @@ package com.winlator.cmod.core;
 import android.os.Process;
 
 
-import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -78,10 +77,8 @@ public abstract class ProcessHelper {
                 if (isProcessStopped(pid)) {
                     int ppid = getParentPid(pid);
                     if (ppid <= 1) {
-                        Log.w("ProcessHelper", "Killing orphaned stopped wine process: pid=" + pid);
                         killProcess(pid);
                     } else {
-                        Log.w("ProcessHelper", "Resuming orphaned stopped wine process: pid=" + pid);
                         resumeProcess(pid);
                     }
                 }

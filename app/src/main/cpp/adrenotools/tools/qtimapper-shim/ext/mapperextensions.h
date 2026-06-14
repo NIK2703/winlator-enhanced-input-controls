@@ -60,7 +60,6 @@ struct IQtiMapperExtensions : public IBase {
       ::vendor::qti::hardware::display::mapperextensions::V1_0::Error error, bool mapSecureBuffer)>;
   virtual ::android::hardware::Return<void> getMapSecureBufferFlag(
       void* buffer, getMapSecureBufferFlag_cb _hidl_cb) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
@@ -74,8 +73,7 @@ struct IQtiMapperExtensions : public IBase {
       std::function<void(::vendor::qti::hardware::display::mapperextensions::V1_0::Error error,
                          int32_t stride, int32_t height)>;
   virtual ::android::hardware::Return<void> getCustomDimensions(void* buffer,
-                                                                getCustomDimensions_cb _hidl_cb) {
-    ALOGE("%s", __func__);
+                                                                 getCustomDimensions_cb _hidl_cb) {
     std::terminate();
   }
 
@@ -91,7 +89,6 @@ struct IQtiMapperExtensions : public IBase {
   virtual ::android::hardware::Return<void> calculateBufferAttributes(
       int32_t width, int32_t height, int32_t format, uint64_t usage,
       calculateBufferAttributes_cb _hidl_cb) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
@@ -99,7 +96,6 @@ struct IQtiMapperExtensions : public IBase {
   using getColorSpace_cb = std::function<void(
       ::vendor::qti::hardware::display::mapperextensions::V1_0::Error error, int32_t color_space)>;
   virtual ::android::hardware::Return<void> getColorSpace(void* buffer, getColorSpace_cb _hidl_cb) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
@@ -109,15 +105,13 @@ struct IQtiMapperExtensions : public IBase {
       const ::android::hardware::hidl_vec<
           ::vendor::qti::hardware::display::mapperextensions::V1_0::YCbCrLayout>& layout)>;
   virtual ::android::hardware::Return<void> getYuvPlaneInfo(void* buffer,
-                                                            getYuvPlaneInfo_cb _hidl_cb) {
-    ALOGE("%s", __func__);
+                                                             getYuvPlaneInfo_cb _hidl_cb) {
     std::terminate();
   }
 
   virtual ::android::hardware::Return<
       ::vendor::qti::hardware::display::mapperextensions::V1_0::Error>
   setSingleBufferMode(void* buffer, bool enable) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
@@ -125,8 +119,7 @@ struct IQtiMapperExtensions : public IBase {
       std::function<void(::vendor::qti::hardware::display::mapperextensions::V1_0::Error error,
                          int32_t format, uint64_t priv_flags)>;
   virtual ::android::hardware::Return<void> getCustomFormatFlags(int32_t format, uint64_t usage,
-                                                                 getCustomFormatFlags_cb _hidl_cb) {
-    ALOGE("%s", __func__);
+                                                                  getCustomFormatFlags_cb _hidl_cb) {
     std::terminate();
   }
 
@@ -193,8 +186,7 @@ struct IQtiMapperExtensions : public IBase {
   using getSurfaceMetadata_cb = std::function<void(
       ::vendor::qti::hardware::display::mapperextensions::V1_0::Error error, void* metadata)>;
   virtual ::android::hardware::Return<void> getSurfaceMetadata(void* buffer,
-                                                               getSurfaceMetadata_cb _hidl_cb) {
-    ALOGE("%s", __func__);
+                                                                getSurfaceMetadata_cb _hidl_cb) {
     std::terminate();
   }
 
@@ -212,7 +204,6 @@ struct IQtiMapperExtensions : public IBase {
   virtual ::android::hardware::Return<
       ::vendor::qti::hardware::display::mapperextensions::V1_0::Error>
   getSurfaceMetadata_V1(void* buffer, void* metadata) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 

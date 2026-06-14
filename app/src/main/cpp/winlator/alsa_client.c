@@ -1,9 +1,6 @@
 #include <aaudio/AAudio.h>
 #include <jni.h>
-#include <android/log.h>
-
-#define LOG_TAG "ALSAClient"
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) do {} while(0)
 
 #define WAIT_COMPLETION_TIMEOUT (100 * 1000000L)
 

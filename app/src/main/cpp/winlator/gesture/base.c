@@ -9,12 +9,8 @@ static inline int finger_index(const TouchFinger* f) {
 
 static bool validate_dt_confirm(void) {
     if (!g_state.gesture_double_tap_waiting) {
-        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture", "DT_CONFIRM: skipped - not waiting");
         return false;
     }
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture", "DT_CONFIRM: pending_dbl=%d pending_deferred_dbl=%d",
-        g_state.gesture_pending_double_count,
-        g_state.gesture_pending_deferred_double_count);
     g_state.gesture_double_tap_waiting = false;
     g_state.gesture_deferred_tap_count = 0;
     return true;
@@ -68,29 +64,20 @@ bool resolve_drag_binding(
     int* out_count)
 {
     if (ctx->drag_count > 0) {
-        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
-            "RESOLVE_DRAG: tier1_xd xd_cnt=%d type0=%d", ctx->drag_count, ctx->drag->type);
         *out_binding = ctx->drag;
         *out_count = ctx->drag_count;
         return true;
     }
     if (ctx->press_on_drag && ctx->non_drag_count > 0) {
-        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
-            "RESOLVE_DRAG: tier2_press_on_drag x_cnt=%d type0=%d", ctx->non_drag_count, ctx->non_drag->type);
         *out_binding = ctx->non_drag;
         *out_count = ctx->non_drag_count;
         return true;
     }
     if (ctx->is_d2_slot && ctx->fallback_count > 0) {
-        __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
-            "RESOLVE_DRAG: tier3_fallback fb_cnt=%d type0=%d", ctx->fallback_count, ctx->fallback->type);
         *out_binding = ctx->fallback;
         *out_count = ctx->fallback_count;
         return true;
     }
-    __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Gesture",
-        "RESOLVE_DRAG: NONE xd_cnt=%d press=%d x_cnt=%d use_fb=%d fb_cnt=%d",
-        ctx->drag_count, ctx->press_on_drag, ctx->non_drag_count, ctx->is_d2_slot, ctx->fallback_count);
     return false;
 }
 

@@ -5,12 +5,10 @@ import android.graphics.Canvas;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
-import android.util.Log;
 
 import java.nio.ByteBuffer;
 
 public class ElementOverlayRenderer {
-    private static final String TAG = "Winlator_Overlay";
     private static final int MSG_RENDER = 1;
     private static final int MSG_SHUTDOWN = 2;
 
@@ -77,7 +75,6 @@ public class ElementOverlayRenderer {
 
     public void setViewSize(int w, int h) {
         if (w == width && h == height && overlayBitmap != null) return;
-        Log.d(TAG, "setViewSize: " + w + "x" + h + " (was " + width + "x" + height + ")");
         this.width = w;
         this.height = h;
         if (overlayBitmap != null) {
@@ -91,9 +88,7 @@ public class ElementOverlayRenderer {
             int size = w * h * 4;
             if (pixelBuffer == null || pixelBuffer.capacity() < size) {
                 pixelBuffer = ByteBuffer.allocateDirect(size);
-                Log.d(TAG, "allocated pixelBuffer: " + size + " bytes");
             }
-            Log.d(TAG, "overlay bitmap ready: " + w + "x" + h);
         }
     }
 
@@ -112,11 +107,9 @@ public class ElementOverlayRenderer {
         if (!needsRender) return;
         needsRender = false;
         if (overlayCanvas == null) {
-            Log.w(TAG, "doRender: overlayCanvas null, skipping");
             return;
         }
         if (callback == null) {
-            Log.w(TAG, "doRender: callback null, skipping");
             return;
         }
 
@@ -135,7 +128,6 @@ public class ElementOverlayRenderer {
         diagRenderCount++;
         if (renderElapsedUs > 10000) {
             diagSlowRenders++;
-            Log.e("DIAG_OVERLAY", "SLOW RENDER #" + diagRenderCount + " " + renderElapsedUs + "us");
         }
     }
 
@@ -146,7 +138,6 @@ public class ElementOverlayRenderer {
             pixelBuffer.rewind();
             vulkanRenderer.updateElementOverlay(vulkanHandle, pixelBuffer, width, height);
         } catch (Exception e) {
-            Log.e(TAG, "upload failed: " + e.getMessage());
         }
     }
 

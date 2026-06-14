@@ -1,10 +1,8 @@
-#include <android/log.h>
 #include <android/hardware_buffer.h>
 #include <jni.h>
 #include <unistd.h>
 
-#define LOG_TAG "GPUImage"
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) do {} while(0)
 #define RGBA_BYTES_PER_PIXEL 4
 #define HW_BUFFER_FENCE_TIMEOUT -1
 #define HANDSHAKE_BYTE 1
@@ -15,11 +13,9 @@ Java_com_winlator_cmod_renderer_GPUImage_hardwareBufferFromSocket(JNIEnv *env, j
     AHardwareBuffer *ahb = NULL;
     uint8_t buf = HANDSHAKE_BYTE;
     if (write(fd, &buf, 1) == -1) {
-        LOGE("hardwareBufferFromSocket: write failed");
         return 0;
     }
     if (AHardwareBuffer_recvHandleFromUnixSocket(fd, &ahb) != 0) {
-        LOGE("hardwareBufferFromSocket: recvHandle failed");
         return 0;
     }
     AHardwareBuffer_acquire(ahb);
@@ -42,14 +38,12 @@ Java_com_winlator_cmod_renderer_GPUImage_createHardwareBuffer(JNIEnv *env, jclas
     if (AHardwareBuffer_isSupported(&desc) != 0) {
         desc.usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE | AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY;
         if (AHardwareBuffer_isSupported(&desc) != 0) {
-            LOGE("createHardwareBuffer: unsupported desc");
             return 0;
         }
     }
 #endif
     AHardwareBuffer *ahb = NULL;
     if (AHardwareBuffer_allocate(&desc, &ahb) != 0) {
-        LOGE("createHardwareBuffer: alloc failed");
         return 0;
     }
     return (jlong)ahb;
@@ -73,16 +67,13 @@ JNIEXPORT jobject JNICALL
 Java_com_winlator_cmod_renderer_GPUImage_lockHardwareBuffer(JNIEnv *env, jclass obj, jlong ptr) {
     AHardwareBuffer *ahb = (AHardwareBuffer *)ptr;
     if (!ahb) {
-        LOGE("lockHardwareBuffer: null pointer");
         return NULL;
     }
     void *addr;
     if (AHardwareBuffer_lock(ahb, AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, HW_BUFFER_FENCE_TIMEOUT, NULL, &addr) != 0) {
-        LOGE("lockHardwareBuffer: lock failed");
         return NULL;
     }
     if (!addr) {
-        LOGE("lockHardwareBuffer: null address");
         AHardwareBuffer_unlock(ahb, NULL);
         return NULL;
     }
@@ -103,7 +94,6 @@ Java_com_winlator_cmod_renderer_GPUImage_lockHardwareBuffer(JNIEnv *env, jclass 
 
     jobject buffer = (*env)->NewDirectByteBuffer(env, addr, (jlong)desc.stride * (jlong)desc.height * RGBA_BYTES_PER_PIXEL);
     if (!buffer) {
-        LOGE("lockHardwareBuffer: NewDirectByteBuffer failed");
         AHardwareBuffer_unlock(ahb, NULL);
     }
     return buffer;

@@ -2,7 +2,6 @@
 
 #include <jni.h>
 #include <dlfcn.h>
-#include <android/log.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -12,8 +11,7 @@
 
 #define API_LEVEL_ANDROID_T 33
 
-#define LOG_TAG "System.out"
-#define vlog_debug(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define vlog_debug(...) do {} while(0)
 
 static VkInstance instance;
 static VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -250,13 +248,11 @@ static VkResult enumerate_physical_devices() {
 static VkResult setup_vulkan(JNIEnv *env, jstring driverName, jobject context) {
     VkResult result = create_instance(driverName, env, context);
     if (result != VK_SUCCESS) {
-        vlog_debug("Failed to create instance");
         return result;
     }
 
     result = enumerate_physical_devices();
     if (result != VK_SUCCESS) {
-        vlog_debug("Failed to query physical devices");
         teardown_vulkan();
     }
     return result;
@@ -339,7 +335,6 @@ Java_com_winlator_cmod_core_GPUInformation_enumerateExtensions(JNIEnv *env, jcla
     result = enumerateDeviceExtensionProperties(physicalDevice, NULL, &extensionCount, NULL);
 
     if (result != VK_SUCCESS || extensionCount < 1) {
-        vlog_debug("Failed to query extension count");
         teardown_vulkan();
         goto cleanup;
     }
@@ -353,7 +348,6 @@ Java_com_winlator_cmod_core_GPUInformation_enumerateExtensions(JNIEnv *env, jcla
     result = enumerateDeviceExtensionProperties(physicalDevice, NULL, &extensionCount, extensionProperties);
 
     if (result != VK_SUCCESS) {
-        vlog_debug("Failed to query extensions");
         free(extensionProperties);
         teardown_vulkan();
         goto cleanup;

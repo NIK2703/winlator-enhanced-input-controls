@@ -137,12 +137,11 @@ void XrInputInit(struct XrEngine* engine, struct XrInput* input)
                 if (str_count < 256)
                 {
                     OXR(xrGetInputSourceLocalizedName(engine->Session, &name_info, 256, &str_count,
-                                                      string_buffer));
+                                                       string_buffer));
                     char path_str[256];
                     uint32_t str_len = 0;
                     OXR(xrPathToString(engine->Instance, action_paths_buffer[a],
                                        (uint32_t)sizeof(path_str), &str_len, path_str));
-                    ALOGV("mapped %s -> %s", path_str, string_buffer);
                 }
             }
         }

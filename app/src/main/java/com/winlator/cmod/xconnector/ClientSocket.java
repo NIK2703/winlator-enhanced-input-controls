@@ -84,8 +84,6 @@ public class ClientSocket {
             diagWriteCount++;
             if (writeElapsedUs > 10000) {
                 diagSlowWrites++;
-                android.util.Log.e("DIAG_SOCKET", "SLOW WRITE fd=" + fd + " " + writeElapsedUs + "us"
-                    + " blocked=" + diagBlockedWrites);
             }
             pendingBytes.addAndGet(-(buf.limit() - remaining));
         }
@@ -104,7 +102,6 @@ public class ClientSocket {
         long deadline = System.nanoTime() + 5_000_000_000L;
         while (remaining > 0) {
             if (System.nanoTime() > deadline) {
-                android.util.Log.w("ClientSocket", "writeDirect timeout after 5s");
                 return;
             }
             int written = write(fd, data, offset, remaining);
@@ -160,7 +157,6 @@ public class ClientSocket {
             if (dropped == null) break;
             pendingBytes.addAndGet(-dropped.limit());
             writeQueueOverflow = true;
-            android.util.Log.w("ClientSocket", "writeQueue overflow: dropping " + dropped.limit() + " bytes");
         }
 
         ByteBuffer copy = ByteBuffer.allocateDirect(remaining);

@@ -105,18 +105,15 @@ struct IQtiMapper : public IBase {
   virtual Return<void> createDescriptor(
       const graphics::mapper::V2_0::IMapper::BufferDescriptorInfo& descriptorInfo,
       createDescriptor_cb _hidl_cb) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
   using importBuffer_cb = std::function<void(graphics::mapper::V2_0::Error error, void* buffer)>;
   virtual Return<void> importBuffer(const hidl_handle& rawHandle, importBuffer_cb _hidl_cb) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
   virtual Return<graphics::mapper::V2_0::Error> freeBuffer(void* buffer) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
@@ -125,7 +122,6 @@ struct IQtiMapper : public IBase {
                             hidl_bitfield<graphics::common::V1_0::BufferUsage> cpuUsage,
                             const graphics::mapper::V2_0::IMapper::Rect& accessRegion,
                             const hidl_handle& acquireFence, lock_cb _hidl_cb) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
@@ -135,28 +131,24 @@ struct IQtiMapper : public IBase {
                                  hidl_bitfield<graphics::common::V1_0::BufferUsage> cpuUsage,
                                  const graphics::mapper::V2_0::IMapper::Rect& accessRegion,
                                  const hidl_handle& acquireFence, lockYCbCr_cb _hidl_cb) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
   using unlock_cb =
       std::function<void(graphics::mapper::V2_0::Error error, const hidl_handle& releaseFence)>;
   virtual Return<void> unlock(void* buffer, unlock_cb _hidl_cb) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
   virtual Return<graphics::mapper::V2_0::Error> validateBufferSize(
       void* buffer, const graphics::mapper::V2_0::IMapper::BufferDescriptorInfo& descriptorInfo,
       uint32_t stride) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
   using getTransportSize_cb =
       std::function<void(graphics::mapper::V2_0::Error error, uint32_t numFds, uint32_t numInts)>;
   virtual Return<void> getTransportSize(void* buffer, getTransportSize_cb _hidl_cb) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 
@@ -165,7 +157,6 @@ struct IQtiMapper : public IBase {
   virtual Return<void> createDescriptor_2_1(
       const graphics::mapper::V2_0::IMapper::BufferDescriptorInfo& descriptorInfo,
       createDescriptor_2_1_cb _hidl_cb) {
-    ALOGE("%s", __func__);
     std::terminate();
   }
 

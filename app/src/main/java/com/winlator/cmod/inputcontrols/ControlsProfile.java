@@ -1,7 +1,6 @@
 package com.winlator.cmod.inputcontrols;
 
 import android.content.Context;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -688,8 +687,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             data.put("gestureSettings", unifiedGestureData);
 
             String jsonStr = data.toString();
-            if (gestureSingleTapAction.isToggleSwitch())
-                android.util.Log.w("Winlator_Gesture", "SAVE: singleTapAction has toggleSwitch=true JSON="+jsonStr.substring(0, Math.min(500, jsonStr.length())));
             FileUtils.writeString(file, jsonStr);
         }
         catch (JSONException e) {}
@@ -814,9 +811,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         virtualGamepad = false;
 
         File file = getProfileFile(context, id);
-        Log.w("Winlator_Controls", "loadElements: loading profile from " + file.getAbsolutePath());
         if (!file.isFile()) {
-            Log.w("Winlator_Controls", "loadElements: file not found, returning");
             return;
         }
 
@@ -841,7 +836,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             gestureSettingsLoaded = true;
 
             JSONArray elementsJSONArray = profileJSONObject.getJSONArray("elements");
-            Log.w("Winlator_Controls", "loadElements: found " + elementsJSONArray.length() + " elements in JSON");
             for (int i = 0; i < elementsJSONArray.length(); i++) {
                 JSONObject elementJSONObject = elementsJSONArray.getJSONObject(i);
                 ControlElement element = new ControlElement(inputControlsView);
@@ -880,7 +874,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 element.setY((int)(elementJSONObject.getDouble("y") * inputControlsView.getMaxHeight()));
                 element.setScale((float)elementJSONObject.getDouble("scale"));
                 element.setText(elementJSONObject.getString("text"));
-                Log.w("Winlator_Controls", "loadElements: element[" + i + "] type=" + element.getType() + " text=" + element.getText());
                 element.setIconId(elementJSONObject.getInt("iconId"));
                 if (elementJSONObject.has("customIconData")) element.setCustomIconData(elementJSONObject.getString("customIconData"));
                 if (elementJSONObject.has("range")) element.setRange(ControlElement.Range.valueOf(elementJSONObject.getString("range")));
@@ -949,7 +942,6 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             elementsLoaded = true;
         }
         catch (JSONException e) {
-            Log.w("Winlator_Controls", "loadElements: JSONException: " + e.getMessage());
             e.printStackTrace();
         }
     }

@@ -10,7 +10,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.DocumentsContract;
-import android.util.Log;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -90,8 +89,6 @@ import java.util.function.Supplier;
 
 public class ContainerDetailFragment extends Fragment implements DXVKConfigDialog.ContentInstallHost {
     private static final ExecutorService CONTENT_IO_EXECUTOR = Executors.newFixedThreadPool(2);
-
-    private static final String TAG = "FileUtils";
 
     private ContainerManager manager;
     private ContentsManager contentsManager;
@@ -232,9 +229,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         if (requestCode == MainActivity.OPEN_DIRECTORY_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
             if (data != null) {
                 Uri uri = data.getData();
-                Log.d(TAG, "URI obtained in onActivityResult: " + uri.toString());
                 String path = FileUtils.getFilePathFromUri(getContext(), uri);
-                Log.d(TAG, "File path in onActivityResult: " + path);
                 if (path != null) {
                     if (openDirectoryCallback != null) {
                         openDirectoryCallback.call(path);

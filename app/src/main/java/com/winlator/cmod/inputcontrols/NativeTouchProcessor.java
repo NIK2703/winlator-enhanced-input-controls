@@ -3,7 +3,6 @@ package com.winlator.cmod.inputcontrols;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.util.Log;
 
 import com.winlator.cmod.inputcontrols.InputMode;
 import com.winlator.cmod.widget.InputControlsView;
@@ -243,7 +242,6 @@ public class NativeTouchProcessor {
         } catch (Exception e) {
             loaded = false;
         }
-        Log.w("Winlator_Controls", "NativeTouchProcessor: library loaded=" + loaded);
     }
 
     // === DIAGNOSTIC METHODS ===
@@ -256,31 +254,18 @@ public class NativeTouchProcessor {
     /** Call periodically (from tick) to dump full diagnostic state */
     public void dumpDiagnostics() {
         long now = System.currentTimeMillis();
-        Log.w("Winlator_Diag", "=== DIAGNOSTIC DUMP t=" + now + " ===");
-        Log.w("Winlator_Diag", "loaded=" + loaded + " running=" + running);
-        Log.w("Winlator_Diag", "xServer=" + xServer + " winHandler=" + (xServer != null ? xServer.getWinHandler() : "null"));
-        Log.w("Winlator_Diag", "dispatchPacked=" + (dispatchPacked != null ? "len=" + dispatchPacked.length : "NULL"));
-        Log.w("Winlator_Diag", "fingerDownCount=" + fingerDownCount + " lastFingerDown=" + (now - lastFingerDownTime) + "ms ago");
-        Log.w("Winlator_Diag", "tickCount=" + tickCount + " lastTick=" + (now - lastTickTime) + "ms ago");
-        Log.w("Winlator_Diag", "dispatchCount=" + dispatchCount + " dispatchErrors=" + dispatchErrorCount);
-        Log.w("Winlator_Diag", "lastDispatch=" + (now - lastDispatchTime) + "ms ago");
 
         // Dump inputControlsView state
         if (inputControlsView != null) {
-            Log.w("Winlator_Diag", "icv: showTouchscreen=" + inputControlsView.isShowTouchscreenControls()
-                + " profile=" + inputControlsView.getProfile());
         }
 
         // Dump last 50 events from ring buffer
-        Log.w("Winlator_Diag", "--- last events (ring buffer) ---");
         int start = (eventRingHead - 50 + EVENT_RING_SIZE) % EVENT_RING_SIZE;
         for (int i = 0; i < 50; i++) {
             int idx = (start + i) % EVENT_RING_SIZE;
             if (eventRing[idx] != null) {
-                Log.w("Winlator_Diag", "  [" + i + "] " + eventRing[idx]);
             }
         }
-        Log.w("Winlator_Diag", "=== END DIAGNOSTIC ===");
     }
 
     public boolean isLoaded() { return loaded; }
@@ -329,10 +314,8 @@ public class NativeTouchProcessor {
 
     public void init(NativeConfig config) {
         if (!loaded) {
-            Log.w("Winlator_Controls", "init: native library not loaded, aborting");
             return;
         }
-        Log.w("Winlator_Controls", "init: called with config touchMode=" + config.touchMode + " inputMode=" + config.inputMode + " screen=" + config.screenW + "x" + config.screenH);
         nativeInit(config);
         dispatchPacked = new int[256]; // max 64 actions × 4 ints
         nativeSetDispatchPacked(dispatchPacked);
@@ -350,11 +333,9 @@ public class NativeTouchProcessor {
 
     public void setElements(NativeElement[] elements) {
         if (!loaded) {
-            Log.w("Winlator_Controls", "setElements: native library not loaded");
             return;
         }
         elementCount = (elements != null) ? elements.length : 0;
-        Log.w("Winlator_Controls", "setElements: setting " + elementCount + " elements");
         nativeSetElements(elements);
     }
 
@@ -526,10 +507,8 @@ public class NativeTouchProcessor {
 
     public static NativeElement[] buildNativeElements(List<ControlElement> elements, TouchActivationMode activationMode, ControlsProfile profile) {
         if (elements == null) {
-            Log.w("Winlator_Controls", "buildNativeElements: elements list is null");
             return null;
         }
-        Log.w("Winlator_Controls", "buildNativeElements: processing " + elements.size() + " elements");
         NativeElement[] arr = new NativeElement[elements.size()];
         ControlsProfile p = profile;
         for (int i = 0; i < elements.size(); i++) {
@@ -630,7 +609,6 @@ public class NativeTouchProcessor {
             ne.gestureToggleBitmask = ce.computeToggleBitmask(ControlElement.BindingSection.GESTURE);
             if (ne.bindingToggle != null) {
                 for (int j = 0; j < ne.bindingToggle.length && j < 4; j++) {
-                    Log.w("Winlator_Controls", "  elem["+i+"] slot["+j+"] type="+ne.bindingTypes[j*2]+" toggleMask="+ne.bindingToggle[j]+" arMask="+(ne.bindingAutoRepeat != null ? ne.bindingAutoRepeat[j] : -1)+" arInterval="+(ne.bindingAutoRepeatIntervalMs != null ? ne.bindingAutoRepeatIntervalMs[j] : -1));
                 }
             }
             arr[i] = ne;
@@ -691,7 +669,6 @@ public class NativeTouchProcessor {
 
     public void onFingerDown(int ptrId, float x, float y, long eventTime) {
         if (!loaded || !running) {
-            Log.w("Winlator_Touch", "onFingerDown DROPPED: loaded="+loaded+" running="+running+" ptrId="+ptrId);
             return;
         }
         nativeOnFingerDown(ptrId, x, y, eventTime);
@@ -699,7 +676,6 @@ public class NativeTouchProcessor {
 
     public void onFingerMove(int ptrId, float x, float y, long eventTime) {
         if (!loaded || !running) {
-            Log.w("Winlator_Touch", "onFingerMove DROPPED: loaded="+loaded+" running="+running+" ptrId="+ptrId);
             return;
         }
         nativeOnFingerMove(ptrId, x, y, eventTime);
@@ -707,7 +683,6 @@ public class NativeTouchProcessor {
 
     public void onFingerUp(int ptrId, float x, float y, long eventTime) {
         if (!loaded || !running) {
-            Log.w("Winlator_Touch", "onFingerUp DROPPED: loaded="+loaded+" running="+running+" ptrId="+ptrId);
             return;
         }
         nativeOnFingerUp(ptrId, x, y, eventTime);
@@ -715,7 +690,6 @@ public class NativeTouchProcessor {
 
     public void tick(long eventTime) {
         if (!loaded || !running) {
-            Log.w("Winlator_Touch", "tick DROPPED: loaded="+loaded+" running="+running);
             return;
         }
         nativeTick(eventTime);
@@ -747,11 +721,9 @@ public class NativeTouchProcessor {
 
     public void start() {
         running = true;
-        Log.w("Winlator_Touch", "start: running=true");
     }
     public void stop() {
         running = false;
-        Log.w("Winlator_Touch", "stop: running=false");
     }
 
     public void injectPointerMove(int x, int y) {
@@ -830,20 +802,16 @@ public class NativeTouchProcessor {
     }
 
     public void gamepadState(int btn, boolean isDown) {
-        Log.d("Winlator_StickBinding", "NTP.gamepadState btn="+btn+" isDown="+isDown);
         if (xServer != null && xServer.getWinHandler() != null) {
             xServer.getWinHandler().sendGamepadState(btn, isDown);
         } else {
-            Log.w("Winlator_StickBinding", "NTP.gamepadState DROPPED: xServer="+xServer+" winHandler="+(xServer != null ? xServer.getWinHandler() : "null"));
         }
     }
 
     public void gamepadAxis(int isLeft, int axisX, int axisY) {
-        Log.d("Winlator_StickBinding", "NTP.gamepadAxis isLeft="+isLeft+" axisX="+axisX+" axisY="+axisY);
         if (xServer != null && xServer.getWinHandler() != null) {
             xServer.getWinHandler().sendGamepadAxis(isLeft != 0, axisX, axisY);
         } else {
-            Log.w("Winlator_StickBinding", "NTP.gamepadAxis DROPPED: xServer="+xServer+" winHandler="+(xServer != null ? xServer.getWinHandler() : "null"));
         }
     }
 
@@ -858,7 +826,6 @@ public class NativeTouchProcessor {
                 int a1 = buf[base + 2];
                 int a2 = buf[base + 3];
                 if (type == 13 || type == 14) {
-                    Log.d("Winlator_StickBinding", "NTP.dispatchAllActions type="+type+" a0="+a0+" a1="+a1+" a2="+a2);
                 }
                 switch (type) {
                     case 0: break; // ACT_NONE
@@ -880,7 +847,6 @@ public class NativeTouchProcessor {
                 }
             }
         } catch (Exception e) {
-            Log.e("Winlator_Controls", "dispatchAllActions: exception at count="+count, e);
         }
     }
 }

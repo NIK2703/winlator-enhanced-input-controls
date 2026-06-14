@@ -18,7 +18,6 @@ import com.winlator.cmod.xserver.XServer;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.hardware.input.InputManager;
-import android.util.Log;
 import android.os.Handler;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
@@ -131,10 +130,8 @@ public class WinHandler {
             sendPacket.setAddress(localhost);
             sendPacket.setPort(port);
             socket.send(sendPacket);
-            Log.d("Winlator_WinH", "sendPacket port="+port+" size="+size+" code="+sendData.array()[0]);
             return true;
         } catch (IOException e) {
-            Log.d("Winlator_WinH", "sendPacket FAILED port="+port+" "+e);
             return false;
         }
     }
@@ -343,7 +340,6 @@ public class WinHandler {
                     if (!initReceived) {
                         long elapsed = System.currentTimeMillis() - initWaitStart;
                         if (elapsed > 15000 && elapsed < 16000) {
-                            android.util.Log.w(TAG, "Still waiting for wine INIT after 15s - wine may have crashed");
                         }
                     }
                     try {
@@ -370,7 +366,6 @@ public class WinHandler {
                     if (sinceLast > KEEPALIVE_TIMEOUT_MS) {
                         if (!wineKeepaliveFailed) {
                             wineKeepaliveFailed = true;
-                            Log.e("DIAG_WINE", "KEEPALIVE TIMEOUT - no response for " + sinceLast + "ms (total received=" + diagKeepaliveCount + ")");
                             if (activity != null) {
                                 activity.runOnUiThread(() -> {
                                     activity.onWineKeepaliveTimeout();
@@ -382,8 +377,6 @@ public class WinHandler {
                     }
                     if (diagLastKeepaliveLogMs == 0) diagLastKeepaliveLogMs = now;
                     if (now - diagLastKeepaliveLogMs >= 5000) {
-                        Log.e("DIAG_WINE", "keepalive status: received=" + diagKeepaliveCount
-                            + " sinceLast=" + sinceLast + "ms failed=" + wineKeepaliveFailed);
                         diagLastKeepaliveLogMs = now;
                     }
                 }
@@ -525,7 +518,6 @@ public class WinHandler {
     }
 
     private void handleRequest(byte requestCode, final int port) {
-        Log.d("Winlator_WinH", "handleRequest code="+requestCode+" port="+port+" initReceived="+initReceived);
         switch (requestCode) {
             case RequestCodes.INIT: {
                 initReceived = true;
@@ -626,10 +618,8 @@ public class WinHandler {
     }
 
     public void sendGamepadState() {
-        Log.d("Winlator_WinH", "sendGamepadState");
         final ControlsProfile profile = activity.getInputControlsView().getProfile();
         if (profile == null) {
-            Log.w("Winlator_WinH", "sendGamepadState: profile=null, releasing slot");
             releaseSlot(OSC_DEVICE_ID);
             return;
         }
@@ -643,10 +633,8 @@ public class WinHandler {
             if (slot >= 0 && writers[slot] != null) {
                 writers[slot].writeGamepadState(gamepadState);
             } else {
-                Log.w("Winlator_WinH", "sendGamepadState: slot="+slot+" writers["+(slot >= 0 ? slot : "N/A")+"]="+(slot >= 0 ? writers[slot] : "N/A"));
             }
         } else {
-            Log.w("Winlator_WinH", "sendGamepadState: useVirtualGamepad=false (isVirtualGamepad="+profile.isVirtualGamepad()+" showTouchscreenControls="+activity.getInputControlsView().isShowTouchscreenControls()+"), releasing slot");
             releaseSlot(OSC_DEVICE_ID);
         }
 
@@ -654,18 +642,13 @@ public class WinHandler {
 
     public void sendGamepadState(ExternalController controller) {
         if (controller == null) {
-            Log.d("Winlator_WinH", "sendGamepadState: controller=null");
             return;
         }
-        Log.d("Winlator_WinH", "sendGamepadState deviceId="+controller.getDeviceId());
 
         ControlsProfile profile = activity.getInputControlsView().getProfile();
         if (profile != null) {
             ExternalController profileController = profile.getController(controller.getDeviceId());
             if (profileController != null && profileController.getControllerBindingCount() > 0) {
-                Log.d("Winlator_StickBinding", "sendGamepadState USING REMAPPED state bindingsCount="+profileController.getControllerBindingCount()+
-                        " remapped(thumbLX="+profileController.remappedState.thumbLX+" thumbLY="+profileController.remappedState.thumbLY+
-                        " thumbRX="+profileController.remappedState.thumbRX+" thumbRY="+profileController.remappedState.thumbRY+")");
                 int slot = assignSlot(controller.getDeviceId());
                 if (slot >= 0 && writers[slot] != null) {
                     writers[slot].writeGamepadState(profileController.remappedState);
@@ -674,9 +657,6 @@ public class WinHandler {
             }
         }
 
-        Log.d("Winlator_StickBinding", "sendGamepadState USING RAW state bindingsCount=0"+
-                " raw(thumbLX="+controller.state.thumbLX+" thumbLY="+controller.state.thumbLY+
-                " thumbRX="+controller.state.thumbRX+" thumbRY="+controller.state.thumbRY+")");
         int slot = assignSlot(controller.getDeviceId());
         if (slot >= 0 && writers[slot] != null) {
             writers[slot].writeGamepadState(controller.state);

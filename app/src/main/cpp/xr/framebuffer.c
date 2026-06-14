@@ -45,8 +45,6 @@ void XrFramebufferAcquire(struct XrFramebuffer *framebuffer)
         res = xrWaitSwapchainImage(framebuffer->Handle, &wait_info);
         i++;
         usleep(1000);
-        ALOGV("Retry xrWaitSwapchainImage %d times due XR_TIMEOUT_EXPIRED (duration %lf ms",
-              i, wait_info.timeout * (1E-9));
     }
 
     framebuffer->Acquired = res == XR_SUCCESS;
@@ -127,7 +125,6 @@ bool XrFramebufferCreateGL(struct XrFramebuffer *framebuffer, XrSession session,
         GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
         if (renderFramebufferStatus != GL_FRAMEBUFFER_COMPLETE)
         {
-            ALOGE("Incomplete frame buffer object: %d", renderFramebufferStatus);
             return false;
         }
     }

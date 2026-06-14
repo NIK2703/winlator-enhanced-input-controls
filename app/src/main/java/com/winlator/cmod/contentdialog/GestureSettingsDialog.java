@@ -220,8 +220,6 @@ public class GestureSettingsDialog {
 
     private void addBindingSection(LinearLayout container, String key, String label, BindPackage bp, int helpTextResId) {
         BindPackage stored = new BindPackage(bp);
-        if (android.util.Log.isLoggable("Winlator_Gesture", android.util.Log.WARN))
-            android.util.Log.w("Winlator_Gesture", "open: key="+key+" toggleSwitch="+stored.isToggleSwitch()+" label="+label);
         bindingValues.put(key, stored);
         View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(context, label, helpTextResId, stored, () -> {});
         container.addView(section);

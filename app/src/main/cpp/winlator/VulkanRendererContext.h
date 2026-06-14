@@ -91,11 +91,9 @@ struct VkTable {
     PFN_vkGetAndroidHardwareBufferPropertiesANDROID GetAndroidHardwareBufferPropertiesANDROID;
 };
 
-#include <android/log.h>
 #include <string>
-#define WLOG_TAG "Winlator_Renderer"
-#define RLOG(...) if(verboseLog) __android_log_print(ANDROID_LOG_DEBUG,WLOG_TAG,__VA_ARGS__)
-#define RLOG_E(...) __android_log_print(ANDROID_LOG_ERROR,WLOG_TAG,__VA_ARGS__)
+#define RLOG(...) do {} while(0)
+#define RLOG_E(...) do {} while(0)
 
 #include <vulkan/vulkan_android.h>
 #include <android/hardware_buffer.h>

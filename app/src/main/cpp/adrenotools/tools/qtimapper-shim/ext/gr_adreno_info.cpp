@@ -77,7 +77,6 @@ AdrenoMemInfo::AdrenoMemInfo() {
     *reinterpret_cast<void**>(&LINK_adreno_get_aligned_gpu_buffer_size) =
         ::dlsym(libadreno_utils_, "adreno_get_aligned_gpu_buffer_size");
   } else {
-    ALOGE(" Failed to load libadreno_utils.so");
   }
 
   // Check if the overriding property debug.gralloc.gfx_ubwc_disable
@@ -142,14 +141,8 @@ void AdrenoMemInfo::AlignUnCompressedRGB(int width, int height, int format, int 
   } else if (LINK_adreno_compute_padding) {
     int surface_tile_height = 1;  // Linear surface
     *aligned_w = UINT(LINK_adreno_compute_padding(width, bpp, surface_tile_height, raster_mode,
-                                                  padding_threshold));
-    ALOGW("%s: Warning!! Old GFX API is used to calculate stride", __FUNCTION__);
+                                                   padding_threshold));
   } else {
-    ALOGW(
-        "%s: Warning!! Symbols compute_surface_padding and "
-        "compute_fmt_aligned_width_and_height and "
-        "compute_aligned_width_and_height not found",
-        __FUNCTION__);
   }
 }
 
@@ -167,7 +160,6 @@ void AdrenoMemInfo::AlignCompressedRGB(int width, int height, int format, unsign
   } else {
     *aligned_w = (unsigned int)ALIGN(width, 32);
     *aligned_h = (unsigned int)ALIGN(height, 32);
-    ALOGW("%s: Warning!! compute_compressedfmt_aligned_width_and_height not found", __FUNCTION__);
   }
 }
 
@@ -292,7 +284,6 @@ ADRENOPIXELFORMAT AdrenoMemInfo::GetGpuPixelFormat(int hal_format) {
     case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR:
       return ADRENO_PIXELFORMAT_ASTC_12X12_SRGB;
     default:
-      ALOGE("%s: No map for format: 0x%x", __FUNCTION__, hal_format);
       break;
   }
 

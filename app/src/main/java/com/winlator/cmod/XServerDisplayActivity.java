@@ -17,7 +17,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 
-import android.util.Log;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -692,7 +691,6 @@ if (enableLogs) {
     @Override
     public void onResume() {
         super.onResume();
-        Log.w("Winlator_Diag", "onResume: nativeTouchProcessor=" + nativeTouchProcessor + " nativeTickRunnable=" + nativeTickRunnable);
         if (environment != null) {
             xServerView.onResume();
             xServerView.queueEvent(() -> xServerView.getRenderer().updateScene());
@@ -718,7 +716,6 @@ if (enableLogs) {
     @Override
     public void onPause() {
         super.onPause();
-        Log.w("Winlator_Diag", "onPause: nativeTouchProcessor=" + nativeTouchProcessor + " nativeTickRunnable=" + nativeTickRunnable);
         if (!isInPictureInPictureMode()) {
             if (environment != null) {
                 xServerView.onPause();
@@ -737,7 +734,6 @@ if (enableLogs) {
         }
     }
     public void onWineKeepaliveTimeout() {
-        Log.w(TAG, "Wine keepalive timeout - attempting full recovery");
         ProcessHelper.pauseAllWineProcesses();
         try { Thread.sleep(500); } catch (InterruptedException ignored) {}
         ProcessHelper.resumeAllWineProcesses();
@@ -803,7 +799,6 @@ if (enableLogs) {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        Log.w("Winlator_Diag", "onWindowFocusChanged: hasFocus=" + hasFocus + " nativeTouchProcessor=" + nativeTouchProcessor);
         if (hasFocus) {
             if (cursorLock) touchpadView.requestPointerCapture();
         } else {
@@ -1724,12 +1719,10 @@ private void applySidebarSettings() {
         }
     }
     private void showInputControls(ControlsProfile profile) {
-        Log.w("Winlator_Controls", "showInputControls: profile id="+profile.id+" name="+profile.getName()+" mouseMode="+profile.getMouseMode()+" touchMode="+profile.getInputMode()+" elements="+(profile.getElements()!=null?profile.getElements().size():0));
         inputControlsView.setShowTouchscreenControls(true);
         inputControlsView.setVisibility(View.VISIBLE);
         inputControlsView.requestFocus();
         inputControlsView.setProfile(profile);
-        Log.w("Winlator_Controls", "showInputControls: profile set");
 
         touchpadView.setProfile(profile);
         touchpadView.setSensitivity(profile.getCursorSpeed() * globalCursorSpeed);
@@ -1755,7 +1748,6 @@ private void applySidebarSettings() {
                 xServer.getRenderer() != null && xServer.getRenderer().isFullscreen());
             ct.applyToNativeConfig(nativeConfig);
             nativeTouchProcessor.init(nativeConfig);
-            Log.w("Winlator_Controls", "showInputControls: native touch processor init");
 
             // Start tick timer early (for long-press / double-tap timeouts)
             final int tickIntervalMs = 1000 / Math.max(preferences.getInt("native_tick_rate_hz", 60), 1);
@@ -1765,7 +1757,6 @@ private void applySidebarSettings() {
                         try {
                             inputControlsView.tick(SystemClock.uptimeMillis());
                         } catch (Exception e) {
-                            Log.e("Winlator_Controls", "tick: exception in tick loop", e);
                         }
                         if (handler != null) {
                             handler.postDelayed(nativeTickRunnable, tickIntervalMs);
@@ -1775,7 +1766,6 @@ private void applySidebarSettings() {
             }
             handler.removeCallbacks(nativeTickRunnable);
             handler.postDelayed(nativeTickRunnable, tickIntervalMs);
-            Log.w("Winlator_Controls", "showInputControls: tick started, interval="+tickIntervalMs+"ms");
 
             // Set elements immediately if view is already laid out
             if (inputControlsView.getWidth() > 0 && inputControlsView.getHeight() > 0) {
@@ -1799,7 +1789,6 @@ private void applySidebarSettings() {
                     doElementSetup(profile);
                 });
             }
-            Log.w("Winlator_Controls", "showInputControls: element setup posted");
         }
 
         inputControlsView.invalidate();
@@ -1812,20 +1801,17 @@ private void applySidebarSettings() {
                        xServer.screenInfo.width / 100;
         if (snapSize <= 0) snapSize = 10;
         inputControlsView.setSnappingSize(snapSize);
-        Log.w("Winlator_Controls", "doElementSetup: viewWidth="+viewWidth+" snapSize="+snapSize);
 
         if (!profile.isElementsLoaded()) {
             profile.loadElements(inputControlsView);
         }
 
         List<ControlElement> elements = profile.getElements();
-        Log.w("Winlator_Controls", "doElementSetup: element count from profile="+(elements!=null?elements.size():0));
 
         if (elements != null && !elements.isEmpty()) {
             TouchActivationMode actMode = profile.getTouchActivationMode();
             NativeTouchProcessor.NativeElement[] nativeElements =
                 NativeTouchProcessor.buildNativeElements(elements, actMode, profile);
-            Log.w("Winlator_Controls", "doElementSetup: buildNativeElements called, native elements="+nativeElements.length);
             nativeTouchProcessor.setElements(nativeElements);
         }
 
@@ -1835,7 +1821,6 @@ private void applySidebarSettings() {
     }
 
     private void hideInputControls() {
-        Log.w("Winlator_Diag", "hideInputControls: nativeTouchProcessor=" + nativeTouchProcessor);
         inputControlsView.setShowTouchscreenControls(true);
         inputControlsView.setVisibility(View.GONE);
         inputControlsView.setProfile(null);

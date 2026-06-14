@@ -206,27 +206,21 @@ namespace mapperextensions {
 namespace V1_1 {
 
 IQtiMapperExtensions::IQtiMapperExtensions() {
-  ALOGI("IQtiMapperExtensions shim active");
 
   hw_module_t const* module;
   if (hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &module)) {
-    ALOGE("Failed to open gralloc module!");
     std::terminate();
   }
 
   if (gralloc1_open(module, &gralloc)) {
-    ALOGE("Failed to open gralloc HAL!");
     std::terminate();
   }
 
   perform = reinterpret_cast<GRALLOC1_PFN_PERFORM>(
       gralloc->getFunction(gralloc, GRALLOC1_FUNCTION_PERFORM));
   if (!perform) {
-    ALOGE("Failed to get gralloc perform helper!");
     std::terminate();
   }
-
-  ALOGD("Opened gralloc1 HAL");
 }
 
 Return<sp<IQtiMapperExtensions>> IQtiMapperExtensions::castFrom(
@@ -243,7 +237,6 @@ Return<void> IQtiMapperExtensions::getRgbDataAddress(void* buffer, getRgbDataAdd
                  : Error::NONE;
   _hidl_cb(err, rgb_data);
 
-  ALOGV("%s: err: %d rgb_data: %p", __func__, err, rgb_data);
   return Void();
 }
 
@@ -255,7 +248,6 @@ Return<void> IQtiMapperExtensions::getInterlacedFlag(void* buffer, getInterlaced
                  ? Error::BAD_BUFFER
                  : Error::NONE;
   _hidl_cb(err, flag);
-  ALOGV("%s: err: %d flag: %d", __func__, err, flag);
   return Void();
 }
 Return<void> IQtiMapperExtensions::getFd(void* buffer, getFd_cb hidl_cb) {
@@ -267,7 +259,6 @@ Return<void> IQtiMapperExtensions::getFd(void* buffer, getFd_cb hidl_cb) {
     fd = hnd->fd;
   }
   hidl_cb(err, fd);
-  ALOGV("%s: fd: %d", __func__, fd);
   return Void();
 }
 
@@ -280,7 +271,6 @@ Return<void> IQtiMapperExtensions::getWidth(void* buffer, getWidth_cb hidl_cb) {
     width = hnd->width;
   }
   hidl_cb(err, width);
-  ALOGV("%s: width: %d", __func__, width);
   return Void();
 }
 
@@ -293,7 +283,6 @@ Return<void> IQtiMapperExtensions::getHeight(void* buffer, getHeight_cb hidl_cb)
     height = hnd->height;
   }
   hidl_cb(err, height);
-  ALOGV("%s: height: %d", __func__, height);
   return Void();
 }
 
@@ -307,7 +296,6 @@ Return<void> IQtiMapperExtensions::getFormat(void* buffer, getFormat_cb hidl_cb)
   }
   hidl_cb(err, format);
 
-  ALOGV("%s: format: %d", __func__, format);
   return Void();
 }
 
@@ -320,7 +308,6 @@ Return<void> IQtiMapperExtensions::getPrivateFlags(void* buffer, getPrivateFlags
     flags = hnd->flags;
   }
   hidl_cb(err, flags);
-  ALOGV("%s: flags: %d", __func__, flags);
   return Void();
 }
 
@@ -334,7 +321,6 @@ Return<void> IQtiMapperExtensions::getUnalignedWidth(void* buffer, getUnalignedW
   }
   hidl_cb(err, unaligned_width);
 
-  ALOGV("%s: unaligned_width: %u", __func__, unaligned_width);
   return Void();
 }
 
@@ -347,7 +333,6 @@ Return<void> IQtiMapperExtensions::getUnalignedHeight(void* buffer, getUnaligned
     unaligned_height = hnd->unaligned_height;
   }
   hidl_cb(err, unaligned_height);
-  ALOGV("%s: unaligned_height: %u", __func__, unaligned_height);
   return Void();
 }
 
@@ -360,7 +345,6 @@ Return<void> IQtiMapperExtensions::getLayerCount(void* buffer, getLayerCount_cb 
     layer_count = hnd->layer_count;
   }
   hidl_cb(err, layer_count);
-  ALOGV("%s: layer_count: %u", __func__, layer_count);
   return Void();
 }
 
@@ -373,7 +357,6 @@ Return<void> IQtiMapperExtensions::getId(void* buffer, getId_cb hidl_cb) {
     id = hnd->id;
   }
   hidl_cb(err, id);
-  ALOGV("%s: id: %" PRIu64, __func__, id);
   return Void();
 }
 
@@ -386,7 +369,6 @@ Return<void> IQtiMapperExtensions::getUsageFlags(void* buffer, getUsageFlags_cb 
     usage = hnd->usage;
   }
   hidl_cb(err, usage);
-  ALOGV("%s: usage: %" PRIu64, __func__, usage);
 
   return Void();
 }
@@ -400,7 +382,6 @@ Return<void> IQtiMapperExtensions::getSize(void* buffer, getSize_cb hidl_cb) {
     size = hnd->size;
   }
   hidl_cb(err, size);
-  ALOGV("%s: size: %u", __func__, size);
   return Void();
 }
 
@@ -413,7 +394,6 @@ Return<void> IQtiMapperExtensions::getOffset(void* buffer, getOffset_cb hidl_cb)
     offset = hnd->offset;
   }
   hidl_cb(err, offset);
-  ALOGV("%s: offset: %u", __func__, offset);
   return Void();
 }
 
@@ -444,7 +424,6 @@ Return<void> IQtiMapperExtensions::getFormatLayout(int32_t format, uint64_t usag
     gralloc::GetRGBPlaneInfo(info, custom_format, alignedw, alignedh, flags, &plane_count,
                              plane_layout);
   } else {
-    ALOGE("%s: unsupported format %d", __func__, format);
     err = Error::BAD_BUFFER;
     _hidl_cb(err, size, plane_info);
     return Void();

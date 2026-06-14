@@ -12,12 +12,10 @@
 #include <dlfcn.h>
 #include <sstream>
 #include <vector>
-#include <android/log.h>
-
-#define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, "OpenXR-Loader", __VA_ARGS__)
-#define ALOGW(...) __android_log_print(ANDROID_LOG_WARN, "OpenXR-Loader", __VA_ARGS__)
-#define ALOGV(...) __android_log_print(ANDROID_LOG_VERBOSE, "OpenXR-Loader", __VA_ARGS__)
-#define ALOGI(...) __android_log_print(ANDROID_LOG_INFO, "OpenXR-Loader", __VA_ARGS__)
+#define ALOGE(...) do {} while(0)
+#define ALOGW(...) do {} while(0)
+#define ALOGV(...) do {} while(0)
+#define ALOGI(...) do {} while(0)
 
 namespace openxr_android {
 using wrap::android::content::ContentUris;

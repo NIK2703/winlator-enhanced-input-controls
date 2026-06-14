@@ -37,7 +37,6 @@ static inline uint64_t calc_press_delay(int binding_delay, int non_mod_count) {
 
 static int schedule_action(TouchBinding binding, int action_type, uint64_t delay_from_now_ms) {
     if (g_state.scheduled_action_count >= MAX_SCHEDULED_ACTIONS) {
-        __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "schedule_action: overflow (type=%d)", action_type);
         return -1;
     }
     int idx = g_state.scheduled_action_count++;
@@ -63,7 +62,6 @@ static void release_modifiers_with_delay(TouchActionResult* restrict result, con
 
 void add_action(TouchActionResult* restrict r, ActionType type, int param0, int param1, int param2) {
     if (r->count >= (int)(sizeof(r->actions) / sizeof(r->actions[0]))) {
-        __android_log_print(ANDROID_LOG_WARN, "Winlator_Gesture", "add_action: buffer overflow (type=%d)", type);
         return;
     }
     r->actions[r->count].type = type;
@@ -141,10 +139,10 @@ void release_held_actions(TouchActionResult* restrict result) {
 
 static void release_non_modifiers_first(TouchActionResult* restrict result, const TouchBinding* actions, int count) {
     for (int i = count - 1; i >= 0; i--)
-        if (actions[i].type != BINDING_NONE && !is_modifier_binding(&actions[i]))
+        if (actions[i].type != BINDING_NONE && actions[i].modifiers == 0)
             release_binding(result, &actions[i]);
     for (int i = count - 1; i >= 0; i--)
-        if (actions[i].type != BINDING_NONE && is_modifier_binding(&actions[i]))
+        if (actions[i].type != BINDING_NONE && actions[i].modifiers != 0)
             release_binding(result, &actions[i]);
 }
 
@@ -214,34 +212,30 @@ static bool execute_hold_actions(TouchActionResult* restrict result, const Touch
 static void execute_tap_actions(TouchActionResult* restrict result, const TouchBinding* b,
                                 int non_mod_count, int binding_delay) {
     uint64_t press_delay = calc_press_delay(binding_delay, non_mod_count);
-    uint64_t release_delay = press_delay + binding_delay;
     if (is_gamepad_binding(b)) {
         int btn_idx = gamepad_button_index(b);
         if (binding_delay > 0) {
             schedule_action(*b, ACT_GAMEPAD_STATE, press_delay);
-            schedule_action(*b, ACT_GAMEPAD_RELEASE, release_delay);
         } else {
             add_action(result, ACT_GAMEPAD_STATE, btn_idx, 1, 0);
-            add_action(result, ACT_GAMEPAD_STATE, btn_idx, 0, 0);
         }
     } else if (is_keyboard_binding(b)) {
         if (binding_delay > 0) {
             schedule_action(*b, ACT_KEY_PRESS, press_delay);
-            schedule_action(*b, ACT_KEY_RELEASE, release_delay);
         } else {
             add_action(result, ACT_KEY_PRESS, b->keycode, 1, 0);
-            add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0);
         }
     } else if (is_mouse_button_binding(b)) {
         int btn = pointer_button_idx(b);
         if (binding_delay > 0) {
             schedule_action(*b, ACT_POINTER_BUTTON_PRESS, press_delay);
-            schedule_action(*b, ACT_POINTER_BUTTON_RELEASE, release_delay);
         } else {
             add_action(result, ACT_POINTER_BUTTON_PRESS, btn, 0, 0);
-            add_action(result, ACT_POINTER_BUTTON_RELEASE, btn, 0, 0);
         }
     }
+    if (g_state.gesture_held_count < MAX_HELD_ACTIONS)
+        g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
+    g_state.gesture_is_action_held = true;
 }
 
 static void execute_actions_impl(TouchActionResult* restrict result, const TouchBinding* restrict actions, int count, bool force_hold) {

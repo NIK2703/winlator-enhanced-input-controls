@@ -8,9 +8,8 @@
 #endif
 
 #ifdef ANDROID
-#include <android/log.h>
-#define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, "OpenXR", __VA_ARGS__);
-#define ALOGV(...) __android_log_print(ANDROID_LOG_VERBOSE, "OpenXR", __VA_ARGS__);
+#define ALOGE(...) do {} while(0)
+#define ALOGV(...) do {} while(0)
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -19,8 +18,8 @@
 #define XR_USE_GRAPHICS_API_OPENGL_ES 1
 #else
 #include <cstdio>
-#define ALOGE(...) printf(__VA_ARGS__)
-#define ALOGV(...) printf(__VA_ARGS__)
+#define ALOGE(...) do {} while(0)
+#define ALOGV(...) do {} while(0)
 #endif
 
 #include <openxr/openxr.h>

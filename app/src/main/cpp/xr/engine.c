@@ -82,7 +82,6 @@ void XrEngineInit(struct XrEngine* engine, void* system, const char* name, int v
     OXR(result = xrCreateInstance(&instance_info, &engine->Instance));
     if (result != XR_SUCCESS)
     {
-        ALOGE("Failed to create XR instance: %d", (int)result);
         exit(1);
     }
 
@@ -90,10 +89,6 @@ void XrEngineInit(struct XrEngine* engine, void* system, const char* name, int v
     instance_properties.type = XR_TYPE_INSTANCE_PROPERTIES;
     instance_properties.next = NULL;
     OXR(xrGetInstanceProperties(engine->Instance, &instance_properties));
-    ALOGV("Runtime %s: Version : %d.%d.%d", instance_properties.runtimeName,
-          XR_VERSION_MAJOR(instance_properties.runtimeVersion),
-          XR_VERSION_MINOR(instance_properties.runtimeVersion),
-          XR_VERSION_PATCH(instance_properties.runtimeVersion));
 
     XrSystemGetInfo system_info;
     memset(&system_info, 0, sizeof(system_info));
@@ -104,7 +99,6 @@ void XrEngineInit(struct XrEngine* engine, void* system, const char* name, int v
     OXR(result = xrGetSystem(engine->Instance, &system_info, &engine->SystemId));
     if (result != XR_SUCCESS)
     {
-        ALOGE("Failed to get system");
         exit(1);
     }
 
@@ -137,7 +131,6 @@ void XrEngineEnter(struct XrEngine* engine)
 {
     if (engine->Session)
     {
-        ALOGE("EnterXR called with existing session");
         return;
     }
 
@@ -160,7 +153,6 @@ void XrEngineEnter(struct XrEngine* engine)
     OXR(result = xrCreateSession(engine->Instance, &session_info, &engine->Session));
     if (result != XR_SUCCESS)
     {
-        ALOGE("Failed to create XR session: %d", (int)result);
         exit(1);
     }
 

@@ -146,8 +146,6 @@ void XrRendererGetResolution(struct XrEngine* engine, struct XrRenderer* rendere
         {
             const XrViewConfigurationType viewport_config_type = viewport_configs[i];
 
-            ALOGV("Viewport configuration type %d", (int)viewport_config_type);
-
             XrViewConfigurationProperties viewport_config;
             viewport_config.type = XR_TYPE_VIEW_CONFIGURATION_PROPERTIES;
             OXR(xrGetViewConfigurationProperties(engine->Instance, engine->SystemId,
@@ -185,7 +183,6 @@ void XrRendererGetResolution(struct XrEngine* engine, struct XrRenderer* rendere
             }
             else
             {
-                ALOGE("Empty viewport configuration");
             }
         }
 
@@ -460,7 +457,6 @@ void XrRendererRecenter(struct XrEngine* engine, struct XrRenderer* renderer)
         space_info.poseInReferenceSpace.position.y = -1.6750f;
     }
     OXR(xrCreateReferenceSpace(engine->Session, &space_info, &engine->FakeSpace));
-    ALOGV("Created fake stage space from local space with offset");
     engine->CurrentSpace = engine->FakeSpace;
 
     if (renderer->StageSupported)
@@ -469,7 +465,6 @@ void XrRendererRecenter(struct XrEngine* engine, struct XrRenderer* renderer)
         memset(&space_info.poseInReferenceSpace, 0, sizeof(XrPosef));
         space_info.poseInReferenceSpace.orientation.w = 1.0;
         OXR(xrCreateReferenceSpace(engine->Session, &space_info, &engine->StageSpace));
-        ALOGV("Created stage space");
         if (engine->PlatformFlag[PLATFORM_TRACKING_FLOOR])
         {
             engine->CurrentSpace = engine->StageSpace;
@@ -495,7 +490,6 @@ void XrRendererHandleSessionStateChanges(struct XrEngine* engine, struct XrRende
         XrResult result;
         OXR(result = xrBeginSession(engine->Session, &session_begin_info));
         renderer->SessionActive = (result == XR_SUCCESS);
-        ALOGV("Session active = %d", renderer->SessionActive);
 
 #ifdef ANDROID
         if (renderer->SessionActive && engine->PlatformFlag[PLATFORM_EXTENSION_PERFORMANCE])
@@ -550,18 +544,14 @@ void XrRendererHandleXrEvents(struct XrEngine* engine, struct XrRenderer* render
         switch (base_event_handler->type)
         {
             case XR_TYPE_EVENT_DATA_EVENTS_LOST:
-                ALOGV("xrPollEvent: received XR_TYPE_EVENT_DATA_EVENTS_LOST");
                 break;
             case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
             {
                 const XrEventDataInstanceLossPending* instance_loss_pending_event =
                         (XrEventDataInstanceLossPending*)(base_event_handler);
-                ALOGV("xrPollEvent: received XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING: time %lf",
-                      FromXrTime(instance_loss_pending_event->lossTime));
             }
                 break;
             case XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED:
-                ALOGV("xrPollEvent: received XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED");
                 break;
             case XR_TYPE_EVENT_DATA_PERF_SETTINGS_EXT:
                 break;
@@ -590,7 +580,6 @@ void XrRendererHandleXrEvents(struct XrEngine* engine, struct XrRenderer* render
                 break;
             }
             default:
-                ALOGV("xrPollEvent: Unknown event");
                 break;
         }
     }

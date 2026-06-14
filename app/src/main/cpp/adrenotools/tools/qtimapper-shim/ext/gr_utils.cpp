@@ -141,7 +141,6 @@ uint32_t GetBppForUncompressedRGB(int format) {
       bpp = 2;
       break;
     default:
-      ALOGE("Error : %s New format request = 0x%x", __FUNCTION__, format);
       break;
   }
 
@@ -190,12 +189,10 @@ uint32_t GetDataAlignment(int format, uint64_t usage) {
 bool IsGPUFlagSupported(uint64_t usage) {
   bool ret = true;
   if ((usage & BufferUsage::GPU_MIPMAP_COMPLETE)) {
-    ALOGE("GPU_MIPMAP_COMPLETE not supported");
     ret = false;
   }
 
   if ((usage & BufferUsage::GPU_CUBE_MAP)) {
-    ALOGE("GPU_CUBE_MAP not supported");
     ret = false;
   }
 
@@ -211,7 +208,6 @@ unsigned int GetSize(const BufferInfo& info, unsigned int alignedw, unsigned int
   uint64_t usage = info.usage;
 
   if (!IsGPUFlagSupported(usage)) {
-    ALOGE("Unsupported GPU usage flags present 0x%" PRIx64, usage);
     return 0;
   }
 
@@ -251,7 +247,6 @@ unsigned int GetSize(const BufferInfo& info, unsigned int alignedw, unsigned int
         break;
       case HAL_PIXEL_FORMAT_YV12:
         if ((format == HAL_PIXEL_FORMAT_YV12) && ((width & 1) || (height & 1))) {
-          ALOGE("w or h is odd for the YV12 format");
           return 0;
         }
         size = alignedw * alignedh + (ALIGN(alignedw / 2, 16) * (alignedh / 2)) * 2;
@@ -270,7 +265,6 @@ unsigned int GetSize(const BufferInfo& info, unsigned int alignedw, unsigned int
       case HAL_PIXEL_FORMAT_YCrCb_422_I:
       case HAL_PIXEL_FORMAT_CbYCrY_422_I:
         if (width & 1) {
-          ALOGE("width is odd for the YUV422_SP format");
           return 0;
         }
         size = ALIGN(alignedw * alignedh * 2, SIZE_4K);
@@ -278,7 +272,6 @@ unsigned int GetSize(const BufferInfo& info, unsigned int alignedw, unsigned int
       case HAL_PIXEL_FORMAT_BLOB:
       case HAL_PIXEL_FORMAT_RAW_OPAQUE:
         if (height != 1) {
-          ALOGE("%s: Buffers with HAL_PIXEL_FORMAT_BLOB must have height 1 ", __FUNCTION__);
           return 0;
         }
         size = (unsigned int)width;
@@ -287,7 +280,6 @@ unsigned int GetSize(const BufferInfo& info, unsigned int alignedw, unsigned int
         size = ALIGN((alignedw * alignedh) + (alignedw * alignedh) / 2, SIZE_4K);
         break;
       default:
-        ALOGE("%s: Unrecognized pixel format: 0x%x", __FUNCTION__, format);
         return 0;
     }
   }
@@ -402,7 +394,6 @@ void GetRgbUBwcBlockSize(uint32_t bpp, int* block_width, int* block_height) {
       *block_height = 4;
       break;
     default:
-      ALOGE("%s: Unsupported bpp: %d", __FUNCTION__, bpp);
       break;
   }
 }
@@ -414,7 +405,6 @@ unsigned int GetRgbUBwcMetaBufferSize(int width, int height, uint32_t bpp) {
 
   GetRgbUBwcBlockSize(bpp, &block_width, &block_height);
   if (!block_width || !block_height) {
-    ALOGE("%s: Unsupported bpp: %d", __FUNCTION__, bpp);
     return size;
   }
 
@@ -445,7 +435,6 @@ unsigned int GetUBwcSize(int width, int height, int format, unsigned int aligned
       size += GetRgbUBwcMetaBufferSize(width, height, bpp);
       break;
     default:
-      ALOGE("%s: Unsupported pixel format: 0x%x", __FUNCTION__, format);
       break;
   }
 
@@ -468,7 +457,6 @@ unsigned int GetRgbMetaSize(int format, uint32_t width, uint32_t height, uint64_
       meta_size = GetRgbUBwcMetaBufferSize(width, height, bpp);
       break;
     default:
-      ALOGE("%s:Unsupported RGB format: 0x%x", __FUNCTION__, format);
       break;
   }
   return meta_size;

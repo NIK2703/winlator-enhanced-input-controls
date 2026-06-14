@@ -9,7 +9,6 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 
 public class FakeInputWriter {
-    private static final String TAG = "FakeInputWriter";
     private static final int EVENT_SIZE = 24;
     private static final int MAX_EVENTS_PER_UPDATE = 40; // Buttons (10*2) + axes (8) + triggers (2) + hat (2) + sync = 33 max
     private static final int BUFFER_SIZE = EVENT_SIZE * MAX_EVENTS_PER_UPDATE;
@@ -168,10 +167,8 @@ public class FakeInputWriter {
                 channel.write(buffer);
                 long writeElapsedUs = (System.nanoTime() - writeStart) / 1000;
                 if (writeElapsedUs > 5000) {
-                    android.util.Log.e("DIAG_FAKEINPUT", "SLOW WRITE " + writeElapsedUs + "us");
                 }
             } catch (IOException e) {
-                android.util.Log.e("DIAG_FAKEINPUT", "WRITE FAILED: " + e.getMessage());
             }
         }
     }
@@ -282,10 +279,8 @@ public class FakeInputWriter {
                 channel.write(buffer);
                 long writeElapsedUs = (System.nanoTime() - writeStart) / 1000;
                 if (writeElapsedUs > 5000) {
-                    android.util.Log.e("DIAG_FAKEINPUT", "SLOW GAMEPAD WRITE " + writeElapsedUs + "us");
                 }
             } catch (IOException e) {
-                android.util.Log.e("DIAG_FAKEINPUT", "GAMEPAD WRITE FAILED: " + e.getMessage());
                 resetPrevState();
                 close();
             }

@@ -46,7 +46,6 @@ public class XClientRequestHandler implements RequestHandler {
             long now = System.currentTimeMillis();
             if (diagLastRequestLogMs == 0) diagLastRequestLogMs = now;
             if (now - diagLastRequestLogMs >= 5000) {
-                android.util.Log.e("DIAG_X11", "requests=" + diagRequestCount + " interval=" + (now - diagLastRequestLogMs) + "ms");
                 diagLastRequestLogMs = now;
             }
             return result;

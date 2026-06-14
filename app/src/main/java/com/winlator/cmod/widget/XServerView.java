@@ -95,7 +95,6 @@ public class XServerView extends SurfaceView implements SurfaceHolder.Callback {
                     eventExecutor.shutdownNow();
                     eventExecutor = createEventExecutor();
                     eventExecutorHung = false;
-                    android.util.Log.w("XServerView", "eventExecutor restarted after hang");
                 }
             }
         }
@@ -104,7 +103,6 @@ public class XServerView extends SurfaceView implements SurfaceHolder.Callback {
                 try {
                     r.run();
                 } catch (Exception e) {
-                    android.util.Log.e("XServerView", "queueEvent task failed", e);
                 }
             });
         } catch (java.util.concurrent.RejectedExecutionException e) {
@@ -130,7 +128,6 @@ public class XServerView extends SurfaceView implements SurfaceHolder.Callback {
             }
             eventExecutor = createEventExecutor();
             eventExecutorHung = false;
-            android.util.Log.w("XServerView", "eventExecutor restarted by watchdog");
         }
     }
 

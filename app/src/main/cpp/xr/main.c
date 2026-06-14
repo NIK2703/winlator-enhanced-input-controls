@@ -33,7 +33,6 @@ void GLCheckErrors(const char* file, int line) {
 		if (error == GL_NO_ERROR) {
 			break;
 		}
-		ALOGE("OpenGL error on line %s:%d %d", file, line, error);
 	}
 }
 
@@ -41,7 +40,6 @@ void OXRCheckErrors(XrResult result, const char* file, int line) {
 	if (XR_FAILED(result)) {
 		char errorBuffer[XR_MAX_RESULT_STRING_SIZE];
 		xrResultToString(xr_module_engine.Instance, result, errorBuffer);
-        ALOGE("OpenXR error on line %s:%d %s", file, line, errorBuffer);
 	}
 }
 #endif
@@ -69,7 +67,6 @@ JNIEXPORT void JNICALL Java_com_winlator_XrActivity_init(JNIEnv *env, jobject ob
     XrInputInit(&xr_module_engine, &xr_module_input);
     XrRendererInit(&xr_module_engine, &xr_module_renderer);
     xr_initialized = true;
-    ALOGV("Init called");
 }
 
 JNIEXPORT void JNICALL Java_com_winlator_XrActivity_bindFramebuffer(JNIEnv *env, jobject obj) {
