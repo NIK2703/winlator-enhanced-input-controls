@@ -48,6 +48,14 @@ public class BindPackage {
         return Collections.unmodifiableList(bindings);
     }
 
+    public void clear() {
+        bindings.clear();
+        stickyFlags.clear();
+        toggleSwitch = false;
+        autoRepeat = false;
+        autoRepeatIntervalMs = 300;
+    }
+
     public List<Boolean> getStickyFlags() {
         return Collections.unmodifiableList(stickyFlags);
     }
@@ -76,13 +84,6 @@ public class BindPackage {
         return true;
     }
 
-    public void clear() {
-        bindings.clear();
-        stickyFlags.clear();
-        this.toggleSwitch = false;
-        this.autoRepeat = false;
-        this.autoRepeatIntervalMs = 300;
-    }
 
     public void add(Bind binding) {
         bindings.add(binding);

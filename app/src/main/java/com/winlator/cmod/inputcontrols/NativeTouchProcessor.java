@@ -157,6 +157,15 @@ public class NativeTouchProcessor {
         public int colorSecondary = 0xFF0277BD;
         public float strokeWidthDefault = 0.2f;
         public int fillAlphaInactiveDefault = 50;
+
+        // Scroll mode bindings — 5 drag gestures × 4 directions
+        // Indexed: [gesture_slot][direction], gesture_slot: 0=Sd,1=Ld,2=Dd,3=Sd2,4=Dd2
+        // Direction: 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT
+        public int[][] scrollBindingsUp = new int[5][];
+        public int[][] scrollBindingsDown = new int[5][];
+        public int[][] scrollBindingsLeft = new int[5][];
+        public int[][] scrollBindingsRight = new int[5][];
+        public int scrollThresholdPx = 20;
     }
 
     public static class NativeElement {
@@ -495,6 +504,28 @@ public class NativeTouchProcessor {
         c.colorSecondary = 0xFF0277BD;
         c.strokeWidthDefault = profile.getStrokeWidth();
         c.fillAlphaInactiveDefault = profile.getFillAlphaInactive();
+
+        // Scroll mode bindings
+        c.scrollThresholdPx = profile.getScrollThreshold();
+        String[] dirKeys = {"up", "down", "left", "right"};
+        String[] slotKeys = {"Sd", "Ld", "Dd", "Sd2", "Dd2"};
+        StringBuilder sb = new StringBuilder();
+        sb.append("buildNativeConfig scroll: thresh=").append(c.scrollThresholdPx);
+        for (int s = 0; s < 5; s++) {
+            c.scrollBindingsUp[s] = profile.getScrollBinding(s, 0).encode();
+            c.scrollBindingsDown[s] = profile.getScrollBinding(s, 1).encode();
+            c.scrollBindingsLeft[s] = profile.getScrollBinding(s, 2).encode();
+            c.scrollBindingsRight[s] = profile.getScrollBinding(s, 3).encode();
+            int total = c.scrollBindingsUp[s].length + c.scrollBindingsDown[s].length
+                      + c.scrollBindingsLeft[s].length + c.scrollBindingsRight[s].length;
+            if (total > 0) {
+                sb.append(" | ").append(slotKeys[s]).append(":U=").append(c.scrollBindingsUp[s].length)
+                  .append(" D=").append(c.scrollBindingsDown[s].length)
+                  .append(" L=").append(c.scrollBindingsLeft[s].length)
+                  .append(" R=").append(c.scrollBindingsRight[s].length);
+            }
+        }
+        android.util.Log.d("ScrollDbg", sb.toString());
 
         return c;
     }

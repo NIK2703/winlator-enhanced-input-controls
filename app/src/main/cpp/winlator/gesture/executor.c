@@ -255,8 +255,15 @@ static void execute_tap_actions(TouchActionResult* restrict result, const TouchB
 }
 
 static void execute_actions_impl(TouchActionResult* restrict result, const TouchBinding* restrict actions, int count, bool force_hold) {
-    if (g_state.passthrough_active) return;
-    if (count == 0) return;
+    if (g_state.passthrough_active) {
+        __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "execute_actions: BLOCKED passthrough_active");
+        return;
+    }
+    if (count == 0) {
+        __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "execute_actions: BLOCKED count=0");
+        return;
+    }
+    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "execute_actions: count=%d type[0]=%d keycode[0]=%d", count, actions[0].type, actions[0].keycode);
 
     int binding_delay = g_state.cfg.binding_delay_ms;
 
@@ -275,8 +282,14 @@ static void execute_actions_impl(TouchActionResult* restrict result, const Touch
         const TouchBinding* b = &actions[i];
         if (b->type == BINDING_NONE) continue;
         if (is_modifier_binding(b)) continue;
-        if (b->type == BINDING_MOUSE_SCROLL_UP || b->type == BINDING_MOUSE_SCROLL_DOWN) continue;
         if (is_mouse_move_binding(b)) continue;
+
+        // Scroll bindings: fire as tap (press+release) directly
+        if (b->type == BINDING_MOUSE_SCROLL_UP || b->type == BINDING_MOUSE_SCROLL_DOWN) {
+            press_binding(result, b, false);
+            non_mod_count++;
+            continue;
+        }
 
         // Toggle switch: press on first activation, release on second
         if (b->toggle) {

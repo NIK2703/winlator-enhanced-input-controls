@@ -209,6 +209,13 @@ struct CachedFieldIDs {
     jfieldID colorSecondary;
     jfieldID strokeWidthDefault;
     jfieldID fillAlphaInactiveDefault;
+
+    // Scroll mode binding fields
+    jfieldID scrollBindingsUp;
+    jfieldID scrollBindingsDown;
+    jfieldID scrollBindingsLeft;
+    jfieldID scrollBindingsRight;
+    jfieldID scrollThresholdPx;
 };
 
 #define JNI_CHECK(env, msg) do { \
@@ -570,6 +577,29 @@ static void read_config_from_java(JNIEnv* env, jobject config, TouchProcessorCon
     c->color_secondary = (uint32_t)env->GetIntField(config, g_config.colorSecondary);
     c->stroke_width_default = env->GetFloatField(config, g_config.strokeWidthDefault);
     c->fill_alpha_inactive_default = env->GetIntField(config, g_config.fillAlphaInactiveDefault);
+
+    // Read scroll mode bindings: 5 gestures × 4 directions
+    c->scroll_threshold_px = env->GetIntField(config, g_config.scrollThresholdPx);
+    struct { jfieldID fid; int dir; } scroll_dirs[] = {
+        { g_config.scrollBindingsUp, SCROLL_DIR_UP },
+        { g_config.scrollBindingsDown, SCROLL_DIR_DOWN },
+        { g_config.scrollBindingsLeft, SCROLL_DIR_LEFT },
+        { g_config.scrollBindingsRight, SCROLL_DIR_RIGHT },
+    };
+    for (int d = 0; d < 4; d++) {
+        jobjectArray dirArray = (jobjectArray)env->GetObjectField(config, scroll_dirs[d].fid);
+        if (!dirArray) continue;
+        jsize len = env->GetArrayLength(dirArray);
+        for (int s = 0; s < len && s < 5; s++) {
+            jintArray gestureArr = (jintArray)env->GetObjectArrayElement(dirArray, s);
+            if (gestureArr) {
+                c->scroll_bindings[s].dirs[scroll_dirs[d].dir].count =
+                    read_binding_list(env, gestureArr, c->scroll_bindings[s].dirs[scroll_dirs[d].dir].arr, 8);
+                env->DeleteLocalRef(gestureArr);
+            }
+        }
+        env->DeleteLocalRef(dirArray);
+    }
 }
 
 static void cache_config_field_ids(JNIEnv* env, jobject config) {
@@ -642,6 +672,18 @@ static void cache_config_field_ids(JNIEnv* env, jobject config) {
     for (int i = 0; i < (int)(sizeof(render_fields)/sizeof(render_fields[0])); i++) {
         *render_fields[i].dst = env->GetFieldID(cls, render_fields[i].name, render_fields[i].sig);
         JNI_CHECK(env, render_fields[i].name);
+    }
+
+    struct { jfieldID* dst; const char* name; const char* sig; } scroll_fields[] = {
+        { &g_config.scrollBindingsUp, "scrollBindingsUp", "[[I" },
+        { &g_config.scrollBindingsDown, "scrollBindingsDown", "[[I" },
+        { &g_config.scrollBindingsLeft, "scrollBindingsLeft", "[[I" },
+        { &g_config.scrollBindingsRight, "scrollBindingsRight", "[[I" },
+        { &g_config.scrollThresholdPx, "scrollThresholdPx", "I" },
+    };
+    for (int i = 0; i < (int)(sizeof(scroll_fields)/sizeof(scroll_fields[0])); i++) {
+        *scroll_fields[i].dst = env->GetFieldID(cls, scroll_fields[i].name, scroll_fields[i].sig);
+        JNI_CHECK(env, scroll_fields[i].name);
     }
 
     struct { jfieldID* dst; const char* name; } stickies[] = {

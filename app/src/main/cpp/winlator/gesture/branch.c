@@ -669,6 +669,66 @@ static void up_prelude_second_finger(TouchFinger* f,
 }
 
 // =========================================================================
+// SCROLL MODE — processes finger movement when in scroll mode
+// =========================================================================
+
+// Determine which direction has dominant accumulated movement and fire its binding
+static void scroll_mode_process(TouchFinger* f, TouchActionResult* restrict result) {
+    float dx = f->x - f->scroll_origin_x;
+    float dy = f->y - f->scroll_origin_y;
+    float adx = fabsf(dx);
+    float ady = fabsf(dy);
+
+    // Determine dominant direction
+    int dir = -1;
+    float dominant = 0.0f;
+    if (ady > adx && ady > 0.0f) {
+        dir = (dy < 0.0f) ? SCROLL_DIR_UP : SCROLL_DIR_DOWN;
+        dominant = ady;
+    } else if (adx > 0.0f) {
+        dir = (dx < 0.0f) ? SCROLL_DIR_LEFT : SCROLL_DIR_RIGHT;
+        dominant = adx;
+    }
+
+    if (dir < 0) {
+        __android_log_print(ANDROID_LOG_VERBOSE, "ScrollDbg", "scroll_process: NO MOVEMENT dx=%.1f dy=%.1f", dx, dy);
+        return;
+    }
+
+    float threshold = (float)g_state.cfg.scroll_threshold_px;
+    int si = f->scroll_gesture_index;
+    if (si < 0 || si >= 5) {
+        __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "scroll_process: BAD slot=%d", si);
+        return;
+    }
+
+    const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[dir];
+
+    // Accumulate distance in the dominant axis
+    f->scroll_accum[dir] += dominant;
+
+    static const char* dir_names[] = {"UP", "DOWN", "LEFT", "RIGHT"};
+
+    // Reset origin to current position for incremental accumulation
+    f->scroll_origin_x = f->x;
+    f->scroll_origin_y = f->y;
+
+    // Fire binding when threshold is reached
+    if (f->scroll_accum[dir] >= threshold && slot->count > 0) {
+        f->scroll_accum[dir] -= threshold;
+        int before = result->count;
+        execute_actions(result, slot->arr, slot->count);
+        __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL FIRE dir=%s slot=%d result_count=%d->%d",
+            dir_names[dir], si, before, result->count);
+    }
+}
+
+static void handle_move_scroll_mode(TouchFinger* f, GestureFingerCtx* ctx,
+                                     TouchActionResult* restrict result, uint64_t time_ms) {
+    scroll_mode_process(f, result);
+}
+
+// =========================================================================
 // MOVE HELPERS
 // =========================================================================
 
@@ -766,7 +826,9 @@ static bool move_handle_gates(TouchFinger* f, GestureFingerCtx* ctx,
     if (slot->is_second_finger && g_state.gesture_is_action_held) {
         int effective_second_drag_count = g_state.cfg.is_tp
             ? g_state.cfg.tp[slot->tp_drag].count : xd_cnt;
-        if (!effective_second_drag_count) {
+        bool has_scroll = g_state.cfg.caps_has_scroll_bindings
+            && gesture_has_scroll_bindings(slot->bindings_drag);
+        if (!effective_second_drag_count && !has_scroll) {
             ctx->pending_double.count = 0;
             start_drag_no_binding(f, result);
             return false;
@@ -835,7 +897,8 @@ static void handle_down(TouchFinger* f, GestureFingerCtx* ctx,
 
     reset_finger_ctx(ctx, f->is_second_finger);
 
-    if (!current_mode_has_gestures() && !g_state.gesture_double_tap_waiting) {
+    if (!current_mode_has_gestures() && !g_state.gesture_double_tap_waiting
+        && !g_state.cfg.caps_has_scroll_bindings) {
         f->state = GESTURE_STATE_IDLE;
         return;
     }
@@ -863,8 +926,6 @@ static void handle_down(TouchFinger* f, GestureFingerCtx* ctx,
                && resolved.non_drag_count > 0
                && !plan.pulse_on_up && !plan.press_on_drag
                && !g_state.gesture_is_action_held) {
-        // TP mode, S2-only (no Sd2, no D2 competition): execute S2 on
-        // finger-down as hold, release on finger-up via cleanup_second_finger.
         execute_actions_hold(result, resolved.non_drag, resolved.non_drag_count);
     } else {
     }
@@ -950,6 +1011,11 @@ static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
                         TouchActionResult* restrict result, uint64_t time_ms,
                         float dx, float dy)
 {
+    // If already in scroll mode, just process scroll movement
+    if (f->scroll_mode) {
+        handle_move_scroll_mode(f, ctx, result, time_ms);
+        return;
+    }
 
     MoveContext mc;
     if (!handle_move_resolve(f, ctx, result, &dx, &dy, &mc))
@@ -961,14 +1027,36 @@ static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
     }
     if (mc.is_d_slot) f->single_tap_hold_delay_ms = 0;
 
+    // Scroll mode: a variant of the drag gesture.
+    // Goes through the SAME mode-binding checks and exclusion gates as normal drag.
+    // Only diverges at execution: scroll_mode_enter instead of execute_actions_hold(drag).
+    bool scroll_for_slot = g_state.cfg.is_ts && g_state.cfg.caps_has_scroll_bindings
+        && gesture_has_scroll_bindings(mc.slot->bindings_drag);
+
     if (!current_mode_has_gesture(mc.slot->bindings_non_drag)
-        && !current_mode_has_gesture(mc.slot->bindings_drag)) {
+        && !current_mode_has_gesture(mc.slot->bindings_drag)
+        && !scroll_for_slot) {
         start_drag_no_binding(f, result);
         return;
     }
 
     if (!move_handle_gates(f, ctx, mc.slot, mc.is_d_slot, mc.resolved.drag_count, result))
         return;
+
+    // SCROLL MODE: enters after the same gates as normal drag.
+    // For two-finger gestures, scroll tracking is on the FIRST finger (the one
+    // already down), not the second finger (the trigger).
+    if (scroll_for_slot) {
+        TouchFinger* scroll_finger = f;
+        if (mc.slot->is_second_finger) {
+            TouchFinger* main = find_finger(g_state.gesture_main_ptr_id);
+            if (main && main->active) scroll_finger = main;
+        }
+        release_held_actions(result);
+        scroll_mode_enter(scroll_finger, mc.slot->bindings_drag);
+        start_drag_no_binding(f, result);
+        return;
+    }
 
     const TouchBinding* drag_binding = NULL; int drag_count = 0;
     const DragResolveParams drag_params = {
@@ -993,6 +1081,26 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
                       TouchActionResult* restrict result, uint64_t time_ms)
 {
     g_state.gesture_is_down_event = false;
+
+    // Exit scroll mode if active on this finger
+    if (f->scroll_mode) {
+        scroll_mode_exit(f, result);
+        release_held_actions(result);
+        f->state = GESTURE_STATE_IDLE;
+        cleanup_main_finger(f, ctx);
+        return;
+    }
+
+    // For second-finger gestures, scroll mode is on the FIRST finger.
+    // When the second finger goes up, exit scroll mode on the first finger.
+    if (f->is_second_finger && g_state.gesture_main_ptr_id >= 0) {
+        TouchFinger* main = find_finger(g_state.gesture_main_ptr_id);
+        if (main && main->scroll_mode) {
+            scroll_mode_exit(main, result);
+            release_held_actions(result);
+        }
+    }
+
     f->tap_up_x = f->x;
     f->tap_up_y = f->y;
 

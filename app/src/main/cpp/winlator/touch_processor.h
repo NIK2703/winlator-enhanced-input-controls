@@ -89,6 +89,18 @@ typedef struct {
     const TouchBinding* double_drag_2nd;    int double_drag_2nd_count;
 } GestureModeBindings;
 
+// Scroll mode direction indices
+#define SCROLL_DIR_UP    0
+#define SCROLL_DIR_DOWN  1
+#define SCROLL_DIR_LEFT  2
+#define SCROLL_DIR_RIGHT 3
+#define SCROLL_DIR_COUNT 4
+
+// Per-gesture scroll bindings (up/down/left/right)
+typedef struct {
+    GestureBindingSlot dirs[SCROLL_DIR_COUNT];
+} ScrollGestureBindings;
+
 // --- Element types ---
 typedef enum {
     ELEM_BUTTON, ELEM_DPAD, ELEM_RANGE_BUTTON, ELEM_STICK, ELEM_TRACKPAD
@@ -291,6 +303,22 @@ typedef struct {
     // Once set, all subsequent gesture/long-press triggers on ANY
     // button are blocked until the finger lifts.
     bool gesture_activated_in_touch;
+
+    // Scroll mode state (for drag gestures with scroll bindings)
+    bool scroll_mode;
+    float scroll_origin_x;
+    float scroll_origin_y;
+    float scroll_accum[SCROLL_DIR_COUNT]; // accumulated distance per direction
+    int scroll_active_dir;                 // currently firing direction (-1 = none)
+    int scroll_gesture_index;              // which drag gesture's scroll bindings to use
+
+    // Pending scroll mode resume (saved when second finger interrupts scroll mode)
+    bool pending_scroll_mode;
+    float pending_scroll_origin_x;
+    float pending_scroll_origin_y;
+    float pending_scroll_accum[SCROLL_DIR_COUNT];
+    int pending_scroll_active_dir;
+    int pending_scroll_gesture_index;
 } TouchFinger;
 
 typedef enum {
@@ -339,6 +367,10 @@ typedef struct {
     GestureBindingSlot tp[GESTURE_TYPE_COUNT];
     uint32_t bindings_generation;
 
+    // Scroll mode bindings — indexed by drag gesture slot (0=Sd, 1=Ld, 2=Dd, 3=Sd2, 4=Dd2)
+    ScrollGestureBindings scroll_bindings[5];
+    int scroll_threshold_px;  // distance in pixels to trigger a scroll binding fire
+
     // Render config (shared across all elements)
     uint32_t color_primary;       // default 0xFFFFFFFF (white)
     uint32_t color_secondary;     // default 0xFF0277BD (blue)
@@ -362,6 +394,7 @@ typedef struct {
     bool caps_has_auto_repeat_buttons;   // true if any button has auto_repeat binding
     bool caps_has_mouse_left_element;    // true if any element has BINDING_MOUSE_LEFT as first binding
     bool caps_has_passthrough_elements;  // true if any element has passthrough_touch
+    bool caps_has_scroll_bindings;       // true if any drag gesture has scroll mode bindings
 
     // Per-mode gesture type presence bitmasks (bit i set iff GestureType i has bindings in that mode)
     // Enables O(1) tests like: if (caps_ts_mask & GESTURE_MASK(GESTURE_LONG_PRESS)) ...
@@ -409,6 +442,18 @@ static inline void compute_gesture_caps(TouchProcessorConfig* cfg) {
 
     cfg->is_ts = (cfg->touch_mode == TOUCH_MODE_TOUCHSCREEN);
     cfg->is_tp = (cfg->touch_mode == TOUCH_MODE_TOUCHPAD);
+
+    // Check if any drag gesture has scroll mode bindings
+    cfg->caps_has_scroll_bindings = false;
+    for (int s = 0; s < 5; s++) {
+        for (int d = 0; d < SCROLL_DIR_COUNT; d++) {
+            if (cfg->scroll_bindings[s].dirs[d].count > 0) {
+                cfg->caps_has_scroll_bindings = true;
+                break;
+            }
+        }
+        if (cfg->caps_has_scroll_bindings) break;
+    }
 
     {
         const GestureBindingSlot* slots = cfg->is_ts ? cfg->ts : cfg->tp;

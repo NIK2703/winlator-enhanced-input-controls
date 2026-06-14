@@ -15,9 +15,12 @@ import com.google.android.material.tabs.TabLayout;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.UnitUtils;
+import com.winlator.cmod.inputcontrols.Bind;
 import com.winlator.cmod.inputcontrols.BindPackage;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.MouseMode;
+import com.winlator.cmod.widget.BindingSequenceEditor;
 import com.winlator.cmod.widget.NumberPicker;
 
 import java.util.HashMap;
@@ -27,6 +30,8 @@ public class GestureSettingsDialog {
     private final ControlsProfile profile;
     private OnSaveListener onSaveListener;
     private final HashMap<String, BindPackage> bindingValues = new HashMap<>();
+    // Scroll bindings: key = "scroll_{gestureIndex}_{dirKey}"
+    private final HashMap<String, BindPackage> scrollBindingValues = new HashMap<>();
 
     public interface OnSaveListener {
         void onSave(ControlsProfile profile);
@@ -72,6 +77,11 @@ public class GestureSettingsDialog {
         npDragThreshold.setValue(profile.getDragThreshold());
         npSingleTapDelay.setValue(profile.getSingleTapDelay());
 
+        // Scroll threshold
+        View llScrollThreshold = view.findViewById(R.id.LLScrollThreshold);
+        NumberPicker npScrollThreshold = view.findViewById(R.id.NPScrollThreshold);
+        npScrollThreshold.setValue(profile.getScrollThreshold());
+
         // Cursor speed
         View llCursorSpeed = view.findViewById(R.id.LLCursorSpeed);
         SeekBar sbCursorSpeed = view.findViewById(R.id.SBCursorSpeed);
@@ -94,15 +104,22 @@ public class GestureSettingsDialog {
         view.findViewById(R.id.BTHelpTwoFinger).setOnClickListener((v) ->
                 AppUtils.showHelpBox(context, v, R.string.two_finger_help));
 
-        // Gesture bindings — using unified gesture fields from profile
-        // In touchpad mode, single_tap_drag is used for cursor movement and unavailable as gesture
+        // Gesture bindings
         boolean isTouchpad = currentMode == MouseMode.TOUCHPAD;
 
         LinearLayout llSingleFinger = view.findViewById(R.id.LLSingleFinger);
         LinearLayout llHoldGestures = view.findViewById(R.id.LLHoldGesturesContent);
         LinearLayout llTwoFinger = view.findViewById(R.id.LLTwoFinger);
 
-        // Gesture binding sections (mirrors saveKeys/saveIndices pattern in save())
+        // Drag gesture indices that support scroll mode
+        final int[] DRAG_GESTURE_INDICES = {
+            ControlsProfile.GESTURE_SINGLE_TAP_DRAG,
+            ControlsProfile.GESTURE_LONG_PRESS_DRAG,
+            ControlsProfile.GESTURE_DOUBLE_TAP_DRAG,
+            ControlsProfile.GESTURE_SINGLE_DRAG_2ND,
+            ControlsProfile.GESTURE_DOUBLE_DRAG_2ND
+        };
+
         LinearLayout[] sectionContainers = {llSingleFinger, llSingleFinger, llSingleFinger, llSingleFinger,
                                             llHoldGestures, llHoldGestures,
                                             llTwoFinger, llTwoFinger, llTwoFinger, llTwoFinger};
@@ -121,18 +138,56 @@ public class GestureSettingsDialog {
                                     R.string.double_tap_help, R.string.single_tap_delay_help,
                                    R.string.long_press_drag_help, R.string.long_press_drag_help,
                                    0, 0, R.string.single_tap_delay_help, R.string.single_tap_delay_help};
+
         for (int i = 0; i < sectionKeys.length; i++) {
-            addBindingSection(sectionContainers[i], sectionKeys[i], sectionLabels[i],
-                              profile.getGestureAction(sectionGestureIndices[i]), sectionHelpResIds[i]);
+            int gestureIdx = sectionGestureIndices[i];
+            BindPackage bp = profile.getGestureAction(gestureIdx);
+            BindPackage stored = new BindPackage(bp);
+            bindingValues.put(sectionKeys[i], stored);
+
+            boolean isDragGesture = false;
+            int scrollSlotIndex = -1;
+            for (int d = 0; d < DRAG_GESTURE_INDICES.length; d++) {
+                if (DRAG_GESTURE_INDICES[d] == gestureIdx) {
+                    isDragGesture = true;
+                    scrollSlotIndex = d;
+                    break;
+                }
+            }
+
+            View section;
+            if (isDragGesture) {
+                // Load scroll bindings for this drag gesture
+                HashMap<String, BindPackage> scrollBps = new HashMap<>();
+                String[] dirKeys = {"up", "down", "left", "right"};
+                boolean hasScrollBindings = false;
+                for (int dir = 0; dir < 4; dir++) {
+                    String scrollKey = "scroll_" + gestureIdx + "_" + dirKeys[dir];
+                    BindPackage scrollBp = profile.getScrollBinding(scrollSlotIndex, dir);
+                    BindPackage storedScroll = new BindPackage(scrollBp);
+                    scrollBindingValues.put(scrollKey, storedScroll);
+                    scrollBps.put(dirKeys[dir], storedScroll);
+                    if (storedScroll.size() > 0) hasScrollBindings = true;
+                }
+                section = BindingSequenceEditor.createDragView(context, sectionLabels[i], sectionHelpResIds[i],
+                        stored, () -> {}, scrollBps, hasScrollBindings);
+            } else {
+                section = BindingSequenceEditor.createView(context, sectionLabels[i], sectionHelpResIds[i],
+                        stored, () -> {});
+            }
+            sectionContainers[i].addView(section);
         }
 
         // Update single-tap-drag visibility based on mode
         updateSingleTapDragVisibility(llSingleFinger, isTouchpad);
         // Cursor speed only applies to touchpad mode
         updateCursorSpeedVisibility(llCursorSpeed, isTouchpad);
+        // Scroll threshold only applies to touchscreen mode
+        updateScrollThresholdVisibility(llScrollThreshold, isTouchpad);
 
         builder.setPositiveButton("Save", (dialog, which) -> save(
-                tabLayout, modes, npLongPress, npDoubleTap, npDragThreshold, npSingleTapDelay, sbCursorSpeed));
+                tabLayout, modes, npLongPress, npDoubleTap, npDragThreshold, npSingleTapDelay, sbCursorSpeed,
+                npScrollThreshold));
         builder.setNegativeButton("Cancel", null);
 
         AlertDialog dialog = builder.create();
@@ -145,6 +200,7 @@ public class GestureSettingsDialog {
                 boolean tpMode = tab.getPosition() == 0;
                 updateSingleTapDragVisibility(llSingleFinger, tpMode);
                 updateCursorSpeedVisibility(llCursorSpeed, tpMode);
+                updateScrollThresholdVisibility(llScrollThreshold, tpMode);
             }
             @Override
             public void onTabUnselected(TabLayout.Tab tab) {}
@@ -153,12 +209,12 @@ public class GestureSettingsDialog {
                 boolean tpMode = tab.getPosition() == 0;
                 updateSingleTapDragVisibility(llSingleFinger, tpMode);
                 updateCursorSpeedVisibility(llCursorSpeed, tpMode);
+                updateScrollThresholdVisibility(llScrollThreshold, tpMode);
             }
         });
     }
 
     private void updateSingleTapDragVisibility(LinearLayout container, boolean isTouchpad) {
-        // Single tap drag section is added 2nd (index 1) in LLSingleFinger
         if (container.getChildCount() > 1) {
             View section = container.getChildAt(1);
             section.setAlpha(isTouchpad ? 0.4f : 1.0f);
@@ -167,8 +223,12 @@ public class GestureSettingsDialog {
     }
 
     private void updateCursorSpeedVisibility(View container, boolean isTouchpad) {
-        // Cursor speed only applies to touchpad; dim in touchscreen mode
         container.setAlpha(isTouchpad ? 1.0f : 0.4f);
+    }
+
+    private void updateScrollThresholdVisibility(View container, boolean isTouchpad) {
+        // Scroll threshold only applies to touchscreen mode
+        container.setAlpha(isTouchpad ? 0.4f : 1.0f);
     }
 
     private void setViewEnabled(View view, boolean enabled) {
@@ -182,7 +242,8 @@ public class GestureSettingsDialog {
     }
 
     private void save(TabLayout tabLayout, MouseMode[] modes, NumberPicker npLongPress, NumberPicker npDoubleTap,
-                      NumberPicker npDragThreshold, NumberPicker npSingleTapDelay, SeekBar sbCursorSpeed) {
+                      NumberPicker npDragThreshold, NumberPicker npSingleTapDelay, SeekBar sbCursorSpeed,
+                      NumberPicker npScrollThreshold) {
         // Save mode
         profile.setMouseMode(modes[tabLayout.getSelectedTabPosition()]);
 
@@ -196,7 +257,10 @@ public class GestureSettingsDialog {
         float speed = 0.25f + (sbCursorSpeed.getProgress() / 55.0f) * 2.75f;
         profile.setCursorSpeed(speed);
 
-        // Save gesture bindings (BindPackage includes sticky flags)
+        // Save scroll threshold (touchscreen-only)
+        profile.setScrollThreshold(npScrollThreshold.getValue());
+
+        // Save gesture bindings
         String[] saveKeys = {"single", "single_drag", "long", "long_drag",
             "double", "double_drag",
             "single_2nd", "single_2nd_drag", "double_2nd", "double_2nd_drag"};
@@ -210,18 +274,26 @@ public class GestureSettingsDialog {
             profile.setGestureAction(saveIndices[i], bindingValues.get(saveKeys[i]));
         }
 
+        // Save scroll bindings
+        String[] dirKeys = {"up", "down", "left", "right"};
+        int[] dragGestureIndices = {
+            ControlsProfile.GESTURE_SINGLE_TAP_DRAG,
+            ControlsProfile.GESTURE_LONG_PRESS_DRAG,
+            ControlsProfile.GESTURE_DOUBLE_TAP_DRAG,
+            ControlsProfile.GESTURE_SINGLE_DRAG_2ND,
+            ControlsProfile.GESTURE_DOUBLE_DRAG_2ND
+        };
+        for (int slot = 0; slot < 5; slot++) {
+            for (int dir = 0; dir < 4; dir++) {
+                String scrollKey = "scroll_" + dragGestureIndices[slot] + "_" + dirKeys[dir];
+                BindPackage scrollBp = scrollBindingValues.get(scrollKey);
+                if (scrollBp != null) {
+                    profile.setScrollBinding(slot, dir, scrollBp);
+                }
+            }
+        }
+
         profile.save();
         if (onSaveListener != null) onSaveListener.onSave(profile);
-    }
-
-    private void addBindingSection(LinearLayout container, String key, String label, BindPackage bp) {
-        addBindingSection(container, key, label, bp, 0);
-    }
-
-    private void addBindingSection(LinearLayout container, String key, String label, BindPackage bp, int helpTextResId) {
-        BindPackage stored = new BindPackage(bp);
-        bindingValues.put(key, stored);
-        View section = com.winlator.cmod.widget.BindingSequenceEditor.createView(context, label, helpTextResId, stored, () -> {});
-        container.addView(section);
     }
 }

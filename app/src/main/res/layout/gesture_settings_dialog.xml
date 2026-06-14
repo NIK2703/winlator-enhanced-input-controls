@@ -155,6 +155,30 @@
                 android:layout_marginStart="8dp" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/LLScrollThreshold"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Scroll Threshold (px)" />
+
+            <com.winlator.cmod.widget.NumberPicker
+                android:id="@+id/NPScrollThreshold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:minValue="5"
+                app:maxValue="100"
+                app:step="1"
+                app:value="20" />
+        </LinearLayout>
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

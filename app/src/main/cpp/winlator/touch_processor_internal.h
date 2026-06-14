@@ -319,6 +319,7 @@ static inline void element_update_position_cache(TouchElement* e) {
 }
 static inline bool gesture_processing_needed(void) {
     return __builtin_expect(g_state.cfg.caps_mode_mask != 0, 1)
+        || g_state.cfg.caps_has_scroll_bindings
         || g_state.gesture_double_tap_waiting
         || g_state.gesture_post_double_tap_drag
         || g_state.second_double_tap_waiting
@@ -693,6 +694,81 @@ static inline void copy_bindings_bounded(const TouchBinding* src, int src_count,
     for (int _i = 0; _i < src_count && _i < dst_max; _i++)
         dst[_i] = src[_i];
     *dst_count = src_count > dst_max ? dst_max : src_count;
+}
+
+// --- Scroll mode helpers ---
+
+// Map drag GestureType to scroll_bindings index (0=Sd,1=Ld,2=Dd,3=Sd2,4=Dd2)
+static inline int scroll_gesture_index(GestureType gt) {
+    switch (gt) {
+        case GESTURE_SINGLE_TAP_DRAG:   return 0;
+        case GESTURE_LONG_PRESS_DRAG:   return 1;
+        case GESTURE_DOUBLE_TAP_DRAG:   return 2;
+        case GESTURE_SINGLE_DRAG_2ND:   return 3;
+        case GESTURE_DOUBLE_DRAG_2ND:   return 4;
+        default: return -1;
+    }
+}
+
+// Check if a drag gesture has any scroll bindings configured
+static inline bool gesture_has_scroll_bindings(GestureType gt) {
+    int idx = scroll_gesture_index(gt);
+    if (idx < 0) return false;
+    for (int d = 0; d < SCROLL_DIR_COUNT; d++) {
+        if (g_state.cfg.scroll_bindings[idx].dirs[d].count > 0)
+            return true;
+    }
+    return false;
+}
+
+// Enter scroll mode for a finger
+static inline void scroll_mode_enter(TouchFinger* f, GestureType drag_gt) {
+    int idx = scroll_gesture_index(drag_gt);
+    if (idx < 0) return;
+    f->scroll_mode = true;
+    f->scroll_origin_x = f->x;
+    f->scroll_origin_y = f->y;
+    f->scroll_gesture_index = idx;
+    f->scroll_active_dir = -1;
+    for (int d = 0; d < SCROLL_DIR_COUNT; d++)
+        f->scroll_accum[d] = 0.0f;
+    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL ENTER slot=%d gt=%d pos=(%.0f,%.0f)", idx, (int)drag_gt, f->x, f->y);
+}
+
+// Exit scroll mode for a finger
+static inline void scroll_mode_exit(TouchFinger* f, TouchActionResult* restrict result) {
+    if (!f->scroll_mode) return;
+    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL EXIT slot=%d", f->scroll_gesture_index);
+    f->scroll_mode = false;
+    f->scroll_active_dir = -1;
+}
+
+// Save scroll mode state (when second finger interrupts a scroll-mode gesture)
+static inline void scroll_mode_save(TouchFinger* f) {
+    if (!f->scroll_mode) return;
+    f->pending_scroll_mode = true;
+    f->pending_scroll_origin_x = f->scroll_origin_x;
+    f->pending_scroll_origin_y = f->scroll_origin_y;
+    f->pending_scroll_active_dir = f->scroll_active_dir;
+    f->pending_scroll_gesture_index = f->scroll_gesture_index;
+    for (int d = 0; d < SCROLL_DIR_COUNT; d++)
+        f->pending_scroll_accum[d] = f->scroll_accum[d];
+    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL SAVE slot=%d", f->scroll_gesture_index);
+}
+
+// Restore scroll mode state (when second finger lifts and first finger had scroll mode)
+static inline void scroll_mode_restore(TouchFinger* f) {
+    if (!f->pending_scroll_mode) return;
+    f->scroll_mode = true;
+    f->scroll_origin_x = f->pending_scroll_origin_x;
+    f->scroll_origin_y = f->pending_scroll_origin_y;
+    f->scroll_active_dir = f->pending_scroll_active_dir;
+    f->scroll_gesture_index = f->pending_scroll_gesture_index;
+    for (int d = 0; d < SCROLL_DIR_COUNT; d++)
+        f->scroll_accum[d] = f->pending_scroll_accum[d];
+    f->pending_scroll_mode = false;
+    f->state = GESTURE_STATE_DRAGGING;
+    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL RESTORE slot=%d", f->scroll_gesture_index);
 }
 
 // --- Activation internal helpers ---

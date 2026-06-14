@@ -85,6 +85,14 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private BindPackage gestureSingleTap2ndFingerDragAction = BindPackage.fromSingle(Bind.MOUSE_LEFT_BUTTON);
     private BindPackage gestureDoubleTap2ndFingerDragAction = new BindPackage();
 
+    // Per-gesture scroll mode bindings (up/down/left/right for each drag gesture)
+    // Index: 0=Sd, 1=Ld, 2=Dd, 3=Sd2, 4=Dd2
+    private final BindPackage[] gestureScrollUp = new BindPackage[5];
+    private final BindPackage[] gestureScrollDown = new BindPackage[5];
+    private final BindPackage[] gestureScrollLeft = new BindPackage[5];
+    private final BindPackage[] gestureScrollRight = new BindPackage[5];
+    private int scrollThreshold = 20;
+
     private boolean gestureSettingsLoaded = false;
 
     public ControlsProfile(Context context, int id) {
@@ -423,6 +431,53 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public void setGestureDoubleTap2ndFingerDragAction(BindPackage bp) { setGestureAction(GESTURE_DOUBLE_DRAG_2ND, bp); }
     public void setGestureDoubleTap2ndFingerDragAction(List<Bind> bindings) { setGestureAction(GESTURE_DOUBLE_DRAG_2ND, new BindPackage(bindings)); }
 
+    // Scroll mode binding accessors
+    // slotIndex: 0=Sd, 1=Ld, 2=Dd, 3=Sd2, 4=Dd2
+    // dirIndex: 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT
+    private static final int SCROLL_SLOT_SD = 0;
+    private static final int SCROLL_SLOT_LD = 1;
+    private static final int SCROLL_SLOT_DD = 2;
+    private static final int SCROLL_SLOT_SD2 = 3;
+    private static final int SCROLL_SLOT_DD2 = 4;
+    private static final int SCROLL_DIR_UP = 0;
+    private static final int SCROLL_DIR_DOWN = 1;
+    private static final int SCROLL_DIR_LEFT = 2;
+    private static final int SCROLL_DIR_RIGHT = 3;
+
+    public BindPackage getScrollBinding(int slotIndex, int dirIndex) {
+        ensureGestureSettingsLoaded();
+        BindPackage[][] arrays = { gestureScrollUp, gestureScrollDown, gestureScrollLeft, gestureScrollRight };
+        BindPackage bp = arrays[dirIndex][slotIndex];
+        return bp != null ? bp : new BindPackage();
+    }
+
+    public void setScrollBinding(int slotIndex, int dirIndex, BindPackage bp) {
+        BindPackage[][] arrays = { gestureScrollUp, gestureScrollDown, gestureScrollLeft, gestureScrollRight };
+        arrays[dirIndex][slotIndex] = bp != null ? new BindPackage(bp) : new BindPackage();
+    }
+
+    public void setScrollBinding(int slotIndex, int dirIndex, Bind binding) {
+        setScrollBinding(slotIndex, dirIndex, BindPackage.fromSingle(binding));
+    }
+
+    public int getScrollThreshold() {
+        ensureGestureSettingsLoaded();
+        return scrollThreshold;
+    }
+
+    public void setScrollThreshold(int threshold) {
+        this.scrollThreshold = clamp(threshold, 5, 100);
+    }
+
+    public static int scrollGestureSlotForDragGesture(int gestureType) {
+        if (gestureType == GESTURE_SINGLE_TAP_DRAG) return 0;
+        if (gestureType == GESTURE_LONG_PRESS_DRAG) return 1;
+        if (gestureType == GESTURE_DOUBLE_TAP_DRAG) return 2;
+        if (gestureType == GESTURE_SINGLE_DRAG_2ND) return 3;
+        if (gestureType == GESTURE_DOUBLE_DRAG_2ND) return 4;
+        return -1;
+    }
+
     public BindPackage getGestureAction(int gestureIndex) {
         ensureGestureSettingsLoaded();
         if (gestureIndex == GESTURE_SINGLE_TAP) return gestureSingleTapAction;
@@ -535,6 +590,25 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 cursorSpeed = (float)gestureData.getDouble("cursorSpeed");
             if (gestureData.has("touchActivationMode"))
                 touchActivationMode = parseEnum(TouchActivationMode.class, gestureData.getString("touchActivationMode"), TouchActivationMode.LOCK);
+
+            // Load scroll mode bindings
+            if (gestureData.has("scrollBindings")) {
+                JSONObject scrollData = gestureData.getJSONObject("scrollBindings");
+                String[] slotKeys = {"sd", "ld", "dd", "sd2", "dd2"};
+                String[] dirKeys = {"up", "down", "left", "right"};
+                BindPackage[][] arrays = { gestureScrollUp, gestureScrollDown, gestureScrollLeft, gestureScrollRight };
+                for (int s = 0; s < 5; s++) {
+                    if (!scrollData.has(slotKeys[s])) continue;
+                    JSONObject slotObj = scrollData.getJSONObject(slotKeys[s]);
+                    for (int d = 0; d < 4; d++) {
+                        if (slotObj.has(dirKeys[d])) {
+                            arrays[d][s] = BindPackage.fromJSON(slotObj.getJSONObject(dirKeys[d]), Bind.NONE);
+                        }
+                    }
+                }
+            }
+            if (gestureData.has("scrollThreshold"))
+                scrollThreshold = clamp(gestureData.getInt("scrollThreshold"), 5, 100);
         }
         catch (JSONException e) {
 
@@ -684,6 +758,30 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             unifiedGestureData.put("singleTapDelay", singleTapDelay);
             unifiedGestureData.put("cursorSpeed", Float.valueOf(cursorSpeed));
             unifiedGestureData.put("touchActivationMode", touchActivationMode.name());
+
+            // Save scroll mode bindings
+            JSONObject scrollData = new JSONObject();
+            String[] slotKeys = {"sd", "ld", "dd", "sd2", "dd2"};
+            String[] dirKeys = {"up", "down", "left", "right"};
+            BindPackage[][] arrays = { gestureScrollUp, gestureScrollDown, gestureScrollLeft, gestureScrollRight };
+            boolean hasAnyScroll = false;
+            for (int s = 0; s < 5; s++) {
+                JSONObject slotObj = new JSONObject();
+                boolean hasSlot = false;
+                for (int d = 0; d < 4; d++) {
+                    if (arrays[d][s] != null && arrays[d][s].size() > 0) {
+                        slotObj.put(dirKeys[d], arrays[d][s].toJSON());
+                        hasSlot = true;
+                    }
+                }
+                if (hasSlot) {
+                    scrollData.put(slotKeys[s], slotObj);
+                    hasAnyScroll = true;
+                }
+            }
+            if (hasAnyScroll) unifiedGestureData.put("scrollBindings", scrollData);
+            if (scrollThreshold != 20) unifiedGestureData.put("scrollThreshold", scrollThreshold);
+
             data.put("gestureSettings", unifiedGestureData);
 
             String jsonStr = data.toString();

@@ -107,6 +107,7 @@ static void save_pending_resume_action(TouchFinger* main_finger) {
         memcpy(main_finger->pending_resume_action, g_state.gesture_held_actions, n * sizeof(TouchBinding));
         main_finger->pending_resume_action_count = n;
     }
+    scroll_mode_save(main_finger);
 }
 
 static void cleanup_second_finger_up(TouchActionResult* restrict result) {
@@ -116,6 +117,7 @@ static void cleanup_second_finger_up(TouchActionResult* restrict result) {
         main->pending_resume_action_count = 0;
         main->state = GESTURE_STATE_DRAGGING;
     }
+    if (main) scroll_mode_restore(main);
     g_state.gesture_second_ptr_id = INVALID_PTR_ID;
 }
 
@@ -181,6 +183,7 @@ static void handle_ts_second_finger_down(TouchFinger* finger, uint64_t time_ms, 
         return;
     }
     if (!(g_state.cfg.caps_ts_mask & GESTURE_SECOND_MASK)
+        && !g_state.cfg.caps_has_scroll_bindings
         && !g_state.gesture_double_tap_waiting) {
         g_state.gesture_second_active = true;
         g_state.gesture_second_ptr_id = finger->ptr_id;
@@ -607,6 +610,7 @@ static void handle_track_hover_move(TouchFinger* finger, float x, float y, uint6
 static void handle_cursor_move(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
     int active_count = active_finger_count();
     if (!g_state.cfg.is_tp || g_state.scrolling || active_count > 2) return;
+    if (finger->scroll_mode) return; // cursor frozen in scroll mode
     if (g_state.sim_touch_screen) {
         if (finger->travel_x > MAX_TAP_TRAVEL || finger->travel_y > MAX_TAP_TRAVEL)
             g_state.sim_continue_click = false;
@@ -699,7 +703,9 @@ static void handle_gesture_move_processing(TouchFinger* finger, float x, float y
             && !finger->cached_has_active_double_tap_drag
             && !finger->cached_has_long_press_timer
             && !g_state.gesture_post_double_tap_drag
-            && finger->state != GESTURE_STATE_LONG_PRESSING) {
+            && finger->state != GESTURE_STATE_LONG_PRESSING
+            && !finger->scroll_mode
+            && !g_state.cfg.caps_has_scroll_bindings) {
             update_ts_pointer(x, y, result);
             finger->last_x = x;
             finger->last_y = y;
@@ -716,7 +722,8 @@ static void handle_gesture_move_processing(TouchFinger* finger, float x, float y
     handle_second_finger_move(finger, x, y, time_ms, result, is_ts, is_tp);
 
     if (is_ts) {
-        if (g_state.gesture_main_ptr_id < 0 || finger->ptr_id == g_state.gesture_main_ptr_id)
+        if ((g_state.gesture_main_ptr_id < 0 || finger->ptr_id == g_state.gesture_main_ptr_id)
+            && !finger->scroll_mode)
             update_ts_pointer(x, y, result);
         finger->last_x = x;
         finger->last_y = y;

@@ -40,6 +40,7 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     if (g_state.cfg.cursor_acceleration_factor <= 0.0f) g_state.cfg.cursor_acceleration_factor = DEFAULT_CURSOR_ACCEL_FACTOR;
     if (g_state.cfg.xform_scale_x <= 0.0f) g_state.cfg.xform_scale_x = 1.0f;
     if (g_state.cfg.xform_scale_y <= 0.0f) g_state.cfg.xform_scale_y = 1.0f;
+    if (g_state.cfg.scroll_threshold_px <= 0) g_state.cfg.scroll_threshold_px = 20;
     g_state.cfg.bindings_generation = 1;
     compute_gesture_caps(&g_state.cfg);
 }
@@ -47,6 +48,25 @@ void touch_processor_init(const TouchProcessorConfig* config) {
 void touch_processor_update_config(const TouchProcessorConfig* config) {
     memcpy(&g_state.cfg, config, sizeof(TouchProcessorConfig));
     compute_gesture_caps(&g_state.cfg);
+
+    // Log scroll config state
+    {
+        static const char* dir_names[] = {"UP", "DOWN", "LEFT", "RIGHT"};
+        static const char* slot_names[] = {"Sd", "Ld", "Dd", "Sd2", "Dd2"};
+        __android_log_print(ANDROID_LOG_WARN, "ScrollDbg",
+            "CONFIG: is_ts=%d caps_scroll=%d thresh=%d",
+            g_state.cfg.is_ts, g_state.cfg.caps_has_scroll_bindings, g_state.cfg.scroll_threshold_px);
+        for (int s = 0; s < 5; s++) {
+            for (int d = 0; d < 4; d++) {
+                int cnt = g_state.cfg.scroll_bindings[s].dirs[d].count;
+                if (cnt > 0) {
+                    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg",
+                        "CONFIG %s/%s: %d bindings", slot_names[s], dir_names[d], cnt);
+                }
+            }
+        }
+    }
+
     g_state.cfg.bindings_generation++;
 
     // Clear stale gesture state from previous mode on switch
@@ -428,6 +448,8 @@ void touch_processor_on_finger_cancel(int ptr_id) {
         gesture_clear_second_finger_globals();
         gesture_clear_second_finger_state();
     }
+    // Clear scroll mode if active
+    scroll_mode_exit(f, &cancel_result);
     reset_unused_toggle_gesture_timers();
     f->state = GESTURE_STATE_IDLE;
     if (f->active) deactivate_finger(f);

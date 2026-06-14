@@ -170,6 +170,17 @@ GesturePairPlan resolve_gesture_pair(
     bool has_non_drag = gesture_type_has_binding(slot->bindings_non_drag, &f->bindings, f);
     bool has_drag = gesture_type_has_binding(slot->bindings_drag, &f->bindings, f);
 
+    // Scroll mode is a variant of the drag gesture. When scroll bindings exist
+    // for this drag gesture, the drag variant is "available" even if no package
+    // binding is configured for it. This ensures the non-drag action is deferred
+    // (pulse_on_up) on finger-down, matching the behavior of a normal non-drag+drag
+    // pair. The actual mode (scroll vs package binding) is decided at drag
+    // recognition time in handle_move.
+    if (!has_drag && g_state.cfg.is_ts && g_state.cfg.caps_has_scroll_bindings
+        && gesture_has_scroll_bindings(slot->bindings_drag)) {
+        has_drag = true;
+    }
+
     // S slot gets hold_delay from config; others use 0
     int hold_delay_ms = (slot == SLOT_S()) ? g_state.cfg.single_tap_delay_ms : 0;
 

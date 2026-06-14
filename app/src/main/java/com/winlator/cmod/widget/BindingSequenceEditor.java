@@ -17,7 +17,13 @@ import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.inputcontrols.BindPackage;
 import com.winlator.cmod.inputcontrols.Bind;
 
+import java.util.HashMap;
+
 public class BindingSequenceEditor {
+
+    public static final String EXTRA_SCROLL_BINDINGS = "scrollBindings";
+    public static final String EXTRA_IS_SCROLL_MODE = "isScrollMode";
+
     public static View createView(Context context, String label, int helpTextResId,
                                    final BindPackage bp, final Runnable onChanged) {
         return createView(context, label, helpTextResId, bp, onChanged, true);
@@ -25,6 +31,26 @@ public class BindingSequenceEditor {
 
     public static View createView(Context context, String label, int helpTextResId,
                                    final BindPackage bp, final Runnable onChanged, boolean showMenu) {
+        return createViewInternal(context, label, helpTextResId, bp, onChanged, showMenu, false, null);
+    }
+
+    public static View createDragView(Context context, String label, int helpTextResId,
+                                       final BindPackage bp, final Runnable onChanged,
+                                       HashMap<String, BindPackage> scrollBindings,
+                                       boolean initialScrollActive) {
+        return createViewInternal(context, label, helpTextResId, bp, onChanged, true, true, scrollBindings, initialScrollActive);
+    }
+
+    private static View createViewInternal(Context context, String label, int helpTextResId,
+                                            final BindPackage bp, final Runnable onChanged, boolean showMenu,
+                                            boolean isDragGesture, HashMap<String, BindPackage> scrollBindings) {
+        return createViewInternal(context, label, helpTextResId, bp, onChanged, showMenu, isDragGesture, scrollBindings, false);
+    }
+
+    private static View createViewInternal(Context context, String label, int helpTextResId,
+                                            final BindPackage bp, final Runnable onChanged, boolean showMenu,
+                                            boolean isDragGesture, HashMap<String, BindPackage> scrollBindings,
+                                            boolean initialScrollActive) {
         final LinearLayout section = new LinearLayout(context);
         section.setOrientation(LinearLayout.VERTICAL);
         section.setLayoutParams(new LinearLayout.LayoutParams(
@@ -61,42 +87,79 @@ public class BindingSequenceEditor {
         }
         titleRow.addView(leftGroup);
 
-        if (showMenu) {
-            final int colorAccent = context.getResources().getColor(R.color.colorAccent, context.getTheme());
-            int iconSize = (int) UnitUtils.dpToPx(28);
+        final int colorAccent = context.getResources().getColor(R.color.colorAccent, context.getTheme());
+        int iconSize = (int) UnitUtils.dpToPx(28);
 
-            LinearLayout toggleGroup = new LinearLayout(context);
-            toggleGroup.setOrientation(LinearLayout.HORIZONTAL);
-            toggleGroup.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        // Scroll mode toggle for drag gestures
+        if (showMenu && isDragGesture) {
+            final boolean[] scrollModeActive = {initialScrollActive};
+            final LinearLayout[] scrollContainer = {null};
 
-            ImageView btToggle = new ImageView(context);
-            btToggle.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
-            btToggle.setScaleType(ImageView.ScaleType.CENTER);
-            btToggle.setImageResource(R.drawable.icon_toggle);
-            btToggle.setColorFilter(bp.isToggleSwitch() ? colorAccent : 0xff888888);
-            toggleGroup.addView(btToggle);
+            LinearLayout scrollToggleGroup = new LinearLayout(context);
+            scrollToggleGroup.setOrientation(LinearLayout.HORIZONTAL);
+            scrollToggleGroup.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
-            TextView tvToggleLabel = new TextView(context);
-            tvToggleLabel.setText("Switch");
-            tvToggleLabel.setTextColor(bp.isToggleSwitch() ? colorAccent : 0xff888888);
-            tvToggleLabel.setTextSize(12);
-            tvToggleLabel.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams lpToggleLabel = new LinearLayout.LayoutParams(
+            ImageView btScrollMode = new ImageView(context);
+            btScrollMode.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
+            btScrollMode.setScaleType(ImageView.ScaleType.CENTER);
+            btScrollMode.setImageResource(R.drawable.icon_scroll_mode);
+            btScrollMode.setColorFilter(0xff888888);
+            scrollToggleGroup.addView(btScrollMode);
+
+            TextView tvScrollLabel = new TextView(context);
+            tvScrollLabel.setText("Scroll");
+            tvScrollLabel.setTextColor(0xff888888);
+            tvScrollLabel.setTextSize(12);
+            tvScrollLabel.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams lpScrollLabel = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.MATCH_PARENT);
-            lpToggleLabel.leftMargin = (int) UnitUtils.dpToPx(2);
-            tvToggleLabel.setLayoutParams(lpToggleLabel);
-            toggleGroup.addView(tvToggleLabel);
+            lpScrollLabel.leftMargin = (int) UnitUtils.dpToPx(2);
+            tvScrollLabel.setLayoutParams(lpScrollLabel);
+            scrollToggleGroup.addView(tvScrollLabel);
 
-            toggleGroup.setOnClickListener((v) -> {
-                boolean newState = !bp.isToggleSwitch();
-                bp.setToggleSwitch(newState);
-                btToggle.setColorFilter(newState ? colorAccent : 0xff888888);
-                tvToggleLabel.setTextColor(newState ? colorAccent : 0xff888888);
+            // Container for normal bindings and add button (hidden when scroll mode is on)
+            final LinearLayout normalContent = new LinearLayout(context);
+            normalContent.setOrientation(LinearLayout.VERTICAL);
+            normalContent.setVisibility(initialScrollActive ? View.GONE : View.VISIBLE);
+
+            // Set initial toggle button colors
+            if (initialScrollActive) {
+                btScrollMode.setColorFilter(colorAccent);
+                tvScrollLabel.setTextColor(colorAccent);
+            }
+
+            // Container for scroll bindings (hidden by default, unless initialScrollActive)
+            scrollContainer[0] = new LinearLayout(context);
+            scrollContainer[0].setOrientation(LinearLayout.VERTICAL);
+            scrollContainer[0].setVisibility(initialScrollActive ? View.VISIBLE : View.GONE);
+
+            scrollToggleGroup.setOnClickListener((v) -> {
+                scrollModeActive[0] = !scrollModeActive[0];
+                if (scrollModeActive[0]) {
+                    btScrollMode.setColorFilter(colorAccent);
+                    tvScrollLabel.setTextColor(colorAccent);
+                    normalContent.setVisibility(View.GONE);
+                    scrollContainer[0].setVisibility(View.VISIBLE);
+                } else {
+                    btScrollMode.setColorFilter(0xff888888);
+                    tvScrollLabel.setTextColor(0xff888888);
+                    normalContent.setVisibility(View.VISIBLE);
+                    scrollContainer[0].setVisibility(View.GONE);
+                    // Clear all scroll bindings when toggling off (in-place, so
+                    // GestureSettingsDialog.scrollBindingValues is also cleared)
+                    if (scrollBindings != null) {
+                        for (String dirKey : new String[]{"up", "down", "left", "right"}) {
+                            BindPackage sbp = scrollBindings.get(dirKey);
+                            if (sbp != null) sbp.clear();
+                        }
+                    }
+                }
                 if (onChanged != null) onChanged.run();
             });
-            titleRow.addView(toggleGroup);
+            titleRow.addView(scrollToggleGroup);
 
+            // Auto repeat (right of scroll toggle)
             LinearLayout autoRepeatGroup = new LinearLayout(context);
             autoRepeatGroup.setOrientation(LinearLayout.HORIZONTAL);
             autoRepeatGroup.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -135,20 +198,114 @@ public class BindingSequenceEditor {
                 if (onChanged != null) onChanged.run();
             });
             titleRow.addView(autoRepeatGroup);
+
+            section.addView(titleRow);
+
+            // Normal bindings content (button and rows go inside normalContent)
+            populateNormalBindings(context, normalContent, normalContent, bp, onChanged);
+            section.addView(normalContent);
+
+            // Scroll bindings content (4 directional rows)
+            populateScrollBindings(context, scrollContainer[0], scrollBindings, colorAccent, onChanged);
+            section.addView(scrollContainer[0]);
+
+        } else {
+            section.addView(titleRow);
+
+            if (showMenu) {
+                // Toggle switch
+                LinearLayout toggleGroup = new LinearLayout(context);
+                toggleGroup.setOrientation(LinearLayout.HORIZONTAL);
+                toggleGroup.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+                ImageView btToggle = new ImageView(context);
+                btToggle.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
+                btToggle.setScaleType(ImageView.ScaleType.CENTER);
+                btToggle.setImageResource(R.drawable.icon_toggle);
+                btToggle.setColorFilter(bp.isToggleSwitch() ? colorAccent : 0xff888888);
+                toggleGroup.addView(btToggle);
+
+                TextView tvToggleLabel = new TextView(context);
+                tvToggleLabel.setText("Switch");
+                tvToggleLabel.setTextColor(bp.isToggleSwitch() ? colorAccent : 0xff888888);
+                tvToggleLabel.setTextSize(12);
+                tvToggleLabel.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                LinearLayout.LayoutParams lpToggleLabel = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.MATCH_PARENT);
+                lpToggleLabel.leftMargin = (int) UnitUtils.dpToPx(2);
+                tvToggleLabel.setLayoutParams(lpToggleLabel);
+                toggleGroup.addView(tvToggleLabel);
+
+                toggleGroup.setOnClickListener((v) -> {
+                    boolean newState = !bp.isToggleSwitch();
+                    bp.setToggleSwitch(newState);
+                    btToggle.setColorFilter(newState ? colorAccent : 0xff888888);
+                    tvToggleLabel.setTextColor(newState ? colorAccent : 0xff888888);
+                    if (onChanged != null) onChanged.run();
+                });
+                titleRow.addView(toggleGroup);
+
+                // Auto repeat
+                LinearLayout autoRepeatGroup = new LinearLayout(context);
+                autoRepeatGroup.setOrientation(LinearLayout.HORIZONTAL);
+                autoRepeatGroup.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+                ImageView btAutoRepeat = new ImageView(context);
+                btAutoRepeat.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
+                btAutoRepeat.setScaleType(ImageView.ScaleType.CENTER);
+                btAutoRepeat.setImageResource(R.drawable.icon_autorepeat);
+                btAutoRepeat.setColorFilter(bp.isAutoRepeat() ? colorAccent : 0xff888888);
+                autoRepeatGroup.addView(btAutoRepeat);
+
+                TextView tvInterval = new TextView(context);
+                tvInterval.setText("Repeat" + (bp.isAutoRepeat() ? " (" + bp.getAutoRepeatIntervalMs() + "ms)" : ""));
+                tvInterval.setTextColor(bp.isAutoRepeat() ? colorAccent : 0xff888888);
+                tvInterval.setTextSize(12);
+                tvInterval.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                LinearLayout.LayoutParams lpInterval = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.MATCH_PARENT);
+                lpInterval.leftMargin = (int) UnitUtils.dpToPx(2);
+                tvInterval.setLayoutParams(lpInterval);
+                autoRepeatGroup.addView(tvInterval);
+
+                autoRepeatGroup.setOnClickListener((v) -> {
+                    boolean newState = !bp.isAutoRepeat();
+                    bp.setAutoRepeat(newState);
+                    btAutoRepeat.setColorFilter(newState ? colorAccent : 0xff888888);
+                    tvInterval.setTextColor(newState ? colorAccent : 0xff888888);
+                    tvInterval.setText("Repeat" + (newState ? " (" + bp.getAutoRepeatIntervalMs() + "ms)" : ""));
+                    if (newState) {
+                        showIntervalDialog(context, bp, () -> {
+                            tvInterval.setText("Repeat (" + bp.getAutoRepeatIntervalMs() + "ms)");
+                            if (onChanged != null) onChanged.run();
+                        });
+                    }
+                    if (onChanged != null) onChanged.run();
+                });
+                titleRow.addView(autoRepeatGroup);
+            }
+
+            final LinearLayout llItems = new LinearLayout(context);
+            llItems.setOrientation(LinearLayout.VERTICAL);
+            section.addView(llItems);
+
+            populateNormalBindings(context, section, llItems, bp, onChanged);
         }
 
-        section.addView(titleRow);
+        return section;
+    }
 
-        final LinearLayout llItems = new LinearLayout(context);
-        llItems.setOrientation(LinearLayout.VERTICAL);
-        section.addView(llItems);
-
+    private static void populateNormalBindings(Context context, LinearLayout section,
+                                                LinearLayout llItems, final BindPackage bp,
+                                                final Runnable onChanged) {
         final int colorAccent = context.getResources().getColor(R.color.colorAccent, context.getTheme());
+        final int MAX_BINDINGS = 8;
 
         final Runnable[] populateRef = new Runnable[1];
         populateRef[0] = () -> {
             llItems.removeAllViews();
-
             bp.sync();
 
             for (int i = 0; i < bp.size(); i++) {
@@ -190,8 +347,6 @@ public class BindingSequenceEditor {
             }
         };
 
-        final int MAX_BINDINGS = 8;
-
         int buttonHeight = (int) UnitUtils.dpToPx(36);
         Button btAdd = new Button(context, null, 0, R.style.ButtonNeutral);
         btAdd.setText("+ Add Bind");
@@ -213,11 +368,119 @@ public class BindingSequenceEditor {
         final Runnable origPopulate = populateRef[0];
         populateRef[0] = () -> {
             origPopulate.run();
+            if (btAdd.getParent() instanceof android.view.ViewGroup)
+                ((android.view.ViewGroup) btAdd.getParent()).removeView(btAdd);
+            section.addView(btAdd);
             btAdd.setVisibility(bp.size() >= MAX_BINDINGS ? View.GONE : View.VISIBLE);
         };
         populateRef[0].run();
+    }
 
-        return section;
+    private static void populateScrollBindings(Context context, LinearLayout container,
+                                                HashMap<String, BindPackage> scrollBindings,
+                                                int colorAccent, final Runnable onChanged) {
+        if (scrollBindings == null) return;
+
+        String[] dirKeys = {"up", "down", "left", "right"};
+        String[] dirLabels = {"\u2191 Up", "\u2193 Down", "\u2190 Left", "\u2192 Right"};
+
+        for (int d = 0; d < 4; d++) {
+            final String dirKey = dirKeys[d];
+            BindPackage dirBp = scrollBindings.get(dirKey);
+            if (dirBp == null) {
+                dirBp = new BindPackage();
+                scrollBindings.put(dirKey, dirBp);
+            }
+            final BindPackage finalDirBp = dirBp;
+
+            LinearLayout row = new LinearLayout(context);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            row.setPadding(0, 2, 0, 2);
+
+            TextView tvDirLabel = new TextView(context);
+            tvDirLabel.setText(dirLabels[d]);
+            tvDirLabel.setTextSize(13);
+            tvDirLabel.setTextColor(0xcccccccc);
+            tvDirLabel.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams lpLabel = new LinearLayout.LayoutParams(
+                    (int) UnitUtils.dpToPx(80),
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            tvDirLabel.setLayoutParams(lpLabel);
+            row.addView(tvDirLabel);
+
+            LinearLayout bindsContainer = new LinearLayout(context);
+            bindsContainer.setOrientation(LinearLayout.HORIZONTAL);
+            bindsContainer.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            bindsContainer.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+            for (int i = 0; i < finalDirBp.size(); i++) {
+                final Bind binding = finalDirBp.get(i);
+                TextView tvBind = new TextView(context);
+                tvBind.setText(binding.toString());
+                tvBind.setTextSize(12);
+                tvBind.setTextColor(colorAccent);
+                tvBind.setPadding(6, 4, 6, 4);
+                tvBind.setBackgroundResource(R.drawable.combo_box);
+                LinearLayout.LayoutParams lpBind = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        (int) UnitUtils.dpToPx(30));
+                lpBind.rightMargin = (int) UnitUtils.dpToPx(4);
+                tvBind.setLayoutParams(lpBind);
+
+                final int bindIndex = i;
+                tvBind.setOnClickListener((v) -> {
+                    BindingPickerDialog.show(context, finalDirBp.get(bindIndex), (newBinding) -> {
+                        if (bindIndex < finalDirBp.size() && newBinding != finalDirBp.get(bindIndex)) {
+                            finalDirBp.set(bindIndex, newBinding);
+                            tvBind.setText(newBinding.toString());
+                            if (onChanged != null) onChanged.run();
+                        }
+                    });
+                });
+                bindsContainer.addView(tvBind);
+            }
+
+            if (finalDirBp.size() == 0) {
+                TextView tvEmpty = new TextView(context);
+                tvEmpty.setText("None");
+                tvEmpty.setTextSize(12);
+                tvEmpty.setTextColor(0x66888888);
+                tvEmpty.setPadding(6, 4, 6, 4);
+                bindsContainer.addView(tvEmpty);
+            }
+
+            int addBtnSize = (int) UnitUtils.dpToPx(28);
+            ImageView btAddBind = new ImageView(context);
+            btAddBind.setLayoutParams(new LinearLayout.LayoutParams(addBtnSize, addBtnSize));
+            btAddBind.setScaleType(ImageView.ScaleType.CENTER);
+            btAddBind.setImageResource(android.R.drawable.ic_input_add);
+            btAddBind.setColorFilter(0xff888888);
+            btAddBind.setOnClickListener((v) -> {
+                finalDirBp.add(Bind.NONE);
+                if (onChanged != null) onChanged.run();
+                int lastIdx = finalDirBp.size() - 1;
+                if (lastIdx >= 0) {
+                    BindingPickerDialog.show(context, finalDirBp.get(lastIdx), (newBinding) -> {
+                        if (lastIdx < finalDirBp.size()) {
+                            finalDirBp.set(lastIdx, newBinding);
+                            // Rebuild the row
+                            container.removeAllViews();
+                            populateScrollBindings(context, container, scrollBindings, colorAccent, onChanged);
+                            if (onChanged != null) onChanged.run();
+                        }
+                    });
+                }
+            });
+            bindsContainer.addView(btAddBind);
+
+            row.addView(bindsContainer);
+            container.addView(row);
+        }
     }
 
     private static void showIntervalDialog(Context context, BindPackage bp, Runnable onOk) {
