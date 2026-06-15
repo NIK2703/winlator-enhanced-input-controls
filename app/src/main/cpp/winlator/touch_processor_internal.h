@@ -409,6 +409,12 @@ static inline void deactivate_finger(TouchFinger* f) {
     g_state.active_finger_count--;
     f->active = false;
     f->gesture_activated_in_touch = false;
+    // Defensive: clear scroll mode state so no stale held bindings survive.
+    // Actual binding release should have happened via scroll_mode_exit before this.
+    f->scroll_mode = false;
+    f->scroll_hold_v_state = 0;
+    f->scroll_hold_h_state = 0;
+    f->pending_scroll_mode = false;
 }
 
 // --- Internal function declarations ---
@@ -498,6 +504,8 @@ static inline void enter_sdtw(TouchFinger* f, uint64_t time_ms) {
     sdtw_ctx->dt_wait_start_time = time_ms;
     copy_bindings_bounded(f->bindings.double_tap, f->bindings.double_tap_count,
         sdtw_ctx->pending_double.items, &sdtw_ctx->pending_double.count, FALLBACK_MAX);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "SDTW_ENTER ptr=%d", f->ptr_id);
 }
 
 static inline bool finger_has_gesture(const TouchFinger* f) {
@@ -736,21 +744,29 @@ static inline void scroll_mode_enter(TouchFinger* f, GestureType drag_gt) {
     f->scroll_hold_h_state = 0;
     for (int d = 0; d < SCROLL_DIR_COUNT; d++)
         f->scroll_accum[d] = 0.0f;
-    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL ENTER slot=%d gt=%d pos=(%.0f,%.0f)", idx, (int)drag_gt, f->x, f->y);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "SCROLL_ENTER slot=%d gt=%d pos=(%.0f,%.0f)", idx, (int)drag_gt, f->x, f->y);
 }
 
-// Exit scroll mode for a finger — release all hold bindings for this gesture slot
+// Exit scroll mode for a finger — release only the actively held bindings
 static inline void scroll_mode_exit(TouchFinger* f, TouchActionResult* restrict result) {
     if (!f->scroll_mode) return;
     int si = f->scroll_gesture_index;
     if (si >= 0 && si < 5) {
-        for (int d = 0; d < SCROLL_DIR_COUNT; d++) {
+        // Release only the specific direction that was held
+        if (f->scroll_hold_v_state != 0) {
+            int d = (f->scroll_hold_v_state == 1) ? SCROLL_DIR_UP : SCROLL_DIR_DOWN;
+            const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[d];
+            for (int i = 0; i < slot->count; i++)
+                release_binding(result, &slot->arr[i]);
+        }
+        if (f->scroll_hold_h_state != 0) {
+            int d = (f->scroll_hold_h_state == 1) ? SCROLL_DIR_LEFT : SCROLL_DIR_RIGHT;
             const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[d];
             for (int i = 0; i < slot->count; i++)
                 release_binding(result, &slot->arr[i]);
         }
     }
-    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL EXIT slot=%d released all hold binds", si);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "SCROLL_EXIT slot=%d v=%d h=%d", si, f->scroll_hold_v_state, f->scroll_hold_h_state);
     f->scroll_mode = false;
     f->scroll_active_dir = -1;
     f->scroll_hold_v_state = 0;
@@ -758,8 +774,25 @@ static inline void scroll_mode_exit(TouchFinger* f, TouchActionResult* restrict 
 }
 
 // Save scroll mode state (when second finger interrupts a scroll-mode gesture)
-static inline void scroll_mode_save(TouchFinger* f) {
+// Releases held bindings so they can be cleanly re-pressed on restore.
+static inline void scroll_mode_save(TouchFinger* f, TouchActionResult* restrict result) {
     if (!f->scroll_mode) return;
+    int si = f->scroll_gesture_index;
+    // Release held bindings before saving — restore will re-press them
+    if (si >= 0 && si < 5) {
+        if (f->scroll_hold_v_state != 0) {
+            int d = (f->scroll_hold_v_state == 1) ? SCROLL_DIR_UP : SCROLL_DIR_DOWN;
+            const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[d];
+            for (int i = 0; i < slot->count; i++)
+                release_binding(result, &slot->arr[i]);
+        }
+        if (f->scroll_hold_h_state != 0) {
+            int d = (f->scroll_hold_h_state == 1) ? SCROLL_DIR_LEFT : SCROLL_DIR_RIGHT;
+            const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[d];
+            for (int i = 0; i < slot->count; i++)
+                release_binding(result, &slot->arr[i]);
+        }
+    }
     f->pending_scroll_mode = true;
     f->pending_scroll_origin_x = f->scroll_origin_x;
     f->pending_scroll_origin_y = f->scroll_origin_y;
@@ -771,11 +804,13 @@ static inline void scroll_mode_save(TouchFinger* f) {
     f->pending_scroll_hold_h_state = f->scroll_hold_h_state;
     for (int d = 0; d < SCROLL_DIR_COUNT; d++)
         f->pending_scroll_accum[d] = f->scroll_accum[d];
-    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL SAVE slot=%d", f->scroll_gesture_index);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "SCROLL_SAVE slot=%d v=%d h=%d",
+        f->scroll_gesture_index, f->scroll_hold_v_state, f->scroll_hold_h_state);
 }
 
 // Restore scroll mode state (when second finger lifts and first finger had scroll mode)
-static inline void scroll_mode_restore(TouchFinger* f) {
+// Re-presses any bindings that were held before the interrupt.
+static inline void scroll_mode_restore(TouchFinger* f, TouchActionResult* restrict result) {
     if (!f->pending_scroll_mode) return;
     f->scroll_mode = true;
     f->scroll_origin_x = f->pending_scroll_origin_x;
@@ -790,7 +825,23 @@ static inline void scroll_mode_restore(TouchFinger* f) {
         f->scroll_accum[d] = f->pending_scroll_accum[d];
     f->pending_scroll_mode = false;
     f->state = GESTURE_STATE_DRAGGING;
-    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL RESTORE slot=%d hold_v=%d hold_h=%d",
+    // Re-press bindings that were held before the save
+    int si = f->scroll_gesture_index;
+    if (si >= 0 && si < 5) {
+        if (f->scroll_hold_v_state != 0) {
+            int d = (f->scroll_hold_v_state == 1) ? SCROLL_DIR_UP : SCROLL_DIR_DOWN;
+            const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[d];
+            for (int i = 0; i < slot->count; i++)
+                press_binding(result, &slot->arr[i], true);
+        }
+        if (f->scroll_hold_h_state != 0) {
+            int d = (f->scroll_hold_h_state == 1) ? SCROLL_DIR_LEFT : SCROLL_DIR_RIGHT;
+            const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[d];
+            for (int i = 0; i < slot->count; i++)
+                press_binding(result, &slot->arr[i], true);
+        }
+    }
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "SCROLL_RESTORE slot=%d hold_v=%d hold_h=%d",
         f->scroll_gesture_index, f->scroll_hold_v_state, f->scroll_hold_h_state);
 }
 

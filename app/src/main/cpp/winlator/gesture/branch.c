@@ -1,10 +1,76 @@
 #include <inttypes.h>
+#include <stdio.h>
 #include "../touch_processor_internal.h"
 #include "types.h"
 #include "branch.h"
 
 #define LOGD(...) do {} while(0)
 #define LOGD_MOVE(...) do {} while(0)
+
+// =========================================================================
+// GESTURE LOGGING HELPERS
+// =========================================================================
+
+static const char* gesture_state_name(GestureState s) {
+    switch (s) {
+        case GESTURE_STATE_IDLE:                return "IDLE";
+        case GESTURE_STATE_TAP_WAITING:         return "TAP_WAIT";
+        case GESTURE_STATE_TOUCHING:            return "TOUCHING";
+        case GESTURE_STATE_DOUBLE_TAP_WAITING:  return "DT_WAIT";
+        case GESTURE_STATE_LONG_PRESSING:       return "LP";
+        case GESTURE_STATE_DRAGGING:            return "DRAG";
+        default:                                return "UNKNOWN";
+    }
+}
+
+static const char* gesture_slot_name(const GesturePairSlot* slot) {
+    if (slot == SLOT_S())  return "S";
+    if (slot == SLOT_D())  return "D";
+    if (slot == SLOT_L())  return "L";
+    if (slot == SLOT_S2()) return "S2";
+    if (slot == SLOT_D2()) return "D2";
+    return "?";
+}
+
+static const char* binding_type_name(BindingType t) {
+    switch (t) {
+        case BINDING_NONE:              return "none";
+        case BINDING_MOUSE_LEFT:        return "M_LEFT";
+        case BINDING_MOUSE_RIGHT:       return "M_RIGHT";
+        case BINDING_MOUSE_MIDDLE:      return "M_MID";
+        case BINDING_MOUSE_BUTTON4:     return "M_B4";
+        case BINDING_MOUSE_BUTTON5:     return "M_B5";
+        case BINDING_MOUSE_SCROLL_UP:   return "SCROLL_U";
+        case BINDING_MOUSE_SCROLL_DOWN: return "SCROLL_D";
+        case BINDING_MOUSE_MOVE_LEFT:   return "MOVE_L";
+        case BINDING_MOUSE_MOVE_RIGHT:  return "MOVE_R";
+        case BINDING_MOUSE_MOVE_UP:     return "MOVE_U";
+        case BINDING_MOUSE_MOVE_DOWN:   return "MOVE_D";
+        default:
+            if (t >= BINDING_KEYBOARD_FIRST && t <= BINDING_KEYBOARD_LAST)
+                return "KEY";
+            if (t >= BINDING_GAMEPAD_BASE) return "GP";
+            return "?";
+    }
+}
+
+static void log_bindings(const char* label, const TouchBinding* b, int count) {
+    if (count == 0) return;
+    char buf[256];
+    int pos = 0;
+    for (int i = 0; i < count && i < 4 && pos < (int)sizeof(buf) - 32; i++) {
+        if (i > 0) pos += snprintf(buf + pos, sizeof(buf) - pos, ",");
+        if (b[i].type >= BINDING_KEYBOARD_FIRST && b[i].type <= BINDING_KEYBOARD_LAST)
+            pos += snprintf(buf + pos, sizeof(buf) - pos, "KEY(%d)", b[i].keycode);
+        else if (b[i].type >= BINDING_GAMEPAD_BASE)
+            pos += snprintf(buf + pos, sizeof(buf) - pos, "GP(%d)", b[i].type - BINDING_GAMEPAD_BASE);
+        else
+            pos += snprintf(buf + pos, sizeof(buf) - pos, "%s%s",
+                binding_type_name(b[i].type), b[i].modifiers ? "[S]" : "");
+    }
+    if (count > 4) pos += snprintf(buf + pos, sizeof(buf) - pos, ",+%d", count - 4);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "  %s[%d]: %s", label, count, buf);
+}
 
 // =========================================================================
 // INLINE HELPERS (branch.c local, need g_state)
@@ -161,6 +227,7 @@ static TapPathResult tap_path_deferred_double(
     TouchActionResult* restrict result)
 {
     if (ctx->deferred_double.count > 0) {
+        g_state.gesture_pending_deferred_double_count = 0;
         if (!g_state.gesture_is_action_held)
             execute_actions(result, ctx->deferred_double.items, ctx->deferred_double.count);
         else
@@ -288,6 +355,11 @@ static void tick_lp_timer(TouchFinger* f, GestureFingerCtx* ctx,
     }
     f->single_tap_hold_delay_ms = 0;
     f->state = GESTURE_STATE_LONG_PRESSING;
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "TICK_LP ptr=%d pulse=%d drag=%d held=%d",
+        f->ptr_id, long_press_plan.pulse_on_up, long_press_plan.drag_available,
+        g_state.gesture_is_action_held);
+    log_bindings("TICK_LP", resolved.non_drag, resolved.non_drag_count);
     if (g_state.cfg.gesture_long_press_haptic > 0)
         add_action(result, ACT_HAPTIC, g_state.cfg.gesture_long_press_haptic, 0, 0);
 }
@@ -310,6 +382,10 @@ static void tick_s_hold_timer(TouchFinger* f, GestureFingerCtx* ctx,
         execute_actions(result, resolved.non_drag, resolved.non_drag_count);
     else
         execute_actions_hold(result, resolved.non_drag, resolved.non_drag_count);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "TICK_S_HOLD ptr=%d slot=%s held=%d",
+        f->ptr_id, gesture_slot_name(slot), g_state.gesture_is_action_held);
+    log_bindings("TICK_S_HOLD", resolved.non_drag, resolved.non_drag_count);
     ctx->pending_double.count = 0;
     gesture_clear_deferred_tap();
     if (slot->is_second_finger) {
@@ -354,13 +430,24 @@ static void tick_dt_timeout(TouchFinger* f, GestureFingerCtx* ctx,
 
     reset_dt_ctx(ctx);
 
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "TICK_DT_TIMEOUT ptr=%d is_2nd=%d deferred=%d",
+        f->ptr_id, slot->is_second_finger, slot->is_second_finger ? ctx->fallback.count : g_state.gesture_deferred_tap_count);
+
     if (slot->is_second_finger) {
         execute_and_cleanup_deferred(result, ctx->fallback.items, ctx->fallback.count, f, ctx);
         ctx->fallback.count = 0;
-        reset_second_gesture_state();
-        TouchFinger* main_finger = find_finger(g_state.gesture_main_ptr_id);
-        if (main_finger && finger_can_go_idle(main_finger))
-            main_finger->state = GESTURE_STATE_IDLE;
+        // Only reset second gesture state if this finger is still the registered
+        // second finger — otherwise a new second finger may have been assigned
+        // via handle_ts_second_finger_down or role transfer, and resetting would
+        // corrupt its state (gesture_second_active, second_double_tap_waiting, etc.)
+        if (g_state.gesture_second_ptr_id == f->ptr_id
+            || g_state.gesture_second_ptr_id == INVALID_PTR_ID) {
+            reset_second_gesture_state();
+            TouchFinger* main_finger = find_finger(g_state.gesture_main_ptr_id);
+            if (main_finger && finger_can_go_idle(main_finger))
+                main_finger->state = GESTURE_STATE_IDLE;
+        }
     } else {
         if (g_state.gesture_deferred_tap_count > 0) {
         }
@@ -433,20 +520,19 @@ static bool down_handle_sdtw(TouchFinger* f, GestureFingerCtx* ctx,
             &g_state.pending_second_double_count, FALLBACK_MAX,
             &g_state.gesture_post_double_tap_drag);
         ctx->post_double_tap_drag = g_state.gesture_post_double_tap_drag;
+        __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+            "SDTW_CONFIRMED ptr=%d slot=%s post_dtd=%d",
+            f->ptr_id, gesture_slot_name(double_tap_slot), ctx->post_double_tap_drag);
 
-        // When Dd2 is NOT configured: populate ctx->deferred_double so
-        // select_slot_common() returns SLOT_D2() for drag resolution
-        // (matching single-finger D-only behavior where ctx->deferred_double
-        // is populated by handle_dt_waiting_on_down). Also clear
-        // pending_second_double to prevent on_drag_start() from firing D2
-        // again when it's already held.
-        // When Dd2 IS configured: leave ctx->deferred_double empty so
-        // on_drag_start() handles D2 execution from pending_second_double.
-        if (!g_state.gesture_post_double_tap_drag) {
-            copy_bindings_bounded(f->bindings.double_tap, f->bindings.double_tap_count,
-                ctx->deferred_double.items, &ctx->deferred_double.count, FALLBACK_MAX);
-            g_state.pending_second_double_count = 0;
-        }
+        // Always populate ctx->deferred_double so D2 fires on second-tap UP
+        // (via tap_path_deferred_double) or after drag (via up_handle_dragging),
+        // matching single-finger D/Dd behavior where handle_dt_waiting_on_down
+        // copies ctx->pending_double to ctx->deferred_double.
+        // Clear pending_second_double to prevent on_drag_start() from re-firing
+        // D2 when the user transitions from tap to drag.
+        copy_bindings_bounded(f->bindings.double_tap, f->bindings.double_tap_count,
+            ctx->deferred_double.items, &ctx->deferred_double.count, FALLBACK_MAX);
+        g_state.pending_second_double_count = 0;
 
         f->cached_has_long_press_timer = false;
         f->down_time_ms = time_ms;
@@ -473,6 +559,9 @@ static bool down_handle_global_dt(TouchFinger* f, GestureFingerCtx* ctx,
 
     if (gesture_is_within_tap_distance(f->x, f->y)) {
         double_tap_confirm_internal(result, main_dt_finger);
+        __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+            "GLOBAL_DT_CONFIRMED main_ptr=%d second_ptr=%d",
+            main_dt_finger->ptr_id, f->ptr_id);
         main_dt_finger->state = GESTURE_STATE_TAP_WAITING;
         reset_finger_tap_state(main_dt_finger);
         main_dt_finger->down_x = main_dt_finger->x;
@@ -544,6 +633,9 @@ static bool handle_dt_waiting_on_down(TouchFinger* f, GestureFingerCtx* ctx,
         ctx->pending_double.count = 0;
         reset_finger_tap_state(f);
         f->state = GESTURE_STATE_TAP_WAITING;
+        __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+            "DT_DOWN_CONFIRMED ptr=%d slot=%s post_dtd=%d",
+            f->ptr_id, gesture_slot_name(dt_slot), ctx->post_double_tap_drag);
         return true;
     }
 
@@ -575,6 +667,10 @@ static bool up_handle_tap_waiting(TouchFinger* f, GestureFingerCtx* ctx,
     };
     TapPathResult path = execute_tap_path(f, ctx, result, time_ms, &tap_params);
 
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "UP_TAP ptr=%d slot=%s path=%d result=%d",
+        f->ptr_id, gesture_slot_name(slot), path, result->count);
+
     // TAP_PATH_HANDLED: DT consumed paths 1-3. State set to IDLE by execute_tap_path.
     if (path == TAP_PATH_HANDLED)
         return false;
@@ -594,9 +690,7 @@ static bool up_handle_tap_waiting(TouchFinger* f, GestureFingerCtx* ctx,
     }
 
     if (!f->single_tap_deferred) {
-        if (!g_state.gesture_second_active || !g_state.gesture_is_action_held
-            || g_state.cfg.is_tp)
-            release_held_actions(result);
+        release_held_actions(result);
     }
     return false;
 }
@@ -695,22 +789,23 @@ static void scroll_mode_process(TouchFinger* f, TouchActionResult* restrict resu
             if (g_state.cfg.scroll_hold_haptic > 0)
                 add_action(result, ACT_HAPTIC, g_state.cfg.scroll_hold_haptic, 0, 0);
 
-            // Release both vertical bindings first
-            for (int d = SCROLL_DIR_UP; d <= SCROLL_DIR_DOWN; d++) {
-                const GestureBindingSlot* s = &g_state.cfg.scroll_bindings[si].dirs[d];
-                for (int i = 0; i < s->count; i++)
-                    release_binding(result, &s->arr[i]);
+            // Release only the previously held binding
+            if (f->scroll_hold_v_state != 0) {
+                int old_dir = (f->scroll_hold_v_state == 1) ? SCROLL_DIR_UP : SCROLL_DIR_DOWN;
+                const GestureBindingSlot* old_slot = &g_state.cfg.scroll_bindings[si].dirs[old_dir];
+                for (int i = 0; i < old_slot->count; i++)
+                    release_binding(result, &old_slot->arr[i]);
             }
 
             if (new_state != 0) {
                 int new_dir = (new_state == 1) ? SCROLL_DIR_UP : SCROLL_DIR_DOWN;
-                const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[new_dir];
-                for (int i = 0; i < slot->count; i++)
-                    press_binding(result, &slot->arr[i], true);
-                __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "HOLD V →%s",
-                    dir_names[new_dir]);
+                const GestureBindingSlot* new_slot = &g_state.cfg.scroll_bindings[si].dirs[new_dir];
+                for (int i = 0; i < new_slot->count; i++)
+                    press_binding(result, &new_slot->arr[i], true);
+                __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "HOLD_V slot=%d dir=%s",
+                    si, dir_names[new_dir]);
             } else {
-                __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "HOLD V →NONE");
+                __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "HOLD_V slot=%d NONE", si);
             }
             f->scroll_hold_v_state = new_state;
         }
@@ -727,22 +822,23 @@ static void scroll_mode_process(TouchFinger* f, TouchActionResult* restrict resu
             if (g_state.cfg.scroll_hold_haptic > 0)
                 add_action(result, ACT_HAPTIC, g_state.cfg.scroll_hold_haptic, 0, 0);
 
-            // Release both horizontal bindings first
-            for (int d = SCROLL_DIR_LEFT; d <= SCROLL_DIR_RIGHT; d++) {
-                const GestureBindingSlot* s = &g_state.cfg.scroll_bindings[si].dirs[d];
-                for (int i = 0; i < s->count; i++)
-                    release_binding(result, &s->arr[i]);
+            // Release only the previously held binding
+            if (f->scroll_hold_h_state != 0) {
+                int old_dir = (f->scroll_hold_h_state == 1) ? SCROLL_DIR_LEFT : SCROLL_DIR_RIGHT;
+                const GestureBindingSlot* old_slot = &g_state.cfg.scroll_bindings[si].dirs[old_dir];
+                for (int i = 0; i < old_slot->count; i++)
+                    release_binding(result, &old_slot->arr[i]);
             }
 
             if (new_state != 0) {
                 int new_dir = (new_state == 1) ? SCROLL_DIR_LEFT : SCROLL_DIR_RIGHT;
-                const GestureBindingSlot* slot = &g_state.cfg.scroll_bindings[si].dirs[new_dir];
-                for (int i = 0; i < slot->count; i++)
-                    press_binding(result, &slot->arr[i], true);
-                __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "HOLD H →%s",
-                    dir_names[new_dir]);
+                const GestureBindingSlot* new_slot = &g_state.cfg.scroll_bindings[si].dirs[new_dir];
+                for (int i = 0; i < new_slot->count; i++)
+                    press_binding(result, &new_slot->arr[i], true);
+                __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "HOLD_H slot=%d dir=%s",
+                    si, dir_names[new_dir]);
             } else {
-                __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "HOLD H →NONE");
+                __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "HOLD_H slot=%d NONE", si);
             }
             f->scroll_hold_h_state = new_state;
         }
@@ -780,8 +876,6 @@ static void scroll_mode_process(TouchFinger* f, TouchActionResult* restrict resu
     if (g_state.cfg.scroll_bind_haptic > 0)
         add_action(result, ACT_HAPTIC, g_state.cfg.scroll_bind_haptic, 0, 0);
     execute_actions(result, slot->arr, slot->count);
-    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "SCROLL FIRE dir=%s slot=%d",
-        dir_names[dir], si);
 }
 
 static void handle_move_scroll_mode(TouchFinger* f, GestureFingerCtx* ctx,
@@ -981,6 +1075,17 @@ static void handle_down(TouchFinger* f, GestureFingerCtx* ctx,
     ctx->dt_consumed = false;
 
     GesturePairPlan plan = resolve_gesture_pair(f, slot);
+    const GesturePairSlot* gesture_slot = select_gesture_slot(f);
+
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "DOWN ptr=%d role=%s slot=%s gesture=%s pulse=%d press_drag=%d drag_avail=%d hold_delay=%d nd=%d",
+        f->ptr_id, f->is_second_finger ? "2ND" : "MAIN",
+        gesture_slot_name(slot), gesture_slot ? gesture_slot_name(gesture_slot) : "?",
+        plan.pulse_on_up, plan.press_on_drag,
+        plan.drag_available, plan.hold_delay_ms, resolved.non_drag_count);
+    log_bindings("DOWN nd", resolved.non_drag, resolved.non_drag_count);
+    log_bindings("DOWN drag", resolved.drag, resolved.drag_count);
+
     if (g_state.cfg.is_ts && !g_state.gesture_is_action_held) {
         execute_tap_on_finger_down(f, result, time_ms, plan, true, resolved.non_drag, resolved.non_drag_count);
     } else if (g_state.cfg.is_tp && slot->is_second_finger
@@ -1094,8 +1199,13 @@ static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
     // Scroll mode: a variant of the drag gesture.
     // Goes through the SAME mode-binding checks and exclusion gates as normal drag.
     // Only diverges at execution: scroll_mode_enter instead of execute_actions_hold(drag).
+    // When Dd2-only is triggered via double-tap and Dd2 drag bindings exist,
+    // skip scroll mode so the user's configured drag bindings fire.
+    bool post_dtd_with_drag = ctx->post_double_tap_drag
+        && current_mode_has_gesture(mc.slot->bindings_drag);
     bool scroll_for_slot = g_state.cfg.is_ts && g_state.cfg.caps_has_scroll_bindings
-        && gesture_has_scroll_bindings(mc.slot->bindings_drag);
+        && gesture_has_scroll_bindings(mc.slot->bindings_drag)
+        && !post_dtd_with_drag;
 
     if (!current_mode_has_gesture(mc.slot->bindings_non_drag)
         && !current_mode_has_gesture(mc.slot->bindings_drag)
@@ -1108,7 +1218,7 @@ static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
         return;
 
     // SCROLL MODE: enters after the same gates as normal drag.
-    // For two-finger gestures, scroll tracking is on the FIRST finger (the one
+    // For two-finger gestures, scroll tracking is on the MAIN finger (the one
     // already down), not the second finger (the trigger).
     if (scroll_for_slot) {
         TouchFinger* scroll_finger = f;
@@ -1116,6 +1226,10 @@ static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
             TouchFinger* main = find_finger(g_state.gesture_main_ptr_id);
             if (main && main->active) scroll_finger = main;
         }
+        __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+            "MOVE_SCROLL ptr=%d scroll_ptr=%d slot=%s dx=%.1f dy=%.1f cursor=(%.0f,%.0f)",
+            f->ptr_id, scroll_finger->ptr_id, gesture_slot_name(mc.slot), dx, dy,
+            g_state.ptr_x, g_state.ptr_y);
         release_held_actions(result);
         scroll_mode_enter(scroll_finger, mc.slot->bindings_drag);
         start_drag_no_binding(f, result);
@@ -1135,6 +1249,10 @@ static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
     if (handle_move_second_finger(f, ctx, result, &mc, drag_binding, drag_count))
         return;
 
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "MOVE_DRAG ptr=%d state=%s->DRAG slot=%s dx=%.1f dy=%.1f cursor=(%.0f,%.0f)",
+        f->ptr_id, gesture_state_name(f->state), gesture_slot_name(mc.slot),
+        dx, dy, f->travel_x, f->travel_y);
     handle_move_apply(f, ctx, result, &mc, drag_binding, drag_count);
 }
 
@@ -1148,6 +1266,9 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
 
     // Exit scroll mode if active on this finger
     if (f->scroll_mode) {
+        __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+            "UP_SCROLL ptr=%d pos=(%.0f,%.0f) travel=(%.1f,%.1f) cursor=(%.0f,%.0f)",
+            f->ptr_id, f->x, f->y, f->travel_x, f->travel_y, g_state.ptr_x, g_state.ptr_y);
         scroll_mode_exit(f, result);
         release_held_actions(result);
         f->state = GESTURE_STATE_IDLE;
@@ -1155,11 +1276,14 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
         return;
     }
 
-    // For second-finger gestures, scroll mode is on the FIRST finger.
-    // When the second finger goes up, exit scroll mode on the first finger.
+    // For second-finger gestures, scroll mode is on the MAIN finger.
+    // When the second finger goes up, exit scroll mode on the main finger.
     if (f->is_second_finger && g_state.gesture_main_ptr_id >= 0) {
         TouchFinger* main = find_finger(g_state.gesture_main_ptr_id);
         if (main && main->scroll_mode) {
+            __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+                "UP_2ND_SCROLL_EXIT main=%d pos=(%.0f,%.0f) cursor=(%.0f,%.0f)",
+                main->ptr_id, main->x, main->y, g_state.ptr_x, g_state.ptr_y);
             scroll_mode_exit(main, result);
             release_held_actions(result);
         }
@@ -1169,6 +1293,7 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
     f->tap_up_y = f->y;
 
     const GesturePairSlot* slot = select_slot_common(f, ctx, true);
+    const GesturePairSlot* final_gesture_slot = select_gesture_slot(f);
     ResolvedBindings resolved = resolve_slot(f, slot);
 
     up_prelude_second_finger(f, result, slot);
@@ -1201,6 +1326,13 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
             up_handle_default(f, ctx, result);
             break;
     }
+
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "UP ptr=%d slot=%s gesture=%s final_state=%s actions=%d pos=(%.0f,%.0f) travel=(%.1f,%.1f) cursor=(%.0f,%.0f)",
+        f->ptr_id, gesture_slot_name(slot),
+        final_gesture_slot ? gesture_slot_name(final_gesture_slot) : gesture_slot_name(slot),
+        gesture_state_name(f->state),
+        result->count, f->x, f->y, f->travel_x, f->travel_y, g_state.ptr_x, g_state.ptr_y);
 
     if (slot->is_second_finger) {
         cleanup_second_finger(f, ctx, result);

@@ -256,10 +256,13 @@ void cleanup_second_finger(TouchFinger* f, GestureFingerCtx* ctx,
 
     // SDTW was just entered — clear gesture_second_active so the NEXT second
     // finger DOWN can be recognized (otherwise it hits branch.c:46 as "3rd+ finger").
+    // Also clear gesture_second_ptr_id so a new second finger can properly claim
+    // the role without finding a stale reference to this lingering finger.
     // Preserve second_double_tap_waiting for the SDTW confirm check.
     if (ctx->dt_waiting) {
         release_second_finger_buttons(result, false);
         g_state.gesture_second_active = false;
+        g_state.gesture_second_ptr_id = INVALID_PTR_ID;
         f->state = GESTURE_STATE_DOUBLE_TAP_WAITING;
         return;
     }

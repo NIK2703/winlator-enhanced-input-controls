@@ -54,6 +54,9 @@ void double_tap_confirm_internal(TouchActionResult* result, TouchFinger* f) {
     } else {
         g_state.gesture_post_double_tap_drag = has_dt_drag;
     }
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "DT_CONFIRMED ptr=%d has_dt=%d has_dt_drag=%d post_dtd=%d",
+        f->ptr_id, has_dt, has_dt_drag, g_state.gesture_post_double_tap_drag);
 
     sync_dt_ctx(f);
 }
@@ -101,6 +104,9 @@ bool gesture_is_within_tap_distance(float x, float y) {
 
 void gesture_cancel_double_tap_wait(TouchActionResult* result) {
     if (!g_state.gesture_double_tap_waiting) return;
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "DT_CANCEL pending_d=%d deferred_d=%d",
+        g_state.gesture_pending_double_count, g_state.gesture_pending_deferred_double_count);
     g_state.gesture_double_tap_waiting = false;
     if (g_state.gesture_deferred_tap_count > 0) {
         execute_actions(result, g_state.gesture_deferred_tap, g_state.gesture_deferred_tap_count);
@@ -209,6 +215,9 @@ void enter_double_tap_waiting(TouchFinger* f, uint64_t time_ms,
     dt_context->dt_wait_start_time = time_ms;
     f->cached_has_long_press_timer = false;
     f->state = GESTURE_STATE_DOUBLE_TAP_WAITING;
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace",
+        "DT_WAITING ptr=%d deferred_s=%d deferred_d=%d",
+        f->ptr_id, deferred_single_count, deferred_double_count);
 }
 
 // Confirm double-tap: execute D now or defer to finger-up.

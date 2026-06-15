@@ -134,16 +134,24 @@ void release_held_actions(TouchActionResult* restrict result) {
         return;
     }
 
-    // Cancel all pending scheduled actions — gesture is ending, any scheduled
-    // presses must not fire after the held release (would cause orphaned press).
+    // Flush pending scheduled presses (fire them now) so user sees PRESS before
+    // the held release below; then cancel remaining scheduled actions.
+    int flushed = 0;
     int cancelled = 0;
     for (int i = 0; i < g_state.scheduled_action_count; i++) {
-        if (g_state.scheduled_actions[i].active) {
-            g_state.scheduled_actions[i].active = false;
-            cancelled++;
+        if (!g_state.scheduled_actions[i].active) continue;
+        ScheduledAction* sa = &g_state.scheduled_actions[i];
+        // Fire pending PRESS actions so they aren't lost
+        if (sa->action_type == ACT_KEY_PRESS ||
+            sa->action_type == ACT_POINTER_BUTTON_PRESS ||
+            sa->action_type == ACT_GAMEPAD_STATE) {
+            press_binding(result, &sa->binding, true);
+            flushed++;
         }
+        sa->active = false;
+        cancelled++;
     }
-    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "RELEASE_HELD cancelled_sched=%d", cancelled);
+    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "RELEASE_HELD flushed_sched=%d cancelled_sched=%d", flushed, cancelled);
 
     release_non_modifiers_first(result, g_state.gesture_held_actions, g_state.gesture_held_count);
     g_state.gesture_held_count = 0;
@@ -225,45 +233,42 @@ static bool execute_hold_actions(TouchActionResult* restrict result, const Touch
 
 static void execute_tap_actions(TouchActionResult* restrict result, const TouchBinding* b,
                                 int non_mod_count, int binding_delay) {
-    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "EXEC_TAP type=%d kc=%d delay=%d non_mod=%d actions_before=%d",
-        b->type, b->keycode, binding_delay, non_mod_count, result->count);
+    (void)binding_delay; (void)non_mod_count;
     uint64_t press_delay = calc_press_delay(binding_delay, non_mod_count);
-    if (is_gamepad_binding(b)) {
-        int btn_idx = gamepad_button_index(b);
-        if (binding_delay > 0) {
+    if (binding_delay > 0) {
+        // Deferred: schedule press, store in held_actions for release_held_actions to release later
+        if (is_gamepad_binding(b)) {
             schedule_action(*b, ACT_GAMEPAD_STATE, press_delay);
-        } else {
-            add_action(result, ACT_GAMEPAD_STATE, btn_idx, 1, 0);
-        }
-    } else if (is_keyboard_binding(b)) {
-        if (binding_delay > 0) {
+        } else if (is_keyboard_binding(b)) {
             schedule_action(*b, ACT_KEY_PRESS, press_delay);
-        } else {
-            add_action(result, ACT_KEY_PRESS, b->keycode, 1, 0);
-        }
-    } else if (is_mouse_button_binding(b)) {
-        int btn = pointer_button_idx(b);
-        if (binding_delay > 0) {
+        } else if (is_mouse_button_binding(b)) {
             schedule_action(*b, ACT_POINTER_BUTTON_PRESS, press_delay);
-        } else {
-            add_action(result, ACT_POINTER_BUTTON_PRESS, btn, 0, 0);
         }
+        if (g_state.gesture_held_count < MAX_HELD_ACTIONS)
+            g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
+        g_state.gesture_is_action_held = true;
+    } else {
+        // Immediate: self-contained press+release (restore 391808d behavior)
+        if (is_gamepad_binding(b)) {
+            int btn_idx = gamepad_button_index(b);
+            add_action(result, ACT_GAMEPAD_STATE, btn_idx, 1, 0);
+            add_action(result, ACT_GAMEPAD_STATE, btn_idx, 0, 0);
+        } else if (is_keyboard_binding(b)) {
+            add_action(result, ACT_KEY_PRESS, b->keycode, 1, 0);
+            add_action(result, ACT_KEY_RELEASE, b->keycode, 0, 0);
+        } else if (is_mouse_button_binding(b)) {
+            int btn = pointer_button_idx(b);
+            add_action(result, ACT_POINTER_BUTTON_PRESS, btn, 0, 0);
+            add_action(result, ACT_POINTER_BUTTON_RELEASE, btn, 0, 0);
+        }
+        // Do NOT store in held_actions or set gesture_is_action_held — tap is self-contained
     }
-    if (g_state.gesture_held_count < MAX_HELD_ACTIONS)
-        g_state.gesture_held_actions[g_state.gesture_held_count++] = *b;
-    g_state.gesture_is_action_held = true;
 }
 
 static void execute_actions_impl(TouchActionResult* restrict result, const TouchBinding* restrict actions, int count, bool force_hold) {
-    if (g_state.passthrough_active) {
-        __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "execute_actions: BLOCKED passthrough_active");
+    if (g_state.passthrough_active || count == 0) {
         return;
     }
-    if (count == 0) {
-        __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "execute_actions: BLOCKED count=0");
-        return;
-    }
-    __android_log_print(ANDROID_LOG_WARN, "ScrollDbg", "execute_actions: count=%d type[0]=%d keycode[0]=%d", count, actions[0].type, actions[0].keycode);
 
     int binding_delay = g_state.cfg.binding_delay_ms;
 
@@ -338,7 +343,6 @@ static int pointer_button_idx(const TouchBinding* b) {
 
 static void dispatch_binding_action(TouchActionResult* restrict result, const TouchBinding* b, bool is_press) {
     if (b->type == BINDING_NONE) return;
-    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "DISPATCH_ACTION type=%d keycode=%d modifiers=%d press=%d actions_before=%d", b->type, b->keycode, b->modifiers, is_press, result->count);
     if (is_gamepad_binding(b)) {
         int btn_idx = gamepad_button_index(b);
         add_action(result, ACT_GAMEPAD_STATE, btn_idx, is_press ? 1 : 0, 0);
@@ -359,12 +363,10 @@ static void dispatch_binding_action(TouchActionResult* restrict result, const To
 }
 
 void release_binding(TouchActionResult* restrict result, const TouchBinding* b) {
-    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "RELEASE_BINDING type=%d keycode=%d actions_before=%d", b->type, b->keycode, result->count);
     dispatch_binding_action(result, b, false);
 }
 
 void press_binding(TouchActionResult* restrict result, const TouchBinding* b, bool hold) {
-    __android_log_print(ANDROID_LOG_DEBUG, "SigTrace", "PRESS_BINDING type=%d keycode=%d hold=%d actions_before=%d", b->type, b->keycode, hold, result->count);
     if (b->type == BINDING_NONE) return;
     if (is_mouse_move_binding(b)) {
         static const int move_dx[] = { -1, 1, 0, 0 };
