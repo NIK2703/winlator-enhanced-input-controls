@@ -74,6 +74,28 @@ public class Keyboard {
         }
     }
 
+    /** Force-release all currently pressed keys, including sticky modifiers. */
+    public void releaseAllPressedKeys() {
+        Object[] snapshot = pressedKeys.toArray();
+        for (Object obj : snapshot) {
+            byte keycode = (Byte) obj;
+            if (!isModifierSticky(keycode)) {
+                pressedKeys.remove(keycode);
+                if (isModifier(keycode)) modifiersMask.unset(getModifierFlag(keycode));
+                triggerOnKeyRelease(keycode);
+            }
+        }
+        // Release sticky modifiers (CapsLock/NumLock) which setKeyRelease() skips
+        for (Object obj : snapshot) {
+            byte keycode = (Byte) obj;
+            if (isModifierSticky(keycode)) {
+                pressedKeys.remove(keycode);
+                modifiersMask.unset(getModifierFlag(keycode));
+                triggerOnKeyRelease(keycode);
+            }
+        }
+    }
+
     public void addOnKeyboardListener(OnKeyboardListener onKeyboardListener) {
         onKeyboardListeners.add(onKeyboardListener);
     }

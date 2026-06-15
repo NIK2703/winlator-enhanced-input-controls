@@ -83,6 +83,16 @@ public class Pointer {
         return buttonMask.isSet(button.flag());
     }
 
+    /** Force-release all currently held pointer buttons, triggering release callbacks. */
+    public void releaseAllButtons() {
+        for (Button button : Button.values()) {
+            if (buttonMask.isSet(button.flag())) {
+                buttonMask.set(button.flag(), false);
+                triggerOnPointerButtonRelease(button);
+            }
+        }
+    }
+
     public void addOnPointerMotionListener(OnPointerMotionListener onPointerMotionListener) {
         onPointerMotionListeners.add(onPointerMotionListener);
     }

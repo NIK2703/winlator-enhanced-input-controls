@@ -722,6 +722,13 @@ if (enableLogs) {
                 xServerView.onPause();
             }
         }
+
+        // Release all held keys/buttons/gestures BEFORE pausing Wine processes
+        // so release actions can be dispatched while processes are still alive
+        if (nativeTouchProcessor != null) {
+            nativeTouchProcessor.cancelAll();
+        }
+
         ProcessHelper.pauseAllWineProcesses();
 
         // Stop tick timer to prevent background gesture state corruption
@@ -1836,7 +1843,7 @@ private void applySidebarSettings() {
             handler.removeCallbacks(nativeTickRunnable);
         }
         if (nativeTouchProcessor != null) {
-            nativeTouchProcessor.reset();
+            nativeTouchProcessor.cancelAll();
         }
 
         touchpadView.clearProfile();

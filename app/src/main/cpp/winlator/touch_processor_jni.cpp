@@ -1063,13 +1063,9 @@ static void nativeTick(JNIEnv* env, jclass clazz, jlong timeMs) {
     dispatch_and_flush(env, &r, "tick");
 }
 
-static void nativeReset(JNIEnv* env, jclass clazz) {
-    touch_processor_reset();
-    memset(g_visual_buffer, 0, sizeof(g_visual_buffer));
-}
-
 static void nativeCancelAll(JNIEnv* env, jclass clazz) {
-    touch_processor_cancel_all();
+    TouchActionResult r = touch_processor_cancel_all();
+    dispatch_and_flush(env, &r, "cancel");
 }
 
 static jobject nativeGetVisualBuffer(JNIEnv* env, jclass clazz) {
@@ -1190,7 +1186,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
         {"nativeHandleDownByMode", "(IFFJ)Z", (void*)nativeHandleDownByMode},
         {"nativeHandleUpByMode", "(IFFJ)Z", (void*)nativeHandleUpByMode},
         {"nativeHandleMoveByMode", "(IFFJ)V", (void*)nativeHandleMoveByMode},
-        {"nativeReset", "()V", (void*)nativeReset},
         {"nativeCancelAll", "()V", (void*)nativeCancelAll},
         {"nativeGetVisualBuffer", "()Ljava/nio/ByteBuffer;", (void*)nativeGetVisualBuffer},
         {"nativeIsPassthroughActive", "()Z", (void*)nativeIsPassthroughActive},

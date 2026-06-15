@@ -861,7 +861,7 @@ public class InputControlsView extends View {
                         return true;
                     }
                     case MotionEvent.ACTION_CANCEL: {
-                        nativeTouchProcessor.reset();
+                        nativeTouchProcessor.cancelAll();
                         invalidate();
                         if (elementOverlayRenderer != null && elementOverlayRenderer.isActive()) {
                             elementOverlayRenderer.scheduleRender();

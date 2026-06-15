@@ -281,7 +281,14 @@ static bool handle_gesture_down_element(TouchFinger* finger, float x, float y, u
     }
 
     hit_test_elements_down(finger, x, y, time_ms, result, has_passthrough, &found_lock, &handled, &btn);
-    if (found_lock) return true;
+    if (found_lock) {
+        if (!g_state.passthrough_active)
+            return true;
+        // Passthrough element in LOCK mode: fall through to passthrough handling
+        // so gesture_main_ptr_id is set and touch is passed to touchpad.
+        // The button is already pressed (handle_element_down was called in process_element_hit)
+        // and will be released on finger-up via the engaged elements list.
+    }
 
     // TRACK/HOVER BUTTON
     if (btn == NULL) btn = hit_test_element(x, y);
@@ -560,7 +567,8 @@ static void handle_track_hover_move(TouchFinger* finger, float x, float y, uint6
 
         if (curr_idx >= 0 && tracked->count > 0 && curr_idx == tracked->element_indices[0]) {
             handle_element_move(&g_state.elements[curr_idx], x, y, time_ms, result);
-            *had_element_move = true;
+            if (!g_state.elements[curr_idx].passthrough_touch)
+                *had_element_move = true;
         }
     } else if (tracked->count > 0) {
         activation_mode_move_buttons(finger->ptr_id, x, y, time_ms, result, &ACTIVATION_MODE_TRACK);
@@ -692,7 +700,8 @@ static bool handle_engaged_element_move(TouchFinger* finger, float x, float y, u
     bool had_element_move = false;
     for (uint8_t i = 0; i < cnt; i++) {
         TouchElement* element = &g_state.elements[finger->engaged_elem_indices[i]];
-        if (element->current_ptr_id == finger->ptr_id && element->passthrough_touch)
+        if (element->current_ptr_id == finger->ptr_id && element->passthrough_touch
+            && element->activation_mode != ACTIVATION_HOVER)
             continue;
         if (element->current_ptr_id == finger->ptr_id) {
             if (skip_buttons && element->type == ELEM_BUTTON)
@@ -708,7 +717,8 @@ static bool check_passthrough_engagement(TouchFinger* finger) {
     if (g_state.cfg.caps_has_passthrough_elements) {
         uint8_t count = finger->engaged_elem_count;
         for (uint8_t i = 0; i < count; i++) {
-            if (g_state.elements[finger->engaged_elem_indices[i]].passthrough_touch) {
+            TouchElement* e = &g_state.elements[finger->engaged_elem_indices[i]];
+            if (e->passthrough_touch && e->activation_mode == ACTIVATION_LOCK) {
                 return true;
             }
         }

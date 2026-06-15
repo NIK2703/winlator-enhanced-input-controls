@@ -142,7 +142,7 @@ public class TouchpadView extends View {
                     break;
                 }
                 case MotionEvent.ACTION_CANCEL: {
-                    nativeTouchProcessor.reset();
+                    nativeTouchProcessor.cancelAll();
                     break;
                 }
             }

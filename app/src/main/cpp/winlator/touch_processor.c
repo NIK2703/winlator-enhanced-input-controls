@@ -40,7 +40,7 @@ void touch_processor_init(const TouchProcessorConfig* config) {
     if (g_state.cfg.cursor_acceleration_factor <= 0.0f) g_state.cfg.cursor_acceleration_factor = DEFAULT_CURSOR_ACCEL_FACTOR;
     if (g_state.cfg.xform_scale_x <= 0.0f) g_state.cfg.xform_scale_x = 1.0f;
     if (g_state.cfg.xform_scale_y <= 0.0f) g_state.cfg.xform_scale_y = 1.0f;
-    if (g_state.cfg.scroll_threshold_px <= 0) g_state.cfg.scroll_threshold_px = 30;
+    if (g_state.cfg.scroll_threshold_px <= 0) g_state.cfg.scroll_threshold_px = 50;
     if (g_state.cfg.scroll_hold_threshold_px <= 0) g_state.cfg.scroll_hold_threshold_px = 100;
     g_state.cfg.bindings_generation = 1;
     compute_gesture_caps(&g_state.cfg);
@@ -717,87 +717,39 @@ TouchActionResult touch_processor_tick(uint64_t time_ms) {
     return result;
 }
 
-void touch_processor_reset(void) {
-    // Save config/geometry before memset
-    TouchProcessorConfig saved_cfg = g_state.cfg;
-    int saved_element_count = g_state.element_count;
-    float saved_snapping_size = g_state.snapping_size;
-    float saved_resolution_scale = g_state.resolution_scale;
-    int saved_button_count = g_state.button_count;
-    int saved_range_count = g_state.range_count;
-    float saved_ptr_x = g_state.ptr_x;
-    float saved_ptr_y = g_state.ptr_y;
-    TouchElement saved_elements[MAX_ELEMENTS];
-    memcpy(saved_elements, g_state.elements, sizeof(g_state.elements));
+// Full cancel: releases ALL held keys, element bindings, and clears all state.
+// Dispatches release actions so keys/buttons are properly released in Wine/XServer.
+TouchActionResult touch_processor_cancel_all(void) {
+    TouchActionResult cancel_result = {0};
 
-    memset(&g_state, 0, sizeof(g_state));
-    memset(g_ctx, 0, sizeof(g_ctx));
-
-    // Restore config (NOT zeroed — needed for touch processing after reset)
-    g_state.cfg = saved_cfg;
-    // Restore geometry
-    g_state.element_count = saved_element_count;
-    g_state.snapping_size = saved_snapping_size;
-    g_state.resolution_scale = saved_resolution_scale;
-    g_state.button_count = saved_button_count;
-    g_state.range_count = saved_range_count;
-    g_state.ptr_x = saved_ptr_x;
-    g_state.ptr_y = saved_ptr_y;
-    memcpy(g_state.elements, saved_elements, sizeof(g_state.elements));
-
-    // Reset runtime state only
-    g_state.main_ptr_id = -1;
-    g_state.gesture_main_ptr_id = -1;
-    g_state.gesture_second_ptr_id = -1;
-    g_state.finger_pointer_left = -1;
-    g_state.finger_pointer_right = -1;
-    g_state.pending_left_release_ptr_id = -1;
-    g_state.pending_right_release_ptr_id = -1;
-    g_state.sim_click_ptr_id = -1;
-    for (int i = 0; i < MAX_FINGERS; i++) g_state.hovered_element_per_ptr[i] = -1;
-    g_state.free_finger_hint = 0;
-    for (int i = 0; i < MAX_FINGERS; i++) g_state.fingers[i].active = false;
-    for (int i = 0; i < MAX_FINGERS; i++) g_state.finger_by_ptr_id[i] = NULL;
-    g_state.active_finger_count = 0;
-    g_state.passthrough_active = false;
-    g_state.sim_continue_click = false;
-    g_state.sim_click_press_time = 0;
-    g_state.sim_click_release_time = 0;
-    g_state.pending_left_release_time = 0;
-    g_state.pending_right_release_time = 0;
-    g_state.pointer_left_enabled = true;
-    g_state.pointer_right_enabled = true;
-    g_state.scroll_accum_y = 0;
-    g_state.gesture_toggled_count = 0;
-
-    ToggleState saved_toggle;
-    save_toggle_state(&saved_toggle, g_state.element_count);
-
-    for (int i = 0; i < g_state.element_count; i++)
-        element_reset_runtime(&g_state.elements[i]);
-
-    restore_toggle_state(&saved_toggle, g_state.element_count);
-
-    mark_all_dirty();
-    build_spatial_grid();
-    activation_reset();
-}
-
-// Lightweight cancel: clears all finger/gesture state without touching elements.
-// Used on app resume to avoid clearing visual_flags and element runtime state.
-void touch_processor_cancel_all(void) {
-    TouchActionResult release_result = {0};
-    release_held_actions(&release_result);
+    release_held_actions(&cancel_result);
 
     for (int i = 0; i < g_state.gesture_toggled_count; i++)
-        release_binding(&release_result, &g_state.gesture_toggled_actions[i]);
+        release_binding(&cancel_result, &g_state.gesture_toggled_actions[i]);
     g_state.gesture_toggled_count = 0;
     g_state.gesture_is_action_held = false;
     g_state.gesture_held_count = 0;
 
+    // Release ALL element bindings (engaged, tracked, or toggled elements)
+    for (int i = 0; i < g_state.element_count; i++) {
+        TouchElement* e = &g_state.elements[i];
+        if (e->current_ptr_id >= 0 || e->engaged
+            || e->selected || e->gesture_toggled || e->lp_toggled) {
+            release_element_bindings(e, &cancel_result, true);
+            force_release_element_toggles(e, &cancel_result);
+        }
+    }
+    // Full reset of ALL element runtime state (visual_flags, gesture_suppressed,
+    // stick/trackpad/range/petal, auto_repeat, etc.) so elements start clean on next touch.
+    for (int i = 0; i < g_state.element_count; i++) {
+        element_reset_runtime(&g_state.elements[i]);
+    }
+
     for (int i = 0; i < MAX_FINGERS; i++) {
-        if (g_state.fingers[i].active)
+        if (g_state.fingers[i].active) {
+            scroll_mode_exit(&g_state.fingers[i], &cancel_result);
             deactivate_finger(&g_state.fingers[i]);
+        }
     }
     g_state.active_finger_count = 0;
     g_state.free_finger_hint = 0;
@@ -820,6 +772,11 @@ void touch_processor_cancel_all(void) {
     g_state.pointer_left_enabled = true;
     g_state.pointer_right_enabled = true;
 
+    // Cancel any scheduled actions that haven't fired yet
+    for (int i = 0; i < g_state.scheduled_action_count; i++)
+        g_state.scheduled_actions[i].active = false;
+    g_state.scheduled_action_count = 0;
+
     gesture_clear_deferred_tap();
     gesture_clear_pending_long_press();
     gesture_clear_second_finger_globals();
@@ -831,6 +788,8 @@ void touch_processor_cancel_all(void) {
         g_state.hovered_element_per_ptr[i] = -1;
 
     activation_reset();
+
+    return cancel_result;
 }
 
 bool touch_processor_is_passthrough_active(void) { return g_state.passthrough_active; }

@@ -321,6 +321,11 @@ static bool handle_btn_move_transition(int ptr_id, float x, float y, TouchElemen
         btn->gesture_timer_armed = true;
         btn->current_ptr_id = ptr_id;
         btn->engaged = true;
+        TouchFinger* f = find_finger(ptr_id);
+        if (f && f->engaged_elem_count < 16) {
+            f->engaged_elem_indices[f->engaged_elem_count] = curr_idx;
+            f->engaged_elem_count++;
+        }
     } else if (curr_idx >= 0) {
         bool already_tracked = is_tracked(tb, curr_idx);
         if (!already_tracked && tb->count < MAX_TRACKED_PER_POINTER) {
@@ -333,6 +338,15 @@ static bool handle_btn_move_transition(int ptr_id, float x, float y, TouchElemen
             handle_element_down(btn, ptr_id, x, y, time_ms, result);
         if (tb->count > 1 || already_tracked)
             suppress_element_gestures(btn, result);
+
+        if (btn->type == ELEM_BUTTON && btn->defer_primary) {
+            if (btn->bindings[0].type != BINDING_NONE)
+                press_binding(result, &btn->bindings[0], false);
+            btn->defer_primary = false;
+            btn->long_press_arm = false;
+            btn->gesture_timer_armed = false;
+            suppress_element_gestures(btn, result);
+        }
     }
 
     g_state.hovered_element_per_ptr[pid_slot] = curr_idx >= 0 ? curr_idx : -1;

@@ -169,7 +169,7 @@ public class NativeTouchProcessor {
         public int[][] scrollBindingsRight = new int[5][];
         public boolean[] scrollHoldV = new boolean[5];
         public boolean[] scrollHoldH = new boolean[5];
-        public int scrollThresholdPx = 30;
+        public int scrollThresholdPx = 50;
         public int scrollHoldThresholdPx = 100;
     }
 
@@ -292,7 +292,6 @@ public class NativeTouchProcessor {
     private static native void nativeOnFingerMove(int ptrId, float x, float y, long timeMs);
     private static native void nativeOnFingerUp(int ptrId, float x, float y, long timeMs);
     private static native void nativeTick(long timeMs);
-    private static native void nativeReset();
     private static native void nativeCancelAll();
     private static native ByteBuffer nativeGetVisualBuffer();
     private static native boolean nativeIsPassthroughActive();
@@ -682,14 +681,26 @@ public class NativeTouchProcessor {
         return nativeGetElementCount();
     }
 
+    /** @deprecated Use {@link #cancelAll()} instead — reset() did not release XServer keys. */
     public void reset() {
-        if (!loaded) return;
-        nativeReset();
+        cancelAll();
     }
 
     public void cancelAll() {
         if (!loaded) return;
         nativeCancelAll();
+        releaseAllXServerKeys();
+    }
+
+    /** Failsafe: directly release all keys and pointer buttons at the XServer level,
+     *  bypassing the normal action dispatch chain which can fail silently. */
+    public void releaseAllXServerKeys() {
+        if (xServer == null) return;
+        try {
+            xServer.keyboard.releaseAllPressedKeys();
+            xServer.pointer.releaseAllButtons();
+        } catch (Exception e) {
+        }
     }
 
     public boolean isPassthroughActive() {
