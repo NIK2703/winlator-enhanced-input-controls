@@ -504,6 +504,12 @@ public class NativeTouchProcessor {
             arInterval[i] = bp.getAutoRepeatIntervalMs();
         }
 
+        // Touchpad: replace single-finger single-tap-drag with a NONE binding
+        // so the gesture slot stays active (count > 0) but no drag is executed on single tap.
+        if (c.touchMode == 0) {
+            tp[GestureType.SINGLE_TAP_DRAG.id] = new int[]{ 0, 0 };
+        }
+
         setGestureField(c, ts, tp, st, tg, ar, arInterval);
 
         // Render config

@@ -24,7 +24,10 @@ static void sync_dt_ctx(TouchFinger* f) {
     GestureFingerCtx* dt_context = &g_ctx[idx];
     dt_context->dt_waiting = false;
     dt_context->pending_double.count = 0;
-    dt_context->deferred_double.count = 0;
+    // Keep deferred_double when D was deferred (pulse_on_up / post_dtd).
+    // tap_path_deferred_double needs it to fire D on finger-up.
+    if (!g_state.gesture_post_double_tap_drag)
+        dt_context->deferred_double.count = 0;
     dt_context->post_double_tap_drag = g_state.gesture_post_double_tap_drag;
 }
 
@@ -41,7 +44,7 @@ void double_tap_confirm_internal(TouchActionResult* result, TouchFinger* f) {
 
     if (has_dt) {
         GesturePairPlan double_plan = gesture_decide_branch(gesture_branch_params_simple(
-            true, has_dt_drag, g_state.cfg.is_ts
+            true, has_dt_drag
         ));
 
         confirm_double_tap(result, double_plan,

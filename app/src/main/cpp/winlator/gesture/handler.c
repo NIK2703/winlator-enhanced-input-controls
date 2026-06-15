@@ -121,14 +121,6 @@ static void cleanup_second_finger_up(TouchActionResult* restrict result) {
     g_state.gesture_second_ptr_id = INVALID_PTR_ID;
 }
 
-static void schedule_pending_release(uint64_t* time_field, int* ptr_field, int* id_field, int ptr_id, uint64_t time_ms) {
-    if (*id_field == ptr_id) {
-        *time_field = time_ms + DELAYED_RELEASE_MS;
-        *ptr_field = ptr_id;
-        *id_field = -1;
-    }
-}
-
 static TouchFinger* find_other_dt_finger(TouchFinger* finger) {
     for (int i = 0; i < MAX_FINGERS; i++) {
         TouchFinger* other = &g_state.fingers[i];
@@ -148,31 +140,12 @@ static void setup_second_finger_state(void) {
 }
 
 static void handle_ts_main_finger_down(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, bool was_second_deferred) {
-    if (check_confirm_dt_waiting(finger, result, NULL, false)) {
-        g_state.gesture_main_ptr_id = finger->ptr_id;
-
-        if (finger->double_tap_original_id_set) {
-            TouchFinger* other = find_other_dt_finger(finger);
-            if (other) {
-                g_state.gesture_second_active = false;
-                g_state.gesture_main_ptr_id = other->ptr_id;
-                update_ts_pointer(x, y, result);
-                finger->state = GESTURE_STATE_TAP_WAITING;
-                return;
-            }
-        }
-
-        if (was_second_deferred && g_state.gesture_second_ptr_id >= 0)
-            setup_second_finger_state();
-        return;
-    }
-
     if (!g_state.gesture_double_tap_waiting && was_second_deferred && g_state.gesture_second_ptr_id >= 0)
         setup_second_finger_state();
 
     finger->original_ptr_id = finger->ptr_id;
     finger->double_tap_original_id_set = true;
-    update_ts_pointer(x, y, result);
+    if (g_state.cfg.is_ts) update_ts_pointer(x, y, result);
 
     gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_DOWN, finger->x, finger->y);
 }
@@ -225,24 +198,6 @@ static void handle_sim_touch_down(TouchFinger* finger, float x, float y, uint64_
             g_state.sim_click_press_time = 0;
         }
     }
-}
-
-static void handle_tp_finger_down(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result, TouchFinger* main_finger, bool is_first, bool is_second) {
-    if (is_first) {
-        g_state.scrolling = false;
-        g_state.scroll_accum_y = 0;
-    } else if (is_second) {
-        save_pending_resume_action(main_finger, result);
-        release_held_actions(result);
-    }
-
-    if (g_state.sim_touch_screen) {
-        handle_sim_touch_down(finger, x, y, time_ms);
-    }
-
-    if (is_second)
-        setup_second_finger_bindings(finger);
-    gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_DOWN, finger->x, finger->y);
 }
 
 static void process_element_hit(TouchElement* element, TouchFinger* finger,
@@ -400,21 +355,36 @@ void handle_gesture_down(TouchFinger* finger, float x, float y, uint64_t time_ms
         g_state.gesture_double_tap_consumed = false;
         g_state.gesture_second_active = false;
         g_state.gesture_pending_double_count = 0;
-    }
 
-    if (g_state.cfg.is_ts && is_first) {
+        if (g_state.cfg.is_tp) {
+            g_state.scrolling = false;
+            g_state.scroll_accum_y = 0;
+            if (g_state.sim_touch_screen)
+                handle_sim_touch_down(finger, x, y, time_ms);
+        }
+
         bool was_second_deferred = g_state.gesture_deferred_second_finger_tap;
         g_state.gesture_deferred_second_finger_tap = false;
         handle_ts_main_finger_down(finger, x, y, time_ms, result, was_second_deferred);
         return;
     }
 
-    if (g_state.cfg.is_ts && is_second) {
+    if (is_second) {
         handle_ts_second_finger_down(finger, time_ms, result, main_finger);
         return;
     }
 
-    handle_tp_finger_down(finger, x, y, time_ms, result, main_finger, is_first, is_second);
+    // Same ptr_id re-tapping while gesture_main_ptr_id is still set
+    // (e.g., second tap of single-finger DT where Android reused the ptr_id).
+    // branch.c handle_dt_waiting_on_down will confirm the DT.
+    if (g_state.cfg.is_tp) {
+        g_state.scrolling = false;
+        g_state.scroll_accum_y = 0;
+        if (g_state.sim_touch_screen)
+            handle_sim_touch_down(finger, x, y, time_ms);
+    }
+    gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)],
+                   result, time_ms, GESTURE_EVENT_DOWN, finger->x, finger->y);
 }
 
 static void release_gesture_alternate_bindings(TouchElement* element,
@@ -647,23 +617,18 @@ static void handle_cursor_move(TouchFinger* finger, float x, float y, uint64_t t
 }
 
 static void handle_main_finger_propagate_to_second(float x, float y, uint64_t time_ms,
-    TouchActionResult* restrict result, bool is_ts, bool is_tp)
+    TouchActionResult* restrict result)
 {
     if (!g_state.gesture_second_active) return;
     TouchFinger* second_finger = find_finger(g_state.gesture_second_ptr_id);
     if (!second_finger) return;
-    if (is_ts) {
-        float second_dx = x - g_state.gesture_second_main_ref_x;
-        float second_dy = y - g_state.gesture_second_main_ref_y;
-        gesture_branch(second_finger, &g_ctx[(int)(second_finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_MOVE, second_dx, second_dy);
-    } else if (is_tp && second_finger->state >= GESTURE_STATE_TAP_WAITING
-        && second_finger->state != GESTURE_STATE_DRAGGING) {
-        gesture_branch(second_finger, &g_ctx[(int)(second_finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_MOVE, 0.0f, 0.0f);
-    }
+    float second_dx = x - g_state.gesture_second_main_ref_x;
+    float second_dy = y - g_state.gesture_second_main_ref_y;
+    gesture_branch(second_finger, &g_ctx[(int)(second_finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_MOVE, second_dx, second_dy);
 }
 
 static void handle_second_finger_move(TouchFinger* finger, float x, float y, uint64_t time_ms,
-    TouchActionResult* restrict result, bool is_ts, bool is_tp)
+    TouchActionResult* restrict result)
 {
     if (!g_state.gesture_second_active || finger->ptr_id != g_state.gesture_second_ptr_id)
         return;
@@ -673,20 +638,16 @@ static void handle_second_finger_move(TouchFinger* finger, float x, float y, uin
     float dx = x - finger->down_x;
     float dy = y - finger->down_y;
 
-    if (is_ts) {
-        uint32_t ts_second = GESTURE_SECOND_MASK;
-        if (g_state.cfg.caps_ts_mask & ts_second)
-            gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_MOVE, dx, dy);
-    } else if (is_tp && finger->state != GESTURE_STATE_DRAGGING) {
-        uint32_t tp_second = GESTURE_SECOND_MASK;
-        if (g_state.cfg.caps_tp_mask & tp_second)
-            gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_MOVE, dx, dy);
-    }
+    uint32_t second_mask = GESTURE_SECOND_MASK;
+    if (g_state.cfg.caps_mode_mask & second_mask)
+        gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_MOVE, dx, dy);
 }
 
 static void handle_gesture_move_processing(TouchFinger* finger, float x, float y, uint64_t time_ms,
-    TouchActionResult* restrict result, bool is_ts, bool is_tp)
+    TouchActionResult* restrict result)
 {
+    const bool is_ts = g_state.cfg.is_ts;
+
     if (finger->ptr_id == g_state.gesture_main_ptr_id) {
         if (is_ts
             && !g_state.gesture_second_active
@@ -711,10 +672,10 @@ static void handle_gesture_move_processing(TouchFinger* finger, float x, float y
 
         gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_MOVE, dx, dy);
 
-        handle_main_finger_propagate_to_second(x, y, time_ms, result, is_ts, is_tp);
+        handle_main_finger_propagate_to_second(x, y, time_ms, result);
     }
 
-    handle_second_finger_move(finger, x, y, time_ms, result, is_ts, is_tp);
+    handle_second_finger_move(finger, x, y, time_ms, result);
 
     if (is_ts) {
         if ((g_state.gesture_main_ptr_id < 0 || finger->ptr_id == g_state.gesture_main_ptr_id)
@@ -722,7 +683,6 @@ static void handle_gesture_move_processing(TouchFinger* finger, float x, float y
             update_ts_pointer(x, y, result);
         finger->last_x = x;
         finger->last_y = y;
-        return;
     }
 }
 
@@ -808,9 +768,9 @@ static bool handle_move_button_interactions(
 // ============================================================
 static void handle_move_gesture_and_cursor(
     TouchFinger* finger, float x, float y, uint64_t time_ms,
-    TouchActionResult* restrict result, bool is_ts, bool is_tp)
+    TouchActionResult* restrict result)
 {
-    handle_gesture_move_processing(finger, x, y, time_ms, result, is_ts, is_tp);
+    handle_gesture_move_processing(finger, x, y, time_ms, result);
     handle_cursor_move(finger, x, y, time_ms, result);
 }
 
@@ -820,8 +780,6 @@ static void handle_move_gesture_and_cursor(
 __attribute__((hot))
 void handle_gesture_move(TouchFinger* finger, float x, float y, uint64_t time_ms, TouchActionResult* restrict result) {
 
-    const bool is_ts = g_state.cfg.is_ts;
-    const bool is_tp = g_state.cfg.is_tp;
     const bool has_track_hover = g_state.cfg.caps_has_track_hover_buttons;
     const bool has_element_toggle = g_state.cfg.caps_has_element_toggle;
 
@@ -846,7 +804,7 @@ void handle_gesture_move(TouchFinger* finger, float x, float y, uint64_t time_ms
         return;
     }
 
-    handle_move_gesture_and_cursor(finger, x, y, time_ms, result, is_ts, is_tp);
+    handle_move_gesture_and_cursor(finger, x, y, time_ms, result);
 
     finger->last_x = x; finger->last_y = y;
 }
@@ -891,6 +849,23 @@ static void ts_up_second_finger(TouchFinger* finger, uint64_t time_ms, TouchActi
 }
 
 static inline void ts_up_idle_double_tap(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result) {
+    // If DT was just confirmed via check_confirm_dt_waiting (new-ptr_id second tap),
+    // the deferred D bindings are on the main finger's context. Fire them now.
+    if (g_state.gesture_post_double_tap_drag && g_state.gesture_main_ptr_id >= 0) {
+        TouchFinger* main = find_finger(g_state.gesture_main_ptr_id);
+        if (main) {
+            GestureFingerCtx* ctx = &g_ctx[(int)(main - g_state.fingers)];
+            if (ctx->deferred_double.count > 0) {
+                execute_actions(result, ctx->deferred_double.items, ctx->deferred_double.count);
+                ctx->deferred_double.count = 0;
+            }
+            ctx->post_double_tap_drag = false;
+            g_state.gesture_post_double_tap_drag = false;
+            release_held_actions(result);
+        }
+        deactivate_finger_to_idle(finger);
+        return;
+    }
     gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_UP, finger->x, finger->y);
     deactivate_finger_to_idle(finger);
 }
@@ -911,20 +886,6 @@ static void handle_ts_up(TouchFinger* finger, uint64_t time_ms, TouchActionResul
     } else {
         deactivate_finger(finger);
     }
-}
-
-static void handle_tp_up(TouchFinger* finger, uint64_t time_ms, TouchActionResult* restrict result) {
-    if (finger->ptr_id == g_state.gesture_main_ptr_id) {
-        finger->pending_resume_action_count = 0;
-    }
-    gesture_branch(finger, &g_ctx[(int)(finger - g_state.fingers)], result, time_ms, GESTURE_EVENT_UP, finger->x, finger->y);
-
-    if (finger->is_second_finger) {
-        cleanup_second_finger_up(result);
-    }
-
-    schedule_pending_release(&g_state.pending_left_release_time, &g_state.pending_left_release_ptr_id, &g_state.finger_pointer_left, finger->ptr_id, time_ms);
-    schedule_pending_release(&g_state.pending_right_release_time, &g_state.pending_right_release_ptr_id, &g_state.finger_pointer_right, finger->ptr_id, time_ms);
 }
 
 // ============================================================
@@ -975,11 +936,7 @@ void handle_gesture_up(TouchFinger* finger, float x, float y, uint64_t time_ms, 
         return;
     }
 
-    if (g_state.cfg.is_ts) {
-        handle_ts_up(finger, time_ms, result);
-    } else {
-        handle_tp_up(finger, time_ms, result);
-    }
+    handle_ts_up(finger, time_ms, result);
 
     g_state.main_ptr_id = INVALID_PTR_ID;
 }

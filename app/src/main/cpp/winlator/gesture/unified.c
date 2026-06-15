@@ -140,19 +140,12 @@ void resolve_binding_slot(
     const TouchBinding** non_drag, int* non_drag_count,
     const TouchBinding** drag, int* drag_count)
 {
-    if (slot->is_second_finger && g_state.cfg.is_tp) {
-        *non_drag = g_state.cfg.tp[slot->tp_non_drag].arr;
-        *non_drag_count = g_state.cfg.tp[slot->tp_non_drag].count;
-        *drag = g_state.cfg.tp[slot->tp_drag].arr;
-        *drag_count = g_state.cfg.tp[slot->tp_drag].count;
-    } else {
-        const FingerBindings* fb = &f->bindings;
-        // NOTE: setup_second_finger_bindings maps 2nd-variant bindings into
-        // PRIMARY fields (single_tap ← S2, double_tap ← D2, etc.) and NULLs
-        // the 2nd-variant fields. So S2/D2 slots resolve from PRIMARY fields.
-        gesture_type_resolve_binding(slot->bindings_non_drag, fb, non_drag, non_drag_count);
-        gesture_type_resolve_binding(slot->bindings_drag, fb, drag, drag_count);
-    }
+    const FingerBindings* fb = &f->bindings;
+    // NOTE: setup_second_finger_bindings maps 2nd-variant bindings into
+    // PRIMARY fields (single_tap ← S2, double_tap ← D2, etc.) and NULLs
+    // the 2nd-variant fields. So S2/D2 slots resolve from PRIMARY fields.
+    gesture_type_resolve_binding(slot->bindings_non_drag, fb, non_drag, non_drag_count);
+    gesture_type_resolve_binding(slot->bindings_drag, fb, drag, drag_count);
 }
 
 // ============================================================
@@ -176,7 +169,7 @@ GesturePairPlan resolve_gesture_pair(
     // (pulse_on_up) on finger-down, matching the behavior of a normal non-drag+drag
     // pair. The actual mode (scroll vs package binding) is decided at drag
     // recognition time in handle_move.
-    if (!has_drag && g_state.cfg.is_ts && g_state.cfg.caps_has_scroll_bindings
+    if (!has_drag && g_state.cfg.caps_has_scroll_bindings
         && gesture_has_scroll_bindings(slot->bindings_drag)) {
         has_drag = true;
     }
@@ -185,7 +178,7 @@ GesturePairPlan resolve_gesture_pair(
     int hold_delay_ms = (slot == SLOT_S()) ? g_state.cfg.single_tap_delay_ms : 0;
 
     return gesture_decide_branch(gesture_branch_params(has_non_drag, has_drag, has_competing_dt, has_competing_lp,
-        g_state.cfg.is_ts, slot->is_second_finger, hold_delay_ms));
+        slot->is_second_finger, hold_delay_ms));
 }
 
 // ============================================================

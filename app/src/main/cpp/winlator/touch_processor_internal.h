@@ -353,13 +353,9 @@ static inline void copy_second_finger_bindings(FingerBindings* fb, const Gesture
     (fb_)->double_tap_drag_2nd = NULL; (fb_)->double_tap_drag_2nd_count = 0; \
 }
 
-// Set up bindings for a main finger from the active mode, zeroing single-tap-drag for TP.
+// Set up bindings for a main finger from the active mode.
 static inline void setup_main_finger_bindings(FingerBindings* fb) {
     GestureModeBindings mb = *get_mode_bindings();
-    if (g_state.cfg.is_tp) {
-        mb.single_tap_drag = NULL; mb.single_tap_drag_count = 0;
-        mb.single_drag_2nd = NULL; mb.single_drag_2nd_count = 0;
-    }
     copy_main_finger_bindings(fb, &mb);
 }
 
@@ -374,9 +370,6 @@ static inline void setup_second_finger_bindings(TouchFinger* f) {
     }
     const GestureModeBindings* mb = get_mode_bindings();
     copy_second_finger_bindings(fb, mb);
-    if (g_state.cfg.is_tp) {
-        fb->single_tap_drag = NULL; fb->single_tap_drag_count = 0;
-    }
     touch_finger_cache_bindings_state(f);
 }
 

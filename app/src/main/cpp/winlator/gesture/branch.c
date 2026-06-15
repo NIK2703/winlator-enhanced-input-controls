@@ -156,9 +156,6 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
                       TouchActionResult* restrict result, uint64_t time_ms);
 static void handle_tick(TouchFinger* f, GestureFingerCtx* ctx,
                         TouchActionResult* restrict result, uint64_t time_ms);
-static void up_handle_tp_early_exit(TouchFinger* f, GestureFingerCtx* ctx,
-                                    TouchActionResult* restrict result, uint64_t time_ms,
-                                    const TouchBinding* non_drag, int non_drag_count);
 
 // =========================================================================
 // DISPATCHER (public entry point)
@@ -942,12 +939,12 @@ static bool move_resolve_drag(
         .non_drag_count = params->non_drag_count,
         .fallback = fallback_bindings,
         .fallback_count = fallback_count,
-        .press_on_drag = is_d_slot ? press : (g_state.cfg.is_ts && press),
+        .press_on_drag = is_d_slot ? press : press,
         .is_d2_slot = slot == SLOT_D2(),
     };
     bool drag_ok = resolve_drag_binding(&resolve_ctx, &drag_binding, &drag_count);
 
-    if (!drag_ok && !g_state.cfg.is_tp && params->non_drag_count > 0) {
+    if (!drag_ok && params->non_drag_count > 0) {
         drag_binding = params->non_drag;
         drag_count = params->non_drag_count;
         drag_ok = true;
@@ -979,58 +976,17 @@ static bool move_handle_gates(TouchFinger* f, GestureFingerCtx* ctx,
                               int xd_cnt,
                               TouchActionResult* restrict result) {
     if (slot->is_second_finger && g_state.gesture_is_action_held) {
-        int effective_second_drag_count = g_state.cfg.is_tp
-            ? g_state.cfg.tp[slot->tp_drag].count : xd_cnt;
         bool has_scroll = g_state.cfg.caps_has_scroll_bindings
             && gesture_has_scroll_bindings(slot->bindings_drag);
-        if (!effective_second_drag_count && !has_scroll) {
+        if (!xd_cnt && !has_scroll) {
             ctx->pending_double.count = 0;
             start_drag_no_binding(f, result);
             return false;
         }
     }
 
-    if (is_d_slot && g_state.cfg.is_tp && g_state.gesture_second_active) {
-        ctx->post_double_tap_drag = false;
-        return false;
-    }
-    if (!slot->is_second_finger && g_state.cfg.is_tp && !g_state.cfg.caps_has_drag_bindings) {
-        return false;
-    }
     return true;
 }
-
-// =========================================================================
-// TP EARLY EXIT (used by handle_up)
-// =========================================================================
-static void up_handle_tp_early_exit(TouchFinger* f, GestureFingerCtx* ctx,
-                                    TouchActionResult* restrict result, uint64_t time_ms,
-                                    const TouchBinding* non_drag, int non_drag_count)
-{
-    if (!g_state.cfg.is_tp
-        || f->state != GESTURE_STATE_TAP_WAITING)
-        return;
-
-    if (!current_mode_has_gestures()) {
-        release_held_actions(result);
-        reset_main_gesture_state();
-        cleanup_main_finger(f, ctx);
-        return;
-    }
-
-    if (f->cached_has_moved_beyond_threshold
-        || (time_ms - f->down_time_ms) >= TP_EARLY_EXIT_MS) {
-        if (g_state.gesture_double_tap_consumed) {
-            g_state.gesture_double_tap_consumed = false;
-            execute_if_not_held(result, non_drag, non_drag_count);
-        }
-        release_held_actions(result);
-        reset_main_gesture_state();
-        cleanup_main_finger(f, ctx);
-    }
-}
-
-
 
 // =========================================================================
 // GESTURE_EVENT_DOWN
@@ -1086,14 +1042,8 @@ static void handle_down(TouchFinger* f, GestureFingerCtx* ctx,
     log_bindings("DOWN nd", resolved.non_drag, resolved.non_drag_count);
     log_bindings("DOWN drag", resolved.drag, resolved.drag_count);
 
-    if (g_state.cfg.is_ts && !g_state.gesture_is_action_held) {
+    if (!g_state.gesture_is_action_held) {
         execute_tap_on_finger_down(f, result, time_ms, plan, true, resolved.non_drag, resolved.non_drag_count);
-    } else if (g_state.cfg.is_tp && slot->is_second_finger
-               && resolved.non_drag_count > 0
-               && !plan.pulse_on_up && !plan.press_on_drag
-               && !g_state.gesture_is_action_held) {
-        execute_actions_hold(result, resolved.non_drag, resolved.non_drag_count);
-    } else {
     }
 }
 
@@ -1130,17 +1080,7 @@ static bool handle_move_resolve(TouchFinger* f, GestureFingerCtx* ctx,
 
     move_resolve_binding(f, ctx, mc->slot, mc->is_d_slot, &mc->resolved);
 
-    TouchFinger* main_finger_tp = NULL;
-    if (mc->slot->is_second_finger && g_state.cfg.is_tp) {
-        main_finger_tp = find_finger(g_state.gesture_main_ptr_id);
-        if (main_finger_tp) {
-            *dx += main_finger_tp->x - g_state.gesture_second_main_ref_x;
-            *dy += main_finger_tp->y - g_state.gesture_second_main_ref_y;
-        }
-    }
-    float check_dx = main_finger_tp ? main_finger_tp->x - g_state.gesture_second_main_ref_x : *dx;
-    float check_dy = main_finger_tp ? main_finger_tp->y - g_state.gesture_second_main_ref_y : *dy;
-    if (fabsf(check_dx) <= g_state.cfg.drag_threshold_px && fabsf(check_dy) <= g_state.cfg.drag_threshold_px) {
+    if (fabsf(*dx) <= g_state.cfg.drag_threshold_px && fabsf(*dy) <= g_state.cfg.drag_threshold_px) {
         return false;
     }
     return true;
@@ -1203,7 +1143,7 @@ static void handle_move(TouchFinger* f, GestureFingerCtx* ctx,
     // skip scroll mode so the user's configured drag bindings fire.
     bool post_dtd_with_drag = ctx->post_double_tap_drag
         && current_mode_has_gesture(mc.slot->bindings_drag);
-    bool scroll_for_slot = g_state.cfg.is_ts && g_state.cfg.caps_has_scroll_bindings
+    bool scroll_for_slot = g_state.cfg.caps_has_scroll_bindings
         && gesture_has_scroll_bindings(mc.slot->bindings_drag)
         && !post_dtd_with_drag;
 
@@ -1297,9 +1237,6 @@ static void handle_up(TouchFinger* f, GestureFingerCtx* ctx,
     ResolvedBindings resolved = resolve_slot(f, slot);
 
     up_prelude_second_finger(f, result, slot);
-
-    if (!slot->is_second_finger)
-        up_handle_tp_early_exit(f, ctx, result, time_ms, resolved.non_drag, resolved.non_drag_count);
 
     if (f->state == GESTURE_STATE_IDLE)
         return;

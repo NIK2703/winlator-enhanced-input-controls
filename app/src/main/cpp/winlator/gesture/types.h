@@ -31,7 +31,6 @@ typedef struct {
     bool has_xd;
     bool has_competing_dt;
     bool has_competing_lp;
-    bool is_ts;
     bool is_second;
     int  hold_delay_ms;
 } GestureBranchParams;
@@ -40,21 +39,21 @@ typedef struct {
 static inline GestureBranchParams gesture_branch_params(
     bool has_x, bool has_xd,
     bool has_competing_dt, bool has_competing_lp,
-    bool is_ts, bool is_second,
+    bool is_second,
     int hold_delay_ms
 ) {
     GestureBranchParams p;
     p.has_x = has_x; p.has_xd = has_xd;
     p.has_competing_dt = has_competing_dt; p.has_competing_lp = has_competing_lp;
-    p.is_ts = is_ts; p.is_second = is_second;
+    p.is_second = is_second;
     p.hold_delay_ms = hold_delay_ms;
     return p;
 }
 
-// Shorthand for the common case: only has_x / has_xd / is_ts vary,
+// Shorthand for the common case: only has_x / has_xd vary,
 // everything else is false/0.
-#define gesture_branch_params_simple(has_x, has_xd, is_ts) \
-    gesture_branch_params((has_x), (has_xd), false, false, (is_ts), false, 0)
+#define gesture_branch_params_simple(has_x, has_xd) \
+    gesture_branch_params((has_x), (has_xd), false, false, false, 0)
 
 // Unified decision for ANY non-drag/drag gesture pair.
 // When competing gestures exist for a pair, the non-drag action is deferred:
@@ -71,7 +70,7 @@ static inline GesturePairPlan gesture_decide_branch(GestureBranchParams bp) {
         if (bp.has_competing_dt || bp.has_competing_lp) {
             p.press_on_drag = true;
             p.pulse_on_up = true;
-        } else if (bp.is_ts && bp.hold_delay_ms > 0 && !bp.is_second) {
+        } else if (bp.hold_delay_ms > 0 && !bp.is_second) {
             p.hold_delay_ms = bp.hold_delay_ms;
         } else {
             // S-only, no competition, no hold: execute immediately (caller will hold)

@@ -707,6 +707,7 @@ if (enableLogs) {
 
         // Restart native tick timer if it was stopped
         if (nativeTouchProcessor != null && nativeTickRunnable != null && handler != null) {
+            nativeTouchProcessor.reset();
             handler.removeCallbacks(nativeTickRunnable);
             int tickIntervalMs = 1000 / Math.max(preferences.getInt("native_tick_rate_hz", 60), 1);
             handler.postDelayed(nativeTickRunnable, tickIntervalMs);
