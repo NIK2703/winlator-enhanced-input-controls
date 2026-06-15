@@ -293,6 +293,7 @@ public class NativeTouchProcessor {
     private static native void nativeOnFingerUp(int ptrId, float x, float y, long timeMs);
     private static native void nativeTick(long timeMs);
     private static native void nativeReset();
+    private static native void nativeCancelAll();
     private static native ByteBuffer nativeGetVisualBuffer();
     private static native boolean nativeIsPassthroughActive();
     private static native void nativeSetSnappingSize(float size);
@@ -684,6 +685,11 @@ public class NativeTouchProcessor {
     public void reset() {
         if (!loaded) return;
         nativeReset();
+    }
+
+    public void cancelAll() {
+        if (!loaded) return;
+        nativeCancelAll();
     }
 
     public boolean isPassthroughActive() {

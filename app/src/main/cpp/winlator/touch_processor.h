@@ -567,6 +567,9 @@ TouchActionResult touch_processor_tick(uint64_t time_ms);
 // Reset all state
 void touch_processor_reset(void);
 
+// Lightweight cancel: clears finger/gesture state only (no element reset)
+void touch_processor_cancel_all(void);
+
 // --- Query state ---
 bool touch_processor_is_passthrough_active(void);
 

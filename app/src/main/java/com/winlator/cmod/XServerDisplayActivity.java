@@ -490,7 +490,7 @@ if (enableLogs) {
                 ? shortcut.getGridCycleInterval()
                 : container.getGridCycleInterval();
             if (gridCycleInterval < 0) {
-                gridCycleInterval = com.winlator.cmod.contentdialog.RendererOptionsDialog.isOledDisplay(this) ? 240 : 0;
+                gridCycleInterval = com.winlator.cmod.contentdialog.RendererOptionsDialog.isOledDisplay(this) ? 60 : 0;
             }
         }
 
@@ -707,7 +707,7 @@ if (enableLogs) {
 
         // Restart native tick timer if it was stopped
         if (nativeTouchProcessor != null && nativeTickRunnable != null && handler != null) {
-            nativeTouchProcessor.reset();
+            nativeTouchProcessor.cancelAll();
             handler.removeCallbacks(nativeTickRunnable);
             int tickIntervalMs = 1000 / Math.max(preferences.getInt("native_tick_rate_hz", 60), 1);
             handler.postDelayed(nativeTickRunnable, tickIntervalMs);

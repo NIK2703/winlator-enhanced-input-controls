@@ -783,6 +783,56 @@ void touch_processor_reset(void) {
     activation_reset();
 }
 
+// Lightweight cancel: clears all finger/gesture state without touching elements.
+// Used on app resume to avoid clearing visual_flags and element runtime state.
+void touch_processor_cancel_all(void) {
+    TouchActionResult release_result = {0};
+    release_held_actions(&release_result);
+
+    for (int i = 0; i < g_state.gesture_toggled_count; i++)
+        release_binding(&release_result, &g_state.gesture_toggled_actions[i]);
+    g_state.gesture_toggled_count = 0;
+    g_state.gesture_is_action_held = false;
+    g_state.gesture_held_count = 0;
+
+    for (int i = 0; i < MAX_FINGERS; i++) {
+        if (g_state.fingers[i].active)
+            deactivate_finger(&g_state.fingers[i]);
+    }
+    g_state.active_finger_count = 0;
+    g_state.free_finger_hint = 0;
+
+    g_state.main_ptr_id = -1;
+    g_state.gesture_main_ptr_id = -1;
+    g_state.gesture_second_ptr_id = INVALID_PTR_ID;
+    g_state.finger_pointer_left = -1;
+    g_state.finger_pointer_right = -1;
+    g_state.pending_left_release_ptr_id = -1;
+    g_state.pending_right_release_ptr_id = -1;
+    g_state.pending_left_release_time = 0;
+    g_state.pending_right_release_time = 0;
+    g_state.sim_click_ptr_id = -1;
+    g_state.sim_click_press_time = 0;
+    g_state.sim_click_release_time = 0;
+    g_state.sim_continue_click = false;
+    g_state.passthrough_active = false;
+    g_state.scroll_accum_y = 0;
+    g_state.pointer_left_enabled = true;
+    g_state.pointer_right_enabled = true;
+
+    gesture_clear_deferred_tap();
+    gesture_clear_pending_long_press();
+    gesture_clear_second_finger_globals();
+    gesture_clear_second_finger_state();
+
+    memset(g_ctx, 0, sizeof(g_ctx));
+
+    for (int i = 0; i < MAX_FINGERS; i++)
+        g_state.hovered_element_per_ptr[i] = -1;
+
+    activation_reset();
+}
+
 bool touch_processor_is_passthrough_active(void) { return g_state.passthrough_active; }
 void touch_processor_get_pointer_pos(int* x, int* y) { *x = (int)g_state.ptr_x; *y = (int)g_state.ptr_y; }
 

@@ -1068,6 +1068,10 @@ static void nativeReset(JNIEnv* env, jclass clazz) {
     memset(g_visual_buffer, 0, sizeof(g_visual_buffer));
 }
 
+static void nativeCancelAll(JNIEnv* env, jclass clazz) {
+    touch_processor_cancel_all();
+}
+
 static jobject nativeGetVisualBuffer(JNIEnv* env, jclass clazz) {
     if (g_visual_buffer_ref == NULL) {
         g_visual_buffer_ref = env->NewGlobalRef(
@@ -1187,6 +1191,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
         {"nativeHandleUpByMode", "(IFFJ)Z", (void*)nativeHandleUpByMode},
         {"nativeHandleMoveByMode", "(IFFJ)V", (void*)nativeHandleMoveByMode},
         {"nativeReset", "()V", (void*)nativeReset},
+        {"nativeCancelAll", "()V", (void*)nativeCancelAll},
         {"nativeGetVisualBuffer", "()Ljava/nio/ByteBuffer;", (void*)nativeGetVisualBuffer},
         {"nativeIsPassthroughActive", "()Z", (void*)nativeIsPassthroughActive},
         {"nativeSetSnappingSize", "(F)V", (void*)nativeSetSnappingSize},
